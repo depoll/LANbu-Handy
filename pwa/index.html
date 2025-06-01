@@ -1,57 +1,21 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="LANbu Handy - Self-hosted PWA for slicing and printing 3D models to Bambu Lab printers in LAN-only mode">
-    <meta name="theme-color" content="#2196F3">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="LANbu Handy - Self-hosted PWA for slicing and printing 3D models to Bambu Lab printers in LAN-only mode" />
+    <meta name="theme-color" content="#2196F3" />
     
     <title>LANbu Handy PWA</title>
     
     <!-- PWA Manifest -->
-    <link rel="manifest" href="manifest.json">
+    <link rel="manifest" href="manifest.json" />
     
     <!-- Favicon -->
-    <link rel="icon" type="image/x-icon" href="/favicon.ico">
-    
-    <!-- CSS -->
-    <link rel="stylesheet" href="css/style.css">
-</head>
-<body>
-    <header>
-        <h1>LANbu Handy PWA</h1>
-        <p>Self-hosted 3D printing for Bambu Lab printers</p>
-    </header>
-    
-    <main>
-        <section class="hero">
-            <h2>Welcome to LANbu Handy</h2>
-            <p>Your local solution for slicing and printing 3D models on Bambu Lab printers in LAN-only mode.</p>
-        </section>
-        
-        <section class="features">
-            <div class="feature-card">
-                <h3>🔗 URL to Print</h3>
-                <p>Provide a URL to your 3D model and start printing</p>
-            </div>
-            
-            <div class="feature-card">
-                <h3>⚙️ Local Slicing</h3>
-                <p>Uses embedded Bambu Studio CLI for reliable slicing</p>
-            </div>
-            
-            <div class="feature-card">
-                <h3>🏠 LAN Only</h3>
-                <p>Operates entirely within your local network</p>
-            </div>
-        </section>
-    </main>
-    
-    <footer>
-        <p>&copy; 2025 LANbu Handy - Phase 0 MVP</p>
-    </footer>
-    
-    <!-- JavaScript -->
-    <script src="js/app.js"></script>
-</body>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
 </html>
