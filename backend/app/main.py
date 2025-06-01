@@ -18,7 +18,11 @@ app = FastAPI(
 
 # Path to the PWA static files directory
 # In Docker, this will be /app/static_pwa, but for local testing we use a relative path
-STATIC_PWA_DIR = Path(__file__).parent.parent / "static_pwa"
+# Try Docker path first, then fall back to relative path for local development
+DOCKER_STATIC_PWA_DIR = Path("/app/static_pwa")
+LOCAL_STATIC_PWA_DIR = Path(__file__).parent.parent / "static_pwa"
+
+STATIC_PWA_DIR = DOCKER_STATIC_PWA_DIR if DOCKER_STATIC_PWA_DIR.exists() else LOCAL_STATIC_PWA_DIR
 
 # Mount static files for PWA assets (CSS, JS, etc.)
 if STATIC_PWA_DIR.exists():
