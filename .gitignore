@@ -62,3 +62,6 @@ Thumbs.db
 /tmp/
 *.tmp
 *.temp
+
+# Build artifacts
+backend/static_pwa/

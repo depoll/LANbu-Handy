@@ -8,6 +8,11 @@ import './App.css'
 interface AppStatus {
   status: 'initializing' | 'ready' | 'error'
   message?: string
+  backendData?: {
+    status: string
+    application_name: string
+    version: string
+  }
 }
 
 function App() {
@@ -22,9 +27,37 @@ function App() {
       console.log('Service worker support detected')
     }
     
-    // Set app as ready
-    setAppStatus({ status: 'ready' })
-    console.log('LANbu Handy PWA ready')
+    // Fetch backend status
+    const fetchBackendStatus = async () => {
+      try {
+        console.log('Fetching backend status...')
+        const response = await fetch('/api/status')
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+        }
+        
+        const backendData = await response.json()
+        console.log('Backend status received:', backendData)
+        
+        // Set app as ready with backend data
+        setAppStatus({ 
+          status: 'ready', 
+          backendData,
+          message: 'Connected to backend successfully'
+        })
+        console.log('LANbu Handy PWA ready')
+        
+      } catch (error) {
+        console.error('Failed to fetch backend status:', error)
+        setAppStatus({ 
+          status: 'error', 
+          message: `Failed to connect to backend: ${error instanceof Error ? error.message : 'Unknown error'}`
+        })
+      }
+    }
+    
+    fetchBackendStatus()
   }, [])
 
   const handleFeatureClick = (featureName: string) => {
@@ -34,6 +67,28 @@ function App() {
   return (
     <div className={`app ${appStatus.status === 'ready' ? 'app-ready' : ''}`}>
       <Header />
+      
+      {/* Backend Status Display */}
+      <div className="status-bar">
+        {appStatus.status === 'initializing' && (
+          <div className="status-message status-loading">
+            Connecting to backend...
+          </div>
+        )}
+        
+        {appStatus.status === 'ready' && appStatus.backendData && (
+          <div className="status-message status-success">
+            ✓ {appStatus.backendData.application_name} v{appStatus.backendData.version} - Status: {appStatus.backendData.status}
+          </div>
+        )}
+        
+        {appStatus.status === 'error' && (
+          <div className="status-message status-error">
+            ⚠ {appStatus.message}
+          </div>
+        )}
+      </div>
+      
       <main>
         <Hero />
         <Features onFeatureClick={handleFeatureClick} />
