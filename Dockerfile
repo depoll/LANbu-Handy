@@ -35,6 +35,7 @@ COPY backend/requirements.txt ./
 RUN pip install --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host files.pythonhosted.org --no-cache-dir -r requirements.txt
 
 # Install Bambu Studio CLI
+COPY scripts/bambu-studio-version.txt /scripts/
 COPY scripts/install-bambu-studio-cli.sh /tmp/
 RUN chmod +x /tmp/install-bambu-studio-cli.sh && \
     /tmp/install-bambu-studio-cli.sh && \

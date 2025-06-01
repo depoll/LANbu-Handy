@@ -16,23 +16,66 @@ The installation infrastructure is complete and working. The Docker build proces
 
 The installation script now:
 - Downloads the actual Bambu Studio AppImage from GitHub releases (https://github.com/bambulab/BambuStudio/releases)
-- Supports configurable version selection via `BAMBU_VERSION` environment variable (defaults to v1.8.4)
+- **Defaults to the latest version** automatically by fetching from GitHub API
+- Uses a version configuration file (`bambu-studio-version.txt`) for version tracking
+- Supports configurable version selection via `BAMBU_VERSION` environment variable
 - Extracts the CLI binary from the AppImage and installs it properly
 - Provides error handling and fallback mechanisms
 - Creates both `bambu-studio-cli` and `bambu-studio` commands
+
+## Version Management
+
+The project uses a version tracking approach for maintainability:
+
+### Version Configuration File
+
+The version is controlled by `scripts/bambu-studio-version.txt`:
+- Contains either "latest" for automatic latest version detection
+- Or a specific version tag like "v1.8.4"
+- When updated, triggers new builds and releases
+
+### Version Resolution Priority
+
+1. **Environment variable**: `BAMBU_VERSION` (if set)
+2. **Version file**: Content of `scripts/bambu-studio-version.txt`
+3. **Default fallback**: "latest"
+
+### Latest Version Detection
+
+When version is set to "latest":
+- Script attempts to fetch the latest release from GitHub API
+- Falls back to a known stable version if API is unavailable
+- Handles network restrictions gracefully
 
 ## Installation Details
 
 ### Version Configuration
 
-You can specify a different Bambu Studio version by setting the `BAMBU_VERSION` environment variable:
+You can specify a different Bambu Studio version in several ways:
 
+#### 1. Update Version File (Recommended)
+Edit `scripts/bambu-studio-version.txt`:
+```bash
+# For latest version
+echo "latest" > scripts/bambu-studio-version.txt
+
+# For specific version  
+echo "v1.8.4" > scripts/bambu-studio-version.txt
+```
+
+#### 2. Environment Variable
 ```bash
 # In Dockerfile or build environment
 ENV BAMBU_VERSION=v1.8.4
 
 # Or during docker build
 docker build --build-arg BAMBU_VERSION=v1.8.2 -t lanbu-handy .
+```
+
+#### 3. Build-time Override
+```bash
+# Override both file and default
+docker build --build-arg BAMBU_VERSION=latest -t lanbu-handy .
 ```
 
 ### Download Process
@@ -98,5 +141,12 @@ result = subprocess.run([
 
 If a specific version fails to download:
 1. Check available versions at: https://github.com/bambulab/BambuStudio/releases
-2. Update the `BAMBU_VERSION` environment variable to a valid release tag
+2. Update `scripts/bambu-studio-version.txt` or the `BAMBU_VERSION` environment variable to a valid release tag
 3. Rebuild the Docker image
+
+### When "latest" Version Detection Fails
+
+If automatic latest version detection fails (due to network restrictions):
+- The script falls back to a known stable version (v1.8.4)
+- Manual version specification still works via the version file or environment variable
+- Check the build logs for specific error messages

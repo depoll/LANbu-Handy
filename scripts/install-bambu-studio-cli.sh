@@ -7,13 +7,42 @@ set -e
 echo "Installing Bambu Studio CLI..."
 
 # Configuration
-BAMBU_VERSION="${BAMBU_VERSION:-v1.8.4}"
+# Read version from configuration file, fall back to environment variable, then to "latest"
+VERSION_FILE="/scripts/bambu-studio-version.txt"
+if [ -f "$VERSION_FILE" ]; then
+    BAMBU_VERSION="${BAMBU_VERSION:-$(cat "$VERSION_FILE" | tr -d '[:space:]')}"
+else
+    BAMBU_VERSION="${BAMBU_VERSION:-latest}"
+fi
 INSTALL_DIR="/usr/local/bin"
 TEMP_DIR="/tmp/bambu-studio-install"
 
 echo "Bambu Studio version: $BAMBU_VERSION"
 echo "Install directory: $INSTALL_DIR"
 echo "Temporary directory: $TEMP_DIR"
+
+# If version is "latest", try to get the latest release version
+if [ "$BAMBU_VERSION" = "latest" ]; then
+    echo "Attempting to fetch latest release version..."
+    
+    # Try to get latest release info from GitHub API
+    LATEST_VERSION=""
+    if command -v curl >/dev/null 2>&1; then
+        LATEST_VERSION=$(curl -s --max-time 10 "https://api.github.com/repos/bambulab/BambuStudio/releases/latest" 2>/dev/null | grep '"tag_name"' | cut -d'"' -f4 || echo "")
+    fi
+    
+    if [ -n "$LATEST_VERSION" ]; then
+        echo "Found latest version: $LATEST_VERSION"
+        BAMBU_VERSION="$LATEST_VERSION"
+    else
+        echo "Warning: Could not fetch latest version from GitHub API"
+        echo "This may be due to network restrictions or API rate limits"
+        echo "Falling back to known stable version: v1.8.4"
+        BAMBU_VERSION="v1.8.4"
+    fi
+    
+    echo "Using version: $BAMBU_VERSION"
+fi
 
 # Create temporary directory
 mkdir -p "$TEMP_DIR"
