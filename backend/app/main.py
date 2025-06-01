@@ -48,3 +48,11 @@ async def health_check():
     Health check endpoint.
     """
     return {"status": "healthy"}
+
+
+@app.get("/api/status")
+async def status():
+    """
+    Basic backend status endpoint.
+    """
+    return {"status": "ok", "application_name": "LANbu Handy", "version": "0.0.1"}
