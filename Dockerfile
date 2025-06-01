@@ -1,7 +1,7 @@
 # LANbu Handy - All-in-One Docker Image
 # Note: Build the PWA locally first with `cd pwa && npm run build`
 
-FROM python:3.10-slim
+FROM python:3.12-slim
 
 # Set working directory
 WORKDIR /app
