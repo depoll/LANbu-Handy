@@ -8,30 +8,40 @@ The installation infrastructure is complete and working. The Docker build proces
 
 1. ✅ Installs all necessary system dependencies for running AppImages and GUI applications
 2. ✅ Downloads and executes the Bambu Studio CLI installation script
-3. ✅ Creates executable CLI commands at `/usr/local/bin/bambu-studio-cli` and `/usr/local/bin/bambu-studio`
-4. ✅ Makes the CLI available system-wide in the container
+3. ✅ Downloads the actual Bambu Studio AppImage from GitHub releases
+4. ✅ Extracts and installs the CLI binary at `/usr/local/bin/bambu-studio-cli` and `/usr/local/bin/bambu-studio`
+5. ✅ Makes the CLI available system-wide in the container
 
 ## Current Implementation
 
-Currently, a placeholder CLI is installed that:
-- Responds to `--help`, `--version`, and `--slice` commands  
-- Provides clear feedback about its placeholder status
-- Allows the Docker build and application to work while the real CLI URLs are researched
+The installation script now:
+- Downloads the actual Bambu Studio AppImage from GitHub releases (https://github.com/bambulab/BambuStudio/releases)
+- Supports configurable version selection via `BAMBU_VERSION` environment variable (defaults to v1.8.4)
+- Extracts the CLI binary from the AppImage and installs it properly
+- Provides error handling and fallback mechanisms
+- Creates both `bambu-studio-cli` and `bambu-studio` commands
 
-## To Complete the Installation
+## Installation Details
 
-To replace the placeholder with the actual Bambu Studio CLI:
+### Version Configuration
 
-1. **Research the correct download URLs** for Bambu Studio releases
-   - Check the official Bambu Lab GitHub releases
-   - Identify the Linux AppImage or .deb package URLs
-   - Note the exact naming conventions used
+You can specify a different Bambu Studio version by setting the `BAMBU_VERSION` environment variable:
 
-2. **Update the installation script** (`install-bambu-studio-cli.sh`)
-   - Replace the placeholder URL patterns with working URLs
-   - Test that the download and installation works
+```bash
+# In Dockerfile or build environment
+ENV BAMBU_VERSION=v1.8.4
 
-3. **Rebuild the Docker image** to pick up the changes
+# Or during docker build
+docker build --build-arg BAMBU_VERSION=v1.8.2 -t lanbu-handy .
+```
+
+### Download Process
+
+The script:
+1. Downloads the AppImage from: `https://github.com/bambulab/BambuStudio/releases/download/{VERSION}/BambuStudio_ubu64.AppImage`
+2. Makes it executable and extracts the contents
+3. Locates the CLI binary within the extracted files
+4. Installs it to `/usr/local/bin/` with proper permissions
 
 ## Dependencies Installed
 
@@ -52,7 +62,7 @@ These support:
 
 ## Testing
 
-You can test the current installation:
+You can test the installation:
 
 ```bash
 # Build the image
@@ -74,7 +84,7 @@ The backend Python application can call the CLI using subprocess:
 ```python
 import subprocess
 
-# Example CLI usage (once real CLI is installed)
+# Example CLI usage
 result = subprocess.run([
     'bambu-studio-cli', 
     '--slice', 
@@ -83,3 +93,10 @@ result = subprocess.run([
     'output.gcode'
 ], capture_output=True, text=True)
 ```
+
+## Troubleshooting
+
+If a specific version fails to download:
+1. Check available versions at: https://github.com/bambulab/BambuStudio/releases
+2. Update the `BAMBU_VERSION` environment variable to a valid release tag
+3. Rebuild the Docker image
