@@ -1,0 +1,10 @@
+services:
+  lanbuhandy:
+    build: .
+    ports:
+      - "8080:8000"
+    restart: unless-stopped
+    environment:
+      # Placeholder environment variables for future configuration
+      - BAMBU_PRINTER_IP=${BAMBU_PRINTER_IP:-}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
