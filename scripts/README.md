@@ -15,7 +15,7 @@ The installation infrastructure is complete and working. The Docker build proces
 ## Current Implementation
 
 The installation script now:
-- **Installs comprehensive system dependencies** required for Bambu Studio CLI
+- **Installs minimal system dependencies by default** for faster CI builds (9 packages vs 90+ in full mode)
 - Downloads the actual Bambu Studio AppImage from GitHub releases (https://github.com/bambulab/BambuStudio/releases)
 - **Defaults to the latest version** automatically by fetching from GitHub API
 - Uses a version configuration file (`bambu-studio-version.txt`) for version tracking
@@ -24,6 +24,8 @@ The installation script now:
 - Provides error handling and fallback mechanisms
 - Creates both `bambu-studio-cli` and `bambu-studio` commands
 - **Provides `--skip-deps` flag** to skip system dependencies if already installed
+- **Provides `--minimal` flag** (default) for minimal dependencies
+- **Provides `--full-deps` flag** for complete GUI support when debugging
 
 ## Version Management
 
@@ -79,7 +81,16 @@ The script is designed to work in multiple environments:
 
 ## Dependencies Installed
 
-The script installs a comprehensive list of dependencies based on the official Bambu Studio Dockerfile:
+The script now supports two dependency modes:
+
+### Minimal Mode (Default)
+For faster CI builds and CLI-only operation (~9 packages):
+```bash
+wget curl ca-certificates fuse libfuse2 binutils locales libssl3 file
+```
+
+### Full Mode (--full-deps flag)
+The script installs a comprehensive list of dependencies based on the official Bambu Studio Dockerfile (~90 packages):
 
 ### Build and Development Tools
 ```bash
@@ -124,7 +135,7 @@ libgstreamer-plugins-base1.0-0 libsoup-2.4-1 libgtk-3-0t64
 libglib2.0-0t64 libdbus-1-3 libfontconfig1 libfreetype6
 ```
 
-These ensure the Bambu Studio CLI works properly in all environments.
+The minimal mode ensures the Bambu Studio CLI works for slicing operations in headless environments. The full mode provides complete GUI library support for debugging.
 
 ## Installation Details
 
