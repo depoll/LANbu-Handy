@@ -194,6 +194,12 @@ class ModelService:
             raise ModelDownloadError(msg)
         except httpx.RequestError as e:
             raise ModelDownloadError(f"Failed to download file: {str(e)}")
+        except ModelValidationError:
+            # Re-raise validation errors as-is
+            # (don't convert to download error)
+            # Clean up partial file if it exists
+            temp_file_path.unlink(missing_ok=True)
+            raise
         except Exception as e:
             # Clean up partial file if it exists
             temp_file_path.unlink(missing_ok=True)

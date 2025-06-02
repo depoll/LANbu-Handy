@@ -222,17 +222,21 @@ class TestModelServiceDownload:
 
         # Mock HTTP client and response
         mock_client = AsyncMock()
-        mock_response = AsyncMock()
+        mock_response = Mock()  # Use regular Mock for response object
         mock_response.status_code = 404
+        mock_response.headers = {}
         mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
             "Not Found", request=Mock(), response=mock_response
         )
 
-        # Set up the context manager properly
-        mock_client.__aenter__.return_value = mock_client
-        mock_client.__aexit__.return_value = None
-        mock_client.stream.return_value.__aenter__.return_value = mock_response
-        mock_client.stream.return_value.__aexit__.return_value = None
+        # Set up the context managers properly
+        mock_stream_context = AsyncMock()
+        mock_stream_context.__aenter__ = AsyncMock(return_value=mock_response)
+        mock_stream_context.__aexit__ = AsyncMock(return_value=None)
+
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=None)
+        mock_client.stream = Mock(return_value=mock_stream_context)
 
         mock_client_class.return_value = mock_client
 
@@ -248,7 +252,7 @@ class TestModelServiceDownload:
 
         # Mock HTTP client and response
         mock_client = AsyncMock()
-        mock_response = AsyncMock()
+        mock_response = Mock()  # Use regular Mock for response object
         mock_response.headers = {}
         mock_response.raise_for_status = Mock()
 
@@ -259,10 +263,13 @@ class TestModelServiceDownload:
         mock_response.aiter_bytes.return_value = mock_aiter_bytes()
 
         # Set up the context managers properly
-        mock_client.__aenter__.return_value = mock_client
-        mock_client.__aexit__.return_value = None
-        mock_client.stream.return_value.__aenter__.return_value = mock_response
-        mock_client.stream.return_value.__aexit__.return_value = None
+        mock_stream_context = AsyncMock()
+        mock_stream_context.__aenter__ = AsyncMock(return_value=mock_response)
+        mock_stream_context.__aexit__ = AsyncMock(return_value=None)
+
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=None)
+        mock_client.stream = Mock(return_value=mock_stream_context)
 
         mock_client_class.return_value = mock_client
 
@@ -288,15 +295,18 @@ class TestModelServiceDownload:
 
         # Mock HTTP client and response
         mock_client = AsyncMock()
-        mock_response = AsyncMock()
+        mock_response = Mock()  # Use regular Mock for response object
         mock_response.headers = {'content-length': str(2 * 1024 * 1024)}  # 2MB
         mock_response.raise_for_status = Mock()
 
         # Set up the context managers properly
-        mock_client.__aenter__.return_value = mock_client
-        mock_client.__aexit__.return_value = None
-        mock_client.stream.return_value.__aenter__.return_value = mock_response
-        mock_client.stream.return_value.__aexit__.return_value = None
+        mock_stream_context = AsyncMock()
+        mock_stream_context.__aenter__ = AsyncMock(return_value=mock_response)
+        mock_stream_context.__aexit__ = AsyncMock(return_value=None)
+
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=None)
+        mock_client.stream = Mock(return_value=mock_stream_context)
 
         mock_client_class.return_value = mock_client
 
@@ -313,7 +323,7 @@ class TestModelServiceDownload:
 
         # Mock HTTP client and response
         mock_client = AsyncMock()
-        mock_response = AsyncMock()
+        mock_response = Mock()  # Use regular Mock for response object
         mock_response.headers = {}
         mock_response.raise_for_status = Mock()
 
@@ -326,10 +336,13 @@ class TestModelServiceDownload:
         mock_response.aiter_bytes.return_value = mock_aiter_bytes()
 
         # Set up the context managers properly
-        mock_client.__aenter__.return_value = mock_client
-        mock_client.__aexit__.return_value = None
-        mock_client.stream.return_value.__aenter__.return_value = mock_response
-        mock_client.stream.return_value.__aexit__.return_value = None
+        mock_stream_context = AsyncMock()
+        mock_stream_context.__aenter__ = AsyncMock(return_value=mock_response)
+        mock_stream_context.__aexit__ = AsyncMock(return_value=None)
+
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=None)
+        mock_client.stream = Mock(return_value=mock_stream_context)
 
         mock_client_class.return_value = mock_client
 
