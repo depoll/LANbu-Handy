@@ -150,3 +150,44 @@ If automatic latest version detection fails (due to network restrictions):
 - The script falls back to a known stable version (v1.8.4)
 - Manual version specification still works via the version file or environment variable
 - Check the build logs for specific error messages
+
+## Dev Container Testing
+
+### Validation Script
+
+The `test-dev-container.sh` script provides comprehensive validation of the dev container environment:
+
+```bash
+# From the repository root
+./scripts/test-dev-container.sh
+```
+
+This script tests:
+- **Python environment**: Verifies Python 3 and backend dependencies (FastAPI, pytest)
+- **Node.js environment**: Checks Node.js and npm availability  
+- **Bambu Studio CLI**: Tests CLI installation and basic functionality
+- **Backend tests**: Runs unit tests and integration tests
+- **Workspace configuration**: Validates file permissions and test files
+
+### Integration Testing
+
+The dev container environment supports full end-to-end testing:
+
+```bash
+# Run integration tests with real 3MF files
+cd backend
+python -m pytest tests/test_slicer_service.py::TestEndToEndSlicing -v
+```
+
+This runs 7 integration tests that:
+1. **Process real 3MF files** from the `test_files/` directory
+2. **Generate G-code output** using the actual Bambu Studio CLI
+3. **Validate the complete slicing pipeline** end-to-end
+
+### CI Environment
+
+The same CLI installation and testing approach is used in GitHub Actions CI:
+- Integration tests run in CI (not skipped)
+- CLI works in headless environments with Xvfb
+- All test files are properly validated
+- Enhanced CI wrapper provides fallback functionality when needed
