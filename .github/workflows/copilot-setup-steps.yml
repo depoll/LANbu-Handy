@@ -5,7 +5,7 @@
 name: "Copilot Setup Steps"
 
 # Allow testing of the setup steps from your repository's "Actions" tab.
-on: workflow_dispatch
+"on": workflow_dispatch
 
 jobs:
   # The job MUST be called `copilot-setup-steps` or it will not be picked up by Copilot.
