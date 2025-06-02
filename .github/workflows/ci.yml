@@ -30,6 +30,11 @@ jobs:
       run: |
         python -m flake8 backend/
         
+    - name: Run backend tests
+      run: |
+        cd backend
+        python -m pytest tests/ -v --cov=app --cov-report=term-missing
+        
     - name: Set up Node.js for PWA
       uses: actions/setup-node@v4
       with:
