@@ -1,0 +1,12 @@
+Defaulting to user installation because normal site-packages is not writeable
+Collecting pytest-asyncio
+  Downloading pytest_asyncio-1.0.0-py3-none-any.whl.metadata
+     - 4.0 kB ? 0:00:00
+Requirement already satisfied: pytest<9,>=8.2 in /home/runner/.local/lib/python3.12/site-packages (from pytest-asyncio) (8.3.5)
+Requirement already satisfied: iniconfig in /home/runner/.local/lib/python3.12/site-packages (from pytest<9,>=8.2->pytest-asyncio) (2.1.0)
+Requirement already satisfied: packaging in /usr/lib/python3/dist-packages (from pytest<9,>=8.2->pytest-asyncio) (24.0)
+Requirement already satisfied: pluggy<2,>=1.5 in /home/runner/.local/lib/python3.12/site-packages (from pytest<9,>=8.2->pytest-asyncio) (1.6.0)
+Downloading pytest_asyncio-1.0.0-py3-none-any.whl
+   - 16.0 kB 168.9 MB/s 0:00:00
+Installing collected packages: pytest-asyncio
+Successfully installed pytest-asyncio-1.0.0
