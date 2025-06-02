@@ -25,92 +25,140 @@ install_system_dependencies() {
     # Update package list
     $APT_CMD update
     
-    # Install comprehensive list of dependencies based on official Bambu Studio Dockerfile
-    # and additional runtime requirements
-    $APT_CMD install -y \
-        autoconf \
-        build-essential \
-        cmake \
-        curl \
-        xvfb \
-        eglexternalplatform-dev \
-        extra-cmake-modules \
-        file \
-        git \
-        gstreamer1.0-plugins-bad \
-        gstreamer1.0-libav \
-        libcairo2-dev \
-        libcurl4-openssl-dev \
-        libdbus-1-dev \
-        libglew-dev \
-        libglu1-mesa-dev \
-        libgstreamer1.0-dev \
-        libgstreamerd-3-dev \
-        libgstreamer-plugins-base1.0-dev \
-        libgstreamer-plugins-good1.0-dev \
-        libgtk-3-dev \
-        libosmesa6-dev \
-        libsecret-1-dev \
-        libsoup2.4-dev \
-        libssl3 \
-        libssl-dev \
-        libudev-dev \
-        libwayland-dev \
-        libxkbcommon-dev \
-        locales \
-        locales-all \
-        m4 \
-        pkgconf \
-        sudo \
-        wayland-protocols \
-        libwebkit2gtk-4.1-dev \
-        wget \
-        binutils \
-        fuse \
-        libfuse2 \
-        libxcb1 \
-        libxcb-icccm4 \
-        libxcb-image0 \
-        libxcb-keysyms1 \
-        libxcb-randr0 \
-        libxcb-render-util0 \
-        libxcb-render0 \
-        libxcb-shape0 \
-        libxcb-sync1 \
-        libxcb-util1 \
-        libxcb-xfixes0 \
-        libxcb-xinerama0 \
-        libxcb-xkb1 \
-        libxkbcommon-x11-0 \
-        libxkbcommon0 \
-        ca-certificates \
-        gnupg \
-        libegl1 \
-        libegl-mesa0 \
-        libgl1-mesa-dri \
-        libopengl0 \
-        libgstreamer1.0-0 \
-        libgstreamer-plugins-base1.0-0 \
-        libsoup-2.4-1 \
-        libgtk-3-0t64 \
-        libglib2.0-0t64 \
-        libdbus-1-3 \
-        libfontconfig1 \
-        libfreetype6 \
-        libgssapi-krb5-2 \
-        libdrm2 \
-        libxss1 \
-        libasound2t64 \
-        libxrandr2 \
-        libxcomposite1 \
-        libxdamage1 \
-        libxi6 \
-        libxfixes3 \
-        libxcursor1 \
-        libxinerama1 \
-        libwebkit2gtk-4.1-0
+    # Core build dependencies (always required)
+    CORE_DEPS=(
+        autoconf
+        build-essential
+        cmake
+        curl
+        file
+        git
+        wget
+        ca-certificates
+        gnupg
+    )
     
-    echo "System dependencies installed successfully"
+    # GUI and graphics dependencies
+    GUI_DEPS=(
+        xvfb
+        libcairo2-dev
+        libglew-dev
+        libglu1-mesa-dev
+        libgtk-3-dev
+        libosmesa6-dev
+        libwayland-dev
+        libxkbcommon-dev
+        libwebkit2gtk-4.1-dev
+        libegl1
+        libegl-mesa0
+        libgl1-mesa-dri
+        libopengl0
+        libgtk-3-0
+        libglib2.0-0
+        libdbus-1-3
+        libfontconfig1
+        libfreetype6
+        libdrm2
+        libxss1
+        libasound2
+        libxrandr2
+        libxcomposite1
+        libxdamage1
+        libxi6
+        libxfixes3
+        libxcursor1
+        libxinerama1
+        libwebkit2gtk-4.1-0
+    )
+    
+    # GStreamer dependencies
+    GSTREAMER_DEPS=(
+        gstreamer1.0-plugins-bad
+        gstreamer1.0-libav
+        libgstreamer1.0-dev
+        libgstreamer-plugins-base1.0-dev
+        libgstreamer1.0-0
+        libgstreamer-plugins-base1.0-0
+    )
+    
+    # X11 and window system dependencies
+    X11_DEPS=(
+        libxcb1
+        libxcb-icccm4
+        libxcb-image0
+        libxcb-keysyms1
+        libxcb-randr0
+        libxcb-render-util0
+        libxcb-render0
+        libxcb-shape0
+        libxcb-sync1
+        libxcb-util1
+        libxcb-xfixes0
+        libxcb-xinerama0
+        libxcb-xkb1
+        libxkbcommon-x11-0
+        libxkbcommon0
+    )
+    
+    # Network and security dependencies
+    NETWORK_DEPS=(
+        libcurl4-openssl-dev
+        libdbus-1-dev
+        libsecret-1-dev
+        libsoup2.4-dev
+        libsoup2.4-1
+        libssl3
+        libssl-dev
+        libudev-dev
+        libgssapi-krb5-2
+    )
+    
+    # Additional system dependencies
+    SYSTEM_DEPS=(
+        locales
+        locales-all
+        m4
+        pkgconf
+        sudo
+        binutils
+        fuse
+        libfuse2
+    )
+    
+    # Optional dependencies that might not be available on all systems
+    OPTIONAL_DEPS=(
+        eglexternalplatform-dev
+        extra-cmake-modules
+        wayland-protocols
+        libgstreamerd-3-dev
+    )
+    
+    # Function to install a list of packages, continuing on failure
+    install_package_list() {
+        local desc="$1"
+        shift
+        local packages=("$@")
+        
+        echo "Installing $desc..."
+        for package in "${packages[@]}"; do
+            if $APT_CMD install -y "$package" 2>/dev/null; then
+                echo "  ✓ $package"
+            else
+                echo "  ✗ $package (not available or failed to install)"
+            fi
+        done
+    }
+    
+    # Install packages in groups
+    install_package_list "core dependencies" "${CORE_DEPS[@]}"
+    install_package_list "GUI and graphics dependencies" "${GUI_DEPS[@]}"
+    install_package_list "GStreamer dependencies" "${GSTREAMER_DEPS[@]}"
+    install_package_list "X11 dependencies" "${X11_DEPS[@]}"
+    install_package_list "network and security dependencies" "${NETWORK_DEPS[@]}"
+    install_package_list "system dependencies" "${SYSTEM_DEPS[@]}"
+    install_package_list "optional dependencies" "${OPTIONAL_DEPS[@]}"
+    
+    echo "System dependencies installation completed"
 }
 
 # Parse command line arguments
