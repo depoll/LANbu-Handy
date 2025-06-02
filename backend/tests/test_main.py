@@ -2,9 +2,8 @@
 Tests for the main FastAPI application endpoints.
 """
 
-import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import patch, AsyncMock, Mock
+from unittest.mock import patch
 from pathlib import Path
 
 from app.main import app
@@ -16,13 +15,13 @@ client = TestClient(app)
 
 class TestHealthEndpoints:
     """Test cases for health check endpoints."""
-    
+
     def test_health_check(self):
         """Test health check endpoint."""
         response = client.get("/api/health")
         assert response.status_code == 200
         assert response.json() == {"status": "healthy"}
-    
+
     def test_status_endpoint(self):
         """Test status endpoint."""
         response = client.get("/api/status")
@@ -34,30 +33,31 @@ class TestHealthEndpoints:
 
 class TestModelSubmissionEndpoint:
     """Test cases for the model URL submission endpoint."""
-    
+
     def test_submit_model_url_missing_field(self):
         """Test model submission with missing model_url field."""
         response = client.post("/api/model/submit-url", json={})
         assert response.status_code == 422
         assert "model_url" in response.json()["detail"][0]["loc"]
-    
+
     def test_submit_model_url_invalid_json(self):
         """Test model submission with invalid JSON."""
         response = client.post(
-            "/api/model/submit-url", 
+            "/api/model/submit-url",
             data="invalid json",
             headers={"Content-Type": "application/json"}
         )
         assert response.status_code == 422
-    
+
     @patch('app.main.model_service.download_model')
     @patch('app.main.model_service.get_file_info')
-    def test_submit_model_url_success(self, mock_get_file_info, mock_download_model):
+    def test_submit_model_url_success(self, mock_get_file_info,
+                                      mock_download_model):
         """Test successful model submission."""
         # Mock successful download
         mock_file_path = Path("/tmp/test_model.stl")
         mock_download_model.return_value = mock_file_path
-        
+
         # Mock file info
         mock_get_file_info.return_value = {
             "filename": "test_model.stl",
@@ -66,79 +66,83 @@ class TestModelSubmissionEndpoint:
             "extension": ".stl",
             "path": "/tmp/test_model.stl"
         }
-        
+
         response = client.post(
             "/api/model/submit-url",
             json={"model_url": "https://example.com/model.stl"}
         )
-        
+
         assert response.status_code == 200
         data = response.json()
         assert data["success"] is True
         assert data["message"] == "Model downloaded and validated successfully"
         assert data["file_id"] == "test_model.stl"
         assert data["file_info"]["filename"] == "test_model.stl"
-        
+
         # Verify the service was called correctly
-        mock_download_model.assert_called_once_with("https://example.com/model.stl")
+        mock_download_model.assert_called_once_with(
+            "https://example.com/model.stl")
         mock_get_file_info.assert_called_once_with(mock_file_path)
-    
+
     @patch('app.main.model_service.download_model')
     def test_submit_model_url_validation_error(self, mock_download_model):
         """Test model submission with validation error."""
         # Mock validation error
-        mock_download_model.side_effect = ModelValidationError("Invalid URL format")
-        
+        mock_download_model.side_effect = ModelValidationError(
+            "Invalid URL format")
+
         response = client.post(
             "/api/model/submit-url",
             json={"model_url": "invalid-url"}
         )
-        
+
         assert response.status_code == 400
         assert response.json()["detail"] == "Invalid URL format"
-    
+
     @patch('app.main.model_service.download_model')
     def test_submit_model_url_download_error(self, mock_download_model):
         """Test model submission with download error."""
         # Mock download error
-        mock_download_model.side_effect = ModelDownloadError("Failed to download file: HTTP 404")
-        
+        mock_download_model.side_effect = ModelDownloadError(
+            "Failed to download file: HTTP 404")
+
         response = client.post(
             "/api/model/submit-url",
             json={"model_url": "https://example.com/nonexistent.stl"}
         )
-        
+
         assert response.status_code == 422
         assert response.json()["detail"] == "Failed to download file: HTTP 404"
-    
+
     @patch('app.main.model_service.download_model')
     def test_submit_model_url_unexpected_error(self, mock_download_model):
         """Test model submission with unexpected error."""
         # Mock unexpected error
         mock_download_model.side_effect = Exception("Unexpected error")
-        
+
         response = client.post(
             "/api/model/submit-url",
             json={"model_url": "https://example.com/model.stl"}
         )
-        
+
         assert response.status_code == 500
-        assert "Internal server error: Unexpected error" in response.json()["detail"]
-    
+        detail = response.json()["detail"]
+        assert "Internal server error: Unexpected error" in detail
+
     def test_submit_model_url_valid_request_format(self):
-        """Test that valid request format is accepted (even if service fails)."""
+        """Test that valid request format is accepted (service fails)."""
         # This test verifies the Pydantic model validation
         with patch('app.main.model_service.download_model') as mock_download:
             mock_download.side_effect = ModelValidationError("Test error")
-            
+
             response = client.post(
                 "/api/model/submit-url",
                 json={"model_url": "https://example.com/model.stl"}
             )
-            
+
             # Should get validation error (400), not request format error (422)
             assert response.status_code == 400
-    
+
     def test_submit_model_url_wrong_content_type(self):
         """Test model submission with wrong content type."""
         response = client.post(
@@ -146,7 +150,7 @@ class TestModelSubmissionEndpoint:
             data="model_url=https://example.com/model.stl",
             headers={"Content-Type": "application/x-www-form-urlencoded"}
         )
-        
+
         # Should still work as FastAPI can handle form data too
         # But if we want to enforce JSON, we could test for specific behavior
-        assert response.status_code in [400, 422]  # Either validation or format error
+        assert response.status_code in [400, 422]  # Validation or format error

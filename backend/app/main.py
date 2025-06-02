@@ -11,7 +11,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
-from app.model_service import ModelService, ModelValidationError, ModelDownloadError
+from app.model_service import (ModelService, ModelValidationError,
+                               ModelDownloadError)
 
 app = FastAPI(
     title="LANbu Handy",
@@ -86,39 +87,41 @@ class ModelSubmissionResponse(BaseModel):
 async def submit_model_url(request: ModelURLRequest):
     """
     Submit a model URL for download and validation.
-    
+
     Accepts a JSON payload containing a model_url string, downloads the file,
     validates it, and stores it temporarily for processing.
-    
+
     Args:
         request: ModelURLRequest containing the model_url
-        
+
     Returns:
         ModelSubmissionResponse with success status and file information
-        
+
     Raises:
         HTTPException: If validation or download fails
     """
     try:
         # Download and validate the model
         file_path = await model_service.download_model(request.model_url)
-        
+
         # Get file information
         file_info = model_service.get_file_info(file_path)
-        
-        # Generate file ID (using the filename without UUID prefix for user display)
+
+        # Generate file ID (using the filename without UUID prefix
+        # for user display)
         file_id = file_path.name
-        
+
         return ModelSubmissionResponse(
             success=True,
             message="Model downloaded and validated successfully",
             file_id=file_id,
             file_info=file_info
         )
-        
+
     except ModelValidationError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except ModelDownloadError as e:
         raise HTTPException(status_code=422, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+        msg = f"Internal server error: {str(e)}"
+        raise HTTPException(status_code=500, detail=msg)

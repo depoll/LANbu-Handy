@@ -5,12 +5,9 @@ This module provides functionality for downloading 3D model files from URLs,
 validating them, and storing them temporarily for processing.
 """
 
-import os
 import tempfile
 from pathlib import Path
-from typing import Optional, Tuple
 from urllib.parse import urlparse
-import re
 
 import httpx
 
@@ -27,67 +24,68 @@ class ModelDownloadError(Exception):
 
 class ModelService:
     """Service for downloading and validating 3D model files."""
-    
+
     def __init__(self, max_file_size_mb: int = 100):
         """
         Initialize the model service.
-        
+
         Args:
             max_file_size_mb: Maximum allowed file size in megabytes
         """
         self.max_file_size_bytes = max_file_size_mb * 1024 * 1024
         self.temp_dir = Path(tempfile.gettempdir()) / "lanbu-handy" / "models"
         self.temp_dir.mkdir(parents=True, exist_ok=True)
-        
+
         # Supported file extensions
         self.supported_extensions = {'.stl', '.3mf'}
-        
+
         # Content types for validation
         self.content_type_mapping = {
             'application/octet-stream': True,  # Common for STL files
-            'application/vnd.ms-package.3dmanufacturing-3dmodel+xml': True,  # 3MF
+            'application/vnd.ms-package.3dmanufacturing-3dmodel+xml': True,
             'model/3mf': True,  # 3MF alternative
             'model/stl': True,  # STL
             'text/plain': True,  # Sometimes STL files are served as text
         }
-    
+
     def validate_url(self, url: str) -> bool:
         """
         Validate if the URL format is correct.
-        
+
         Args:
             url: URL string to validate
-            
+
         Returns:
             True if URL format is valid, False otherwise
         """
         try:
             result = urlparse(url)
             # Check if URL has scheme and netloc
-            return all([result.scheme, result.netloc]) and result.scheme in ('http', 'https')
+            return all([result.scheme, result.netloc]) and \
+                result.scheme in ('http', 'https')
         except Exception:
             return False
-    
+
     def validate_file_extension(self, filename: str) -> bool:
         """
         Validate if the file has a supported extension.
-        
+
         Args:
             filename: Name of the file to validate
-            
+
         Returns:
             True if extension is supported, False otherwise
         """
         file_path = Path(filename)
         return file_path.suffix.lower() in self.supported_extensions
-    
+
     def validate_file_size(self, file_path: Path) -> bool:
         """
         Validate if the file size is within limits.
-        
+
         Args:
             file_path: Path to the file to validate
-            
+
         Returns:
             True if file size is acceptable, False otherwise
         """
@@ -96,20 +94,20 @@ class ModelService:
             return file_size <= self.max_file_size_bytes
         except OSError:
             return False
-    
+
     def get_filename_from_url(self, url: str) -> str:
         """
         Extract filename from URL or generate one.
-        
+
         Args:
             url: URL to extract filename from
-            
+
         Returns:
             Filename string
         """
         parsed_url = urlparse(url)
         filename = Path(parsed_url.path).name
-        
+
         # If no filename in URL or no extension, generate one
         if not filename or '.' not in filename:
             # Try to extract from URL path
@@ -122,19 +120,19 @@ class ModelService:
                     filename = f"{potential_filename}.stl"  # Default to STL
             else:
                 filename = "model.stl"  # Default filename
-        
+
         return filename
-    
+
     async def download_model(self, url: str) -> Path:
         """
         Download a model file from URL and validate it.
-        
+
         Args:
             url: URL to download the model from
-            
+
         Returns:
             Path to the downloaded and validated file
-            
+
         Raises:
             ModelValidationError: If URL format or file validation fails
             ModelDownloadError: If download fails
@@ -142,35 +140,39 @@ class ModelService:
         # Validate URL format
         if not self.validate_url(url):
             raise ModelValidationError(f"Invalid URL format: {url}")
-        
+
         # Extract or generate filename
         filename = self.get_filename_from_url(url)
-        
+
         # Validate file extension
         if not self.validate_file_extension(filename):
+            extensions = ', '.join(self.supported_extensions)
             raise ModelValidationError(
-                f"Unsupported file extension. File must be one of: {', '.join(self.supported_extensions)}"
+                f"Unsupported file extension. File must be one of: "
+                f"{extensions}"
             )
-        
+
         # Generate unique temporary file path
         import uuid
         unique_filename = f"{uuid.uuid4().hex}_{filename}"
         temp_file_path = self.temp_dir / unique_filename
-        
+
         try:
             # Download the file
             async with httpx.AsyncClient(timeout=30.0) as client:
                 async with client.stream('GET', url) as response:
                     response.raise_for_status()
-                    
+
                     # Check content-length if available
                     content_length = response.headers.get('content-length')
                     if content_length:
                         if int(content_length) > self.max_file_size_bytes:
+                            max_mb = self.max_file_size_bytes // (1024*1024)
                             raise ModelValidationError(
-                                f"File size exceeds maximum allowed size of {self.max_file_size_bytes // (1024*1024)}MB"
+                                f"File size exceeds maximum allowed size "
+                                f"of {max_mb}MB"
                             )
-                    
+
                     # Download file in chunks
                     total_size = 0
                     with open(temp_file_path, 'wb') as f:
@@ -179,33 +181,39 @@ class ModelService:
                             if total_size > self.max_file_size_bytes:
                                 # Clean up partial file
                                 temp_file_path.unlink(missing_ok=True)
+                                max_mb = self.max_file_size_bytes // \
+                                    (1024 * 1024)
                                 raise ModelValidationError(
-                                    f"File size exceeds maximum allowed size of {self.max_file_size_bytes // (1024*1024)}MB"
+                                    f"File size exceeds maximum allowed "
+                                    f"size of {max_mb}MB"
                                 )
                             f.write(chunk)
-        
+
         except httpx.HTTPStatusError as e:
-            raise ModelDownloadError(f"Failed to download file: HTTP {e.response.status_code}")
+            msg = f"Failed to download file: HTTP {e.response.status_code}"
+            raise ModelDownloadError(msg)
         except httpx.RequestError as e:
             raise ModelDownloadError(f"Failed to download file: {str(e)}")
         except Exception as e:
             # Clean up partial file if it exists
             temp_file_path.unlink(missing_ok=True)
-            raise ModelDownloadError(f"Unexpected error during download: {str(e)}")
-        
+            msg = f"Unexpected error during download: {str(e)}"
+            raise ModelDownloadError(msg)
+
         # Final validation of downloaded file
         if not self.validate_file_size(temp_file_path):
             temp_file_path.unlink(missing_ok=True)
+            max_mb = self.max_file_size_bytes // (1024*1024)
             raise ModelValidationError(
-                f"Downloaded file exceeds maximum allowed size of {self.max_file_size_bytes // (1024*1024)}MB"
+                f"Downloaded file exceeds maximum allowed size of {max_mb}MB"
             )
-        
+
         return temp_file_path
-    
+
     def cleanup_temp_file(self, file_path: Path) -> None:
         """
         Clean up a temporary file.
-        
+
         Args:
             file_path: Path to the file to clean up
         """
@@ -214,14 +222,14 @@ class ModelService:
         except Exception:
             # Silently ignore cleanup errors
             pass
-    
+
     def get_file_info(self, file_path: Path) -> dict:
         """
         Get information about a downloaded file.
-        
+
         Args:
             file_path: Path to the file
-            
+
         Returns:
             Dictionary with file information
         """
