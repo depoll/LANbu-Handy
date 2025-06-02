@@ -1,0 +1,103 @@
+name: Update Bambu Studio
+
+on:
+  schedule:
+    # Run every hour
+    - cron: '0 * * * *'
+  workflow_dispatch: # Allow manual trigger for testing
+
+jobs:
+  check-for-updates:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Get current Bambu Studio version
+      id: current-version
+      run: |
+        if [ -f "scripts/bambu-studio-version.txt" ]; then
+          current_version=$(cat scripts/bambu-studio-version.txt | tr -d '[:space:]')
+        else
+          current_version="none"
+        fi
+        echo "version=$current_version" >> $GITHUB_OUTPUT
+        echo "Current Bambu Studio version: $current_version"
+        
+    - name: Get latest Bambu Studio release
+      id: latest-version
+      run: |
+        # Get the latest release version from GitHub API
+        latest_version=$(curl -s "https://api.github.com/repos/bambulab/BambuStudio/releases/latest" | grep '"tag_name"' | cut -d'"' -f4)
+        
+        if [ -z "$latest_version" ]; then
+          echo "Error: Could not fetch latest version from GitHub API"
+          exit 1
+        fi
+        
+        echo "version=$latest_version" >> $GITHUB_OUTPUT
+        echo "Latest Bambu Studio version: $latest_version"
+        
+    - name: Check if update is needed
+      id: check-update
+      run: |
+        current="${{ steps.current-version.outputs.version }}"
+        latest="${{ steps.latest-version.outputs.version }}"
+        
+        if [ "$current" != "$latest" ]; then
+          echo "needs_update=true" >> $GITHUB_OUTPUT
+          echo "Update needed: $current -> $latest"
+        else
+          echo "needs_update=false" >> $GITHUB_OUTPUT
+          echo "No update needed: already on $current"
+        fi
+        
+    - name: Update version file
+      if: steps.check-update.outputs.needs_update == 'true'
+      run: |
+        echo "${{ steps.latest-version.outputs.version }}" > scripts/bambu-studio-version.txt
+        echo "Updated scripts/bambu-studio-version.txt to ${{ steps.latest-version.outputs.version }}"
+        
+    - name: Create Pull Request
+      if: steps.check-update.outputs.needs_update == 'true'
+      id: create-pr
+      uses: peter-evans/create-pull-request@v5
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        commit-message: "chore: update Bambu Studio to ${{ steps.latest-version.outputs.version }}"
+        title: "Update Bambu Studio to ${{ steps.latest-version.outputs.version }}"
+        body: |
+          This is an automated update of Bambu Studio CLI version.
+          
+          **Changes:**
+          - Updated `scripts/bambu-studio-version.txt` from `${{ steps.current-version.outputs.version }}` to `${{ steps.latest-version.outputs.version }}`
+          
+          **Release Notes:**
+          See the [Bambu Studio release page](https://github.com/bambulab/BambuStudio/releases/tag/${{ steps.latest-version.outputs.version }}) for details about this version.
+          
+          This PR will be automatically merged once CI checks pass.
+        branch: auto-update/bambu-studio-${{ steps.latest-version.outputs.version }}
+        delete-branch: true
+        
+    - name: Enable auto-merge
+      if: steps.check-update.outputs.needs_update == 'true' && steps.create-pr.outputs.pull-request-number
+      run: |
+        # Wait a moment for the PR to be fully created
+        sleep 5
+        
+        # Enable auto-merge for the PR
+        gh pr merge ${{ steps.create-pr.outputs.pull-request-number }} --auto --squash
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Summary
+      run: |
+        if [ "${{ steps.check-update.outputs.needs_update }}" == "true" ]; then
+          echo "✅ Created PR #${{ steps.create-pr.outputs.pull-request-number }} to update Bambu Studio to ${{ steps.latest-version.outputs.version }}"
+          echo "The PR will auto-merge once CI checks pass."
+        else
+          echo "ℹ️ No update needed - already on latest version ${{ steps.current-version.outputs.version }}"
+        fi
