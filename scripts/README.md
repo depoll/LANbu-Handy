@@ -253,3 +253,4 @@ The same CLI installation and testing approach is used in GitHub Actions CI:
 - CLI works in headless environments with Xvfb
 - All test files are properly validated
 - Enhanced CI wrapper provides fallback functionality when needed
+- **CLI caching**: The workflow caches the CLI binaries based on the version in `bambu-studio-version.txt` to improve build times
