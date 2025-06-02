@@ -43,6 +43,76 @@ class TestHealthEndpoints:
         assert data["application_name"] == "LANbu Handy"
 
 
+class TestConfigEndpoint:
+    """Test cases for config endpoints."""
+
+    def test_config_endpoint_with_printer_ip(self):
+        """Test config endpoint when printer IP is configured."""
+        from app.config import PrinterConfig
+
+        with patch('app.config.config') as mock_config:
+            mock_printer = PrinterConfig(name="Test Printer",
+                                         ip="192.168.1.100",
+                                         access_code="test123")
+            mock_config.is_printer_configured.return_value = True
+            mock_config.get_printer_ip.return_value = "192.168.1.100"
+            mock_config.get_printers.return_value = [mock_printer]
+
+            response = client.get("/api/config")
+            assert response.status_code == 200
+            data = response.json()
+            assert data["printer_configured"] is True
+            assert data["printer_ip"] == "192.168.1.100"
+            assert data["printer_count"] == 1
+            assert len(data["printers"]) == 1
+            assert data["printers"][0]["name"] == "Test Printer"
+            assert data["printers"][0]["ip"] == "192.168.1.100"
+            assert data["printers"][0]["has_access_code"] is True
+
+    def test_config_endpoint_without_printer_ip(self):
+        """Test config endpoint when printer IP is not configured."""
+        with patch('app.config.config') as mock_config:
+            mock_config.is_printer_configured.return_value = False
+            mock_config.get_printer_ip.return_value = None
+            mock_config.get_printers.return_value = []
+
+            response = client.get("/api/config")
+            assert response.status_code == 200
+            data = response.json()
+            assert data["printer_configured"] is False
+            assert data["printer_ip"] is None
+            assert data["printer_count"] == 0
+            assert data["printers"] == []
+
+    def test_config_endpoint_with_multiple_printers(self):
+        """Test config endpoint when multiple printers are configured."""
+        from app.config import PrinterConfig
+
+        with patch('app.config.config') as mock_config:
+            mock_printers = [
+                PrinterConfig(name="Living Room", ip="192.168.1.100",
+                              access_code="test123"),
+                PrinterConfig(name="Garage", ip="192.168.1.101",
+                              access_code="test456")
+            ]
+            mock_config.is_printer_configured.return_value = True
+            mock_config.get_printer_ip.return_value = "192.168.1.100"
+            mock_config.get_printers.return_value = mock_printers
+
+            response = client.get("/api/config")
+            assert response.status_code == 200
+            data = response.json()
+            assert data["printer_configured"] is True
+            # Legacy field shows first printer
+            assert data["printer_ip"] == "192.168.1.100"
+            assert data["printer_count"] == 2
+            assert len(data["printers"]) == 2
+            assert data["printers"][0]["name"] == "Living Room"
+            assert data["printers"][0]["ip"] == "192.168.1.100"
+            assert data["printers"][1]["name"] == "Garage"
+            assert data["printers"][1]["ip"] == "192.168.1.101"
+
+
 class TestModelSubmissionEndpoint:
     """Test cases for the model URL submission endpoint."""
 

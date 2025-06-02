@@ -72,6 +72,37 @@ async def status():
             "version": "0.0.1"}
 
 
+@app.get("/api/config")
+async def get_config():
+    """
+    Get application configuration status.
+
+    Returns information about printer configuration and other settings.
+    """
+    # Import config inside the function so it can be mocked
+    from app.config import config
+
+    printers = config.get_printers()
+    printers_info = []
+
+    for printer in printers:
+        printers_info.append({
+            "name": printer.name,
+            "ip": printer.ip,
+            # Don't expose access codes in API for security
+            "has_access_code": bool(printer.access_code)
+        })
+
+    return {
+        "printer_configured": config.is_printer_configured(),
+        "printers": printers_info,
+        "printer_count": len(printers),
+        # Legacy fields for backward compatibility
+        "printer_ip": (config.get_printer_ip()
+                       if config.is_printer_configured() else None)
+    }
+
+
 # Pydantic models for API requests/responses
 class ModelURLRequest(BaseModel):
     model_url: str
