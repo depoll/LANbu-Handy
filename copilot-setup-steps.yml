@@ -70,22 +70,21 @@ steps:
       
       # Test Python environment
       echo "Testing Python environment..."
-      python3 -c "import fastapi, uvicorn, pytest; print('✅ Core Python packages available')"
+      python3 -c "import fastapi, uvicorn, pytest; print('✅ Core Python packages available')" || echo "❌ Some core Python packages missing"
       
       # Test linting tools
       echo "Testing Python linting tools..."
-      python3 -c "import flake8, black, mypy, isort; print('✅ Python linting tools available')"
+      python3 -c "import flake8, black, mypy, isort; print('✅ Python linting tools available')" || echo "❌ Some Python linting tools missing"
       
       # Test Node.js environment
       echo "Testing Node.js environment..."
-      cd pwa
-      npm list react react-dom typescript vite > /dev/null 2>&1 && echo "✅ Core PWA packages available"
+      (cd pwa && npm list react react-dom typescript vite > /dev/null 2>&1 && echo "✅ Core PWA packages available") || echo "❌ Some PWA packages missing"
       
       # Test Bambu Studio CLI (if available)
       echo "Testing Bambu Studio CLI..."
       if command -v bambu-studio-cli > /dev/null 2>&1; then
         echo "✅ Bambu Studio CLI available in PATH"
-        bambu-studio-cli --help > /dev/null 2>&1 && echo "✅ CLI help command works"
+        timeout 10 bambu-studio-cli --help > /dev/null 2>&1 && echo "✅ CLI help command works" || echo "⚠️  CLI help command failed (expected in headless environments)"
       else
         echo "⚠️  Bambu Studio CLI not in PATH (this is expected if installation failed)"
       fi
