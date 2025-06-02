@@ -871,3 +871,105 @@ class TestStartPrint:
         # Verify cleanup was attempted
         mock_client.loop_stop.assert_called_once()
         mock_client.disconnect.assert_called_once()
+
+
+class TestMQTTIntegration:
+    """Integration tests for MQTT functionality."""
+
+    @pytest.fixture
+    def printer_service(self):
+        """Create a printer service instance for testing."""
+        return PrinterService(timeout=10)
+
+    @pytest.fixture
+    def test_printer_config(self):
+        """Create a test printer configuration."""
+        return PrinterConfig(
+            name="Test Printer",
+            ip="192.168.1.100",
+            access_code="test123"
+        )
+
+    @patch('paho.mqtt.client.Client')
+    def test_mqtt_print_initiation_workflow(self, mock_mqtt_client_class,
+                                            printer_service, test_printer_config):
+        """Test complete MQTT print initiation workflow."""
+        # Mock MQTT client
+        mock_client = Mock()
+        mock_mqtt_client_class.return_value = mock_client
+
+        # Track the sequence of calls
+        call_sequence = []
+
+        def track_call(name):
+            def wrapper(*args, **kwargs):
+                call_sequence.append(name)
+                if name == 'loop_start':
+                    # Simulate successful connection
+                    mock_client.on_connect(mock_client, None, None, 0, None)
+                elif name == 'publish':
+                    # Simulate successful publish
+                    mock_msg_info = Mock()
+                    mock_msg_info.is_published.return_value = True
+                    return mock_msg_info
+            return wrapper
+
+        # Set up method tracking
+        mock_client.username_pw_set.side_effect = track_call('username_pw_set')
+        mock_client.connect.side_effect = track_call('connect')
+        mock_client.loop_start.side_effect = track_call('loop_start')
+        mock_client.publish.side_effect = track_call('publish')
+        mock_client.loop_stop.side_effect = track_call('loop_stop')
+        mock_client.disconnect.side_effect = track_call('disconnect')
+
+        # Execute the print start command
+        result = printer_service.start_print(
+            test_printer_config, "test_model.gcode")
+
+        # Verify the result
+        assert result.success is True
+        assert "Print command sent successfully" in result.message
+
+        # Verify the correct sequence of MQTT operations
+        expected_sequence = [
+            'username_pw_set',
+            'connect',
+            'loop_start',
+            'publish',
+            'loop_stop',
+            'disconnect'
+        ]
+        assert call_sequence == expected_sequence
+
+        # Verify MQTT message content
+        publish_call = mock_client.publish.call_args
+        args = publish_call[0]
+        kwargs = publish_call[1] if publish_call[1] else {}
+        
+        topic = args[0]
+        message = args[1]
+        qos = kwargs.get('qos', 0)
+
+        # Check topic format
+        expected_topic = f"device/{test_printer_config.ip.replace('.', '_')}/request"
+        assert topic == expected_topic
+
+        # Check message content
+        import json
+        parsed_message = json.loads(message)
+        assert "print" in parsed_message
+        assert parsed_message["print"]["command"] == "project_file"
+        assert parsed_message["print"]["param"] == "test_model.gcode"
+
+        # Check QoS level
+        assert qos == 1
+
+    def test_mqtt_service_constants(self, printer_service):
+        """Test that MQTT constants are properly defined."""
+        assert hasattr(printer_service, 'DEFAULT_MQTT_PORT')
+        assert hasattr(printer_service, 'DEFAULT_MQTT_TIMEOUT')
+        assert hasattr(printer_service, 'DEFAULT_MQTT_KEEPALIVE')
+        
+        assert printer_service.DEFAULT_MQTT_PORT == 1883
+        assert printer_service.DEFAULT_MQTT_TIMEOUT == 30
+        assert printer_service.DEFAULT_MQTT_KEEPALIVE == 60
