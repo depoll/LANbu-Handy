@@ -49,10 +49,13 @@ mkdir -p "$TEMP_DIR"
 cd "$TEMP_DIR"
 
 # Try multiple possible naming patterns for Bambu Studio releases
+LOWERCASE_VERSION=$(echo "$BAMBU_VERSION" | tr '[:upper:]' '[:lower:]')
 POSSIBLE_NAMES=(
+    "Bambu_Studio_linux_fedora-${LOWERCASE_VERSION}.AppImage"
     "Bambu_Studio_linux_fedora-${BAMBU_VERSION}.AppImage"
     "BambuStudio_ubu64.AppImage"
     "Bambu_Studio_ubuntu-22.04_${BAMBU_VERSION}.AppImage"
+    "Bambu_Studio_ubuntu-22.04_${LOWERCASE_VERSION}.AppImage"
     "BambuStudio_Linux_${BAMBU_VERSION}.AppImage"
     "bambu-studio_${BAMBU_VERSION}_linux_x64.AppImage"
 )
@@ -65,7 +68,7 @@ for FILENAME in "${POSSIBLE_NAMES[@]}"; do
     APPIMAGE_URL="https://github.com/bambulab/BambuStudio/releases/download/${BAMBU_VERSION}/${FILENAME}"
     echo "Trying download URL: $APPIMAGE_URL"
     
-    if curl -L --silent --fail -o "BambuStudio.AppImage" "$APPIMAGE_URL"; then
+    if curl -L --insecure --fail --max-time 30 -o "BambuStudio.AppImage" "$APPIMAGE_URL"; then
         echo "Successfully downloaded: $FILENAME"
         DOWNLOAD_SUCCESSFUL=true
         break
