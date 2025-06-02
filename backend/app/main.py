@@ -13,6 +13,7 @@ from pydantic import BaseModel
 
 from app.model_service import (ModelService, ModelValidationError,
                                ModelDownloadError)
+from app.slicer_service import slice_model
 
 app = FastAPI(
     title="LANbu Handy",
@@ -83,6 +84,17 @@ class ModelSubmissionResponse(BaseModel):
     file_info: dict = None
 
 
+class SliceRequest(BaseModel):
+    file_id: str
+
+
+class SliceResponse(BaseModel):
+    success: bool
+    message: str
+    gcode_path: str = None
+    error_details: str = None
+
+
 @app.post("/api/model/submit-url", response_model=ModelSubmissionResponse)
 async def submit_model_url(request: ModelURLRequest):
     """
@@ -124,4 +136,84 @@ async def submit_model_url(request: ModelURLRequest):
         raise HTTPException(status_code=422, detail=str(e))
     except Exception as e:
         msg = f"Internal server error: {str(e)}"
+        raise HTTPException(status_code=500, detail=msg)
+
+
+@app.post("/api/slice/defaults", response_model=SliceResponse)
+async def slice_model_with_defaults(request: SliceRequest):
+    """
+    Slice a previously downloaded model using default settings.
+
+    Accepts a file_id from a previously downloaded model, slices it using
+    hardcoded default Bambu Studio CLI settings, and returns the G-code path.
+
+    Args:
+        request: SliceRequest containing the file_id
+
+    Returns:
+        SliceResponse with success status and G-code path or error details
+
+    Raises:
+        HTTPException: If file is not found or slicing fails
+    """
+    try:
+        # Find the model file in the temp directory
+        model_file_path = model_service.temp_dir / request.file_id
+
+        if not model_file_path.exists():
+            raise HTTPException(
+                status_code=404,
+                detail=f"Model file not found: {request.file_id}"
+            )
+
+        # Create output directory for G-code
+        import tempfile
+        output_dir = Path(tempfile.gettempdir()) / "lanbu-handy" / "gcode"
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        # Hardcoded default slicing settings for PLA
+        default_options = {
+            "profile": "pla",
+            "layer-height": "0.2",
+            "infill": "15",
+            "support": "auto"
+        }
+
+        # Slice the model
+        result = slice_model(
+            input_path=model_file_path,
+            output_dir=output_dir,
+            options=default_options
+        )
+
+        if result.success:
+            # Return success with G-code path
+            # The G-code should be in the output directory
+            gcode_files = list(output_dir.glob("*.gcode"))
+            if gcode_files:
+                gcode_path = str(gcode_files[0])
+            else:
+                # Fallback: use the output directory path
+                gcode_path = str(output_dir)
+
+            return SliceResponse(
+                success=True,
+                message="Model sliced successfully with default settings",
+                gcode_path=gcode_path
+            )
+        else:
+            # Return slicing failure
+            error_details = (f"CLI Error: {result.stderr}"
+                             if result.stderr else result.stdout)
+            return SliceResponse(
+                success=False,
+                message="Slicing failed",
+                error_details=error_details
+            )
+
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
+    except Exception as e:
+        msg = f"Internal server error during slicing: {str(e)}"
         raise HTTPException(status_code=500, detail=msg)
