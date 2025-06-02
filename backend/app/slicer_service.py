@@ -1,0 +1,231 @@
+"""
+LANbu Handy - Bambu Studio CLI Wrapper Service
+
+This module provides a wrapper interface for the Bambu Studio CLI,
+allowing programmatic construction and execution of slicing commands.
+"""
+
+import subprocess
+import tempfile
+import os
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple, Union
+from dataclasses import dataclass
+
+
+@dataclass
+class CLIResult:
+    """Result of a CLI command execution."""
+    exit_code: int
+    stdout: str
+    stderr: str
+    success: bool
+    
+    def __post_init__(self):
+        self.success = self.exit_code == 0
+
+
+class BambuStudioCLIWrapper:
+    """
+    Wrapper for Bambu Studio CLI operations.
+    
+    Provides methods to construct and execute Bambu Studio CLI commands,
+    with proper error handling and output capture.
+    """
+    
+    def __init__(self, cli_command: str = "bambu-studio-cli"):
+        """
+        Initialize the CLI wrapper.
+        
+        Args:
+            cli_command: The CLI command to use (default: "bambu-studio-cli")
+        """
+        self.cli_command = cli_command
+        self.temp_dir = Path(tempfile.gettempdir()) / "lanbu-handy"
+        self.temp_dir.mkdir(exist_ok=True)
+    
+    def _run_command(self, args: List[str], timeout: Optional[int] = None) -> CLIResult:
+        """
+        Execute a CLI command with the given arguments.
+        
+        Args:
+            args: List of command arguments
+            timeout: Optional timeout in seconds
+            
+        Returns:
+            CLIResult object containing execution results
+        """
+        command = [self.cli_command] + args
+        
+        try:
+            result = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                cwd=self.temp_dir
+            )
+            
+            return CLIResult(
+                exit_code=result.returncode,
+                stdout=result.stdout,
+                stderr=result.stderr,
+                success=result.returncode == 0
+            )
+            
+        except subprocess.TimeoutExpired as e:
+            return CLIResult(
+                exit_code=-1,
+                stdout="",
+                stderr=f"Command timed out after {timeout} seconds",
+                success=False
+            )
+        except FileNotFoundError as e:
+            return CLIResult(
+                exit_code=-1,
+                stdout="",
+                stderr=f"CLI command not found: {self.cli_command}",
+                success=False
+            )
+        except Exception as e:
+            return CLIResult(
+                exit_code=-1,
+                stdout="",
+                stderr=f"Unexpected error: {str(e)}",
+                success=False
+            )
+    
+    def get_version(self) -> CLIResult:
+        """
+        Get the version of Bambu Studio CLI.
+        
+        Returns:
+            CLIResult with version information
+        """
+        return self._run_command(["--version"])
+    
+    def get_help(self) -> CLIResult:
+        """
+        Get help information from Bambu Studio CLI.
+        
+        Returns:
+            CLIResult with help information
+        """
+        return self._run_command(["--help"])
+    
+    def slice_model(
+        self,
+        input_path: Union[str, Path],
+        output_dir: Union[str, Path],
+        options: Optional[Dict[str, str]] = None
+    ) -> CLIResult:
+        """
+        Slice a 3D model using Bambu Studio CLI.
+        
+        Args:
+            input_path: Path to the input model file (.stl, .3mf)
+            output_dir: Directory where the output G-code should be saved
+            options: Optional dictionary of CLI options/parameters
+            
+        Returns:
+            CLIResult with slicing results
+        """
+        input_path = Path(input_path)
+        output_dir = Path(output_dir)
+        
+        # Validate input file exists
+        if not input_path.exists():
+            return CLIResult(
+                exit_code=-1,
+                stdout="",
+                stderr=f"Input file does not exist: {input_path}",
+                success=False
+            )
+        
+        # Ensure output directory exists
+        output_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Build command arguments
+        args = ["--slice", str(input_path), "--output", str(output_dir)]
+        
+        # Add any additional options
+        if options:
+            for key, value in options.items():
+                args.extend([f"--{key}", value])
+        
+        return self._run_command(args, timeout=300)  # 5 minute timeout for slicing
+    
+    def check_availability(self) -> CLIResult:
+        """
+        Check if the Bambu Studio CLI is available and functional.
+        
+        Returns:
+            CLIResult indicating availability status
+        """
+        return self.get_help()
+    
+    def get_temp_path(self, filename: str) -> Path:
+        """
+        Get a temporary file path for CLI operations.
+        
+        Args:
+            filename: Name of the temporary file
+            
+        Returns:
+            Path object for the temporary file
+        """
+        return self.temp_dir / filename
+    
+    def cleanup_temp_files(self, pattern: str = "*") -> None:
+        """
+        Clean up temporary files created during CLI operations.
+        
+        Args:
+            pattern: File pattern to clean up (default: all files)
+        """
+        try:
+            import glob
+            for file_path in glob.glob(str(self.temp_dir / pattern)):
+                os.remove(file_path)
+        except Exception:
+            # Silently ignore cleanup errors
+            pass
+
+
+# Convenience functions for direct usage
+def get_cli_version() -> CLIResult:
+    """Get Bambu Studio CLI version."""
+    wrapper = BambuStudioCLIWrapper()
+    return wrapper.get_version()
+
+
+def get_cli_help() -> CLIResult:
+    """Get Bambu Studio CLI help."""
+    wrapper = BambuStudioCLIWrapper()
+    return wrapper.get_help()
+
+
+def check_cli_availability() -> CLIResult:
+    """Check if Bambu Studio CLI is available."""
+    wrapper = BambuStudioCLIWrapper()
+    return wrapper.check_availability()
+
+
+def slice_model(
+    input_path: Union[str, Path],
+    output_dir: Union[str, Path],
+    options: Optional[Dict[str, str]] = None
+) -> CLIResult:
+    """
+    Slice a 3D model using Bambu Studio CLI.
+    
+    Args:
+        input_path: Path to the input model file
+        output_dir: Directory for output G-code
+        options: Optional CLI options
+        
+    Returns:
+        CLIResult with slicing results
+    """
+    wrapper = BambuStudioCLIWrapper()
+    return wrapper.slice_model(input_path, output_dir, options)

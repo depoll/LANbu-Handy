@@ -28,6 +28,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+test_env/
 
 # Node.js
 node_modules/
