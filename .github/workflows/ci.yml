@@ -19,10 +19,51 @@ jobs:
       with:
         python-version: '3.12'
         
+    - name: Get Bambu Studio CLI version
+      id: bambu-version
+      run: |
+        if [ -f "scripts/bambu-studio-version.txt" ]; then
+          version=$(cat scripts/bambu-studio-version.txt | tr -d '[:space:]')
+        else
+          version="latest"
+        fi
+        echo "version=$version" >> $GITHUB_OUTPUT
+        echo "Bambu Studio CLI version: $version"
+        
+    - name: Cache Bambu Studio CLI
+      id: cache-bambu-cli
+      uses: actions/cache@v4
+      with:
+        path: |
+          /usr/local/bin/BambuStudio.AppImage
+          /usr/local/bin/bambu-studio-cli
+          /usr/local/bin/bambu-studio
+        key: bambu-cli-${{ steps.bambu-version.outputs.version }}-${{ runner.os }}
+        restore-keys: |
+          bambu-cli-${{ steps.bambu-version.outputs.version }}-
+        
     - name: Install Bambu Studio CLI and dependencies
+      if: steps.cache-bambu-cli.outputs.cache-hit != 'true'
       run: |
         chmod +x scripts/install-bambu-studio-cli.sh
         scripts/install-bambu-studio-cli.sh
+        
+    - name: Verify cached Bambu Studio CLI
+      if: steps.cache-bambu-cli.outputs.cache-hit == 'true'
+      run: |
+        echo "Using cached Bambu Studio CLI"
+        echo "Verifying cached files exist:"
+        ls -la /usr/local/bin/BambuStudio.AppImage || echo "AppImage not found"
+        ls -la /usr/local/bin/bambu-studio-cli || echo "CLI wrapper not found" 
+        ls -la /usr/local/bin/bambu-studio || echo "CLI symlink not found"
+        
+        # Ensure proper permissions on cached files
+        if [ -f "/usr/local/bin/BambuStudio.AppImage" ]; then
+          sudo chmod +x /usr/local/bin/BambuStudio.AppImage
+        fi
+        if [ -f "/usr/local/bin/bambu-studio-cli" ]; then
+          sudo chmod +x /usr/local/bin/bambu-studio-cli
+        fi
         
     - name: Install backend dependencies
       run: |
