@@ -20,27 +20,6 @@ RUN apt-get update && apt-get install -y \
     # Build tools and dependencies
     build-essential \
     pkg-config \
-    # Bambu Studio CLI dependencies
-    binutils \
-    fuse \
-    libfuse2 \
-    libxcb1 \
-    libxcb-icccm4 \
-    libxcb-image0 \
-    libxcb-keysyms1 \
-    libxcb-randr0 \
-    libxcb-render-util0 \
-    libxcb-render0 \
-    libxcb-shape0 \
-    libxcb-sync1 \
-    libxcb-util1 \
-    libxcb-xfixes0 \
-    libxcb-xinerama0 \
-    libxcb-xkb1 \
-    libxkbcommon-x11-0 \
-    libxkbcommon0 \
-    ca-certificates \
-    gnupg \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Node.js from Debian packages (version 18+ available in bookworm)
@@ -69,7 +48,7 @@ RUN pip install --trusted-host pypi.org --trusted-host pypi.python.org --trusted
     httpx \
     requests
 
-# Install Bambu Studio CLI
+# Install Bambu Studio CLI and dependencies
 COPY ../scripts/bambu-studio-version.txt /scripts/
 COPY ../scripts/install-bambu-studio-cli.sh /tmp/
 RUN chmod +x /tmp/install-bambu-studio-cli.sh && \

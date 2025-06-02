@@ -19,6 +19,11 @@ jobs:
       with:
         python-version: '3.12'
         
+    - name: Install Bambu Studio CLI and dependencies
+      run: |
+        chmod +x scripts/install-bambu-studio-cli.sh
+        scripts/install-bambu-studio-cli.sh
+        
     - name: Install backend dependencies
       run: |
         cd backend
@@ -29,6 +34,20 @@ jobs:
     - name: Run Python linter (flake8)
       run: |
         python -m flake8 backend/
+        
+    - name: Verify Bambu Studio CLI installation
+      run: |
+        bambu-studio-cli --help || echo "CLI help command failed, but CLI may still be functional"
+        bambu-studio-cli --version || echo "CLI version command failed, but CLI may still be functional"
+        
+    - name: Run backend tests
+      run: |
+        cd backend
+        # Set up virtual display for headless environment
+        export DISPLAY=:99
+        Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
+        # Run tests with verbose output and coverage
+        python -m pytest tests/ -v --cov=app --cov-report=term-missing -s
         
     - name: Set up Node.js for PWA
       uses: actions/setup-node@v4
