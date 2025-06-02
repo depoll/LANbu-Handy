@@ -524,14 +524,43 @@ def is_cli_available():
         return False
 
 
+# Helper function to determine if we should skip CLI tests
+def should_skip_cli_tests():
+    """Determine if CLI tests should be skipped.
+
+    In CI environments, tests should fail if CLI is not available.
+    In local development, tests can be skipped if CLI is not available.
+    """
+    is_ci = os.environ.get("CI", "").lower() == "true"
+    cli_available = is_cli_available()
+
+    # Skip only in local development when CLI is not available
+    # In CI, we let the test run and fail if CLI is not available
+    return not is_ci and not cli_available
+
+
+def ensure_cli_available_in_ci():
+    """Ensure CLI is available when running in CI environment.
+
+    This function should be called at the beginning of CLI tests
+    to ensure they fail properly in CI if CLI is not available.
+    """
+    is_ci = os.environ.get("CI", "").lower() == "true"
+    if is_ci and not is_cli_available():
+        pytest.fail("Bambu Studio CLI is not available in CI environment. "
+                    "This indicates a problem with the CLI installation.")
+
+
 class TestEndToEndSlicing:
     """End-to-end tests that actually use the Bambu Studio CLI with real
     3MF files."""
 
-    @pytest.mark.skipif(not is_cli_available(),
+    @pytest.mark.skipif(should_skip_cli_tests(),
                         reason="Bambu Studio CLI not available")
     def test_slice_3mf_benchy_model(self):
         """Test end-to-end slicing with the 3D Benchy 3MF file."""
+        ensure_cli_available_in_ci()
+
         # Path to the test 3MF file (relative to repository root)
         repo_root = Path(__file__).parent.parent.parent
         test_file = repo_root / "test_files" / \
@@ -569,10 +598,12 @@ class TestEndToEndSlicing:
                 gcode_file = gcode_files[0]
                 assert gcode_file.stat().st_size > 0, "G-code file is empty"
 
-    @pytest.mark.skipif(not is_cli_available(),
+    @pytest.mark.skipif(should_skip_cli_tests(),
                         reason="Bambu Studio CLI not available")
     def test_slice_3mf_multicolor_model(self):
         """Test end-to-end slicing with the multicolor test coin 3MF file."""
+        ensure_cli_available_in_ci()
+
         repo_root = Path(__file__).parent.parent.parent
         test_file = repo_root / "test_files" / "multicolor-test-coin.3mf"
 
@@ -591,10 +622,12 @@ class TestEndToEndSlicing:
             has_output = len(result.stdout) > 0 or len(result.stderr) > 0
             assert has_output, "No output from CLI"
 
-    @pytest.mark.skipif(not is_cli_available(),
+    @pytest.mark.skipif(should_skip_cli_tests(),
                         reason="Bambu Studio CLI not available")
     def test_slice_3mf_multiplate_model(self):
         """Test end-to-end slicing with the multiplate test 3MF file."""
+        ensure_cli_available_in_ci()
+
         repo_root = Path(__file__).parent.parent.parent
         test_file = repo_root / "test_files" / "multiplate-test.3mf"
 
@@ -612,10 +645,12 @@ class TestEndToEndSlicing:
             has_output = len(result.stdout) > 0 or len(result.stderr) > 0
             assert has_output, "No output from CLI"
 
-    @pytest.mark.skipif(not is_cli_available(),
+    @pytest.mark.skipif(should_skip_cli_tests(),
                         reason="Bambu Studio CLI not available")
     def test_slice_with_custom_options(self):
         """Test end-to-end slicing with custom CLI options."""
+        ensure_cli_available_in_ci()
+
         repo_root = Path(__file__).parent.parent.parent
         test_file = repo_root / "test_files" / \
             "Original3DBenchy3Dprintconceptsnormel.3mf"
@@ -641,10 +676,12 @@ class TestEndToEndSlicing:
             has_output = len(result.stdout) > 0 or len(result.stderr) > 0
             assert has_output, "No output from CLI"
 
-    @pytest.mark.skipif(not is_cli_available(),
+    @pytest.mark.skipif(should_skip_cli_tests(),
                         reason="Bambu Studio CLI not available")
     def test_cli_version_real(self):
         """Test getting the real CLI version."""
+        ensure_cli_available_in_ci()
+
         wrapper = BambuStudioCLIWrapper()
         result = wrapper.get_version()
 
@@ -656,10 +693,12 @@ class TestEndToEndSlicing:
         assert has_expected_content, \
             f"Unexpected version output: {result.stdout}"
 
-    @pytest.mark.skipif(not is_cli_available(),
+    @pytest.mark.skipif(should_skip_cli_tests(),
                         reason="Bambu Studio CLI not available")
     def test_cli_help_real(self):
         """Test getting the real CLI help."""
+        ensure_cli_available_in_ci()
+
         result = get_cli_help()
 
         # Should succeed and return help info
