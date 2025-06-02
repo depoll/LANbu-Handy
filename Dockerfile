@@ -1,26 +1,71 @@
-# LANbu Handy - All-in-One Docker Image
-# Note: Build the PWA locally first with `cd pwa && npm run build`
+# LANbu Handy - All-in-One Docker Image (Multi-stage Build)
 
+# Stage 1: PWA Build Stage
+FROM node:18-slim AS pwa-builder
+
+WORKDIR /app/pwa
+
+# Copy package files first for better layer caching
+COPY pwa/package*.json ./
+
+# Configure npm for restrictive environments and install dependencies
+RUN npm config set strict-ssl false && \
+    npm config set registry https://registry.npmjs.org/ && \
+    npm install -g typescript@5.8.3 && \
+    npm ci --no-audit --no-fund --prefer-offline --progress=false || npm install --no-audit --no-fund
+
+# Copy PWA source and build
+COPY pwa/ ./
+RUN npm run build
+
+# Stage 2: Python Runtime Stage
 FROM python:3.12-slim
 
 # Set working directory
 WORKDIR /app
 
-# Install system dependencies that might be needed
+# Install system dependencies for Bambu Studio CLI
 RUN apt-get update && apt-get install -y \
     curl \
+    wget \
+    binutils \
+    fuse \
+    libfuse2 \
+    libxcb1 \
+    libxcb-icccm4 \
+    libxcb-image0 \
+    libxcb-keysyms1 \
+    libxcb-randr0 \
+    libxcb-render-util0 \
+    libxcb-render0 \
+    libxcb-shape0 \
+    libxcb-sync1 \
+    libxcb-util1 \
+    libxcb-xfixes0 \
+    libxcb-xinerama0 \
+    libxcb-xkb1 \
+    libxkbcommon-x11-0 \
+    libxkbcommon0 \
+    ca-certificates \
+    gnupg \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy and install Python dependencies
-COPY backend/requirements.txt ./
-RUN pip install --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host files.pythonhosted.org --no-cache-dir -r requirements.txt
+COPY backend/requirements.txt ./backend/
+RUN pip install --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host files.pythonhosted.org --no-cache-dir -r backend/requirements.txt
 
-# Copy backend application code
+# Install Bambu Studio CLI
+COPY scripts/bambu-studio-version.txt /scripts/
+COPY scripts/install-bambu-studio-cli.sh /tmp/
+RUN chmod +x /tmp/install-bambu-studio-cli.sh && \
+    /tmp/install-bambu-studio-cli.sh && \
+    rm /tmp/install-bambu-studio-cli.sh
+
+# Copy backend application
 COPY backend/ ./
 
-# Copy built PWA static files
-# Note: Run `cd pwa && npm run build` before building this Docker image
-COPY pwa/dist/ ./static_pwa/
+# Copy built PWA from the build stage
+COPY --from=pwa-builder /app/pwa/dist ./static_pwa
 
 # Expose the port the app runs on
 EXPOSE 8000
