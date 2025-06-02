@@ -1,3 +1,13 @@
+# Automated Bambu Studio Version Updates
+#
+# This workflow automatically checks for new Bambu Studio releases and updates
+# the version referenced in this repository. When a new version is found:
+# 1. Updates scripts/bambu-studio-version.txt with the new version
+# 2. Creates a pull request with the changes
+# 3. Enables auto-merge so the PR will be merged automatically if CI passes
+#
+# This ensures LANbu Handy always uses the latest stable version of Bambu Studio CLI.
+
 name: Update Bambu Studio
 
 on:
@@ -31,10 +41,12 @@ jobs:
       id: latest-version
       run: |
         # Get the latest release version from GitHub API
-        latest_version=$(curl -s "https://api.github.com/repos/bambulab/BambuStudio/releases/latest" | grep '"tag_name"' | cut -d'"' -f4)
+        echo "Fetching latest Bambu Studio release..."
+        latest_version=$(curl -s --max-time 30 "https://api.github.com/repos/bambulab/BambuStudio/releases/latest" | grep '"tag_name"' | cut -d'"' -f4)
         
         if [ -z "$latest_version" ]; then
           echo "Error: Could not fetch latest version from GitHub API"
+          echo "This may be due to network issues or API rate limits"
           exit 1
         fi
         
@@ -89,7 +101,13 @@ jobs:
         sleep 5
         
         # Enable auto-merge for the PR
-        gh pr merge ${{ steps.create-pr.outputs.pull-request-number }} --auto --squash
+        echo "Enabling auto-merge for PR #${{ steps.create-pr.outputs.pull-request-number }}"
+        if gh pr merge ${{ steps.create-pr.outputs.pull-request-number }} --auto --squash; then
+          echo "✅ Auto-merge enabled successfully"
+        else
+          echo "⚠️ Failed to enable auto-merge - this may be due to branch protection settings"
+          echo "The PR has been created and will need to be merged manually"
+        fi
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         
