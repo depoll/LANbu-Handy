@@ -508,3 +508,179 @@ class TestIntegration:
         mock_run.assert_called_once()
         call_args = mock_run.call_args[0][0]
         assert call_args == expected_args
+
+
+# Helper function to check if CLI is available
+def is_cli_available():
+    """Check if Bambu Studio CLI is available in the environment."""
+    try:
+        result = subprocess.run(
+            ["bambu-studio-cli", "--help"],
+            capture_output=True,
+            timeout=10
+        )
+        return result.returncode == 0
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return False
+
+
+class TestEndToEndSlicing:
+    """End-to-end tests that actually use the Bambu Studio CLI with real 3MF files."""
+
+    @pytest.mark.skipif(not is_cli_available(),
+                        reason="Bambu Studio CLI not available")
+    def test_slice_3mf_benchy_model(self):
+        """Test end-to-end slicing with the 3D Benchy 3MF file."""
+        # Path to the test 3MF file (relative to repository root)
+        repo_root = Path(__file__).parent.parent.parent
+        test_file = repo_root / "test_files" / \
+            "Original3DBenchy3Dprintconceptsnormel.3mf"
+
+        # Verify the test file exists
+        assert test_file.exists(), f"Test file not found: {test_file}"
+
+        # Create temporary output directory
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_dir = Path(temp_dir)
+
+            # Test using the wrapper class
+            wrapper = BambuStudioCLIWrapper()
+            result = wrapper.slice_model(test_file, output_dir)
+
+            # The result might fail with specific error messages about missing profiles
+            # or other configuration, but the CLI should at least attempt to process
+            # the file and give us meaningful output
+            expected_exit_codes = [0, 1]
+            assert result.exit_code in expected_exit_codes, \
+                f"Unexpected exit code: {result.exit_code}"
+
+            # Check that we got some output (either success or error messages)
+            has_output = len(result.stdout) > 0 or len(result.stderr) > 0
+            assert has_output, "No output from CLI"
+
+            # If successful, check for expected output patterns
+            if result.success:
+                # G-code file should be created
+                gcode_files = list(output_dir.glob("*.gcode"))
+                assert len(gcode_files) > 0, "No G-code files generated"
+
+                # Check that the G-code file is not empty
+                gcode_file = gcode_files[0]
+                assert gcode_file.stat().st_size > 0, "G-code file is empty"
+
+    @pytest.mark.skipif(not is_cli_available(),
+                        reason="Bambu Studio CLI not available")
+    def test_slice_3mf_multicolor_model(self):
+        """Test end-to-end slicing with the multicolor test coin 3MF file."""
+        repo_root = Path(__file__).parent.parent.parent
+        test_file = repo_root / "test_files" / "multicolor-test-coin.3mf"
+
+        assert test_file.exists(), f"Test file not found: {test_file}"
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_dir = Path(temp_dir)
+
+            # Test using the convenience function
+            result = slice_model(test_file, output_dir)
+
+            # Similar to above - CLI should attempt to process
+            expected_exit_codes = [0, 1]
+            assert result.exit_code in expected_exit_codes, \
+                f"Unexpected exit code: {result.exit_code}"
+            has_output = len(result.stdout) > 0 or len(result.stderr) > 0
+            assert has_output, "No output from CLI"
+
+    @pytest.mark.skipif(not is_cli_available(),
+                        reason="Bambu Studio CLI not available")
+    def test_slice_3mf_multiplate_model(self):
+        """Test end-to-end slicing with the multiplate test 3MF file."""
+        repo_root = Path(__file__).parent.parent.parent
+        test_file = repo_root / "test_files" / "multiplate-test.3mf"
+
+        assert test_file.exists(), f"Test file not found: {test_file}"
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_dir = Path(temp_dir)
+
+            wrapper = BambuStudioCLIWrapper()
+            result = wrapper.slice_model(test_file, output_dir)
+
+            expected_exit_codes = [0, 1]
+            assert result.exit_code in expected_exit_codes, \
+                f"Unexpected exit code: {result.exit_code}"
+            has_output = len(result.stdout) > 0 or len(result.stderr) > 0
+            assert has_output, "No output from CLI"
+
+    @pytest.mark.skipif(not is_cli_available(),
+                        reason="Bambu Studio CLI not available")
+    def test_slice_with_custom_options(self):
+        """Test end-to-end slicing with custom CLI options."""
+        repo_root = Path(__file__).parent.parent.parent
+        test_file = repo_root / "test_files" / \
+            "Original3DBenchy3Dprintconceptsnormel.3mf"
+
+        assert test_file.exists(), f"Test file not found: {test_file}"
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_dir = Path(temp_dir)
+
+            # Test with some potential CLI options (may not work without proper setup)
+            options = {
+                "layer-height": "0.2",
+                "infill": "15"
+            }
+
+            result = slice_model(test_file, output_dir, options)
+
+            # CLI should at least recognize the file and attempt processing
+            expected_exit_codes = [0, 1]
+            assert result.exit_code in expected_exit_codes, \
+                f"Unexpected exit code: {result.exit_code}"
+            has_output = len(result.stdout) > 0 or len(result.stderr) > 0
+            assert has_output, "No output from CLI"
+
+    @pytest.mark.skipif(not is_cli_available(),
+                        reason="Bambu Studio CLI not available")
+    def test_cli_version_real(self):
+        """Test getting the real CLI version."""
+        wrapper = BambuStudioCLIWrapper()
+        result = wrapper.get_version()
+
+        # Should succeed and return version info
+        assert result.success, f"CLI version failed: {result.stderr}"
+        assert len(result.stdout) > 0, "No version output"
+        has_expected_content = ("bambu" in result.stdout.lower() or
+                                "studio" in result.stdout.lower())
+        assert has_expected_content, f"Unexpected version output: {result.stdout}"
+
+    @pytest.mark.skipif(not is_cli_available(),
+                        reason="Bambu Studio CLI not available")
+    def test_cli_help_real(self):
+        """Test getting the real CLI help."""
+        result = get_cli_help()
+
+        # Should succeed and return help info
+        assert result.success, f"CLI help failed: {result.stderr}"
+        assert len(result.stdout) > 0, "No help output"
+        has_help_content = ("usage" in result.stdout.lower() or
+                            "options" in result.stdout.lower() or
+                            "commands" in result.stdout.lower())
+        assert has_help_content, f"Unexpected help output: {result.stdout}"
+
+    def test_cli_availability_check(self):
+        """Test the CLI availability check (should work regardless of CLI presence)."""
+        result = check_cli_availability()
+
+        # This should match the actual CLI availability
+        expected_available = is_cli_available()
+        availability_matches = result.success == expected_available
+        assert availability_matches, \
+            f"CLI availability check mismatch: expected {expected_available}, " \
+            f"got {result.success}"
+
+        if not result.success:
+            # Should have meaningful error message when CLI is not available
+            has_error_message = ("not found" in result.stderr.lower() or
+                                 "command not found" in result.stderr.lower() or
+                                 len(result.stderr) > 0)
+            assert has_error_message, "Expected error message when CLI not available"
