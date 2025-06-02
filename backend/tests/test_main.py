@@ -2,6 +2,9 @@
 Tests for the main FastAPI application endpoints.
 """
 
+import tempfile
+import os
+import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import patch
 from pathlib import Path
@@ -11,6 +14,15 @@ from app.model_service import ModelValidationError, ModelDownloadError
 
 
 client = TestClient(app)
+
+
+@pytest.fixture
+def temp_model_file():
+    """Create a temporary model file for testing."""
+    with tempfile.NamedTemporaryFile(suffix=".stl", delete=False) as f:
+        f.write(b"mock stl file content")
+        yield f.name
+    os.unlink(f.name)
 
 
 class TestHealthEndpoints:
@@ -154,3 +166,116 @@ class TestModelSubmissionEndpoint:
         # Should still work as FastAPI can handle form data too
         # But if we want to enforce JSON, we could test for specific behavior
         assert response.status_code in [400, 422]  # Validation or format error
+
+
+class TestSliceEndpoint:
+    """Test cases for the slice endpoint."""
+
+    def test_slice_missing_field(self):
+        """Test slice request missing required field."""
+        response = client.post("/api/slice/defaults", json={})
+        assert response.status_code == 422  # Validation error
+
+    def test_slice_invalid_json(self):
+        """Test slice request with invalid JSON."""
+        response = client.post(
+            "/api/slice/defaults",
+            data="invalid json",
+            headers={"Content-Type": "application/json"}
+        )
+        assert response.status_code == 422  # JSON decode error
+
+    def test_slice_file_not_found(self):
+        """Test slice request with non-existent file_id."""
+        response = client.post(
+            "/api/slice/defaults",
+            json={"file_id": "nonexistent_file.stl"}
+        )
+        assert response.status_code == 404
+        assert "Model file not found" in response.json()["detail"]
+
+    @patch('app.main.slice_model')
+    def test_slice_success(self, mock_slice_model, temp_model_file):
+        """Test successful slicing with mocked CLI."""
+        from app.slicer_service import CLIResult
+        
+        # Mock successful slicing
+        mock_slice_model.return_value = CLIResult(
+            exit_code=0,
+            stdout="G-code generated successfully",
+            stderr="",
+            success=True
+        )
+
+        # Create a temporary file in the model service directory
+        from app.main import model_service
+        import shutil
+        
+        test_file_id = f"test_{Path(temp_model_file).name}"
+        test_file_path = model_service.temp_dir / test_file_id
+        shutil.copy(temp_model_file, test_file_path)
+
+        try:
+            response = client.post(
+                "/api/slice/defaults",
+                json={"file_id": test_file_id}
+            )
+
+            assert response.status_code == 200
+            data = response.json()
+            assert data["success"] is True
+            assert "sliced successfully" in data["message"]
+            assert data["gcode_path"] is not None
+
+            # Verify the slice_model was called with correct arguments
+            mock_slice_model.assert_called_once()
+            call_args = mock_slice_model.call_args
+            assert str(call_args[1]["input_path"]).endswith(test_file_id)
+            
+            # Verify default options were passed
+            options = call_args[1]["options"]
+            assert options["profile"] == "pla"
+            assert options["layer-height"] == "0.2"
+            assert options["infill"] == "15"
+            assert options["support"] == "auto"
+
+        finally:
+            # Clean up test file
+            test_file_path.unlink(missing_ok=True)
+
+    @patch('app.main.slice_model')
+    def test_slice_failure(self, mock_slice_model, temp_model_file):
+        """Test slicing failure with mocked CLI."""
+        from app.slicer_service import CLIResult
+        
+        # Mock failed slicing
+        mock_slice_model.return_value = CLIResult(
+            exit_code=1,
+            stdout="",
+            stderr="Error: Invalid model file",
+            success=False
+        )
+
+        # Create a temporary file in the model service directory
+        from app.main import model_service
+        import shutil
+        
+        test_file_id = f"test_{Path(temp_model_file).name}"
+        test_file_path = model_service.temp_dir / test_file_id
+        shutil.copy(temp_model_file, test_file_path)
+
+        try:
+            response = client.post(
+                "/api/slice/defaults",
+                json={"file_id": test_file_id}
+            )
+
+            assert response.status_code == 200
+            data = response.json()
+            assert data["success"] is False
+            assert data["message"] == "Slicing failed"
+            assert "Invalid model file" in data["error_details"]
+
+        finally:
+            # Clean up test file
+            test_file_path.unlink(missing_ok=True)
