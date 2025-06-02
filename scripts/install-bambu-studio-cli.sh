@@ -99,22 +99,15 @@ chmod +x "BambuStudio.AppImage"
 echo "Extracting AppImage..."
 ./BambuStudio.AppImage --appimage-extract > /dev/null 2>&1
 
-# Look for the CLI binary in the extracted content
-if [ -f "squashfs-root/usr/bin/bambu-studio" ]; then
-    echo "Found CLI binary at: squashfs-root/usr/bin/bambu-studio"
-    cp "squashfs-root/usr/bin/bambu-studio" "$INSTALL_DIR/bambu-studio-cli"
-    chmod +x "$INSTALL_DIR/bambu-studio-cli"
-elif [ -f "squashfs-root/AppRun" ]; then
-    echo "Using AppRun as CLI binary"
-    cp "squashfs-root/AppRun" "$INSTALL_DIR/bambu-studio-cli"
-    chmod +x "$INSTALL_DIR/bambu-studio-cli"
-else
-    echo "CLI binary not found in expected locations. Creating wrapper..."
-    # Create a wrapper script that uses the full AppImage
-    cp "BambuStudio.AppImage" "$INSTALL_DIR/BambuStudio.AppImage"
-    chmod +x "$INSTALL_DIR/BambuStudio.AppImage"
-    
-    cat > "$INSTALL_DIR/bambu-studio-cli" << 'EOF'
+# For better reliability in CI environments, always use the full AppImage approach
+echo "Installing AppImage and creating CLI wrapper..."
+
+# Copy the AppImage to the install directory
+cp "BambuStudio.AppImage" "$INSTALL_DIR/BambuStudio.AppImage"
+chmod +x "$INSTALL_DIR/BambuStudio.AppImage"
+
+# Create a wrapper script that uses the full AppImage
+cat > "$INSTALL_DIR/bambu-studio-cli" << 'EOF'
 #!/bin/bash
 # Bambu Studio CLI wrapper
 # This wrapper runs the Bambu Studio AppImage in CLI mode
@@ -130,8 +123,7 @@ fi
 # Note: Some operations may require a display, but basic CLI functions should work
 exec "$APPIMAGE_PATH" "$@"
 EOF
-    chmod +x "$INSTALL_DIR/bambu-studio-cli"
-fi
+chmod +x "$INSTALL_DIR/bambu-studio-cli"
 
 # Create symlink for bambu-studio command
 ln -sf "$INSTALL_DIR/bambu-studio-cli" "$INSTALL_DIR/bambu-studio"
