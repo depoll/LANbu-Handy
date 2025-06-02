@@ -9,7 +9,7 @@ import tempfile
 import os
 import pytest
 from pathlib import Path
-from unittest.mock import Mock, patch, mock_open, MagicMock
+from unittest.mock import Mock, patch, mock_open
 import ftplib
 
 from app.printer_service import (
@@ -21,13 +21,13 @@ from app.config import PrinterConfig
 
 class TestPrinterServiceExceptions:
     """Test custom exception classes."""
-    
+
     def test_printer_communication_error_inheritance(self):
         """Test that all printer errors inherit from base exception."""
         connection_error = PrinterConnectionError("test")
         auth_error = PrinterAuthenticationError("test")
         transfer_error = PrinterFileTransferError("test")
-        
+
         assert isinstance(connection_error, PrinterCommunicationError)
         assert isinstance(auth_error, PrinterCommunicationError)
         assert isinstance(transfer_error, PrinterCommunicationError)
@@ -35,7 +35,7 @@ class TestPrinterServiceExceptions:
 
 class TestFTPUploadResult:
     """Test FTP upload result dataclass."""
-    
+
     def test_ftp_upload_result_success(self):
         """Test successful upload result."""
         result = FTPUploadResult(
@@ -43,12 +43,12 @@ class TestFTPUploadResult:
             message="Upload successful",
             remote_path="/upload/test.gcode"
         )
-        
+
         assert result.success is True
         assert result.message == "Upload successful"
         assert result.remote_path == "/upload/test.gcode"
         assert result.error_details is None
-    
+
     def test_ftp_upload_result_failure(self):
         """Test failed upload result."""
         result = FTPUploadResult(
@@ -56,7 +56,7 @@ class TestFTPUploadResult:
             message="Upload failed",
             error_details="Connection timeout"
         )
-        
+
         assert result.success is False
         assert result.message == "Upload failed"
         assert result.remote_path is None
@@ -65,12 +65,12 @@ class TestFTPUploadResult:
 
 class TestPrinterService:
     """Test printer service functionality."""
-    
+
     @pytest.fixture
     def printer_service(self):
         """Create a printer service instance for testing."""
         return PrinterService(timeout=10)
-    
+
     @pytest.fixture
     def test_printer_config(self):
         """Create a test printer configuration."""
@@ -79,7 +79,7 @@ class TestPrinterService:
             ip="192.168.1.100",
             access_code="test123"
         )
-    
+
     @pytest.fixture
     def temp_gcode_file(self):
         """Create a temporary G-code file for testing."""
@@ -95,12 +95,12 @@ G1 X10 Y10 F3000 ; Move to position
             yield Path(f.name)
         # Clean up
         os.unlink(f.name)
-    
+
     def test_printer_service_init_default(self):
         """Test printer service initialization with defaults."""
         service = PrinterService()
         assert service.timeout == PrinterService.DEFAULT_FTP_TIMEOUT
-    
+
     def test_printer_service_init_custom_timeout(self):
         """Test printer service initialization with custom timeout."""
         service = PrinterService(timeout=60)
@@ -109,12 +109,12 @@ G1 X10 Y10 F3000 ; Move to position
 
 class TestUploadGcode:
     """Test G-code upload functionality."""
-    
+
     @pytest.fixture
     def printer_service(self):
         """Create a printer service instance for testing."""
         return PrinterService(timeout=10)
-    
+
     @pytest.fixture
     def test_printer_config(self):
         """Create a test printer configuration."""
@@ -123,7 +123,7 @@ class TestUploadGcode:
             ip="192.168.1.100",
             access_code="test123"
         )
-    
+
     @pytest.fixture
     def temp_gcode_file(self):
         """Create a temporary G-code file for testing."""
@@ -132,56 +132,66 @@ class TestUploadGcode:
             f.write(gcode_content)
             yield Path(f.name)
         os.unlink(f.name)
-    
-    def test_upload_gcode_file_not_found(self, printer_service, test_printer_config):
+
+    def test_upload_gcode_file_not_found(
+            self, printer_service, test_printer_config):
         """Test upload with non-existent file."""
         non_existent_file = Path("/tmp/nonexistent.gcode")
-        
+
         with pytest.raises(PrinterFileTransferError) as exc_info:
-            printer_service.upload_gcode(test_printer_config, non_existent_file)
-        
+            printer_service.upload_gcode(
+                test_printer_config, non_existent_file)
+
         assert "G-code file not found" in str(exc_info.value)
-    
-    def test_upload_gcode_not_a_file(self, printer_service, test_printer_config):
+
+    def test_upload_gcode_not_a_file(
+            self, printer_service, test_printer_config):
         """Test upload with directory path instead of file."""
         with tempfile.TemporaryDirectory() as temp_dir:
             dir_path = Path(temp_dir)
-            
+
             with pytest.raises(PrinterFileTransferError) as exc_info:
                 printer_service.upload_gcode(test_printer_config, dir_path)
-            
+
             assert "Path is not a file" in str(exc_info.value)
-    
+
     @patch('ftplib.FTP')
-    def test_upload_gcode_successful_anonymous(self, mock_ftp_class, 
-                                             printer_service, test_printer_config,
-                                             temp_gcode_file):
+    def test_upload_gcode_successful_anonymous(
+            self,
+            mock_ftp_class,
+            printer_service,
+            test_printer_config,
+            temp_gcode_file):
         """Test successful G-code upload with anonymous FTP."""
         # Set up mock FTP
         mock_ftp = Mock()
         mock_ftp_class.return_value = mock_ftp
         mock_ftp.size.return_value = temp_gcode_file.stat().st_size
-        
+
         # Mock file operations
         with patch('builtins.open', mock_open(read_data=b"test gcode")):
-            result = printer_service.upload_gcode(test_printer_config, temp_gcode_file)
-        
+            result = printer_service.upload_gcode(
+                test_printer_config, temp_gcode_file)
+
         # Verify FTP operations
         mock_ftp.connect.assert_called_once_with("192.168.1.100", 21, 10)
         mock_ftp.login.assert_called_once_with()  # Anonymous login
         mock_ftp.cwd.assert_called_once_with("/upload")
         mock_ftp.storbinary.assert_called_once()
         mock_ftp.quit.assert_called_once()
-        
+
         # Verify result
         assert result.success is True
         assert "uploaded successfully" in result.message
         assert result.remote_path == f"/upload/{temp_gcode_file.name}"
-    
+
     @patch('ftplib.FTP')
-    def test_upload_gcode_successful_with_credentials(self, mock_ftp_class,
-                                                    printer_service, test_printer_config,
-                                                    temp_gcode_file):
+    def test_upload_gcode_successful_with_credentials(
+            self,
+            mock_ftp_class,
+            printer_service,
+            test_printer_config,
+            temp_gcode_file):
         """Test successful G-code upload with credential authentication."""
         # Set up mock FTP - anonymous login fails, credential login succeeds
         mock_ftp = Mock()
@@ -191,177 +201,202 @@ class TestUploadGcode:
             None  # Second call succeeds
         ]
         mock_ftp.size.return_value = temp_gcode_file.stat().st_size
-        
+
         with patch('builtins.open', mock_open(read_data=b"test gcode")):
-            result = printer_service.upload_gcode(test_printer_config, temp_gcode_file)
-        
+            result = printer_service.upload_gcode(
+                test_printer_config, temp_gcode_file)
+
         # Verify credential authentication was attempted
         assert mock_ftp.login.call_count == 2
         mock_ftp.login.assert_any_call()  # Anonymous
         mock_ftp.login.assert_any_call("user", "test123")  # With credentials
-        
+
         assert result.success is True
-    
+
     @patch('ftplib.FTP')
-    def test_upload_gcode_custom_remote_filename(self, mock_ftp_class,
-                                                printer_service, test_printer_config,
-                                                temp_gcode_file):
+    def test_upload_gcode_custom_remote_filename(
+            self,
+            mock_ftp_class,
+            printer_service,
+            test_printer_config,
+            temp_gcode_file):
         """Test upload with custom remote filename."""
         mock_ftp = Mock()
         mock_ftp_class.return_value = mock_ftp
         mock_ftp.size.return_value = temp_gcode_file.stat().st_size
-        
+
         custom_filename = "custom_model.gcode"
-        
+
         with patch('builtins.open', mock_open(read_data=b"test gcode")):
             result = printer_service.upload_gcode(
-                test_printer_config, temp_gcode_file, 
+                test_printer_config, temp_gcode_file,
                 remote_filename=custom_filename
             )
-        
+
         # Check that custom filename was used
         mock_ftp.storbinary.assert_called_once()
         call_args = mock_ftp.storbinary.call_args[0]
         assert call_args[0] == f"STOR {custom_filename}"
-        
+
         assert result.remote_path == f"/upload/{custom_filename}"
-    
+
     @patch('ftplib.FTP')
-    def test_upload_gcode_custom_remote_path(self, mock_ftp_class,
-                                           printer_service, test_printer_config,
-                                           temp_gcode_file):
+    def test_upload_gcode_custom_remote_path(
+            self,
+            mock_ftp_class,
+            printer_service,
+            test_printer_config,
+            temp_gcode_file):
         """Test upload with custom remote path."""
         mock_ftp = Mock()
         mock_ftp_class.return_value = mock_ftp
         mock_ftp.size.return_value = temp_gcode_file.stat().st_size
-        
+
         custom_path = "/custom/upload/path"
-        
+
         with patch('builtins.open', mock_open(read_data=b"test gcode")):
             result = printer_service.upload_gcode(
                 test_printer_config, temp_gcode_file,
                 remote_path=custom_path
             )
-        
+
         # Check that custom path was used
         mock_ftp.cwd.assert_called_once_with(custom_path)
         assert result.remote_path == f"{custom_path}/{temp_gcode_file.name}"
-    
+
     @patch('ftplib.FTP')
-    def test_upload_gcode_directory_creation(self, mock_ftp_class,
-                                           printer_service, test_printer_config,
-                                           temp_gcode_file):
+    def test_upload_gcode_directory_creation(
+            self,
+            mock_ftp_class,
+            printer_service,
+            test_printer_config,
+            temp_gcode_file):
         """Test upload when remote directory needs to be created."""
         mock_ftp = Mock()
         mock_ftp_class.return_value = mock_ftp
-        
+
         # First cwd fails, mkd and second cwd succeed
         mock_ftp.cwd.side_effect = [
             ftplib.error_perm("Directory not found"),  # First call
             None  # Second call after mkd
         ]
         mock_ftp.size.return_value = temp_gcode_file.stat().st_size
-        
+
         with patch('builtins.open', mock_open(read_data=b"test gcode")):
-            result = printer_service.upload_gcode(test_printer_config, temp_gcode_file)
-        
+            result = printer_service.upload_gcode(
+                test_printer_config, temp_gcode_file)
+
         # Verify directory creation was attempted
         mock_ftp.mkd.assert_called_once_with("/upload")
         assert mock_ftp.cwd.call_count == 2
         assert result.success is True
-    
+
     @patch('ftplib.FTP')
-    def test_upload_gcode_connection_error(self, mock_ftp_class,
-                                         printer_service, test_printer_config,
-                                         temp_gcode_file):
+    def test_upload_gcode_connection_error(
+            self,
+            mock_ftp_class,
+            printer_service,
+            test_printer_config,
+            temp_gcode_file):
         """Test upload with FTP connection error."""
         mock_ftp = Mock()
         mock_ftp_class.return_value = mock_ftp
         mock_ftp.connect.side_effect = ConnectionError("Connection refused")
-        
+
         with pytest.raises(PrinterConnectionError) as exc_info:
             printer_service.upload_gcode(test_printer_config, temp_gcode_file)
-        
+
         assert "FTP connection error" in str(exc_info.value)
-    
+
     @patch('ftplib.FTP')
-    def test_upload_gcode_authentication_error(self, mock_ftp_class,
-                                             printer_service, test_printer_config,
-                                             temp_gcode_file):
+    def test_upload_gcode_authentication_error(
+            self,
+            mock_ftp_class,
+            printer_service,
+            test_printer_config,
+            temp_gcode_file):
         """Test upload with authentication failure."""
         mock_ftp = Mock()
         mock_ftp_class.return_value = mock_ftp
-        
+
         # Both anonymous and credential login fail
         mock_ftp.login.side_effect = [
             ftplib.error_perm("Anonymous login failed"),
             ftplib.error_perm("Invalid credentials")
         ]
-        
+
         with pytest.raises(PrinterAuthenticationError) as exc_info:
             printer_service.upload_gcode(test_printer_config, temp_gcode_file)
-        
+
         assert "FTP authentication failed" in str(exc_info.value)
-    
+
     @patch('ftplib.FTP')
     def test_upload_gcode_transfer_error(self, mock_ftp_class,
-                                       printer_service, test_printer_config,
-                                       temp_gcode_file):
+                                         printer_service, test_printer_config,
+                                         temp_gcode_file):
         """Test upload with file transfer error."""
         mock_ftp = Mock()
         mock_ftp_class.return_value = mock_ftp
         mock_ftp.storbinary.side_effect = ftplib.error_temp("Transfer failed")
-        
+
         with patch('builtins.open', mock_open(read_data=b"test gcode")):
             with pytest.raises(PrinterFileTransferError) as exc_info:
-                printer_service.upload_gcode(test_printer_config, temp_gcode_file)
-        
+                printer_service.upload_gcode(
+                    test_printer_config, temp_gcode_file)
+
         assert "FTP temporary error" in str(exc_info.value)
-    
+
     @patch('ftplib.FTP')
-    def test_upload_gcode_size_verification_warning(self, mock_ftp_class,
-                                                  printer_service, test_printer_config,
-                                                  temp_gcode_file):
+    def test_upload_gcode_size_verification_warning(
+            self,
+            mock_ftp_class,
+            printer_service,
+            test_printer_config,
+            temp_gcode_file):
         """Test upload with size mismatch warning."""
         mock_ftp = Mock()
         mock_ftp_class.return_value = mock_ftp
-        
+
         # Return different size to trigger warning
         local_size = temp_gcode_file.stat().st_size
         mock_ftp.size.return_value = local_size + 100
-        
+
         with patch('builtins.open', mock_open(read_data=b"test gcode")):
             with patch('app.printer_service.logger') as mock_logger:
-                result = printer_service.upload_gcode(test_printer_config, temp_gcode_file)
-        
+                result = printer_service.upload_gcode(
+                    test_printer_config, temp_gcode_file)
+
         # Should still succeed but log warning
         assert result.success is True
         mock_logger.warning.assert_called_once()
-    
+
     @patch('ftplib.FTP')
-    def test_upload_gcode_cleanup_on_error(self, mock_ftp_class,
-                                         printer_service, test_printer_config,
-                                         temp_gcode_file):
+    def test_upload_gcode_cleanup_on_error(
+            self,
+            mock_ftp_class,
+            printer_service,
+            test_printer_config,
+            temp_gcode_file):
         """Test that FTP connection is cleaned up on error."""
         mock_ftp = Mock()
         mock_ftp_class.return_value = mock_ftp
         mock_ftp.login.side_effect = Exception("Test error")
-        
+
         with pytest.raises(PrinterCommunicationError):
             printer_service.upload_gcode(test_printer_config, temp_gcode_file)
-        
+
         # Verify cleanup was attempted
         mock_ftp.quit.assert_called_once()
 
 
 class TestConnectionTesting:
     """Test FTP connection testing functionality."""
-    
+
     @pytest.fixture
     def printer_service(self):
         """Create a printer service instance for testing."""
         return PrinterService(timeout=10)
-    
+
     @pytest.fixture
     def test_printer_config(self):
         """Create a test printer configuration."""
@@ -370,74 +405,77 @@ class TestConnectionTesting:
             ip="192.168.1.100",
             access_code="test123"
         )
-    
+
     @patch('ftplib.FTP')
-    def test_connection_test_successful_anonymous(self, mock_ftp_class,
-                                                printer_service, test_printer_config):
+    def test_connection_test_successful_anonymous(
+            self, mock_ftp_class, printer_service, test_printer_config):
         """Test successful connection test with anonymous login."""
         mock_ftp = Mock()
         mock_ftp_class.return_value = mock_ftp
-        
+
         result = printer_service.test_connection(test_printer_config)
-        
+
         assert result is True
         mock_ftp.connect.assert_called_once_with("192.168.1.100", 21, 10)
         mock_ftp.login.assert_called_once_with()
         mock_ftp.quit.assert_called_once()
-    
+
     @patch('ftplib.FTP')
-    def test_connection_test_successful_with_credentials(self, mock_ftp_class,
-                                                       printer_service, test_printer_config):
+    def test_connection_test_successful_with_credentials(
+            self, mock_ftp_class, printer_service, test_printer_config):
         """Test successful connection test with credential authentication."""
         mock_ftp = Mock()
         mock_ftp_class.return_value = mock_ftp
-        
+
         # Anonymous fails, credential succeeds
         mock_ftp.login.side_effect = [
             ftplib.error_perm("Anonymous failed"),
             None
         ]
-        
+
         result = printer_service.test_connection(test_printer_config)
-        
+
         assert result is True
         assert mock_ftp.login.call_count == 2
         mock_ftp.login.assert_any_call("user", "test123")
-    
+
     @patch('ftplib.FTP')
     def test_connection_test_failure(self, mock_ftp_class,
-                                   printer_service, test_printer_config):
+                                     printer_service, test_printer_config):
         """Test failed connection test."""
         mock_ftp = Mock()
         mock_ftp_class.return_value = mock_ftp
         mock_ftp.connect.side_effect = ConnectionError("Connection failed")
-        
+
         result = printer_service.test_connection(test_printer_config)
-        
+
         assert result is False
-    
+
     @patch('ftplib.FTP')
-    def test_connection_test_cleanup_on_error(self, mock_ftp_class,
-                                             printer_service, test_printer_config):
+    def test_connection_test_cleanup_on_error(
+            self,
+            mock_ftp_class,
+            printer_service,
+            test_printer_config):
         """Test that connection is cleaned up even when test fails."""
         mock_ftp = Mock()
         mock_ftp_class.return_value = mock_ftp
         mock_ftp.login.side_effect = Exception("Test error")
-        
+
         result = printer_service.test_connection(test_printer_config)
-        
+
         assert result is False
         mock_ftp.quit.assert_called_once()
 
 
 class TestIntegration:
     """Integration tests for printer service."""
-    
+
     @pytest.fixture
     def printer_service(self):
         """Create a printer service instance for testing."""
         return PrinterService()
-    
+
     @pytest.fixture
     def test_printer_config(self):
         """Create a test printer configuration."""
@@ -446,26 +484,26 @@ class TestIntegration:
             ip="192.168.1.100",
             access_code="integration123"
         )
-    
+
     def test_service_constants(self, printer_service):
         """Test that service constants are properly defined."""
         assert hasattr(PrinterService, 'DEFAULT_FTP_PORT')
         assert hasattr(PrinterService, 'DEFAULT_FTP_TIMEOUT')
         assert hasattr(PrinterService, 'DEFAULT_UPLOAD_PATH')
-        
+
         assert PrinterService.DEFAULT_FTP_PORT == 21
         assert PrinterService.DEFAULT_FTP_TIMEOUT == 30
         assert PrinterService.DEFAULT_UPLOAD_PATH == "/upload"
-    
+
     def test_logging_integration(self, printer_service, test_printer_config):
         """Test that logging works correctly."""
         with patch('app.printer_service.logger') as mock_logger:
             with patch('ftplib.FTP') as mock_ftp_class:
                 mock_ftp = Mock()
                 mock_ftp_class.return_value = mock_ftp
-                
+
                 printer_service.test_connection(test_printer_config)
-                
+
                 # Verify logging calls were made
                 mock_logger.info.assert_called()
                 mock_logger.debug.assert_called()
@@ -473,12 +511,12 @@ class TestIntegration:
 
 class TestEndToEndWithMockFTP:
     """End-to-end tests with mock FTP server simulation."""
-    
+
     @pytest.fixture
     def printer_service(self):
         """Create a printer service instance for testing."""
         return PrinterService(timeout=5)
-    
+
     @pytest.fixture
     def test_printer_config(self):
         """Create a test printer configuration."""
@@ -487,7 +525,7 @@ class TestEndToEndWithMockFTP:
             ip="192.168.1.200",
             access_code="mocktest456"
         )
-    
+
     @pytest.fixture
     def sample_gcode_file(self):
         """Create a sample G-code file with realistic content."""
@@ -500,7 +538,7 @@ class TestEndToEndWithMockFTP:
 M73 P0 R155
 M201 X20000 Y20000 Z500 E10000 ; sets maximum accelerations, mm/sec^2
 M203 X500 Y500 Z20 E30 ; sets maximum feedrates, mm/sec
-M204 P20000 R5000 T20000 ; sets acceleration (P, T) and retract acceleration (R), mm/sec^2
+M204 P20000 R5000 T20000 ; sets acceleration (P, T) and retract accel, mm/sec^2
 M220 S100 ; set feedrate percentage
 M221 S100 ; set flow percentage
 G90 ; use absolute coordinates
@@ -535,98 +573,106 @@ M84 ; disable steppers
             f.write(gcode_content)
             yield Path(f.name)
         os.unlink(f.name)
-    
+
     @patch('ftplib.FTP')
     def test_complete_upload_workflow(self, mock_ftp_class, printer_service,
-                                    test_printer_config, sample_gcode_file):
+                                      test_printer_config, sample_gcode_file):
         """Test complete upload workflow with realistic G-code file."""
         # Configure mock FTP to simulate successful upload
         mock_ftp = Mock()
         mock_ftp_class.return_value = mock_ftp
-        
+
         # Simulate file size verification
         file_size = sample_gcode_file.stat().st_size
         mock_ftp.size.return_value = file_size
-        
+
         # Mock open to control file reading
-        with patch('builtins.open', mock_open(read_data=sample_gcode_file.read_bytes())):
+        with patch('builtins.open',
+                   mock_open(read_data=sample_gcode_file.read_bytes())):
             result = printer_service.upload_gcode(
                 test_printer_config,
                 sample_gcode_file,
                 remote_filename="test_model.gcode",
                 remote_path="/printer/upload"
             )
-        
+
         # Verify all FTP operations occurred
         mock_ftp.connect.assert_called_once_with("192.168.1.200", 21, 5)
         mock_ftp.login.assert_called()
         mock_ftp.cwd.assert_called_with("/printer/upload")
         mock_ftp.storbinary.assert_called_once()
-        
+
         # Verify storbinary was called with correct command
         storbinary_args = mock_ftp.storbinary.call_args[0]
         assert storbinary_args[0] == "STOR test_model.gcode"
-        
+
         # Verify size check
         mock_ftp.size.assert_called_once_with("test_model.gcode")
-        
+
         # Verify cleanup
         mock_ftp.quit.assert_called_once()
-        
+
         # Verify result
         assert result.success is True
         assert "uploaded successfully" in result.message
         assert result.remote_path == "/printer/upload/test_model.gcode"
         assert result.error_details is None
-    
+
     @patch('ftplib.FTP')
-    def test_upload_with_directory_creation_scenario(self, mock_ftp_class,
-                                                   printer_service, test_printer_config,
-                                                   sample_gcode_file):
+    def test_upload_with_directory_creation_scenario(
+            self,
+            mock_ftp_class,
+            printer_service,
+            test_printer_config,
+            sample_gcode_file):
         """Test upload scenario where remote directory must be created."""
         mock_ftp = Mock()
         mock_ftp_class.return_value = mock_ftp
-        
+
         # Simulate directory not existing initially
         mock_ftp.cwd.side_effect = [
             ftplib.error_perm("550 Directory not found"),  # First attempt
             None  # Second attempt after creation
         ]
         mock_ftp.size.return_value = sample_gcode_file.stat().st_size
-        
+
         with patch('builtins.open', mock_open()):
-            result = printer_service.upload_gcode(test_printer_config, sample_gcode_file)
-        
+            result = printer_service.upload_gcode(
+                test_printer_config, sample_gcode_file)
+
         # Verify directory creation workflow
         assert mock_ftp.cwd.call_count == 2
         mock_ftp.mkd.assert_called_once_with("/upload")
         assert result.success is True
-    
+
     @patch('ftplib.FTP')
     def test_connection_test_workflow(self, mock_ftp_class, printer_service,
-                                    test_printer_config):
+                                      test_printer_config):
         """Test connection testing workflow."""
         mock_ftp = Mock()
         mock_ftp_class.return_value = mock_ftp
-        
+
         # Test successful connection
         result = printer_service.test_connection(test_printer_config)
-        
+
         assert result is True
         mock_ftp.connect.assert_called_once_with("192.168.1.200", 21, 5)
         mock_ftp.login.assert_called_once_with()  # Anonymous login
         mock_ftp.quit.assert_called_once()
-    
-    def test_error_handling_chain(self, printer_service, test_printer_config):
-        """Test that error handling works correctly for different failure modes."""
+
+    def test_error_handling_chain(self, printer_service,
+                                  test_printer_config):
+        """Test that error handling works correctly for different failure
+        modes."""
         non_existent_file = Path("/tmp/does_not_exist.gcode")
-        
+
         # File not found should raise PrinterFileTransferError
         with pytest.raises(PrinterFileTransferError) as exc_info:
-            printer_service.upload_gcode(test_printer_config, non_existent_file)
-        
+            printer_service.upload_gcode(
+                test_printer_config, non_existent_file)
+
         assert "G-code file not found" in str(exc_info.value)
-        
+
         # Verify it's the right exception type
         assert isinstance(exc_info.value, PrinterFileTransferError)
         assert isinstance(exc_info.value, PrinterCommunicationError)
