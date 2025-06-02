@@ -9,7 +9,79 @@ echo "Starting Bambu Studio CLI installation..."
 
 # Function to install system dependencies
 install_system_dependencies() {
-    echo "Installing system dependencies for Bambu Studio CLI..."
+    if [ "$MINIMAL_DEPS" = true ]; then
+        install_minimal_dependencies
+    else
+        install_full_dependencies
+    fi
+}
+
+# Function to install minimal dependencies for CLI-only operation
+install_minimal_dependencies() {
+    echo "Installing minimal system dependencies for Bambu Studio CLI..."
+    
+    # Check if we're running as root or can use sudo
+    if [ "$EUID" -eq 0 ]; then
+        APT_CMD="apt-get"
+    elif command -v sudo >/dev/null 2>&1; then
+        APT_CMD="sudo apt-get"
+    else
+        echo "Error: This script requires root privileges or sudo access to install system dependencies"
+        echo "Please run as root or ensure sudo is available"
+        exit 1
+    fi
+    
+    # Update package list
+    $APT_CMD update
+    
+    # Minimal dependencies required for CLI operations
+    # Based on AppImage requirements and basic functionality
+    MINIMAL_DEPS_LIST=(
+        # Essential for downloading and running AppImages
+        wget
+        curl
+        ca-certificates
+        fuse
+        libfuse2
+        
+        # Required for AppImage execution
+        binutils
+        
+        # Basic locale support (prevents locale warnings)
+        locales
+        
+        # Basic SSL/TLS support for downloads
+        libssl3
+        
+        # Basic system utilities
+        file
+    )
+    
+    # Function to install a list of packages, continuing on failure
+    install_package_list() {
+        local desc="$1"
+        shift
+        local packages=("$@")
+        
+        echo "Installing $desc..."
+        for package in "${packages[@]}"; do
+            if $APT_CMD install -y "$package" 2>/dev/null; then
+                echo "  ✓ $package"
+            else
+                echo "  ✗ $package (not available or failed to install)"
+            fi
+        done
+    }
+    
+    install_package_list "minimal CLI dependencies" "${MINIMAL_DEPS_LIST[@]}"
+    
+    echo "Minimal system dependencies installation completed"
+    echo "Note: CLI may show warnings about missing GUI libraries, but core functionality should work"
+}
+
+# Function to install full dependencies for debugging and development
+install_full_dependencies() {
+    echo "Installing full system dependencies for Bambu Studio CLI..."
     
     # Check if we're running as root or can use sudo
     if [ "$EUID" -eq 0 ]; then
@@ -158,26 +230,49 @@ install_system_dependencies() {
     install_package_list "system dependencies" "${SYSTEM_DEPS[@]}"
     install_package_list "optional dependencies" "${OPTIONAL_DEPS[@]}"
     
-    echo "System dependencies installation completed"
+    echo "Full system dependencies installation completed"
 }
 
 # Parse command line arguments
 INSTALL_DEPS=true
+DEPS_ONLY=false
+MINIMAL_DEPS=true  # Default to minimal dependencies for faster CI builds
 for arg in "$@"; do
     case $arg in
         --skip-deps)
             INSTALL_DEPS=false
             shift
             ;;
+        --deps-only)
+            DEPS_ONLY=true
+            shift
+            ;;
+        --minimal)
+            MINIMAL_DEPS=true
+            shift
+            ;;
+        --full-deps)
+            MINIMAL_DEPS=false
+            shift
+            ;;
         --help)
-            echo "Usage: $0 [--skip-deps] [--help]"
+            echo "Usage: $0 [--skip-deps] [--deps-only] [--minimal] [--full-deps] [--help]"
             echo ""
             echo "Options:"
-            echo "  --skip-deps  Skip installation of system dependencies"
-            echo "  --help       Show this help message"
+            echo "  --skip-deps   Skip installation of system dependencies"
+            echo "  --deps-only   Install only system dependencies (skip CLI download)"
+            echo "  --minimal     Install minimal dependencies for CLI-only operation (default)"
+            echo "  --full-deps   Install full dependencies for debugging and development"
+            echo "  --help        Show this help message"
             echo ""
             echo "Environment variables:"
             echo "  BAMBU_VERSION  Version to install (default: latest)"
+            echo ""
+            echo "Dependency modes:"
+            echo "  Minimal mode: Installs only essential packages for CLI functionality"
+            echo "               (~10 packages vs ~80+ in full mode for faster CI builds)"
+            echo "  Full mode:    Installs all GUI and development dependencies"
+            echo "               (use for debugging GUI-related issues)"
             exit 0
             ;;
     esac
@@ -185,9 +280,31 @@ done
 
 # Install system dependencies unless skipped
 if [ "$INSTALL_DEPS" = true ]; then
+    if [ "$MINIMAL_DEPS" = true ]; then
+        echo "Using minimal dependency mode for faster installation"
+    else
+        echo "Using full dependency mode for complete GUI support"
+    fi
     install_system_dependencies
 else
     echo "Skipping system dependencies installation (--skip-deps flag used)"
+fi
+
+# If deps-only mode, exit after installing dependencies
+if [ "$DEPS_ONLY" = true ]; then
+    if [ "$INSTALL_DEPS" = true ]; then
+        MODE_MSG=""
+        if [ "$MINIMAL_DEPS" = true ]; then
+            MODE_MSG=" (minimal mode)"
+        else
+            MODE_MSG=" (full mode)"
+        fi
+        echo "Dependencies-only installation completed${MODE_MSG} (--deps-only flag used)"
+    else
+        echo "Dependencies-only mode requested but dependencies were skipped (--skip-deps flag used)"
+    fi
+    echo "Skipping CLI binary download and installation"
+    exit 0
 fi
 
 echo "Installing Bambu Studio CLI binary..."
