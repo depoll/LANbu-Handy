@@ -35,10 +35,10 @@ if [ "$BAMBU_VERSION" = "latest" ]; then
         echo "Found latest version: $LATEST_VERSION"
         BAMBU_VERSION="$LATEST_VERSION"
     else
-        echo "Warning: Could not fetch latest version from GitHub API"
+        echo "Error: Could not fetch latest version from GitHub API"
         echo "This may be due to network restrictions or API rate limits"
-        echo "Falling back to known stable version: v1.8.4"
-        BAMBU_VERSION="v1.8.4"
+        echo "Build failed: Unable to determine latest Bambu Studio version."
+        exit 1
     fi
     
     echo "Using version: $BAMBU_VERSION"
@@ -50,6 +50,7 @@ cd "$TEMP_DIR"
 
 # Try multiple possible naming patterns for Bambu Studio releases
 POSSIBLE_NAMES=(
+    "Bambu_Studio_linux_fedora-${BAMBU_VERSION}.AppImage"
     "BambuStudio_ubu64.AppImage"
     "Bambu_Studio_ubuntu-22.04_${BAMBU_VERSION}.AppImage"
     "BambuStudio_Linux_${BAMBU_VERSION}.AppImage"
@@ -84,40 +85,8 @@ if [ "$DOWNLOAD_SUCCESSFUL" = false ]; then
     echo "  https://github.com/bambulab/BambuStudio/releases/"
     echo "and update the BAMBU_VERSION environment variable if needed."
     echo ""
-    echo "Installing a placeholder CLI for now..."
-    
-    # Install placeholder that provides helpful information
-    cat > "$INSTALL_DIR/bambu-studio-cli" << 'EOF'
-#!/bin/bash
-echo "Bambu Studio CLI Installation Failed"
-echo "The CLI could not be downloaded from GitHub releases."
-echo ""
-echo "To fix this:"
-echo "1. Check available versions at: https://github.com/bambulab/BambuStudio/releases/"
-echo "2. Update the BAMBU_VERSION environment variable in your Docker build"
-echo "3. Rebuild the Docker image"
-echo ""
-echo "For help, use: bambu-studio-cli --help"
-
-if [ "$1" = "--help" ]; then
-    echo ""
-    echo "Available options:"
-    echo "  --help      Show this help message"
-    echo "  --version   Show version information"
-    echo "Note: Full functionality requires successful CLI installation."
-    exit 0
-elif [ "$1" = "--version" ]; then
-    echo "Bambu Studio CLI placeholder (download failed)"
+    echo "Build failed: Unable to download real Bambu Studio CLI."
     exit 1
-else
-    exit 1
-fi
-EOF
-    chmod +x "$INSTALL_DIR/bambu-studio-cli"
-    ln -sf "$INSTALL_DIR/bambu-studio-cli" "$INSTALL_DIR/bambu-studio"
-    
-    echo "Placeholder CLI installed. The build will continue but CLI functionality will be limited."
-    exit 0
 fi
 
 echo "Download completed. Making AppImage executable..."
