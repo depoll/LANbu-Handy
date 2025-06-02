@@ -2,9 +2,147 @@
 set -e
 
 # Bambu Studio CLI Installation Script
-# This script downloads and installs Bambu Studio CLI for use in Docker containers
+# This script installs system dependencies and downloads/installs Bambu Studio CLI
+# for use in Docker containers, CI environments, and development setups
 
-echo "Installing Bambu Studio CLI..."
+echo "Starting Bambu Studio CLI installation..."
+
+# Function to install system dependencies
+install_system_dependencies() {
+    echo "Installing system dependencies for Bambu Studio CLI..."
+    
+    # Check if we're running as root or can use sudo
+    if [ "$EUID" -eq 0 ]; then
+        APT_CMD="apt-get"
+    elif command -v sudo >/dev/null 2>&1; then
+        APT_CMD="sudo apt-get"
+    else
+        echo "Error: This script requires root privileges or sudo access to install system dependencies"
+        echo "Please run as root or ensure sudo is available"
+        exit 1
+    fi
+    
+    # Update package list
+    $APT_CMD update
+    
+    # Install comprehensive list of dependencies based on official Bambu Studio Dockerfile
+    # and additional runtime requirements
+    $APT_CMD install -y \
+        autoconf \
+        build-essential \
+        cmake \
+        curl \
+        xvfb \
+        eglexternalplatform-dev \
+        extra-cmake-modules \
+        file \
+        git \
+        gstreamer1.0-plugins-bad \
+        gstreamer1.0-libav \
+        libcairo2-dev \
+        libcurl4-openssl-dev \
+        libdbus-1-dev \
+        libglew-dev \
+        libglu1-mesa-dev \
+        libgstreamer1.0-dev \
+        libgstreamerd-3-dev \
+        libgstreamer-plugins-base1.0-dev \
+        libgstreamer-plugins-good1.0-dev \
+        libgtk-3-dev \
+        libosmesa6-dev \
+        libsecret-1-dev \
+        libsoup2.4-dev \
+        libssl3 \
+        libssl-dev \
+        libudev-dev \
+        libwayland-dev \
+        libxkbcommon-dev \
+        locales \
+        locales-all \
+        m4 \
+        pkgconf \
+        sudo \
+        wayland-protocols \
+        libwebkit2gtk-4.1-dev \
+        wget \
+        binutils \
+        fuse \
+        libfuse2 \
+        libxcb1 \
+        libxcb-icccm4 \
+        libxcb-image0 \
+        libxcb-keysyms1 \
+        libxcb-randr0 \
+        libxcb-render-util0 \
+        libxcb-render0 \
+        libxcb-shape0 \
+        libxcb-sync1 \
+        libxcb-util1 \
+        libxcb-xfixes0 \
+        libxcb-xinerama0 \
+        libxcb-xkb1 \
+        libxkbcommon-x11-0 \
+        libxkbcommon0 \
+        ca-certificates \
+        gnupg \
+        libegl1 \
+        libegl-mesa0 \
+        libgl1-mesa-dri \
+        libopengl0 \
+        libgstreamer1.0-0 \
+        libgstreamer-plugins-base1.0-0 \
+        libsoup-2.4-1 \
+        libgtk-3-0t64 \
+        libglib2.0-0t64 \
+        libdbus-1-3 \
+        libfontconfig1 \
+        libfreetype6 \
+        libgssapi-krb5-2 \
+        libdrm2 \
+        libxss1 \
+        libasound2t64 \
+        libxrandr2 \
+        libxcomposite1 \
+        libxdamage1 \
+        libxi6 \
+        libxfixes3 \
+        libxcursor1 \
+        libxinerama1 \
+        libwebkit2gtk-4.1-0
+    
+    echo "System dependencies installed successfully"
+}
+
+# Parse command line arguments
+INSTALL_DEPS=true
+for arg in "$@"; do
+    case $arg in
+        --skip-deps)
+            INSTALL_DEPS=false
+            shift
+            ;;
+        --help)
+            echo "Usage: $0 [--skip-deps] [--help]"
+            echo ""
+            echo "Options:"
+            echo "  --skip-deps  Skip installation of system dependencies"
+            echo "  --help       Show this help message"
+            echo ""
+            echo "Environment variables:"
+            echo "  BAMBU_VERSION  Version to install (default: latest)"
+            exit 0
+            ;;
+    esac
+done
+
+# Install system dependencies unless skipped
+if [ "$INSTALL_DEPS" = true ]; then
+    install_system_dependencies
+else
+    echo "Skipping system dependencies installation (--skip-deps flag used)"
+fi
+
+echo "Installing Bambu Studio CLI binary..."
 
 # Configuration
 # Read version from configuration file, fall back to environment variable, then to "latest"
