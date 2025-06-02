@@ -14,6 +14,7 @@ from pydantic import BaseModel
 from app.model_service import (ModelService, ModelValidationError,
                                ModelDownloadError)
 from app.slicer_service import slice_model
+from app.config import config
 
 app = FastAPI(
     title="LANbu Handy",
@@ -70,6 +71,21 @@ async def status():
     """
     return {"status": "ok", "application_name": "LANbu Handy",
             "version": "0.0.1"}
+
+
+@app.get("/api/config")
+async def get_config():
+    """
+    Get application configuration status.
+    
+    Returns information about printer configuration and other settings.
+    """
+    # Import config inside the function so it can be mocked
+    from app.config import config
+    return {
+        "printer_configured": config.is_printer_configured(),
+        "printer_ip": config.get_printer_ip() if config.is_printer_configured() else None
+    }
 
 
 # Pydantic models for API requests/responses

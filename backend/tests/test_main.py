@@ -43,6 +43,34 @@ class TestHealthEndpoints:
         assert data["application_name"] == "LANbu Handy"
 
 
+class TestConfigEndpoint:
+    """Test cases for config endpoints."""
+
+    def test_config_endpoint_with_printer_ip(self):
+        """Test config endpoint when printer IP is configured."""
+        with patch('app.config.config') as mock_config:
+            mock_config.is_printer_configured.return_value = True
+            mock_config.get_printer_ip.return_value = "192.168.1.100"
+            
+            response = client.get("/api/config")
+            assert response.status_code == 200
+            data = response.json()
+            assert data["printer_configured"] is True
+            assert data["printer_ip"] == "192.168.1.100"
+
+    def test_config_endpoint_without_printer_ip(self):
+        """Test config endpoint when printer IP is not configured."""
+        with patch('app.config.config') as mock_config:
+            mock_config.is_printer_configured.return_value = False
+            mock_config.get_printer_ip.return_value = None
+            
+            response = client.get("/api/config")
+            assert response.status_code == 200
+            data = response.json()
+            assert data["printer_configured"] is False
+            assert data["printer_ip"] is None
+
+
 class TestModelSubmissionEndpoint:
     """Test cases for the model URL submission endpoint."""
 

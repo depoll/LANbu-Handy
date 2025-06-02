@@ -5,6 +5,9 @@ services:
       - "8080:8000"
     restart: unless-stopped
     environment:
-      # Placeholder environment variables for future configuration
+      # Set your Bambu printer's IP address for LAN-only mode communication
+      # Example: BAMBU_PRINTER_IP=192.168.1.100
+      # You can set this via environment variable or uncomment and modify the line below:
+      # - BAMBU_PRINTER_IP=192.168.1.100
       - BAMBU_PRINTER_IP=${BAMBU_PRINTER_IP:-}
       - LOG_LEVEL=${LOG_LEVEL:-info}
