@@ -163,17 +163,23 @@ install_system_dependencies() {
 
 # Parse command line arguments
 INSTALL_DEPS=true
+DEPS_ONLY=false
 for arg in "$@"; do
     case $arg in
         --skip-deps)
             INSTALL_DEPS=false
             shift
             ;;
+        --deps-only)
+            DEPS_ONLY=true
+            shift
+            ;;
         --help)
-            echo "Usage: $0 [--skip-deps] [--help]"
+            echo "Usage: $0 [--skip-deps] [--deps-only] [--help]"
             echo ""
             echo "Options:"
             echo "  --skip-deps  Skip installation of system dependencies"
+            echo "  --deps-only  Install only system dependencies (skip CLI download)"
             echo "  --help       Show this help message"
             echo ""
             echo "Environment variables:"
@@ -188,6 +194,17 @@ if [ "$INSTALL_DEPS" = true ]; then
     install_system_dependencies
 else
     echo "Skipping system dependencies installation (--skip-deps flag used)"
+fi
+
+# If deps-only mode, exit after installing dependencies
+if [ "$DEPS_ONLY" = true ]; then
+    if [ "$INSTALL_DEPS" = true ]; then
+        echo "Dependencies-only installation completed (--deps-only flag used)"
+    else
+        echo "Dependencies-only mode requested but dependencies were skipped (--skip-deps flag used)"
+    fi
+    echo "Skipping CLI binary download and installation"
+    exit 0
 fi
 
 echo "Installing Bambu Studio CLI binary..."
