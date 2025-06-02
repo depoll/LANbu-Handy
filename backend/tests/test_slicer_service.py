@@ -525,7 +525,8 @@ def is_cli_available():
 
 
 class TestEndToEndSlicing:
-    """End-to-end tests that actually use the Bambu Studio CLI with real 3MF files."""
+    """End-to-end tests that actually use the Bambu Studio CLI with real
+    3MF files."""
 
     @pytest.mark.skipif(not is_cli_available(),
                         reason="Bambu Studio CLI not available")
@@ -547,9 +548,9 @@ class TestEndToEndSlicing:
             wrapper = BambuStudioCLIWrapper()
             result = wrapper.slice_model(test_file, output_dir)
 
-            # The result might fail with specific error messages about missing profiles
-            # or other configuration, but the CLI should at least attempt to process
-            # the file and give us meaningful output
+            # The result might fail with specific error messages about missing
+            # profiles or other configuration, but the CLI should at least
+            # attempt to process the file and give us meaningful output
             expected_exit_codes = [0, 1]
             assert result.exit_code in expected_exit_codes, \
                 f"Unexpected exit code: {result.exit_code}"
@@ -624,7 +625,8 @@ class TestEndToEndSlicing:
         with tempfile.TemporaryDirectory() as temp_dir:
             output_dir = Path(temp_dir)
 
-            # Test with some potential CLI options (may not work without proper setup)
+            # Test with some potential CLI options (may not work without proper
+            # setup)
             options = {
                 "layer-height": "0.2",
                 "infill": "15"
@@ -651,7 +653,8 @@ class TestEndToEndSlicing:
         assert len(result.stdout) > 0, "No version output"
         has_expected_content = ("bambu" in result.stdout.lower() or
                                 "studio" in result.stdout.lower())
-        assert has_expected_content, f"Unexpected version output: {result.stdout}"
+        assert has_expected_content, \
+            f"Unexpected version output: {result.stdout}"
 
     @pytest.mark.skipif(not is_cli_available(),
                         reason="Bambu Studio CLI not available")
@@ -668,19 +671,22 @@ class TestEndToEndSlicing:
         assert has_help_content, f"Unexpected help output: {result.stdout}"
 
     def test_cli_availability_check(self):
-        """Test the CLI availability check (should work regardless of CLI presence)."""
+        """Test the CLI availability check (should work regardless of CLI
+        presence)."""
         result = check_cli_availability()
 
         # This should match the actual CLI availability
         expected_available = is_cli_available()
         availability_matches = result.success == expected_available
         assert availability_matches, \
-            f"CLI availability check mismatch: expected {expected_available}, " \
-            f"got {result.success}"
+            f"CLI availability check mismatch: expected " \
+            f"{expected_available}, got {result.success}"
 
         if not result.success:
             # Should have meaningful error message when CLI is not available
-            has_error_message = ("not found" in result.stderr.lower() or
-                                 "command not found" in result.stderr.lower() or
-                                 len(result.stderr) > 0)
-            assert has_error_message, "Expected error message when CLI not available"
+            has_error_message = (
+                "not found" in result.stderr.lower() or
+                "command not found" in result.stderr.lower() or
+                len(result.stderr) > 0)
+            assert has_error_message, \
+                "Expected error message when CLI not available"
