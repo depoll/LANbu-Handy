@@ -2,16 +2,27 @@
 # This file initializes the development environment with all required dependencies
 # for working on the LANbu Handy PWA and backend services.
 
-name: Setup LANbu Handy Development Environment
+name: "Copilot Setup Steps"
 
-"on":
-  workflow_dispatch:
+# Allow testing of the setup steps from your repository's "Actions" tab.
+on: workflow_dispatch
 
 jobs:
-  setup:
+  # The job MUST be called `copilot-setup-steps` or it will not be picked up by Copilot.
+  copilot-setup-steps:
     runs-on: ubuntu-latest
+
+    # Set the permissions to the lowest permissions possible needed for your steps.
+    # Copilot will be given its own token for its operations.
+    permissions:
+      # If you want to clone the repository as part of your setup steps, for example to install dependencies, you'll need the `contents: read` permission. If you don't clone the repository in your setup steps, Copilot will do this for you automatically after the steps complete.
+      contents: read
+
+    # You can define any steps you want, and they will run before the agent starts.
+    # If you do not check out your code, Copilot will do this for you.
     steps:
-      # Step 1: Setup Python environment
+      - name: Checkout code
+        uses: actions/checkout@v4
       - name: Setup Python environment
         run: |
           # Ensure Python 3.12 is available
@@ -22,7 +33,6 @@ jobs:
           
           echo "✅ Python environment ready"
 
-      # Step 2: Install backend dependencies
       - name: Install backend dependencies  
         run: |
           # Install core backend dependencies
@@ -34,7 +44,6 @@ jobs:
           
           echo "✅ Backend dependencies installed"
 
-      # Step 3: Setup Node.js environment
       - name: Setup Node.js environment
         run: |
           # Verify Node.js version (should be 20+)
@@ -43,7 +52,6 @@ jobs:
           
           echo "✅ Node.js environment ready"
 
-      # Step 4: Install PWA dependencies
       - name: Install PWA dependencies
         run: |
           # Install PWA dependencies
@@ -52,7 +60,6 @@ jobs:
           
           echo "✅ PWA dependencies installed"
 
-      # Step 5: Install Bambu Studio CLI
       - name: Install Bambu Studio CLI
         run: |
           # Make installation script executable
@@ -63,7 +70,6 @@ jobs:
           
           echo "✅ Bambu Studio CLI installed"
 
-      # Step 6: Verify installations
       - name: Verify installations
         run: |
           echo "🧪 Validating development environment..."
@@ -91,7 +97,6 @@ jobs:
           
           echo "🎉 Development environment validation complete!"
 
-      # Step 7: Setup virtual display for headless testing
       - name: Setup headless display
         run: |
           # Install Xvfb if not available and we're on Linux
@@ -116,7 +121,6 @@ jobs:
             echo "ℹ️  Virtual display setup skipped (not Linux)"
           fi
 
-      # Step 8: Environment summary
       - name: Environment summary
         run: |
           echo ""
