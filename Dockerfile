@@ -24,16 +24,16 @@ FROM python:3.12-slim
 # Set working directory
 WORKDIR /app
 
-# Copy and install Python dependencies
-COPY backend/requirements.txt ./backend/
-RUN pip install --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host files.pythonhosted.org --no-cache-dir -r backend/requirements.txt
-
 # Install Bambu Studio CLI and dependencies
 COPY scripts/bambu-studio-version.txt /scripts/
 COPY scripts/install-bambu-studio-cli.sh /tmp/
 RUN chmod +x /tmp/install-bambu-studio-cli.sh && \
     /tmp/install-bambu-studio-cli.sh && \
     rm /tmp/install-bambu-studio-cli.sh
+
+# Copy and install Python dependencies
+COPY backend/requirements.txt ./backend/
+RUN pip install --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host files.pythonhosted.org --no-cache-dir -r backend/requirements.txt
 
 # Copy backend application
 COPY backend/ ./
