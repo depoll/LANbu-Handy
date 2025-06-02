@@ -88,3 +88,5 @@ LANbu Handy is designed as an "all-in-one" Dockerized application:
 * **Hardcoding paths or sensitive info**: Use relative paths, environment variables, or configuration files.
 
 By following these guidelines, Copilot Workspace can be a powerful assistant in building LANbu Handy efficiently and correctly.
+
+Any new code must pass existing checks -- validate this before committing any change.
