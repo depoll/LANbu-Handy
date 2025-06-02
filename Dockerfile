@@ -1,11 +1,30 @@
-# LANbu Handy - All-in-One Docker Image
+# LANbu Handy - All-in-One Docker Image (Multi-stage Build)
 
+# Stage 1: PWA Build Stage
+FROM node:18-slim AS pwa-builder
+
+WORKDIR /app/pwa
+
+# Copy package files first for better layer caching
+COPY pwa/package*.json ./
+
+# Configure npm for restrictive environments and install dependencies
+RUN npm config set strict-ssl false && \
+    npm config set registry https://registry.npmjs.org/ && \
+    npm install -g typescript@5.8.3 && \
+    npm ci --no-audit --no-fund --prefer-offline --progress=false || npm install --no-audit --no-fund
+
+# Copy PWA source and build
+COPY pwa/ ./
+RUN npm run build
+
+# Stage 2: Python Runtime Stage
 FROM python:3.12-slim
 
 # Set working directory
 WORKDIR /app
 
-# Install system dependencies including Node.js for PWA build
+# Install system dependencies for Bambu Studio CLI
 RUN apt-get update && apt-get install -y \
     curl \
     wget \
@@ -31,10 +50,6 @@ RUN apt-get update && apt-get install -y \
     gnupg \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Node.js from official Debian repos (might be older but more reliable)
-RUN apt-get update && apt-get install -y nodejs npm \
-    && rm -rf /var/lib/apt/lists/*
-
 # Copy and install Python dependencies
 COPY backend/requirements.txt ./backend/
 RUN pip install --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host files.pythonhosted.org --no-cache-dir -r backend/requirements.txt
@@ -46,36 +61,11 @@ RUN chmod +x /tmp/install-bambu-studio-cli.sh && \
     /tmp/install-bambu-studio-cli.sh && \
     rm /tmp/install-bambu-studio-cli.sh
 
-# Build PWA within Docker - with optimized settings
-COPY pwa/package*.json ./pwa/
-WORKDIR /app/pwa
-
-# Try to install dependencies with timeout and optimizations
-RUN timeout 120 npm ci --no-audit --no-fund --prefer-offline --progress=false || \
-    (echo "NPM install timed out or failed. PWA build requires manual build step." && \
-     mkdir -p /app/static_pwa && \
-     echo "<html><body><h1>PWA Build Required</h1><p>Please build the PWA manually with 'cd pwa && npm run build' before running Docker build.</p></body></html>" > /app/static_pwa/index.html && \
-     exit 0)
-
-# Copy PWA source and build it (only if npm ci succeeded)
-COPY pwa/ ./
-RUN if [ -d "node_modules" ]; then \
-        npm run build && \
-        mkdir -p /app/static_pwa && \
-        cp -r dist/* /app/static_pwa/; \
-    else \
-        echo "Skipping PWA build due to dependency installation failure"; \
-    fi
-
-# Return to main working directory and copy backend
-WORKDIR /app
+# Copy backend application
 COPY backend/ ./
 
-# Ensure static_pwa directory exists with fallback content if needed
-RUN mkdir -p ./static_pwa && \
-    if [ ! -f "./static_pwa/index.html" ]; then \
-        echo "<html><body><h1>PWA Build Required</h1><p>Please build the PWA manually with 'cd pwa && npm run build' and rebuild the Docker image.</p></body></html>" > ./static_pwa/index.html; \
-    fi
+# Copy built PWA from the build stage
+COPY --from=pwa-builder /app/pwa/dist ./static_pwa
 
 # Expose the port the app runs on
 EXPOSE 8000
