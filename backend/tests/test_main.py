@@ -198,7 +198,7 @@ class TestSliceEndpoint:
     def test_slice_success(self, mock_slice_model, temp_model_file):
         """Test successful slicing with mocked CLI."""
         from app.slicer_service import CLIResult
-        
+
         # Mock successful slicing
         mock_slice_model.return_value = CLIResult(
             exit_code=0,
@@ -210,7 +210,7 @@ class TestSliceEndpoint:
         # Create a temporary file in the model service directory
         from app.main import model_service
         import shutil
-        
+
         test_file_id = f"test_{Path(temp_model_file).name}"
         test_file_path = model_service.temp_dir / test_file_id
         shutil.copy(temp_model_file, test_file_path)
@@ -231,7 +231,7 @@ class TestSliceEndpoint:
             mock_slice_model.assert_called_once()
             call_args = mock_slice_model.call_args
             assert str(call_args[1]["input_path"]).endswith(test_file_id)
-            
+
             # Verify default options were passed
             options = call_args[1]["options"]
             assert options["profile"] == "pla"
@@ -247,7 +247,7 @@ class TestSliceEndpoint:
     def test_slice_failure(self, mock_slice_model, temp_model_file):
         """Test slicing failure with mocked CLI."""
         from app.slicer_service import CLIResult
-        
+
         # Mock failed slicing
         mock_slice_model.return_value = CLIResult(
             exit_code=1,
@@ -259,7 +259,7 @@ class TestSliceEndpoint:
         # Create a temporary file in the model service directory
         from app.main import model_service
         import shutil
-        
+
         test_file_id = f"test_{Path(temp_model_file).name}"
         test_file_path = model_service.temp_dir / test_file_id
         shutil.copy(temp_model_file, test_file_path)

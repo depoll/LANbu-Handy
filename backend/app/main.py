@@ -13,7 +13,7 @@ from pydantic import BaseModel
 
 from app.model_service import (ModelService, ModelValidationError,
                                ModelDownloadError)
-from app.slicer_service import slice_model, CLIResult
+from app.slicer_service import slice_model
 
 app = FastAPI(
     title="LANbu Handy",
@@ -159,10 +159,10 @@ async def slice_model_with_defaults(request: SliceRequest):
     try:
         # Find the model file in the temp directory
         model_file_path = model_service.temp_dir / request.file_id
-        
+
         if not model_file_path.exists():
             raise HTTPException(
-                status_code=404, 
+                status_code=404,
                 detail=f"Model file not found: {request.file_id}"
             )
 
@@ -195,7 +195,7 @@ async def slice_model_with_defaults(request: SliceRequest):
             else:
                 # Fallback: use the output directory path
                 gcode_path = str(output_dir)
-            
+
             return SliceResponse(
                 success=True,
                 message="Model sliced successfully with default settings",
@@ -203,7 +203,8 @@ async def slice_model_with_defaults(request: SliceRequest):
             )
         else:
             # Return slicing failure
-            error_details = f"CLI Error: {result.stderr}" if result.stderr else result.stdout
+            error_details = (f"CLI Error: {result.stderr}"
+                             if result.stderr else result.stdout)
             return SliceResponse(
                 success=False,
                 message="Slicing failed",
