@@ -4,149 +4,147 @@
 
 name: Setup LANbu Handy Development Environment
 
-steps:
-  # Step 1: Setup Python environment
-  - name: Setup Python environment
-    description: Install Python 3.12 and ensure pip is available
-    run: |
-      # Ensure Python 3.12 is available
-      python3 --version
-      
-      # Upgrade pip to latest version
-      python3 -m pip install --upgrade pip
-      
-      echo "✅ Python environment ready"
+"on":
+  workflow_dispatch:
 
-  # Step 2: Install backend dependencies
-  - name: Install backend dependencies  
-    description: Install FastAPI, testing tools, and Python development dependencies
-    run: |
-      # Install core backend dependencies
-      cd backend
-      pip install -r requirements.txt
-      
-      # Install additional development and testing tools
-      pip install flake8 black mypy isort pytest-asyncio httpx requests
-      
-      echo "✅ Backend dependencies installed"
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    steps:
+      # Step 1: Setup Python environment
+      - name: Setup Python environment
+        run: |
+          # Ensure Python 3.12 is available
+          python3 --version
+          
+          # Upgrade pip to latest version
+          python3 -m pip install --upgrade pip
+          
+          echo "✅ Python environment ready"
 
-  # Step 3: Setup Node.js environment
-  - name: Setup Node.js environment
-    description: Ensure Node.js 20+ and npm are available
-    run: |
-      # Verify Node.js version (should be 20+)
-      node --version
-      npm --version
-      
-      echo "✅ Node.js environment ready"
+      # Step 2: Install backend dependencies
+      - name: Install backend dependencies  
+        run: |
+          # Install core backend dependencies
+          cd backend
+          pip install -r requirements.txt
+          
+          # Install additional development and testing tools
+          pip install flake8 black mypy isort pytest-asyncio httpx requests
+          
+          echo "✅ Backend dependencies installed"
 
-  # Step 4: Install PWA dependencies
-  - name: Install PWA dependencies
-    description: Install React, TypeScript, Vite and development tools
-    run: |
-      # Install PWA dependencies
-      cd pwa
-      npm install
-      
-      echo "✅ PWA dependencies installed"
+      # Step 3: Setup Node.js environment
+      - name: Setup Node.js environment
+        run: |
+          # Verify Node.js version (should be 20+)
+          node --version
+          npm --version
+          
+          echo "✅ Node.js environment ready"
 
-  # Step 5: Install Bambu Studio CLI
-  - name: Install Bambu Studio CLI
-    description: Install Bambu Studio CLI and system dependencies for 3D model slicing
-    run: |
-      # Make installation script executable
-      chmod +x scripts/install-bambu-studio-cli.sh
-      
-      # Install Bambu Studio CLI with all dependencies
-      scripts/install-bambu-studio-cli.sh
-      
-      echo "✅ Bambu Studio CLI installed"
+      # Step 4: Install PWA dependencies
+      - name: Install PWA dependencies
+        run: |
+          # Install PWA dependencies
+          cd pwa
+          npm install
+          
+          echo "✅ PWA dependencies installed"
 
-  # Step 6: Verify installations
-  - name: Verify installations
-    description: Run comprehensive validation of the development environment
-    run: |
-      echo "🧪 Validating development environment..."
-      
-      # Test Python environment
-      echo "Testing Python environment..."
-      python3 -c "import fastapi, uvicorn, pytest; print('✅ Core Python packages available')" || echo "❌ Some core Python packages missing"
-      
-      # Test linting tools
-      echo "Testing Python linting tools..."
-      python3 -c "import flake8, black, mypy, isort; print('✅ Python linting tools available')" || echo "❌ Some Python linting tools missing"
-      
-      # Test Node.js environment
-      echo "Testing Node.js environment..."
-      (cd pwa && npm list react react-dom typescript vite > /dev/null 2>&1 && echo "✅ Core PWA packages available") || echo "❌ Some PWA packages missing"
-      
-      # Test Bambu Studio CLI (if available)
-      echo "Testing Bambu Studio CLI..."
-      if command -v bambu-studio-cli > /dev/null 2>&1; then
-        echo "✅ Bambu Studio CLI available in PATH"
-        timeout 10 bambu-studio-cli --help > /dev/null 2>&1 && echo "✅ CLI help command works" || echo "⚠️  CLI help command failed (expected in headless environments)"
-      else
-        echo "⚠️  Bambu Studio CLI not in PATH (this is expected if installation failed)"
-      fi
-      
-      echo "🎉 Development environment validation complete!"
+      # Step 5: Install Bambu Studio CLI
+      - name: Install Bambu Studio CLI
+        run: |
+          # Make installation script executable
+          chmod +x scripts/install-bambu-studio-cli.sh
+          
+          # Install Bambu Studio CLI with all dependencies
+          scripts/install-bambu-studio-cli.sh
+          
+          echo "✅ Bambu Studio CLI installed"
 
-  # Step 7: Setup virtual display for headless testing
-  - name: Setup headless display
-    description: Configure Xvfb for headless GUI testing (Linux environments)
-    run: |
-      # Install Xvfb if not available and we're on Linux
-      if [ "$(uname)" = "Linux" ]; then
-        # Check if Xvfb is available, install if needed
-        if ! command -v Xvfb > /dev/null 2>&1; then
-          echo "Installing Xvfb for headless testing..."
-          if command -v apt-get > /dev/null 2>&1; then
-            sudo apt-get update && sudo apt-get install -y xvfb
-          elif command -v yum > /dev/null 2>&1; then
-            sudo yum install -y xorg-x11-server-Xvfb
+      # Step 6: Verify installations
+      - name: Verify installations
+        run: |
+          echo "🧪 Validating development environment..."
+          
+          # Test Python environment
+          echo "Testing Python environment..."
+          python3 -c "import fastapi, uvicorn, pytest; print('✅ Core Python packages available')" || echo "❌ Some core Python packages missing"
+          
+          # Test linting tools
+          echo "Testing Python linting tools..."
+          python3 -c "import flake8, black, mypy, isort; print('✅ Python linting tools available')" || echo "❌ Some Python linting tools missing"
+          
+          # Test Node.js environment
+          echo "Testing Node.js environment..."
+          (cd pwa && npm list react react-dom typescript vite > /dev/null 2>&1 && echo "✅ Core PWA packages available") || echo "❌ Some PWA packages missing"
+          
+          # Test Bambu Studio CLI (if available)
+          echo "Testing Bambu Studio CLI..."
+          if command -v bambu-studio-cli > /dev/null 2>&1; then
+            echo "✅ Bambu Studio CLI available in PATH"
+            timeout 10 bambu-studio-cli --help > /dev/null 2>&1 && echo "✅ CLI help command works" || echo "⚠️  CLI help command failed (expected in headless environments)"
           else
-            echo "⚠️  Could not install Xvfb automatically"
+            echo "⚠️  Bambu Studio CLI not in PATH (this is expected if installation failed)"
           fi
-        fi
-        
-        # Start virtual display for testing
-        export DISPLAY=:99
-        Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
-        echo "✅ Virtual display configured"
-      else
-        echo "ℹ️  Virtual display setup skipped (not Linux)"
-      fi
+          
+          echo "🎉 Development environment validation complete!"
 
-  # Step 8: Environment summary
-  - name: Environment summary
-    description: Display setup summary and next steps
-    run: |
-      echo ""
-      echo "🚀 LANbu Handy Development Environment Ready!"
-      echo "=============================================="
-      echo ""
-      echo "📦 Installed Components:"
-      echo "  • Python $(python3 --version | cut -d' ' -f2) with FastAPI backend dependencies"
-      echo "  • Node.js $(node --version) with React PWA dependencies"
-      echo "  • Development tools: flake8, black, mypy, isort, ESLint, TypeScript"
-      echo "  • Testing tools: pytest, Jest/Vitest ready"
-      if command -v bambu-studio-cli > /dev/null 2>&1; then
-        echo "  • Bambu Studio CLI for 3D model slicing"
-      else
-        echo "  • Bambu Studio CLI (installation may require system dependencies)"
-      fi
-      if [ "$(uname)" = "Linux" ]; then
-        echo "  • Xvfb virtual display for headless testing"
-      fi
-      echo ""
-      echo "🛠️  Quick Start Commands:"
-      echo "  Backend development:"
-      echo "    cd backend && uvicorn app.main:app --reload --host 0.0.0.0"
-      echo "  PWA development:"
-      echo "    cd pwa && npm run dev"
-      echo "  Run tests:"
-      echo "    cd backend && python -m pytest tests/ -v"
-      echo "  Lint code:"
-      echo "    python -m flake8 backend/ && cd pwa && npm run lint"
-      echo ""
-      echo "📚 See .devcontainer/README.md and scripts/README.md for more details"
+      # Step 7: Setup virtual display for headless testing
+      - name: Setup headless display
+        run: |
+          # Install Xvfb if not available and we're on Linux
+          if [ "$(uname)" = "Linux" ]; then
+            # Check if Xvfb is available, install if needed
+            if ! command -v Xvfb > /dev/null 2>&1; then
+              echo "Installing Xvfb for headless testing..."
+              if command -v apt-get > /dev/null 2>&1; then
+                sudo apt-get update && sudo apt-get install -y xvfb
+              elif command -v yum > /dev/null 2>&1; then
+                sudo yum install -y xorg-x11-server-Xvfb
+              else
+                echo "⚠️  Could not install Xvfb automatically"
+              fi
+            fi
+            
+            # Start virtual display for testing
+            export DISPLAY=:99
+            Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
+            echo "✅ Virtual display configured"
+          else
+            echo "ℹ️  Virtual display setup skipped (not Linux)"
+          fi
+
+      # Step 8: Environment summary
+      - name: Environment summary
+        run: |
+          echo ""
+          echo "🚀 LANbu Handy Development Environment Ready!"
+          echo "=============================================="
+          echo ""
+          echo "📦 Installed Components:"
+          echo "  • Python $(python3 --version | cut -d' ' -f2) with FastAPI backend dependencies"
+          echo "  • Node.js $(node --version) with React PWA dependencies"
+          echo "  • Development tools: flake8, black, mypy, isort, ESLint, TypeScript"
+          echo "  • Testing tools: pytest, Jest/Vitest ready"
+          if command -v bambu-studio-cli > /dev/null 2>&1; then
+            echo "  • Bambu Studio CLI for 3D model slicing"
+          else
+            echo "  • Bambu Studio CLI (installation may require system dependencies)"
+          fi
+          if [ "$(uname)" = "Linux" ]; then
+            echo "  • Xvfb virtual display for headless testing"
+          fi
+          echo ""
+          echo "🛠️  Quick Start Commands:"
+          echo "  Backend development:"
+          echo "    cd backend && uvicorn app.main:app --reload --host 0.0.0.0"
+          echo "  PWA development:"
+          echo "    cd pwa && npm run dev"
+          echo "  Run tests:"
+          echo "    cd backend && python -m pytest tests/ -v"
+          echo "  Lint code:"
+          echo "    python -m flake8 backend/ && cd pwa && npm run lint"
+          echo ""
+          echo "📚 See .devcontainer/README.md and scripts/README.md for more details"
