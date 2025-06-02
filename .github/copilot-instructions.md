@@ -91,5 +91,5 @@ By following these guidelines, Copilot Workspace can be a powerful assistant in 
 
 ## 8. Additional Guidelines
 
-* Any new code must pass existing checks -- validate this before committing any change.
+* Any new code must pass existing checks (CI, Linting, etc.) -- validate this before committing any change.
 * As much as feasible, do your work within the dev container for the project and keep the dev container definition up to date as requirements change.
