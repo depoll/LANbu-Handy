@@ -51,7 +51,9 @@ class TestConfigEndpoint:
         from app.config import PrinterConfig
 
         with patch('app.config.config') as mock_config:
-            mock_printer = PrinterConfig(name="Test Printer", ip="192.168.1.100", access_code="test123")
+            mock_printer = PrinterConfig(name="Test Printer",
+                                         ip="192.168.1.100",
+                                         access_code="test123")
             mock_config.is_printer_configured.return_value = True
             mock_config.get_printer_ip.return_value = "192.168.1.100"
             mock_config.get_printers.return_value = [mock_printer]
@@ -88,18 +90,21 @@ class TestConfigEndpoint:
 
         with patch('app.config.config') as mock_config:
             mock_printers = [
-                PrinterConfig(name="Living Room", ip="192.168.1.100", access_code="test123"),
-                PrinterConfig(name="Garage", ip="192.168.1.101", access_code="test456")
+                PrinterConfig(name="Living Room", ip="192.168.1.100",
+                              access_code="test123"),
+                PrinterConfig(name="Garage", ip="192.168.1.101",
+                              access_code="test456")
             ]
             mock_config.is_printer_configured.return_value = True
-            mock_config.get_printer_ip.return_value = "192.168.1.100"  # First printer
+            mock_config.get_printer_ip.return_value = "192.168.1.100"
             mock_config.get_printers.return_value = mock_printers
 
             response = client.get("/api/config")
             assert response.status_code == 200
             data = response.json()
             assert data["printer_configured"] is True
-            assert data["printer_ip"] == "192.168.1.100"  # Legacy field shows first printer
+            # Legacy field shows first printer
+            assert data["printer_ip"] == "192.168.1.100"
             assert data["printer_count"] == 2
             assert len(data["printers"]) == 2
             assert data["printers"][0]["name"] == "Living Room"

@@ -99,7 +99,7 @@ async def get_config():
         "printer_count": len(printers),
         # Legacy fields for backward compatibility
         "printer_ip": (config.get_printer_ip()
-                      if config.is_printer_configured() else None)
+                       if config.is_printer_configured() else None)
     }
 
 

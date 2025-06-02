@@ -69,30 +69,30 @@ class Config:
                         try:
                             if not isinstance(printer_data, dict):
                                 logger.error(f"Printer {i} must be a "
-                                           f"JSON object")
+                                             f"JSON object")
                                 continue
 
                             name = printer_data.get("name",
-                                                   f"Printer {i+1}")
+                                                    f"Printer {i+1}")
                             ip = printer_data.get("ip", "")
                             access_code = printer_data.get("access_code", "")
 
                             printer = PrinterConfig(name=name, ip=ip,
-                                                   access_code=access_code)
+                                                    access_code=access_code)
                             printers.append(printer)
                             logger.info(f"Configured printer: {printer.name} "
-                                      f"at {printer.ip}")
+                                        f"at {printer.ip}")
 
                         except (ValueError, KeyError) as e:
                             logger.error(f"Invalid configuration for "
-                                       f"printer {i}: {e}")
+                                         f"printer {i}: {e}")
                             continue
 
                     if printers:
                         return printers
                     else:
                         logger.warning("No valid printers found in "
-                                     "BAMBU_PRINTERS")
+                                       "BAMBU_PRINTERS")
 
             except json.JSONDecodeError as e:
                 logger.error(f"Invalid JSON in BAMBU_PRINTERS: {e}")
@@ -104,7 +104,7 @@ class Config:
             if legacy_ip:
                 # For legacy format, we need an access code too
                 legacy_access_code = os.getenv("BAMBU_PRINTER_ACCESS_CODE",
-                                              "")
+                                               "")
                 if not legacy_access_code.strip():
                     logger.warning("BAMBU_PRINTER_IP is set but "
                                    "BAMBU_PRINTER_ACCESS_CODE is missing. "
@@ -120,7 +120,7 @@ class Config:
                     )
                     printers.append(printer)
                     logger.info(f"Configured legacy printer: {printer.name} "
-                               f"at {printer.ip}")
+                                f"at {printer.ip}")
                     return printers
                 except ValueError as e:
                     logger.error(f"Invalid legacy printer configuration: {e}")
