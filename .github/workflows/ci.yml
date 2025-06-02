@@ -65,6 +65,13 @@ jobs:
           sudo chmod +x /usr/local/bin/bambu-studio-cli
         fi
         
+    - name: Install dependencies for cached CLI
+      if: steps.cache-bambu-cli.outputs.cache-hit == 'true'
+      run: |
+        echo "Installing system dependencies for cached CLI"
+        chmod +x scripts/install-bambu-studio-cli.sh
+        scripts/install-bambu-studio-cli.sh --deps-only
+        
     - name: Install backend dependencies
       run: |
         cd backend
