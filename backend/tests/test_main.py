@@ -504,37 +504,32 @@ class TestJobStartEndpoint:
 class TestAMSStatusEndpoint:
     """Test cases for AMS status endpoints."""
 
-    @patch('app.main.config')
+    @patch("app.main.config")
     def test_ams_status_successful(self, mock_config):
         """Test successful AMS status query."""
-        from app.printer_service import AMSStatusResult, AMSUnit, AMSFilament
         from app.config import PrinterConfig
+        from app.printer_service import AMSFilament, AMSStatusResult, AMSUnit
 
         # Mock configuration object
         mock_config.is_printer_configured.return_value = True
         test_printer = PrinterConfig(
-            name="test-printer",
-            ip="192.168.1.100",
-            access_code="12345678"
+            name="test-printer", ip="192.168.1.100", access_code="12345678"
         )
         mock_config.get_printer_by_name.return_value = test_printer
 
         # Mock successful AMS query result
         filament1 = AMSFilament(
-            slot_id=0, filament_type="PLA", color="Red",
-            material_id="BAMBU_PLA_RED"
+            slot_id=0, filament_type="PLA", color="Red", material_id="BAMBU_PLA_RED"
         )
-        filament2 = AMSFilament(
-            slot_id=1, filament_type="PETG", color="Blue"
-        )
+        filament2 = AMSFilament(slot_id=1, filament_type="PETG", color="Blue")
         ams_unit = AMSUnit(unit_id=0, filaments=[filament1, filament2])
 
         # Mock the printer service query
-        with patch('app.main.printer_service.query_ams_status') as mock_query:
+        with patch("app.main.printer_service.query_ams_status") as mock_query:
             mock_query.return_value = AMSStatusResult(
                 success=True,
                 message="AMS status retrieved successfully",
-                ams_units=[ams_unit]
+                ams_units=[ams_unit],
             )
 
             # Make the request
@@ -567,11 +562,10 @@ class TestAMSStatusEndpoint:
             assert filament_data2["material_id"] is None
 
             # Verify method calls
-            mock_config.get_printer_by_name.assert_called_once_with(
-                "test-printer")
+            mock_config.get_printer_by_name.assert_called_once_with("test-printer")
             mock_query.assert_called_once_with(test_printer)
 
-    @patch('app.main.config')
+    @patch("app.main.config")
     def test_ams_status_no_printers_configured(self, mock_config):
         """Test AMS status when no printers are configured."""
         mock_config.is_printer_configured.return_value = False
@@ -581,7 +575,7 @@ class TestAMSStatusEndpoint:
         assert response.status_code == 400
         assert "No printers configured" in response.json()["detail"]
 
-    @patch('app.main.config')
+    @patch("app.main.config")
     def test_ams_status_printer_not_found(self, mock_config):
         """Test AMS status when printer is not found."""
         from app.config import PrinterConfig
@@ -590,7 +584,7 @@ class TestAMSStatusEndpoint:
         mock_config.get_printer_by_name.return_value = None
         mock_config.get_printers.return_value = [
             PrinterConfig("printer1", "192.168.1.100", "12345678"),
-            PrinterConfig("printer2", "192.168.1.101", "87654321")
+            PrinterConfig("printer2", "192.168.1.101", "87654321"),
         ]
 
         response = client.get("/api/printer/nonexistent/ams-status")
@@ -601,27 +595,23 @@ class TestAMSStatusEndpoint:
         assert "printer1" in data["detail"]
         assert "printer2" in data["detail"]
 
-    @patch('app.main.config')
+    @patch("app.main.config")
     def test_ams_status_default_printer(self, mock_config):
         """Test AMS status using 'default' printer ID."""
-        from app.printer_service import AMSStatusResult
         from app.config import PrinterConfig
+        from app.printer_service import AMSStatusResult
 
         # Mock configuration
         mock_config.is_printer_configured.return_value = True
         test_printer = PrinterConfig(
-            name="default-printer",
-            ip="192.168.1.100",
-            access_code="12345678"
+            name="default-printer", ip="192.168.1.100", access_code="12345678"
         )
         mock_config.get_default_printer.return_value = test_printer
 
         # Mock AMS query result
-        with patch('app.main.printer_service.query_ams_status') as mock_query:
+        with patch("app.main.printer_service.query_ams_status") as mock_query:
             mock_query.return_value = AMSStatusResult(
-                success=True,
-                message="AMS status retrieved",
-                ams_units=[]
+                success=True, message="AMS status retrieved", ams_units=[]
             )
 
             # Make the request with 'default' printer ID
@@ -635,27 +625,25 @@ class TestAMSStatusEndpoint:
             mock_config.get_default_printer.assert_called_once()
             mock_query.assert_called_once_with(test_printer)
 
-    @patch('app.main.config')
+    @patch("app.main.config")
     def test_ams_status_query_failure(self, mock_config):
         """Test AMS status when query fails."""
-        from app.printer_service import AMSStatusResult
         from app.config import PrinterConfig
+        from app.printer_service import AMSStatusResult
 
         # Mock configuration
         mock_config.is_printer_configured.return_value = True
         test_printer = PrinterConfig(
-            name="test-printer",
-            ip="192.168.1.100",
-            access_code="12345678"
+            name="test-printer", ip="192.168.1.100", access_code="12345678"
         )
         mock_config.get_printer_by_name.return_value = test_printer
 
         # Mock failed AMS query
-        with patch('app.main.printer_service.query_ams_status') as mock_query:
+        with patch("app.main.printer_service.query_ams_status") as mock_query:
             mock_query.return_value = AMSStatusResult(
                 success=False,
                 message="MQTT communication failed",
-                error_details="Connection timeout"
+                error_details="Connection timeout",
             )
 
             response = client.get("/api/printer/test-printer/ams-status")
@@ -669,25 +657,22 @@ class TestAMSStatusEndpoint:
             assert data["error_details"] == "Connection timeout"
             assert data["ams_units"] is None
 
-    @patch('app.main.config')
+    @patch("app.main.config")
     def test_ams_status_mqtt_exception(self, mock_config):
         """Test AMS status when MQTT exception is raised."""
-        from app.printer_service import PrinterMQTTError
         from app.config import PrinterConfig
+        from app.printer_service import PrinterMQTTError
 
         # Mock configuration
         mock_config.is_printer_configured.return_value = True
         test_printer = PrinterConfig(
-            name="test-printer",
-            ip="192.168.1.100",
-            access_code="12345678"
+            name="test-printer", ip="192.168.1.100", access_code="12345678"
         )
         mock_config.get_printer_by_name.return_value = test_printer
 
         # Mock MQTT exception
-        with patch('app.main.printer_service.query_ams_status') as mock_query:
-            mock_query.side_effect = PrinterMQTTError(
-                "MQTT broker unreachable")
+        with patch("app.main.printer_service.query_ams_status") as mock_query:
+            mock_query.side_effect = PrinterMQTTError("MQTT broker unreachable")
 
             response = client.get("/api/printer/test-printer/ams-status")
 

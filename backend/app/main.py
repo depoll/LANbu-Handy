@@ -9,11 +9,6 @@ import tempfile
 from pathlib import Path
 from typing import List, Optional
 
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
-
 from app.config import config
 from app.model_service import ModelDownloadError, ModelService, ModelValidationError
 from app.printer_service import (
@@ -22,6 +17,10 @@ from app.printer_service import (
     PrinterService,
 )
 from app.slicer_service import slice_model
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 
 app = FastAPI(
     title="LANbu Handy",
@@ -515,8 +514,7 @@ async def start_basic_job(request: JobStartRequest):
         raise HTTPException(status_code=500, detail=msg)
 
 
-@app.get("/api/printer/{printer_id}/ams-status",
-         response_model=AMSStatusResponse)
+@app.get("/api/printer/{printer_id}/ams-status", response_model=AMSStatusResponse)
 async def get_ams_status(printer_id: str):
     """
     Query the printer's AMS status.
@@ -538,8 +536,7 @@ async def get_ams_status(printer_id: str):
         if not config.is_printer_configured():
             raise HTTPException(
                 status_code=400,
-                detail="No printers configured. "
-                       "Please configure a printer first."
+                detail="No printers configured. " "Please configure a printer first.",
             )
 
         # Find the printer by ID/name
@@ -557,7 +554,7 @@ async def get_ams_status(printer_id: str):
             raise HTTPException(
                 status_code=404,
                 detail=f"Printer '{printer_id}' not found. "
-                       f"Available printers: {available_printers}"
+                f"Available printers: {available_printers}",
             )
 
         # Query AMS status
@@ -575,40 +572,37 @@ async def get_ams_status(printer_id: str):
                                 slot_id=filament.slot_id,
                                 filament_type=filament.filament_type,
                                 color=filament.color,
-                                material_id=filament.material_id
+                                material_id=filament.material_id,
                             )
                             filaments_response.append(filament_response)
 
                         unit_response = AMSUnitResponse(
-                            unit_id=ams_unit.unit_id,
-                            filaments=filaments_response
+                            unit_id=ams_unit.unit_id, filaments=filaments_response
                         )
                         ams_units_response.append(unit_response)
 
                 return AMSStatusResponse(
                     success=True,
                     message=ams_result.message,
-                    ams_units=ams_units_response
+                    ams_units=ams_units_response,
                 )
             else:
                 # Query failed
                 return AMSStatusResponse(
                     success=False,
                     message=ams_result.message,
-                    error_details=ams_result.error_details
+                    error_details=ams_result.error_details,
                 )
 
         except PrinterMQTTError as e:
             return AMSStatusResponse(
-                success=False,
-                message="MQTT communication error",
-                error_details=str(e)
+                success=False, message="MQTT communication error", error_details=str(e)
             )
         except PrinterCommunicationError as e:
             return AMSStatusResponse(
                 success=False,
                 message="Printer communication error",
-                error_details=str(e)
+                error_details=str(e),
             )
 
     except HTTPException:

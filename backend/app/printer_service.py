@@ -71,6 +71,7 @@ class MQTTResult:
 @dataclass
 class AMSFilament:
     """Information about a filament in an AMS slot."""
+
     slot_id: int
     filament_type: str  # e.g., "PLA", "PETG", "ABS"
     color: str  # e.g., "Red", "Blue", "#FF0000"
@@ -80,6 +81,7 @@ class AMSFilament:
 @dataclass
 class AMSUnit:
     """Information about an AMS unit."""
+
     unit_id: int
     filaments: List[AMSFilament]
 
@@ -87,6 +89,7 @@ class AMSUnit:
 @dataclass
 class AMSStatusResult:
     """Result of an AMS status query."""
+
     success: bool
     message: str
     ams_units: List[AMSUnit] = None
@@ -433,9 +436,7 @@ class PrinterService:
                 logger.debug(f"Error during MQTT cleanup: {e}")
 
     def query_ams_status(
-        self,
-        printer_config: PrinterConfig,
-        timeout: Optional[int] = None
+        self, printer_config: PrinterConfig, timeout: Optional[int] = None
     ) -> AMSStatusResult:
         """Query the printer's AMS status via MQTT.
 
@@ -471,8 +472,7 @@ class PrinterService:
                 nonlocal connection_successful, connection_error
                 if reason_code == 0:
                     connection_successful = True
-                    logger.debug(
-                        f"MQTT connected to printer {printer_config.ip}")
+                    logger.debug(f"MQTT connected to printer {printer_config.ip}")
 
                     # Subscribe to response topic immediately after connection
                     response_topic = (
@@ -482,15 +482,15 @@ class PrinterService:
                     logger.debug(f"Subscribed to topic: {response_topic}")
                 else:
                     connection_error = (
-                        f"MQTT connection failed with reason code: "
-                        f"{reason_code}")
+                        f"MQTT connection failed with reason code: " f"{reason_code}"
+                    )
                     logger.error(connection_error)
 
             def on_message(client, userdata, msg):
                 nonlocal response_data, response_received
                 try:
                     # Parse the JSON response
-                    payload = msg.payload.decode('utf-8')
+                    payload = msg.payload.decode("utf-8")
                     logger.debug(f"Received MQTT message: {payload}")
 
                     response_json = json.loads(payload)
@@ -511,16 +511,14 @@ class PrinterService:
                 nonlocal publish_error
                 if reason_code != 0:
                     publish_error = (
-                        f"MQTT publish failed with reason code: "
-                        f"{reason_code}")
+                        f"MQTT publish failed with reason code: " f"{reason_code}"
+                    )
                     logger.error(publish_error)
                 else:
                     logger.debug("MQTT AMS query published successfully")
 
-            def on_disconnect(client, userdata, flags, reason_code,
-                              properties):
-                logger.debug(
-                    f"MQTT disconnected from printer {printer_config.ip}")
+            def on_disconnect(client, userdata, flags, reason_code, properties):
+                logger.debug(f"MQTT disconnected from printer {printer_config.ip}")
 
             # Set up MQTT callbacks
             client.on_connect = on_connect
@@ -537,9 +535,11 @@ class PrinterService:
             # Connect to MQTT broker
             logger.debug(
                 f"Connecting to MQTT broker at "
-                f"{printer_config.ip}:{self.DEFAULT_MQTT_PORT}")
-            client.connect(printer_config.ip, self.DEFAULT_MQTT_PORT,
-                           self.DEFAULT_MQTT_KEEPALIVE)
+                f"{printer_config.ip}:{self.DEFAULT_MQTT_PORT}"
+            )
+            client.connect(
+                printer_config.ip, self.DEFAULT_MQTT_PORT, self.DEFAULT_MQTT_KEEPALIVE
+            )
 
             # Start the network loop
             client.loop_start()
@@ -558,20 +558,13 @@ class PrinterService:
 
             # Bambu Lab AMS status query command
             # This requests the current printer status, which includes AMS info
-            device_topic = (
-                f"device/{printer_config.ip.replace('.', '_')}/request")
+            device_topic = f"device/{printer_config.ip.replace('.', '_')}/request"
 
             # Query command to get printer status including AMS
-            status_query = {
-                "pushing": {
-                    "sequence_id": "1",
-                    "command": "pushall"
-                }
-            }
+            status_query = {"pushing": {"sequence_id": "1", "command": "pushall"}}
 
             message = json.dumps(status_query)
-            logger.debug(
-                f"Publishing AMS query to topic {device_topic}: {message}")
+            logger.debug(f"Publishing AMS query to topic {device_topic}: {message}")
 
             # Publish the query message
             msg_info = client.publish(device_topic, message, qos=1)
@@ -596,11 +589,12 @@ class PrinterService:
             if not response_received:
                 logger.warning(
                     f"No AMS status response received from printer "
-                    f"{printer_config.name} within {timeout} seconds")
+                    f"{printer_config.name} within {timeout} seconds"
+                )
                 return AMSStatusResult(
                     success=False,
                     message="No AMS status response received",
-                    error_details=f"Timeout after {timeout} seconds"
+                    error_details=f"Timeout after {timeout} seconds",
                 )
 
             # Parse the AMS data from the response
@@ -608,13 +602,14 @@ class PrinterService:
 
             logger.info(
                 f"Successfully retrieved AMS status from printer "
-                f"{printer_config.name}")
+                f"{printer_config.name}"
+            )
 
             return AMSStatusResult(
                 success=True,
                 message=f"AMS status retrieved successfully from "
-                        f"{printer_config.name}",
-                ams_units=ams_units
+                f"{printer_config.name}",
+                ams_units=ams_units,
             )
 
         except PrinterMQTTError:
@@ -623,19 +618,18 @@ class PrinterService:
 
         except Exception as e:
             error_msg = f"Unexpected error during AMS query: {str(e)}"
-            logger.error(f"AMS query failed for {printer_config.name}: "
-                         f"{error_msg}")
+            logger.error(f"AMS query failed for {printer_config.name}: " f"{error_msg}")
             raise PrinterMQTTError(error_msg)
 
         finally:
             # Always disconnect the MQTT client if it was created
             try:
-                if 'client' in locals():
+                if "client" in locals():
                     client.loop_stop()
                     client.disconnect()
                     logger.debug(
-                        f"MQTT client disconnected from "
-                        f"{printer_config.ip}")
+                        f"MQTT client disconnected from " f"{printer_config.ip}"
+                    )
             except Exception as e:
                 logger.debug(f"Error during MQTT cleanup: {e}")
 
@@ -687,15 +681,12 @@ class PrinterService:
                             slot_id=slot_id,
                             filament_type=filament_type,
                             color=color,
-                            material_id=tray.get("material_id")
+                            material_id=tray.get("material_id"),
                         )
                         filaments.append(filament)
 
                 # Create AMS unit with its filaments
-                ams_unit = AMSUnit(
-                    unit_id=unit_id,
-                    filaments=filaments
-                )
+                ams_unit = AMSUnit(unit_id=unit_id, filaments=filaments)
                 ams_units.append(ams_unit)
 
         except Exception as e:

@@ -13,7 +13,6 @@ from pathlib import Path
 from unittest.mock import Mock, mock_open, patch
 
 import pytest
-
 from app.config import PrinterConfig
 from app.printer_service import (
     AMSFilament,
@@ -102,10 +101,7 @@ class TestAMSDataStructures:
     def test_ams_filament_creation(self):
         """Test AMSFilament creation."""
         filament = AMSFilament(
-            slot_id=1,
-            filament_type="PLA",
-            color="Red",
-            material_id="BAMBU_PLA_RED"
+            slot_id=1, filament_type="PLA", color="Red", material_id="BAMBU_PLA_RED"
         )
 
         assert filament.slot_id == 1
@@ -115,11 +111,7 @@ class TestAMSDataStructures:
 
     def test_ams_filament_minimal(self):
         """Test AMSFilament with minimal required fields."""
-        filament = AMSFilament(
-            slot_id=0,
-            filament_type="PETG",
-            color="#FF0000"
-        )
+        filament = AMSFilament(slot_id=0, filament_type="PETG", color="#FF0000")
 
         assert filament.slot_id == 0
         assert filament.filament_type == "PETG"
@@ -130,7 +122,7 @@ class TestAMSDataStructures:
         """Test AMSUnit creation."""
         filaments = [
             AMSFilament(slot_id=0, filament_type="PLA", color="Red"),
-            AMSFilament(slot_id=1, filament_type="PETG", color="Blue")
+            AMSFilament(slot_id=1, filament_type="PETG", color="Blue"),
         ]
 
         unit = AMSUnit(unit_id=0, filaments=filaments)
@@ -146,9 +138,7 @@ class TestAMSDataStructures:
         unit = AMSUnit(unit_id=0, filaments=[filament])
 
         result = AMSStatusResult(
-            success=True,
-            message="AMS status retrieved successfully",
-            ams_units=[unit]
+            success=True, message="AMS status retrieved successfully", ams_units=[unit]
         )
 
         assert result.success is True
@@ -160,9 +150,7 @@ class TestAMSDataStructures:
     def test_ams_status_result_failure(self):
         """Test failed AMSStatusResult."""
         result = AMSStatusResult(
-            success=False,
-            message="AMS query failed",
-            error_details="MQTT timeout"
+            success=False, message="AMS query failed", error_details="MQTT timeout"
         )
 
         assert result.success is False
@@ -922,14 +910,13 @@ class TestAMSQuery:
     def test_printer_config(self):
         """Create a test printer configuration."""
         return PrinterConfig(
-            name="Test Printer",
-            ip="192.168.1.100",
-            access_code="12345678"
+            name="Test Printer", ip="192.168.1.100", access_code="12345678"
         )
 
-    @patch('paho.mqtt.client.Client')
-    def test_query_ams_status_successful(self, mock_mqtt_client_class,
-                                         printer_service, test_printer_config):
+    @patch("paho.mqtt.client.Client")
+    def test_query_ams_status_successful(
+        self, mock_mqtt_client_class, printer_service, test_printer_config
+    ):
         """Test successful AMS status query."""
         # Mock MQTT client
         mock_client = Mock()
@@ -937,7 +924,7 @@ class TestAMSQuery:
 
         # Mock successful connection
         def simulate_connection(*args, **kwargs):
-            if hasattr(mock_client, 'on_connect'):
+            if hasattr(mock_client, "on_connect"):
                 mock_client.on_connect(mock_client, None, None, 0, None)
 
         mock_client.loop_start.side_effect = simulate_connection
@@ -952,7 +939,7 @@ class TestAMSQuery:
 
         # Mock AMS response message
         def simulate_ams_response():
-            if hasattr(mock_client, 'on_message'):
+            if hasattr(mock_client, "on_message"):
                 # Create a mock message with AMS data
                 mock_msg = Mock()
                 ams_response = {
@@ -966,16 +953,16 @@ class TestAMSQuery:
                                         "type": "PLA",
                                         "color": "Red",
                                         "exist": True,
-                                        "material_id": "BAMBU_PLA_RED"
+                                        "material_id": "BAMBU_PLA_RED",
                                     },
                                     {
                                         "id": 1,
                                         "type": "PETG",
                                         "color": "Blue",
                                         "exist": True,
-                                        "material_id": "BAMBU_PETG_BLUE"
-                                    }
-                                ]
+                                        "material_id": "BAMBU_PETG_BLUE",
+                                    },
+                                ],
                             }
                         ]
                     }
@@ -985,12 +972,12 @@ class TestAMSQuery:
 
         # Simulate the message arriving after a short delay
         import threading
+
         timer = threading.Timer(0.1, simulate_ams_response)
         timer.start()
 
         # Execute the AMS query
-        result = printer_service.query_ams_status(test_printer_config,
-                                                  timeout=5)
+        result = printer_service.query_ams_status(test_printer_config, timeout=5)
 
         # Verify result
         assert result.success is True
@@ -1018,7 +1005,8 @@ class TestAMSQuery:
 
         # Verify MQTT operations
         mock_client.username_pw_set.assert_called_once_with(
-            "bblp", test_printer_config.access_code)
+            "bblp", test_printer_config.access_code
+        )
         mock_client.connect.assert_called_once()
         mock_client.loop_start.assert_called_once()
         mock_client.subscribe.assert_called_once()
@@ -1026,10 +1014,10 @@ class TestAMSQuery:
         mock_client.loop_stop.assert_called_once()
         mock_client.disconnect.assert_called_once()
 
-    @patch('paho.mqtt.client.Client')
-    def test_query_ams_status_connection_failure(self, mock_mqtt_client_class,
-                                                 printer_service,
-                                                 test_printer_config):
+    @patch("paho.mqtt.client.Client")
+    def test_query_ams_status_connection_failure(
+        self, mock_mqtt_client_class, printer_service, test_printer_config
+    ):
         """Test AMS query with connection failure."""
         # Mock MQTT client
         mock_client = Mock()
@@ -1037,7 +1025,7 @@ class TestAMSQuery:
 
         # Mock connection failure
         def simulate_connection_failure(*args, **kwargs):
-            if hasattr(mock_client, 'on_connect'):
+            if hasattr(mock_client, "on_connect"):
                 mock_client.on_connect(mock_client, None, None, 1, None)
 
         mock_client.loop_start.side_effect = simulate_connection_failure
@@ -1045,12 +1033,12 @@ class TestAMSQuery:
         with pytest.raises(PrinterMQTTError) as exc_info:
             printer_service.query_ams_status(test_printer_config)
 
-        assert ("MQTT connection failed with reason code: 1"
-                in str(exc_info.value))
+        assert "MQTT connection failed with reason code: 1" in str(exc_info.value)
 
-    @patch('paho.mqtt.client.Client')
-    def test_query_ams_status_timeout(self, mock_mqtt_client_class,
-                                      printer_service, test_printer_config):
+    @patch("paho.mqtt.client.Client")
+    def test_query_ams_status_timeout(
+        self, mock_mqtt_client_class, printer_service, test_printer_config
+    ):
         """Test AMS query with timeout."""
         # Mock MQTT client
         mock_client = Mock()
@@ -1058,7 +1046,7 @@ class TestAMSQuery:
 
         # Mock successful connection but no response
         def simulate_connection(*args, **kwargs):
-            if hasattr(mock_client, 'on_connect'):
+            if hasattr(mock_client, "on_connect"):
                 mock_client.on_connect(mock_client, None, None, 0, None)
 
         mock_client.loop_start.side_effect = simulate_connection
@@ -1072,8 +1060,7 @@ class TestAMSQuery:
         mock_client.publish.side_effect = mock_publish
 
         # Execute with short timeout
-        result = printer_service.query_ams_status(test_printer_config,
-                                                  timeout=1)
+        result = printer_service.query_ams_status(test_printer_config, timeout=1)
 
         # Should return unsuccessful result due to timeout
         assert result.success is False
@@ -1093,27 +1080,22 @@ class TestAMSQuery:
                                 "type": "PLA",
                                 "color": "Red",
                                 "exist": True,
-                                "material_id": "BAMBU_PLA_RED"
+                                "material_id": "BAMBU_PLA_RED",
                             },
                             {
                                 "id": 1,
                                 "type": "PETG",
                                 "color": "#0000FF",
-                                "exist": True
-                            }
-                        ]
+                                "exist": True,
+                            },
+                        ],
                     },
                     {
                         "id": 1,
                         "tray": [
-                            {
-                                "id": 0,
-                                "type": "ABS",
-                                "color": "Green",
-                                "exist": True
-                            }
-                        ]
-                    }
+                            {"id": 0, "type": "ABS", "color": "Green", "exist": True}
+                        ],
+                    },
                 ]
             }
         }
@@ -1156,19 +1138,14 @@ class TestAMSQuery:
                     {
                         "id": 0,
                         "tray": [
-                            {
-                                "id": 0,
-                                "type": "PLA",
-                                "color": "Red",
-                                "exist": True
-                            },
+                            {"id": 0, "type": "PLA", "color": "Red", "exist": True},
                             {
                                 "id": 1,
                                 "type": "Unknown",
                                 "color": "Unknown",
-                                "exist": False  # Empty slot
-                            }
-                        ]
+                                "exist": False,  # Empty slot
+                            },
+                        ],
                     }
                 ]
             }
