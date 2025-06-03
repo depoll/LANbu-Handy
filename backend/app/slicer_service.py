@@ -5,17 +5,18 @@ This module provides a wrapper interface for the Bambu Studio CLI,
 allowing programmatic construction and execution of slicing commands.
 """
 
+import os
 import subprocess
 import tempfile
-import os
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional, Union
-from dataclasses import dataclass
 
 
 @dataclass
 class CLIResult:
     """Result of a CLI command execution."""
+
     exit_code: int
     stdout: str
     stderr: str
@@ -44,8 +45,7 @@ class BambuStudioCLIWrapper:
         self.temp_dir = Path(tempfile.gettempdir()) / "lanbu-handy"
         self.temp_dir.mkdir(exist_ok=True)
 
-    def _run_command(self, args: List[str],
-                     timeout: Optional[int] = None) -> CLIResult:
+    def _run_command(self, args: List[str], timeout: Optional[int] = None) -> CLIResult:
         """
         Execute a CLI command with the given arguments.
 
@@ -64,14 +64,14 @@ class BambuStudioCLIWrapper:
                 capture_output=True,
                 text=True,
                 timeout=timeout,
-                cwd=self.temp_dir
+                cwd=self.temp_dir,
             )
 
             return CLIResult(
                 exit_code=result.returncode,
                 stdout=result.stdout,
                 stderr=result.stderr,
-                success=result.returncode == 0
+                success=result.returncode == 0,
             )
 
         except subprocess.TimeoutExpired:
@@ -79,21 +79,21 @@ class BambuStudioCLIWrapper:
                 exit_code=-1,
                 stdout="",
                 stderr=f"Command timed out after {timeout} seconds",
-                success=False
+                success=False,
             )
         except FileNotFoundError:
             return CLIResult(
                 exit_code=-1,
                 stdout="",
                 stderr=f"CLI command not found: {self.cli_command}",
-                success=False
+                success=False,
             )
         except Exception as e:
             return CLIResult(
                 exit_code=-1,
                 stdout="",
                 stderr=f"Unexpected error: {str(e)}",
-                success=False
+                success=False,
             )
 
     def get_version(self) -> CLIResult:
@@ -118,7 +118,7 @@ class BambuStudioCLIWrapper:
         self,
         input_path: Union[str, Path],
         output_dir: Union[str, Path],
-        options: Optional[Dict[str, str]] = None
+        options: Optional[Dict[str, str]] = None,
     ) -> CLIResult:
         """
         Slice a 3D model using Bambu Studio CLI.
@@ -140,7 +140,7 @@ class BambuStudioCLIWrapper:
                 exit_code=-1,
                 stdout="",
                 stderr=f"Input file does not exist: {input_path}",
-                success=False
+                success=False,
             )
 
         # Ensure output directory exists
@@ -175,14 +175,16 @@ class BambuStudioCLIWrapper:
 
         # If help failed with exit code 127 and library errors,
         # CLI is installed but missing GUI dependencies - acceptable
-        if (result.exit_code == 127 and
-                "error while loading shared libraries" in result.stderr):
+        if (
+            result.exit_code == 127
+            and "error while loading shared libraries" in result.stderr
+        ):
             # Return a success result for availability check
             return CLIResult(
                 exit_code=0,
                 stdout="CLI available but requires GUI libraries",
                 stderr=result.stderr,
-                success=True
+                success=True,
             )
 
         # For other failures, return the original failed result
@@ -209,6 +211,7 @@ class BambuStudioCLIWrapper:
         """
         try:
             import glob
+
             for file_path in glob.glob(str(self.temp_dir / pattern)):
                 os.remove(file_path)
         except Exception:
@@ -238,7 +241,7 @@ def check_cli_availability() -> CLIResult:
 def slice_model(
     input_path: Union[str, Path],
     output_dir: Union[str, Path],
-    options: Optional[Dict[str, str]] = None
+    options: Optional[Dict[str, str]] = None,
 ) -> CLIResult:
     """
     Slice a 3D model using Bambu Studio CLI.

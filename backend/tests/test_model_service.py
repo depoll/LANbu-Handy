@@ -2,17 +2,13 @@
 Tests for Model Service - Model Download and Validation functionality.
 """
 
-import pytest
 import tempfile
 from pathlib import Path
-from unittest.mock import Mock, patch, AsyncMock
-import httpx
+from unittest.mock import AsyncMock, Mock, patch
 
-from app.model_service import (
-    ModelService,
-    ModelValidationError,
-    ModelDownloadError
-)
+import httpx
+import pytest
+from app.model_service import ModelDownloadError, ModelService, ModelValidationError
 
 
 class TestModelService:
@@ -23,7 +19,7 @@ class TestModelService:
         service = ModelService()
         assert service.max_file_size_bytes == 100 * 1024 * 1024  # 100MB
         assert service.temp_dir.name == "models"
-        assert service.supported_extensions == {'.stl', '.3mf'}
+        assert service.supported_extensions == {".stl", ".3mf"}
 
     def test_init_custom_size(self):
         """Test ModelService initialization with custom size."""
@@ -168,8 +164,7 @@ class TestModelService:
         """Test getting file information."""
         service = ModelService()
 
-        with tempfile.NamedTemporaryFile(delete=False,
-                                         suffix=".stl") as temp_file:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".stl") as temp_file:
             temp_file.write(b"test data")
             temp_file.flush()
             temp_path = Path(temp_file.name)
@@ -210,12 +205,11 @@ class TestModelServiceDownload:
         """Test download with invalid file extension."""
         service = ModelService()
 
-        with pytest.raises(ModelValidationError,
-                           match="Unsupported file extension"):
+        with pytest.raises(ModelValidationError, match="Unsupported file extension"):
             await service.download_model("https://example.com/model.obj")
 
     @pytest.mark.asyncio
-    @patch('app.model_service.httpx.AsyncClient')
+    @patch("app.model_service.httpx.AsyncClient")
     async def test_download_model_http_error(self, mock_client_class):
         """Test download with HTTP error."""
         service = ModelService()
@@ -240,12 +234,13 @@ class TestModelServiceDownload:
 
         mock_client_class.return_value = mock_client
 
-        with pytest.raises(ModelDownloadError,
-                           match="Failed to download file: HTTP 404"):
+        with pytest.raises(
+            ModelDownloadError, match="Failed to download file: HTTP 404"
+        ):
             await service.download_model("https://example.com/model.stl")
 
     @pytest.mark.asyncio
-    @patch('app.model_service.httpx.AsyncClient')
+    @patch("app.model_service.httpx.AsyncClient")
     async def test_download_model_success(self, mock_client_class):
         """Test successful model download."""
         service = ModelService()
@@ -274,8 +269,7 @@ class TestModelServiceDownload:
         mock_client_class.return_value = mock_client
 
         # Download model
-        file_path = await service.download_model(
-            "https://example.com/model.stl")
+        file_path = await service.download_model("https://example.com/model.stl")
 
         try:
             # Verify file was created and contains data
@@ -287,16 +281,15 @@ class TestModelServiceDownload:
             service.cleanup_temp_file(file_path)
 
     @pytest.mark.asyncio
-    @patch('app.model_service.httpx.AsyncClient')
-    async def test_download_model_content_length_too_large(self,
-                                                           mock_client_class):
+    @patch("app.model_service.httpx.AsyncClient")
+    async def test_download_model_content_length_too_large(self, mock_client_class):
         """Test download with content-length exceeding limit."""
         service = ModelService(max_file_size_mb=1)  # 1MB limit
 
         # Mock HTTP client and response
         mock_client = AsyncMock()
         mock_response = Mock()  # Use regular Mock for response object
-        mock_response.headers = {'content-length': str(2 * 1024 * 1024)}  # 2MB
+        mock_response.headers = {"content-length": str(2 * 1024 * 1024)}  # 2MB
         mock_response.raise_for_status = Mock()
 
         # Set up the context managers properly
@@ -310,14 +303,12 @@ class TestModelServiceDownload:
 
         mock_client_class.return_value = mock_client
 
-        with pytest.raises(ModelValidationError,
-                           match="File size exceeds maximum"):
+        with pytest.raises(ModelValidationError, match="File size exceeds maximum"):
             await service.download_model("https://example.com/model.stl")
 
     @pytest.mark.asyncio
-    @patch('app.model_service.httpx.AsyncClient')
-    async def test_download_model_actual_size_too_large(self,
-                                                        mock_client_class):
+    @patch("app.model_service.httpx.AsyncClient")
+    async def test_download_model_actual_size_too_large(self, mock_client_class):
         """Test download where actual size exceeds limit during download."""
         service = ModelService(max_file_size_mb=1)  # 1MB limit
 
@@ -346,6 +337,5 @@ class TestModelServiceDownload:
 
         mock_client_class.return_value = mock_client
 
-        with pytest.raises(ModelValidationError,
-                           match="File size exceeds maximum"):
+        with pytest.raises(ModelValidationError, match="File size exceeds maximum"):
             await service.download_model("https://example.com/model.stl")

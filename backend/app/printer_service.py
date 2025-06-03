@@ -8,13 +8,12 @@ including G-code file uploads and basic error handling.
 import ftplib
 import json
 import logging
-from pathlib import Path
-from typing import Optional, List
-from dataclasses import dataclass
 import time
+from dataclasses import dataclass
+from pathlib import Path
+from typing import List, Optional
 
 import paho.mqtt.client as mqtt
-
 from app.config import PrinterConfig
 
 logger = logging.getLogger(__name__)
@@ -22,32 +21,38 @@ logger = logging.getLogger(__name__)
 
 class PrinterCommunicationError(Exception):
     """Base exception for printer communication errors."""
+
     pass
 
 
 class PrinterConnectionError(PrinterCommunicationError):
     """Exception raised when unable to connect to printer FTP server."""
+
     pass
 
 
 class PrinterAuthenticationError(PrinterCommunicationError):
     """Exception raised when FTP authentication fails."""
+
     pass
 
 
 class PrinterFileTransferError(PrinterCommunicationError):
     """Exception raised when file transfer fails."""
+
     pass
 
 
 class PrinterMQTTError(PrinterCommunicationError):
     """Exception raised when MQTT communication fails."""
+
     pass
 
 
 @dataclass
 class FTPUploadResult:
     """Result of an FTP upload operation."""
+
     success: bool
     message: str
     remote_path: str = None
@@ -57,6 +62,7 @@ class FTPUploadResult:
 @dataclass
 class MQTTResult:
     """Result of an MQTT operation."""
+
     success: bool
     message: str
     error_details: str = None
@@ -65,6 +71,7 @@ class MQTTResult:
 @dataclass
 class AMSFilament:
     """Information about a filament in an AMS slot."""
+
     slot_id: int
     filament_type: str  # e.g., "PLA", "PETG", "ABS"
     color: str  # e.g., "Red", "Blue", "#FF0000"
@@ -74,6 +81,7 @@ class AMSFilament:
 @dataclass
 class AMSUnit:
     """Information about an AMS unit."""
+
     unit_id: int
     filaments: List[AMSFilament]
 
@@ -81,6 +89,7 @@ class AMSUnit:
 @dataclass
 class AMSStatusResult:
     """Result of an AMS status query."""
+
     success: bool
     message: str
     ams_units: List[AMSUnit] = None
@@ -113,7 +122,7 @@ class PrinterService:
         printer_config: PrinterConfig,
         gcode_file_path: Path,
         remote_filename: Optional[str] = None,
-        remote_path: str = DEFAULT_UPLOAD_PATH
+        remote_path: str = DEFAULT_UPLOAD_PATH,
     ) -> FTPUploadResult:
         """Upload a G-code file to the printer via FTP.
 
@@ -131,14 +140,10 @@ class PrinterService:
             PrinterCommunicationError: If upload fails with details
         """
         if not gcode_file_path.exists():
-            raise PrinterFileTransferError(
-                f"G-code file not found: {gcode_file_path}"
-            )
+            raise PrinterFileTransferError(f"G-code file not found: {gcode_file_path}")
 
         if not gcode_file_path.is_file():
-            raise PrinterFileTransferError(
-                f"Path is not a file: {gcode_file_path}"
-            )
+            raise PrinterFileTransferError(f"Path is not a file: {gcode_file_path}")
 
         # Use original filename if no remote filename specified
         if remote_filename is None:
@@ -147,28 +152,32 @@ class PrinterService:
         # Construct full remote path
         full_remote_path = f"{remote_path.rstrip('/')}/{remote_filename}"
 
-        logger.info(f"Uploading G-code to printer {printer_config.name} "
-                    f"({printer_config.ip}): {gcode_file_path.name}")
+        logger.info(
+            f"Uploading G-code to printer {printer_config.name} "
+            f"({printer_config.ip}): {gcode_file_path.name}"
+        )
         ftp = None
         try:
             # Connect to the printer's FTP server
             ftp = ftplib.FTP()
-            ftp.connect(printer_config.ip, self.DEFAULT_FTP_PORT,
-                        self.timeout)
+            ftp.connect(printer_config.ip, self.DEFAULT_FTP_PORT, self.timeout)
 
             # Authenticate - Bambu printers typically use anonymous login
             # or specific credentials based on access code
             try:
                 # Try anonymous login first (common for LAN mode)
                 ftp.login()
-                logger.debug(f"Connected to printer {printer_config.ip} "
-                             f"using anonymous FTP")
+                logger.debug(
+                    f"Connected to printer {printer_config.ip} " f"using anonymous FTP"
+                )
             except ftplib.error_perm:
                 # If anonymous fails, try with access code as password
                 try:
                     ftp.login("user", printer_config.access_code)
-                    logger.debug(f"Connected to printer {printer_config.ip} "
-                                 f"using access code authentication")
+                    logger.debug(
+                        f"Connected to printer {printer_config.ip} "
+                        f"using access code authentication"
+                    )
                 except ftplib.error_perm as e:
                     raise PrinterAuthenticationError(
                         f"FTP authentication failed for printer "
@@ -184,12 +193,13 @@ class PrinterService:
                     ftp.cwd(remote_path)
                     logger.debug(f"Created remote directory: {remote_path}")
                 except ftplib.error_perm as e:
-                    logger.warning(f"Could not create/access directory "
-                                   f"{remote_path}: {e}")
+                    logger.warning(
+                        f"Could not create/access directory " f"{remote_path}: {e}"
+                    )
                     # Continue anyway, upload to current directory
 
             # Upload the file in binary mode
-            with open(gcode_file_path, 'rb') as file:
+            with open(gcode_file_path, "rb") as file:
                 upload_command = f"STOR {remote_filename}"
                 ftp.storbinary(upload_command, file)
 
@@ -199,21 +209,24 @@ class PrinterService:
                 local_size = gcode_file_path.stat().st_size
 
                 if remote_size == local_size:
-                    logger.info(f"Successfully uploaded "
-                                f"{gcode_file_path.name} to printer "
-                                f"{printer_config.name} ({local_size} bytes)")
+                    logger.info(
+                        f"Successfully uploaded "
+                        f"{gcode_file_path.name} to printer "
+                        f"{printer_config.name} ({local_size} bytes)"
+                    )
                 else:
-                    logger.warning(f"File size mismatch after upload: "
-                                   f"local={local_size}, "
-                                   f"remote={remote_size}")
+                    logger.warning(
+                        f"File size mismatch after upload: "
+                        f"local={local_size}, "
+                        f"remote={remote_size}"
+                    )
             except (ftplib.error_perm, OSError):
                 # Size verification failed, but upload might still be OK
                 logger.debug("Could not verify upload file size")
             return FTPUploadResult(
                 success=True,
-                message=f"G-code uploaded successfully to "
-                        f"{printer_config.name}",
-                remote_path=full_remote_path
+                message=f"G-code uploaded successfully to " f"{printer_config.name}",
+                remote_path=full_remote_path,
             )
 
         except PrinterAuthenticationError:
@@ -230,34 +243,29 @@ class PrinterService:
 
         except ftplib.error_perm as e:
             error_msg = f"FTP permission error: {str(e)}"
-            logger.error(f"Upload failed to {printer_config.name}: "
-                         f"{error_msg}")
+            logger.error(f"Upload failed to {printer_config.name}: " f"{error_msg}")
             raise PrinterAuthenticationError(error_msg)
 
         except ftplib.error_temp as e:
             error_msg = f"FTP temporary error: {str(e)}"
-            logger.error(f"Upload failed to {printer_config.name}: "
-                         f"{error_msg}")
+            logger.error(f"Upload failed to {printer_config.name}: " f"{error_msg}")
             raise PrinterFileTransferError(error_msg)
 
         except (ftplib.error_proto, ConnectionError, OSError) as e:
             error_msg = f"FTP connection error: {str(e)}"
-            logger.error(f"Upload failed to {printer_config.name}: "
-                         f"{error_msg}")
+            logger.error(f"Upload failed to {printer_config.name}: " f"{error_msg}")
             raise PrinterConnectionError(error_msg)
 
         except Exception as e:
             error_msg = f"Unexpected error during FTP upload: {str(e)}"
-            logger.error(f"Upload failed to {printer_config.name}: "
-                         f"{error_msg}")
+            logger.error(f"Upload failed to {printer_config.name}: " f"{error_msg}")
             raise PrinterCommunicationError(error_msg)
         finally:
             # Always close the FTP connection
             if ftp:
                 try:
                     ftp.quit()
-                    logger.debug(f"Closed FTP connection to "
-                                 f"{printer_config.ip}")
+                    logger.debug(f"Closed FTP connection to " f"{printer_config.ip}")
                 except Exception:
                     # If quit fails, try close
                     try:
@@ -269,7 +277,7 @@ class PrinterService:
         self,
         printer_config: PrinterConfig,
         gcode_filename: str,
-        timeout: Optional[int] = None
+        timeout: Optional[int] = None,
     ) -> MQTTResult:
         """Send a start print command to the printer via MQTT.
 
@@ -289,8 +297,10 @@ class PrinterService:
         if timeout is None:
             timeout = self.DEFAULT_MQTT_TIMEOUT
 
-        logger.info(f"Starting print on printer {printer_config.name} "
-                    f"({printer_config.ip}): {gcode_filename}")
+        logger.info(
+            f"Starting print on printer {printer_config.name} "
+            f"({printer_config.ip}): {gcode_filename}"
+        )
 
         connection_error = None
         publish_error = None
@@ -304,28 +314,25 @@ class PrinterService:
                 nonlocal connection_successful, connection_error
                 if reason_code == 0:
                     connection_successful = True
-                    logger.debug(
-                        f"MQTT connected to printer {printer_config.ip}")
+                    logger.debug(f"MQTT connected to printer {printer_config.ip}")
                 else:
                     connection_error = (
-                        f"MQTT connection failed with reason code: "
-                        f"{reason_code}")
+                        f"MQTT connection failed with reason code: " f"{reason_code}"
+                    )
                     logger.error(connection_error)
 
             def on_publish(client, userdata, mid, reason_code, properties):
                 nonlocal publish_error
                 if reason_code != 0:
                     publish_error = (
-                        f"MQTT publish failed with reason code: "
-                        f"{reason_code}")
+                        f"MQTT publish failed with reason code: " f"{reason_code}"
+                    )
                     logger.error(publish_error)
                 else:
                     logger.debug("MQTT message published successfully")
 
-            def on_disconnect(client, userdata, flags, reason_code,
-                              properties):
-                logger.debug(
-                    f"MQTT disconnected from printer {printer_config.ip}")
+            def on_disconnect(client, userdata, flags, reason_code, properties):
+                logger.debug(f"MQTT disconnected from printer {printer_config.ip}")
 
             # Set up MQTT callbacks
             client.on_connect = on_connect
@@ -340,9 +347,11 @@ class PrinterService:
             # Connect to MQTT broker
             logger.debug(
                 f"Connecting to MQTT broker at "
-                f"{printer_config.ip}:{self.DEFAULT_MQTT_PORT}")
-            client.connect(printer_config.ip, self.DEFAULT_MQTT_PORT,
-                           self.DEFAULT_MQTT_KEEPALIVE)
+                f"{printer_config.ip}:{self.DEFAULT_MQTT_PORT}"
+            )
+            client.connect(
+                printer_config.ip, self.DEFAULT_MQTT_PORT, self.DEFAULT_MQTT_KEEPALIVE
+            )
 
             # Wait for connection
             start_time = time.time()
@@ -361,8 +370,7 @@ class PrinterService:
             # Prepare the print command message
             # Bambu Lab MQTT topic format: device/{serial}/request
             # For LAN mode, we can use a generic device ID or the printer IP
-            device_topic = (
-                f"device/{printer_config.ip.replace('.', '_')}/request")
+            device_topic = f"device/{printer_config.ip.replace('.', '_')}/request"
 
             # Bambu Lab print command JSON structure
             print_command = {
@@ -371,13 +379,12 @@ class PrinterService:
                     "param": gcode_filename,
                     "subtask_name": "",
                     "task_id": "",
-                    "project_id": "0"
+                    "project_id": "0",
                 }
             }
 
             message = json.dumps(print_command)
-            logger.debug(
-                f"Publishing MQTT message to topic {device_topic}: {message}")
+            logger.debug(f"Publishing MQTT message to topic {device_topic}: {message}")
 
             # Publish the message
             msg_info = client.publish(device_topic, message, qos=1)
@@ -395,14 +402,14 @@ class PrinterService:
                 raise PrinterMQTTError(publish_error)
 
             logger.info(
-                f"Successfully sent print command to printer "
-                f"{printer_config.name}")
+                f"Successfully sent print command to printer " f"{printer_config.name}"
+            )
 
             return MQTTResult(
                 success=True,
                 message=(
-                    f"Print command sent successfully to "
-                    f"{printer_config.name}")
+                    f"Print command sent successfully to " f"{printer_config.name}"
+                ),
             )
 
         except PrinterMQTTError:
@@ -411,26 +418,25 @@ class PrinterService:
 
         except Exception as e:
             error_msg = f"Unexpected error during MQTT operation: {str(e)}"
-            logger.error(f"MQTT operation failed for {printer_config.name}: "
-                         f"{error_msg}")
+            logger.error(
+                f"MQTT operation failed for {printer_config.name}: " f"{error_msg}"
+            )
             raise PrinterMQTTError(error_msg)
 
         finally:
             # Always disconnect the MQTT client if it was created
             try:
-                if 'client' in locals():
+                if "client" in locals():
                     client.loop_stop()
                     client.disconnect()
                     logger.debug(
-                        f"MQTT client disconnected from "
-                        f"{printer_config.ip}")
+                        f"MQTT client disconnected from " f"{printer_config.ip}"
+                    )
             except Exception as e:
                 logger.debug(f"Error during MQTT cleanup: {e}")
 
     def query_ams_status(
-        self,
-        printer_config: PrinterConfig,
-        timeout: Optional[int] = None
+        self, printer_config: PrinterConfig, timeout: Optional[int] = None
     ) -> AMSStatusResult:
         """Query the printer's AMS status via MQTT.
 
@@ -466,8 +472,7 @@ class PrinterService:
                 nonlocal connection_successful, connection_error
                 if reason_code == 0:
                     connection_successful = True
-                    logger.debug(
-                        f"MQTT connected to printer {printer_config.ip}")
+                    logger.debug(f"MQTT connected to printer {printer_config.ip}")
 
                     # Subscribe to response topic immediately after connection
                     response_topic = (
@@ -477,15 +482,15 @@ class PrinterService:
                     logger.debug(f"Subscribed to topic: {response_topic}")
                 else:
                     connection_error = (
-                        f"MQTT connection failed with reason code: "
-                        f"{reason_code}")
+                        f"MQTT connection failed with reason code: " f"{reason_code}"
+                    )
                     logger.error(connection_error)
 
             def on_message(client, userdata, msg):
                 nonlocal response_data, response_received
                 try:
                     # Parse the JSON response
-                    payload = msg.payload.decode('utf-8')
+                    payload = msg.payload.decode("utf-8")
                     logger.debug(f"Received MQTT message: {payload}")
 
                     response_json = json.loads(payload)
@@ -506,16 +511,14 @@ class PrinterService:
                 nonlocal publish_error
                 if reason_code != 0:
                     publish_error = (
-                        f"MQTT publish failed with reason code: "
-                        f"{reason_code}")
+                        f"MQTT publish failed with reason code: " f"{reason_code}"
+                    )
                     logger.error(publish_error)
                 else:
                     logger.debug("MQTT AMS query published successfully")
 
-            def on_disconnect(client, userdata, flags, reason_code,
-                              properties):
-                logger.debug(
-                    f"MQTT disconnected from printer {printer_config.ip}")
+            def on_disconnect(client, userdata, flags, reason_code, properties):
+                logger.debug(f"MQTT disconnected from printer {printer_config.ip}")
 
             # Set up MQTT callbacks
             client.on_connect = on_connect
@@ -532,9 +535,11 @@ class PrinterService:
             # Connect to MQTT broker
             logger.debug(
                 f"Connecting to MQTT broker at "
-                f"{printer_config.ip}:{self.DEFAULT_MQTT_PORT}")
-            client.connect(printer_config.ip, self.DEFAULT_MQTT_PORT,
-                           self.DEFAULT_MQTT_KEEPALIVE)
+                f"{printer_config.ip}:{self.DEFAULT_MQTT_PORT}"
+            )
+            client.connect(
+                printer_config.ip, self.DEFAULT_MQTT_PORT, self.DEFAULT_MQTT_KEEPALIVE
+            )
 
             # Start the network loop
             client.loop_start()
@@ -553,20 +558,13 @@ class PrinterService:
 
             # Bambu Lab AMS status query command
             # This requests the current printer status, which includes AMS info
-            device_topic = (
-                f"device/{printer_config.ip.replace('.', '_')}/request")
+            device_topic = f"device/{printer_config.ip.replace('.', '_')}/request"
 
             # Query command to get printer status including AMS
-            status_query = {
-                "pushing": {
-                    "sequence_id": "1",
-                    "command": "pushall"
-                }
-            }
+            status_query = {"pushing": {"sequence_id": "1", "command": "pushall"}}
 
             message = json.dumps(status_query)
-            logger.debug(
-                f"Publishing AMS query to topic {device_topic}: {message}")
+            logger.debug(f"Publishing AMS query to topic {device_topic}: {message}")
 
             # Publish the query message
             msg_info = client.publish(device_topic, message, qos=1)
@@ -591,11 +589,12 @@ class PrinterService:
             if not response_received:
                 logger.warning(
                     f"No AMS status response received from printer "
-                    f"{printer_config.name} within {timeout} seconds")
+                    f"{printer_config.name} within {timeout} seconds"
+                )
                 return AMSStatusResult(
                     success=False,
                     message="No AMS status response received",
-                    error_details=f"Timeout after {timeout} seconds"
+                    error_details=f"Timeout after {timeout} seconds",
                 )
 
             # Parse the AMS data from the response
@@ -603,13 +602,14 @@ class PrinterService:
 
             logger.info(
                 f"Successfully retrieved AMS status from printer "
-                f"{printer_config.name}")
+                f"{printer_config.name}"
+            )
 
             return AMSStatusResult(
                 success=True,
                 message=f"AMS status retrieved successfully from "
-                        f"{printer_config.name}",
-                ams_units=ams_units
+                f"{printer_config.name}",
+                ams_units=ams_units,
             )
 
         except PrinterMQTTError:
@@ -618,19 +618,18 @@ class PrinterService:
 
         except Exception as e:
             error_msg = f"Unexpected error during AMS query: {str(e)}"
-            logger.error(f"AMS query failed for {printer_config.name}: "
-                         f"{error_msg}")
+            logger.error(f"AMS query failed for {printer_config.name}: " f"{error_msg}")
             raise PrinterMQTTError(error_msg)
 
         finally:
             # Always disconnect the MQTT client if it was created
             try:
-                if 'client' in locals():
+                if "client" in locals():
                     client.loop_stop()
                     client.disconnect()
                     logger.debug(
-                        f"MQTT client disconnected from "
-                        f"{printer_config.ip}")
+                        f"MQTT client disconnected from " f"{printer_config.ip}"
+                    )
             except Exception as e:
                 logger.debug(f"Error during MQTT cleanup: {e}")
 
@@ -682,15 +681,12 @@ class PrinterService:
                             slot_id=slot_id,
                             filament_type=filament_type,
                             color=color,
-                            material_id=tray.get("material_id")
+                            material_id=tray.get("material_id"),
                         )
                         filaments.append(filament)
 
                 # Create AMS unit with its filaments
-                ams_unit = AMSUnit(
-                    unit_id=unit_id,
-                    filaments=filaments
-                )
+                ams_unit = AMSUnit(unit_id=unit_id, filaments=filaments)
                 ams_units.append(ams_unit)
 
         except Exception as e:
@@ -710,12 +706,13 @@ class PrinterService:
         """
         ftp = None
         try:
-            logger.info(f"Testing FTP connection to printer "
-                        f"{printer_config.name} ({printer_config.ip})")
+            logger.info(
+                f"Testing FTP connection to printer "
+                f"{printer_config.name} ({printer_config.ip})"
+            )
 
             ftp = ftplib.FTP()
-            ftp.connect(printer_config.ip, self.DEFAULT_FTP_PORT,
-                        self.timeout)
+            ftp.connect(printer_config.ip, self.DEFAULT_FTP_PORT, self.timeout)
 
             # Try authentication
             try:
@@ -725,13 +722,13 @@ class PrinterService:
                 ftp.login("user", printer_config.access_code)
                 logger.debug("Access code authentication successful")
 
-            logger.info(f"FTP connection test successful for "
-                        f"{printer_config.name}")
+            logger.info(f"FTP connection test successful for " f"{printer_config.name}")
             return True
 
         except Exception as e:
-            logger.warning(f"FTP connection test failed for "
-                           f"{printer_config.name}: {e}")
+            logger.warning(
+                f"FTP connection test failed for " f"{printer_config.name}: {e}"
+            )
             return False
 
         finally:

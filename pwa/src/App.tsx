@@ -1,74 +1,75 @@
-import { useEffect, useState } from 'react'
-import Header from './components/Header'
-import Hero from './components/Hero'
-import Features from './components/Features'
-import SliceAndPrint from './components/SliceAndPrint'
-import Footer from './components/Footer'
-import './App.css'
+import { useEffect, useState } from 'react';
+import Header from './components/Header';
+import Hero from './components/Hero';
+import Features from './components/Features';
+import SliceAndPrint from './components/SliceAndPrint';
+import Footer from './components/Footer';
+import './App.css';
 
 interface AppStatus {
-  status: 'initializing' | 'ready' | 'error'
-  message?: string
+  status: 'initializing' | 'ready' | 'error';
+  message?: string;
   backendData?: {
-    status: string
-    application_name: string
-    version: string
-  }
+    status: string;
+    application_name: string;
+    version: string;
+  };
 }
 
 function App() {
-  const [appStatus, setAppStatus] = useState<AppStatus>({ status: 'initializing' })
-  
+  const [appStatus, setAppStatus] = useState<AppStatus>({
+    status: 'initializing',
+  });
+
   useEffect(() => {
     // Initialize the app
-    console.log('LANbu Handy PWA initializing...')
-    
+    console.log('LANbu Handy PWA initializing...');
+
     // Register service worker for PWA functionality (future implementation)
     if ('serviceWorker' in navigator) {
-      console.log('Service worker support detected')
+      console.log('Service worker support detected');
     }
-    
+
     // Fetch backend status
     const fetchBackendStatus = async () => {
       try {
-        console.log('Fetching backend status...')
-        const response = await fetch('/api/status')
-        
+        console.log('Fetching backend status...');
+        const response = await fetch('/api/status');
+
         if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
-        
-        const backendData = await response.json()
-        console.log('Backend status received:', backendData)
-        
+
+        const backendData = await response.json();
+        console.log('Backend status received:', backendData);
+
         // Set app as ready with backend data
-        setAppStatus({ 
-          status: 'ready', 
+        setAppStatus({
+          status: 'ready',
           backendData,
-          message: 'Connected to backend successfully'
-        })
-        console.log('LANbu Handy PWA ready')
-        
+          message: 'Connected to backend successfully',
+        });
+        console.log('LANbu Handy PWA ready');
       } catch (error) {
-        console.error('Failed to fetch backend status:', error)
-        setAppStatus({ 
-          status: 'error', 
-          message: `Failed to connect to backend: ${error instanceof Error ? error.message : 'Unknown error'}`
-        })
+        console.error('Failed to fetch backend status:', error);
+        setAppStatus({
+          status: 'error',
+          message: `Failed to connect to backend: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        });
       }
-    }
-    
-    fetchBackendStatus()
-  }, [])
+    };
+
+    fetchBackendStatus();
+  }, []);
 
   const handleFeatureClick = (featureName: string) => {
-    console.log('Feature card clicked:', featureName)
-  }
+    console.log('Feature card clicked:', featureName);
+  };
 
   return (
     <div className={`app ${appStatus.status === 'ready' ? 'app-ready' : ''}`}>
       <Header />
-      
+
       {/* Backend Status Display */}
       <div className="status-bar">
         {appStatus.status === 'initializing' && (
@@ -76,20 +77,22 @@ function App() {
             Connecting to backend...
           </div>
         )}
-        
+
         {appStatus.status === 'ready' && appStatus.backendData && (
           <div className="status-message status-success">
-            ✓ {appStatus.backendData.application_name} v{appStatus.backendData.version} - Status: {appStatus.backendData.status}
+            ✓ {appStatus.backendData.application_name} v
+            {appStatus.backendData.version} - Status:{' '}
+            {appStatus.backendData.status}
           </div>
         )}
-        
+
         {appStatus.status === 'error' && (
           <div className="status-message status-error">
             ⚠ {appStatus.message}
           </div>
         )}
       </div>
-      
+
       <main>
         <Hero />
         <SliceAndPrint />
@@ -97,7 +100,7 @@ function App() {
       </main>
       <Footer />
     </div>
-  )
+  );
 }
 
-export default App
+export default App;

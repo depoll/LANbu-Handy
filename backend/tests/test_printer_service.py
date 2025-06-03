@@ -5,20 +5,28 @@ Tests FTP communication functionality with Bambu Lab printers,
 including connection, authentication, and file upload operations.
 """
 
-import tempfile
-import os
-import json
-import pytest
-from pathlib import Path
-from unittest.mock import Mock, patch, mock_open
 import ftplib
+import json
+import os
+import tempfile
+from pathlib import Path
+from unittest.mock import Mock, mock_open, patch
 
-from app.printer_service import (
-    PrinterService, PrinterCommunicationError, PrinterConnectionError,
-    PrinterAuthenticationError, PrinterFileTransferError, PrinterMQTTError,
-    FTPUploadResult, MQTTResult, AMSStatusResult, AMSUnit, AMSFilament
-)
+import pytest
 from app.config import PrinterConfig
+from app.printer_service import (
+    AMSFilament,
+    AMSStatusResult,
+    AMSUnit,
+    FTPUploadResult,
+    MQTTResult,
+    PrinterAuthenticationError,
+    PrinterCommunicationError,
+    PrinterConnectionError,
+    PrinterFileTransferError,
+    PrinterMQTTError,
+    PrinterService,
+)
 
 
 class TestPrinterServiceExceptions:
@@ -43,9 +51,7 @@ class TestFTPUploadResult:
     def test_ftp_upload_result_success(self):
         """Test successful upload result."""
         result = FTPUploadResult(
-            success=True,
-            message="Upload successful",
-            remote_path="/upload/test.gcode"
+            success=True, message="Upload successful", remote_path="/upload/test.gcode"
         )
 
         assert result.success is True
@@ -56,9 +62,7 @@ class TestFTPUploadResult:
     def test_ftp_upload_result_failure(self):
         """Test failed upload result."""
         result = FTPUploadResult(
-            success=False,
-            message="Upload failed",
-            error_details="Connection timeout"
+            success=False, message="Upload failed", error_details="Connection timeout"
         )
 
         assert result.success is False
@@ -72,10 +76,7 @@ class TestMQTTResult:
 
     def test_mqtt_result_success(self):
         """Test successful MQTT result."""
-        result = MQTTResult(
-            success=True,
-            message="Print command sent successfully"
-        )
+        result = MQTTResult(success=True, message="Print command sent successfully")
 
         assert result.success is True
         assert result.message == "Print command sent successfully"
@@ -86,7 +87,7 @@ class TestMQTTResult:
         result = MQTTResult(
             success=False,
             message="MQTT operation failed",
-            error_details="Connection timeout"
+            error_details="Connection timeout",
         )
 
         assert result.success is False
@@ -100,10 +101,7 @@ class TestAMSDataStructures:
     def test_ams_filament_creation(self):
         """Test AMSFilament creation."""
         filament = AMSFilament(
-            slot_id=1,
-            filament_type="PLA",
-            color="Red",
-            material_id="BAMBU_PLA_RED"
+            slot_id=1, filament_type="PLA", color="Red", material_id="BAMBU_PLA_RED"
         )
 
         assert filament.slot_id == 1
@@ -113,11 +111,7 @@ class TestAMSDataStructures:
 
     def test_ams_filament_minimal(self):
         """Test AMSFilament with minimal required fields."""
-        filament = AMSFilament(
-            slot_id=0,
-            filament_type="PETG",
-            color="#FF0000"
-        )
+        filament = AMSFilament(slot_id=0, filament_type="PETG", color="#FF0000")
 
         assert filament.slot_id == 0
         assert filament.filament_type == "PETG"
@@ -128,7 +122,7 @@ class TestAMSDataStructures:
         """Test AMSUnit creation."""
         filaments = [
             AMSFilament(slot_id=0, filament_type="PLA", color="Red"),
-            AMSFilament(slot_id=1, filament_type="PETG", color="Blue")
+            AMSFilament(slot_id=1, filament_type="PETG", color="Blue"),
         ]
 
         unit = AMSUnit(unit_id=0, filaments=filaments)
@@ -144,9 +138,7 @@ class TestAMSDataStructures:
         unit = AMSUnit(unit_id=0, filaments=[filament])
 
         result = AMSStatusResult(
-            success=True,
-            message="AMS status retrieved successfully",
-            ams_units=[unit]
+            success=True, message="AMS status retrieved successfully", ams_units=[unit]
         )
 
         assert result.success is True
@@ -158,9 +150,7 @@ class TestAMSDataStructures:
     def test_ams_status_result_failure(self):
         """Test failed AMSStatusResult."""
         result = AMSStatusResult(
-            success=False,
-            message="AMS query failed",
-            error_details="MQTT timeout"
+            success=False, message="AMS query failed", error_details="MQTT timeout"
         )
 
         assert result.success is False
@@ -181,9 +171,7 @@ class TestPrinterService:
     def test_printer_config(self):
         """Create a test printer configuration."""
         return PrinterConfig(
-            name="Test Printer",
-            ip="192.168.1.100",
-            access_code="test123"
+            name="Test Printer", ip="192.168.1.100", access_code="test123"
         )
 
     @pytest.fixture
@@ -225,9 +213,7 @@ class TestUploadGcode:
     def test_printer_config(self):
         """Create a test printer configuration."""
         return PrinterConfig(
-            name="Test Printer",
-            ip="192.168.1.100",
-            access_code="test123"
+            name="Test Printer", ip="192.168.1.100", access_code="test123"
         )
 
     @pytest.fixture
@@ -239,19 +225,16 @@ class TestUploadGcode:
             yield Path(f.name)
         os.unlink(f.name)
 
-    def test_upload_gcode_file_not_found(
-            self, printer_service, test_printer_config):
+    def test_upload_gcode_file_not_found(self, printer_service, test_printer_config):
         """Test upload with non-existent file."""
         non_existent_file = Path("/tmp/nonexistent.gcode")
 
         with pytest.raises(PrinterFileTransferError) as exc_info:
-            printer_service.upload_gcode(
-                test_printer_config, non_existent_file)
+            printer_service.upload_gcode(test_printer_config, non_existent_file)
 
         assert "G-code file not found" in str(exc_info.value)
 
-    def test_upload_gcode_not_a_file(
-            self, printer_service, test_printer_config):
+    def test_upload_gcode_not_a_file(self, printer_service, test_printer_config):
         """Test upload with directory path instead of file."""
         with tempfile.TemporaryDirectory() as temp_dir:
             dir_path = Path(temp_dir)
@@ -261,13 +244,10 @@ class TestUploadGcode:
 
             assert "Path is not a file" in str(exc_info.value)
 
-    @patch('ftplib.FTP')
+    @patch("ftplib.FTP")
     def test_upload_gcode_successful_anonymous(
-            self,
-            mock_ftp_class,
-            printer_service,
-            test_printer_config,
-            temp_gcode_file):
+        self, mock_ftp_class, printer_service, test_printer_config, temp_gcode_file
+    ):
         """Test successful G-code upload with anonymous FTP."""
         # Set up mock FTP
         mock_ftp = Mock()
@@ -275,9 +255,8 @@ class TestUploadGcode:
         mock_ftp.size.return_value = temp_gcode_file.stat().st_size
 
         # Mock file operations
-        with patch('builtins.open', mock_open(read_data=b"test gcode")):
-            result = printer_service.upload_gcode(
-                test_printer_config, temp_gcode_file)
+        with patch("builtins.open", mock_open(read_data=b"test gcode")):
+            result = printer_service.upload_gcode(test_printer_config, temp_gcode_file)
 
         # Verify FTP operations
         mock_ftp.connect.assert_called_once_with("192.168.1.100", 21, 10)
@@ -291,26 +270,22 @@ class TestUploadGcode:
         assert "uploaded successfully" in result.message
         assert result.remote_path == f"/upload/{temp_gcode_file.name}"
 
-    @patch('ftplib.FTP')
+    @patch("ftplib.FTP")
     def test_upload_gcode_successful_with_credentials(
-            self,
-            mock_ftp_class,
-            printer_service,
-            test_printer_config,
-            temp_gcode_file):
+        self, mock_ftp_class, printer_service, test_printer_config, temp_gcode_file
+    ):
         """Test successful G-code upload with credential authentication."""
         # Set up mock FTP - anonymous login fails, credential login succeeds
         mock_ftp = Mock()
         mock_ftp_class.return_value = mock_ftp
         mock_ftp.login.side_effect = [
             ftplib.error_perm("Anonymous login failed"),  # First call
-            None  # Second call succeeds
+            None,  # Second call succeeds
         ]
         mock_ftp.size.return_value = temp_gcode_file.stat().st_size
 
-        with patch('builtins.open', mock_open(read_data=b"test gcode")):
-            result = printer_service.upload_gcode(
-                test_printer_config, temp_gcode_file)
+        with patch("builtins.open", mock_open(read_data=b"test gcode")):
+            result = printer_service.upload_gcode(test_printer_config, temp_gcode_file)
 
         # Verify credential authentication was attempted
         assert mock_ftp.login.call_count == 2
@@ -319,13 +294,10 @@ class TestUploadGcode:
 
         assert result.success is True
 
-    @patch('ftplib.FTP')
+    @patch("ftplib.FTP")
     def test_upload_gcode_custom_remote_filename(
-            self,
-            mock_ftp_class,
-            printer_service,
-            test_printer_config,
-            temp_gcode_file):
+        self, mock_ftp_class, printer_service, test_printer_config, temp_gcode_file
+    ):
         """Test upload with custom remote filename."""
         mock_ftp = Mock()
         mock_ftp_class.return_value = mock_ftp
@@ -333,10 +305,9 @@ class TestUploadGcode:
 
         custom_filename = "custom_model.gcode"
 
-        with patch('builtins.open', mock_open(read_data=b"test gcode")):
+        with patch("builtins.open", mock_open(read_data=b"test gcode")):
             result = printer_service.upload_gcode(
-                test_printer_config, temp_gcode_file,
-                remote_filename=custom_filename
+                test_printer_config, temp_gcode_file, remote_filename=custom_filename
             )
 
         # Check that custom filename was used
@@ -346,13 +317,10 @@ class TestUploadGcode:
 
         assert result.remote_path == f"/upload/{custom_filename}"
 
-    @patch('ftplib.FTP')
+    @patch("ftplib.FTP")
     def test_upload_gcode_custom_remote_path(
-            self,
-            mock_ftp_class,
-            printer_service,
-            test_printer_config,
-            temp_gcode_file):
+        self, mock_ftp_class, printer_service, test_printer_config, temp_gcode_file
+    ):
         """Test upload with custom remote path."""
         mock_ftp = Mock()
         mock_ftp_class.return_value = mock_ftp
@@ -360,23 +328,19 @@ class TestUploadGcode:
 
         custom_path = "/custom/upload/path"
 
-        with patch('builtins.open', mock_open(read_data=b"test gcode")):
+        with patch("builtins.open", mock_open(read_data=b"test gcode")):
             result = printer_service.upload_gcode(
-                test_printer_config, temp_gcode_file,
-                remote_path=custom_path
+                test_printer_config, temp_gcode_file, remote_path=custom_path
             )
 
         # Check that custom path was used
         mock_ftp.cwd.assert_called_once_with(custom_path)
         assert result.remote_path == f"{custom_path}/{temp_gcode_file.name}"
 
-    @patch('ftplib.FTP')
+    @patch("ftplib.FTP")
     def test_upload_gcode_directory_creation(
-            self,
-            mock_ftp_class,
-            printer_service,
-            test_printer_config,
-            temp_gcode_file):
+        self, mock_ftp_class, printer_service, test_printer_config, temp_gcode_file
+    ):
         """Test upload when remote directory needs to be created."""
         mock_ftp = Mock()
         mock_ftp_class.return_value = mock_ftp
@@ -384,26 +348,22 @@ class TestUploadGcode:
         # First cwd fails, mkd and second cwd succeed
         mock_ftp.cwd.side_effect = [
             ftplib.error_perm("Directory not found"),  # First call
-            None  # Second call after mkd
+            None,  # Second call after mkd
         ]
         mock_ftp.size.return_value = temp_gcode_file.stat().st_size
 
-        with patch('builtins.open', mock_open(read_data=b"test gcode")):
-            result = printer_service.upload_gcode(
-                test_printer_config, temp_gcode_file)
+        with patch("builtins.open", mock_open(read_data=b"test gcode")):
+            result = printer_service.upload_gcode(test_printer_config, temp_gcode_file)
 
         # Verify directory creation was attempted
         mock_ftp.mkd.assert_called_once_with("/upload")
         assert mock_ftp.cwd.call_count == 2
         assert result.success is True
 
-    @patch('ftplib.FTP')
+    @patch("ftplib.FTP")
     def test_upload_gcode_connection_error(
-            self,
-            mock_ftp_class,
-            printer_service,
-            test_printer_config,
-            temp_gcode_file):
+        self, mock_ftp_class, printer_service, test_printer_config, temp_gcode_file
+    ):
         """Test upload with FTP connection error."""
         mock_ftp = Mock()
         mock_ftp_class.return_value = mock_ftp
@@ -414,13 +374,10 @@ class TestUploadGcode:
 
         assert "FTP connection error" in str(exc_info.value)
 
-    @patch('ftplib.FTP')
+    @patch("ftplib.FTP")
     def test_upload_gcode_authentication_error(
-            self,
-            mock_ftp_class,
-            printer_service,
-            test_printer_config,
-            temp_gcode_file):
+        self, mock_ftp_class, printer_service, test_printer_config, temp_gcode_file
+    ):
         """Test upload with authentication failure."""
         mock_ftp = Mock()
         mock_ftp_class.return_value = mock_ftp
@@ -428,7 +385,7 @@ class TestUploadGcode:
         # Both anonymous and credential login fail
         mock_ftp.login.side_effect = [
             ftplib.error_perm("Anonymous login failed"),
-            ftplib.error_perm("Invalid credentials")
+            ftplib.error_perm("Invalid credentials"),
         ]
 
         with pytest.raises(PrinterAuthenticationError) as exc_info:
@@ -436,29 +393,25 @@ class TestUploadGcode:
 
         assert "FTP authentication failed" in str(exc_info.value)
 
-    @patch('ftplib.FTP')
-    def test_upload_gcode_transfer_error(self, mock_ftp_class,
-                                         printer_service, test_printer_config,
-                                         temp_gcode_file):
+    @patch("ftplib.FTP")
+    def test_upload_gcode_transfer_error(
+        self, mock_ftp_class, printer_service, test_printer_config, temp_gcode_file
+    ):
         """Test upload with file transfer error."""
         mock_ftp = Mock()
         mock_ftp_class.return_value = mock_ftp
         mock_ftp.storbinary.side_effect = ftplib.error_temp("Transfer failed")
 
-        with patch('builtins.open', mock_open(read_data=b"test gcode")):
+        with patch("builtins.open", mock_open(read_data=b"test gcode")):
             with pytest.raises(PrinterFileTransferError) as exc_info:
-                printer_service.upload_gcode(
-                    test_printer_config, temp_gcode_file)
+                printer_service.upload_gcode(test_printer_config, temp_gcode_file)
 
         assert "FTP temporary error" in str(exc_info.value)
 
-    @patch('ftplib.FTP')
+    @patch("ftplib.FTP")
     def test_upload_gcode_size_verification_warning(
-            self,
-            mock_ftp_class,
-            printer_service,
-            test_printer_config,
-            temp_gcode_file):
+        self, mock_ftp_class, printer_service, test_printer_config, temp_gcode_file
+    ):
         """Test upload with size mismatch warning."""
         mock_ftp = Mock()
         mock_ftp_class.return_value = mock_ftp
@@ -467,22 +420,20 @@ class TestUploadGcode:
         local_size = temp_gcode_file.stat().st_size
         mock_ftp.size.return_value = local_size + 100
 
-        with patch('builtins.open', mock_open(read_data=b"test gcode")):
-            with patch('app.printer_service.logger') as mock_logger:
+        with patch("builtins.open", mock_open(read_data=b"test gcode")):
+            with patch("app.printer_service.logger") as mock_logger:
                 result = printer_service.upload_gcode(
-                    test_printer_config, temp_gcode_file)
+                    test_printer_config, temp_gcode_file
+                )
 
         # Should still succeed but log warning
         assert result.success is True
         mock_logger.warning.assert_called_once()
 
-    @patch('ftplib.FTP')
+    @patch("ftplib.FTP")
     def test_upload_gcode_cleanup_on_error(
-            self,
-            mock_ftp_class,
-            printer_service,
-            test_printer_config,
-            temp_gcode_file):
+        self, mock_ftp_class, printer_service, test_printer_config, temp_gcode_file
+    ):
         """Test that FTP connection is cleaned up on error."""
         mock_ftp = Mock()
         mock_ftp_class.return_value = mock_ftp
@@ -507,14 +458,13 @@ class TestConnectionTesting:
     def test_printer_config(self):
         """Create a test printer configuration."""
         return PrinterConfig(
-            name="Test Printer",
-            ip="192.168.1.100",
-            access_code="test123"
+            name="Test Printer", ip="192.168.1.100", access_code="test123"
         )
 
-    @patch('ftplib.FTP')
+    @patch("ftplib.FTP")
     def test_connection_test_successful_anonymous(
-            self, mock_ftp_class, printer_service, test_printer_config):
+        self, mock_ftp_class, printer_service, test_printer_config
+    ):
         """Test successful connection test with anonymous login."""
         mock_ftp = Mock()
         mock_ftp_class.return_value = mock_ftp
@@ -526,18 +476,16 @@ class TestConnectionTesting:
         mock_ftp.login.assert_called_once_with()
         mock_ftp.quit.assert_called_once()
 
-    @patch('ftplib.FTP')
+    @patch("ftplib.FTP")
     def test_connection_test_successful_with_credentials(
-            self, mock_ftp_class, printer_service, test_printer_config):
+        self, mock_ftp_class, printer_service, test_printer_config
+    ):
         """Test successful connection test with credential authentication."""
         mock_ftp = Mock()
         mock_ftp_class.return_value = mock_ftp
 
         # Anonymous fails, credential succeeds
-        mock_ftp.login.side_effect = [
-            ftplib.error_perm("Anonymous failed"),
-            None
-        ]
+        mock_ftp.login.side_effect = [ftplib.error_perm("Anonymous failed"), None]
 
         result = printer_service.test_connection(test_printer_config)
 
@@ -545,9 +493,10 @@ class TestConnectionTesting:
         assert mock_ftp.login.call_count == 2
         mock_ftp.login.assert_any_call("user", "test123")
 
-    @patch('ftplib.FTP')
-    def test_connection_test_failure(self, mock_ftp_class,
-                                     printer_service, test_printer_config):
+    @patch("ftplib.FTP")
+    def test_connection_test_failure(
+        self, mock_ftp_class, printer_service, test_printer_config
+    ):
         """Test failed connection test."""
         mock_ftp = Mock()
         mock_ftp_class.return_value = mock_ftp
@@ -557,12 +506,10 @@ class TestConnectionTesting:
 
         assert result is False
 
-    @patch('ftplib.FTP')
+    @patch("ftplib.FTP")
     def test_connection_test_cleanup_on_error(
-            self,
-            mock_ftp_class,
-            printer_service,
-            test_printer_config):
+        self, mock_ftp_class, printer_service, test_printer_config
+    ):
         """Test that connection is cleaned up even when test fails."""
         mock_ftp = Mock()
         mock_ftp_class.return_value = mock_ftp
@@ -588,14 +535,14 @@ class TestIntegration:
         return PrinterConfig(
             name="Integration Test Printer",
             ip="192.168.1.100",
-            access_code="integration123"
+            access_code="integration123",
         )
 
     def test_service_constants(self, printer_service):
         """Test that service constants are properly defined."""
-        assert hasattr(PrinterService, 'DEFAULT_FTP_PORT')
-        assert hasattr(PrinterService, 'DEFAULT_FTP_TIMEOUT')
-        assert hasattr(PrinterService, 'DEFAULT_UPLOAD_PATH')
+        assert hasattr(PrinterService, "DEFAULT_FTP_PORT")
+        assert hasattr(PrinterService, "DEFAULT_FTP_TIMEOUT")
+        assert hasattr(PrinterService, "DEFAULT_UPLOAD_PATH")
 
         assert PrinterService.DEFAULT_FTP_PORT == 21
         assert PrinterService.DEFAULT_FTP_TIMEOUT == 30
@@ -603,8 +550,8 @@ class TestIntegration:
 
     def test_logging_integration(self, printer_service, test_printer_config):
         """Test that logging works correctly."""
-        with patch('app.printer_service.logger') as mock_logger:
-            with patch('ftplib.FTP') as mock_ftp_class:
+        with patch("app.printer_service.logger") as mock_logger:
+            with patch("ftplib.FTP") as mock_ftp_class:
                 mock_ftp = Mock()
                 mock_ftp_class.return_value = mock_ftp
 
@@ -627,9 +574,7 @@ class TestEndToEndWithMockFTP:
     def test_printer_config(self):
         """Create a test printer configuration."""
         return PrinterConfig(
-            name="Mock FTP Printer",
-            ip="192.168.1.200",
-            access_code="mocktest456"
+            name="Mock FTP Printer", ip="192.168.1.200", access_code="mocktest456"
         )
 
     @pytest.fixture
@@ -680,9 +625,10 @@ M84 ; disable steppers
             yield Path(f.name)
         os.unlink(f.name)
 
-    @patch('ftplib.FTP')
-    def test_complete_upload_workflow(self, mock_ftp_class, printer_service,
-                                      test_printer_config, sample_gcode_file):
+    @patch("ftplib.FTP")
+    def test_complete_upload_workflow(
+        self, mock_ftp_class, printer_service, test_printer_config, sample_gcode_file
+    ):
         """Test complete upload workflow with realistic G-code file."""
         # Configure mock FTP to simulate successful upload
         mock_ftp = Mock()
@@ -693,13 +639,14 @@ M84 ; disable steppers
         mock_ftp.size.return_value = file_size
 
         # Mock open to control file reading
-        with patch('builtins.open',
-                   mock_open(read_data=sample_gcode_file.read_bytes())):
+        with patch(
+            "builtins.open", mock_open(read_data=sample_gcode_file.read_bytes())
+        ):
             result = printer_service.upload_gcode(
                 test_printer_config,
                 sample_gcode_file,
                 remote_filename="test_model.gcode",
-                remote_path="/printer/upload"
+                remote_path="/printer/upload",
             )
 
         # Verify all FTP operations occurred
@@ -724,13 +671,10 @@ M84 ; disable steppers
         assert result.remote_path == "/printer/upload/test_model.gcode"
         assert result.error_details is None
 
-    @patch('ftplib.FTP')
+    @patch("ftplib.FTP")
     def test_upload_with_directory_creation_scenario(
-            self,
-            mock_ftp_class,
-            printer_service,
-            test_printer_config,
-            sample_gcode_file):
+        self, mock_ftp_class, printer_service, test_printer_config, sample_gcode_file
+    ):
         """Test upload scenario where remote directory must be created."""
         mock_ftp = Mock()
         mock_ftp_class.return_value = mock_ftp
@@ -738,22 +682,24 @@ M84 ; disable steppers
         # Simulate directory not existing initially
         mock_ftp.cwd.side_effect = [
             ftplib.error_perm("550 Directory not found"),  # First attempt
-            None  # Second attempt after creation
+            None,  # Second attempt after creation
         ]
         mock_ftp.size.return_value = sample_gcode_file.stat().st_size
 
-        with patch('builtins.open', mock_open()):
+        with patch("builtins.open", mock_open()):
             result = printer_service.upload_gcode(
-                test_printer_config, sample_gcode_file)
+                test_printer_config, sample_gcode_file
+            )
 
         # Verify directory creation workflow
         assert mock_ftp.cwd.call_count == 2
         mock_ftp.mkd.assert_called_once_with("/upload")
         assert result.success is True
 
-    @patch('ftplib.FTP')
-    def test_connection_test_workflow(self, mock_ftp_class, printer_service,
-                                      test_printer_config):
+    @patch("ftplib.FTP")
+    def test_connection_test_workflow(
+        self, mock_ftp_class, printer_service, test_printer_config
+    ):
         """Test connection testing workflow."""
         mock_ftp = Mock()
         mock_ftp_class.return_value = mock_ftp
@@ -766,16 +712,14 @@ M84 ; disable steppers
         mock_ftp.login.assert_called_once_with()  # Anonymous login
         mock_ftp.quit.assert_called_once()
 
-    def test_error_handling_chain(self, printer_service,
-                                  test_printer_config):
+    def test_error_handling_chain(self, printer_service, test_printer_config):
         """Test that error handling works correctly for different failure
         modes."""
         non_existent_file = Path("/tmp/does_not_exist.gcode")
 
         # File not found should raise PrinterFileTransferError
         with pytest.raises(PrinterFileTransferError) as exc_info:
-            printer_service.upload_gcode(
-                test_printer_config, non_existent_file)
+            printer_service.upload_gcode(test_printer_config, non_existent_file)
 
         assert "G-code file not found" in str(exc_info.value)
 
@@ -796,14 +740,13 @@ class TestStartPrint:
     def test_printer_config(self):
         """Create a test printer configuration."""
         return PrinterConfig(
-            name="Test Printer",
-            ip="192.168.1.100",
-            access_code="test123"
+            name="Test Printer", ip="192.168.1.100", access_code="test123"
         )
 
-    @patch('paho.mqtt.client.Client')
-    def test_start_print_successful(self, mock_mqtt_client_class,
-                                    printer_service, test_printer_config):
+    @patch("paho.mqtt.client.Client")
+    def test_start_print_successful(
+        self, mock_mqtt_client_class, printer_service, test_printer_config
+    ):
         """Test successful print start command."""
         # Mock MQTT client
         mock_client = Mock()
@@ -820,13 +763,12 @@ class TestStartPrint:
         # Simulate the connection workflow
         def simulate_connection(*args, **kwargs):
             # Call the on_connect callback to simulate successful connection
-            if hasattr(mock_client, 'on_connect'):
+            if hasattr(mock_client, "on_connect"):
                 mock_client.on_connect(mock_client, None, None, 0, None)
 
         mock_client.loop_start.side_effect = simulate_connection
 
-        result = printer_service.start_print(
-            test_printer_config, "test_model.gcode")
+        result = printer_service.start_print(test_printer_config, "test_model.gcode")
 
         assert result.success is True
         assert "Print command sent successfully" in result.message
@@ -834,7 +776,8 @@ class TestStartPrint:
 
         # Verify MQTT client was used correctly
         mock_client.username_pw_set.assert_called_once_with(
-            "bblp", test_printer_config.access_code)
+            "bblp", test_printer_config.access_code
+        )
         mock_client.connect.assert_called_once()
         mock_client.loop_start.assert_called_once()
         mock_client.publish.assert_called_once()
@@ -846,15 +789,14 @@ class TestStartPrint:
         topic = publish_call[0][0]
         message = publish_call[0][1]
 
-        assert topic == (
-            f"device/{test_printer_config.ip.replace('.', '_')}/request")
+        assert topic == (f"device/{test_printer_config.ip.replace('.', '_')}/request")
         assert "test_model.gcode" in message
         assert "project_file" in message
 
-    @patch('paho.mqtt.client.Client')
-    def test_start_print_connection_failure(self, mock_mqtt_client_class,
-                                            printer_service,
-                                            test_printer_config):
+    @patch("paho.mqtt.client.Client")
+    def test_start_print_connection_failure(
+        self, mock_mqtt_client_class, printer_service, test_printer_config
+    ):
         """Test print start command with connection failure."""
         # Mock MQTT client
         mock_client = Mock()
@@ -863,21 +805,20 @@ class TestStartPrint:
         # Mock connection failure
         def simulate_connection_failure(*args, **kwargs):
             # Call the on_connect callback to simulate connection failure
-            if hasattr(mock_client, 'on_connect'):
+            if hasattr(mock_client, "on_connect"):
                 mock_client.on_connect(mock_client, None, None, 1, None)
 
         mock_client.loop_start.side_effect = simulate_connection_failure
 
         with pytest.raises(PrinterMQTTError) as exc_info:
-            printer_service.start_print(test_printer_config,
-                                        "test_model.gcode")
+            printer_service.start_print(test_printer_config, "test_model.gcode")
 
-        assert ("MQTT connection failed with reason code: 1"
-                in str(exc_info.value))
+        assert "MQTT connection failed with reason code: 1" in str(exc_info.value)
 
-    @patch('paho.mqtt.client.Client')
-    def test_start_print_publish_failure(self, mock_mqtt_client_class,
-                                         printer_service, test_printer_config):
+    @patch("paho.mqtt.client.Client")
+    def test_start_print_publish_failure(
+        self, mock_mqtt_client_class, printer_service, test_printer_config
+    ):
         """Test print start command with publish failure."""
         # Mock MQTT client
         mock_client = Mock()
@@ -885,14 +826,14 @@ class TestStartPrint:
 
         # Mock successful connection but publish failure
         def simulate_connection(*args, **kwargs):
-            if hasattr(mock_client, 'on_connect'):
+            if hasattr(mock_client, "on_connect"):
                 mock_client.on_connect(mock_client, None, None, 0, None)
 
         mock_client.loop_start.side_effect = simulate_connection
 
         # Mock publish that calls on_publish with error code
         def mock_publish(topic, payload, qos):
-            if hasattr(mock_client, 'on_publish'):
+            if hasattr(mock_client, "on_publish"):
                 mock_client.on_publish(mock_client, None, None, 1, None)
             mock_msg_info = Mock()
             mock_msg_info.is_published.return_value = False
@@ -901,15 +842,14 @@ class TestStartPrint:
         mock_client.publish.side_effect = mock_publish
 
         with pytest.raises(PrinterMQTTError) as exc_info:
-            printer_service.start_print(test_printer_config,
-                                        "test_model.gcode")
+            printer_service.start_print(test_printer_config, "test_model.gcode")
 
-        assert ("MQTT publish failed with reason code: 1"
-                in str(exc_info.value))
+        assert "MQTT publish failed with reason code: 1" in str(exc_info.value)
 
-    @patch('paho.mqtt.client.Client')
-    def test_start_print_timeout(self, mock_mqtt_client_class,
-                                 printer_service, test_printer_config):
+    @patch("paho.mqtt.client.Client")
+    def test_start_print_timeout(
+        self, mock_mqtt_client_class, printer_service, test_printer_config
+    ):
         """Test print start command with timeout."""
         # Mock MQTT client
         mock_client = Mock()
@@ -920,29 +860,28 @@ class TestStartPrint:
 
         with pytest.raises(PrinterMQTTError) as exc_info:
             printer_service.start_print(
-                test_printer_config, "test_model.gcode", timeout=1)
+                test_printer_config, "test_model.gcode", timeout=1
+            )
 
         assert "MQTT connection timeout" in str(exc_info.value)
 
-    @patch('app.printer_service.mqtt.Client')
-    def test_start_print_unexpected_error(self, mock_mqtt_client_class,
-                                          printer_service,
-                                          test_printer_config):
+    @patch("app.printer_service.mqtt.Client")
+    def test_start_print_unexpected_error(
+        self, mock_mqtt_client_class, printer_service, test_printer_config
+    ):
         """Test print start command with unexpected error."""
         # Mock MQTT client to raise an exception during initialization
         mock_mqtt_client_class.side_effect = Exception("Unexpected error")
 
         with pytest.raises(PrinterMQTTError) as exc_info:
-            printer_service.start_print(test_printer_config,
-                                        "test_model.gcode")
+            printer_service.start_print(test_printer_config, "test_model.gcode")
 
-        assert ("Unexpected error during MQTT operation"
-                in str(exc_info.value))
+        assert "Unexpected error during MQTT operation" in str(exc_info.value)
 
-    @patch('paho.mqtt.client.Client')
-    def test_start_print_cleanup_on_error(self, mock_mqtt_client_class,
-                                          printer_service,
-                                          test_printer_config):
+    @patch("paho.mqtt.client.Client")
+    def test_start_print_cleanup_on_error(
+        self, mock_mqtt_client_class, printer_service, test_printer_config
+    ):
         """Test that MQTT client is cleaned up even when error occurs."""
         # Mock MQTT client
         mock_client = Mock()
@@ -952,8 +891,7 @@ class TestStartPrint:
         mock_client.connect.side_effect = Exception("Connection error")
 
         with pytest.raises(PrinterMQTTError):
-            printer_service.start_print(test_printer_config,
-                                        "test_model.gcode")
+            printer_service.start_print(test_printer_config, "test_model.gcode")
 
         # Verify cleanup was attempted
         mock_client.loop_stop.assert_called_once()
@@ -972,14 +910,13 @@ class TestAMSQuery:
     def test_printer_config(self):
         """Create a test printer configuration."""
         return PrinterConfig(
-            name="Test Printer",
-            ip="192.168.1.100",
-            access_code="12345678"
+            name="Test Printer", ip="192.168.1.100", access_code="12345678"
         )
 
-    @patch('paho.mqtt.client.Client')
-    def test_query_ams_status_successful(self, mock_mqtt_client_class,
-                                         printer_service, test_printer_config):
+    @patch("paho.mqtt.client.Client")
+    def test_query_ams_status_successful(
+        self, mock_mqtt_client_class, printer_service, test_printer_config
+    ):
         """Test successful AMS status query."""
         # Mock MQTT client
         mock_client = Mock()
@@ -987,7 +924,7 @@ class TestAMSQuery:
 
         # Mock successful connection
         def simulate_connection(*args, **kwargs):
-            if hasattr(mock_client, 'on_connect'):
+            if hasattr(mock_client, "on_connect"):
                 mock_client.on_connect(mock_client, None, None, 0, None)
 
         mock_client.loop_start.side_effect = simulate_connection
@@ -1002,7 +939,7 @@ class TestAMSQuery:
 
         # Mock AMS response message
         def simulate_ams_response():
-            if hasattr(mock_client, 'on_message'):
+            if hasattr(mock_client, "on_message"):
                 # Create a mock message with AMS data
                 mock_msg = Mock()
                 ams_response = {
@@ -1016,16 +953,16 @@ class TestAMSQuery:
                                         "type": "PLA",
                                         "color": "Red",
                                         "exist": True,
-                                        "material_id": "BAMBU_PLA_RED"
+                                        "material_id": "BAMBU_PLA_RED",
                                     },
                                     {
                                         "id": 1,
                                         "type": "PETG",
                                         "color": "Blue",
                                         "exist": True,
-                                        "material_id": "BAMBU_PETG_BLUE"
-                                    }
-                                ]
+                                        "material_id": "BAMBU_PETG_BLUE",
+                                    },
+                                ],
                             }
                         ]
                     }
@@ -1035,12 +972,12 @@ class TestAMSQuery:
 
         # Simulate the message arriving after a short delay
         import threading
+
         timer = threading.Timer(0.1, simulate_ams_response)
         timer.start()
 
         # Execute the AMS query
-        result = printer_service.query_ams_status(test_printer_config,
-                                                  timeout=5)
+        result = printer_service.query_ams_status(test_printer_config, timeout=5)
 
         # Verify result
         assert result.success is True
@@ -1068,7 +1005,8 @@ class TestAMSQuery:
 
         # Verify MQTT operations
         mock_client.username_pw_set.assert_called_once_with(
-            "bblp", test_printer_config.access_code)
+            "bblp", test_printer_config.access_code
+        )
         mock_client.connect.assert_called_once()
         mock_client.loop_start.assert_called_once()
         mock_client.subscribe.assert_called_once()
@@ -1076,10 +1014,10 @@ class TestAMSQuery:
         mock_client.loop_stop.assert_called_once()
         mock_client.disconnect.assert_called_once()
 
-    @patch('paho.mqtt.client.Client')
-    def test_query_ams_status_connection_failure(self, mock_mqtt_client_class,
-                                                 printer_service,
-                                                 test_printer_config):
+    @patch("paho.mqtt.client.Client")
+    def test_query_ams_status_connection_failure(
+        self, mock_mqtt_client_class, printer_service, test_printer_config
+    ):
         """Test AMS query with connection failure."""
         # Mock MQTT client
         mock_client = Mock()
@@ -1087,7 +1025,7 @@ class TestAMSQuery:
 
         # Mock connection failure
         def simulate_connection_failure(*args, **kwargs):
-            if hasattr(mock_client, 'on_connect'):
+            if hasattr(mock_client, "on_connect"):
                 mock_client.on_connect(mock_client, None, None, 1, None)
 
         mock_client.loop_start.side_effect = simulate_connection_failure
@@ -1095,12 +1033,12 @@ class TestAMSQuery:
         with pytest.raises(PrinterMQTTError) as exc_info:
             printer_service.query_ams_status(test_printer_config)
 
-        assert ("MQTT connection failed with reason code: 1"
-                in str(exc_info.value))
+        assert "MQTT connection failed with reason code: 1" in str(exc_info.value)
 
-    @patch('paho.mqtt.client.Client')
-    def test_query_ams_status_timeout(self, mock_mqtt_client_class,
-                                      printer_service, test_printer_config):
+    @patch("paho.mqtt.client.Client")
+    def test_query_ams_status_timeout(
+        self, mock_mqtt_client_class, printer_service, test_printer_config
+    ):
         """Test AMS query with timeout."""
         # Mock MQTT client
         mock_client = Mock()
@@ -1108,7 +1046,7 @@ class TestAMSQuery:
 
         # Mock successful connection but no response
         def simulate_connection(*args, **kwargs):
-            if hasattr(mock_client, 'on_connect'):
+            if hasattr(mock_client, "on_connect"):
                 mock_client.on_connect(mock_client, None, None, 0, None)
 
         mock_client.loop_start.side_effect = simulate_connection
@@ -1122,8 +1060,7 @@ class TestAMSQuery:
         mock_client.publish.side_effect = mock_publish
 
         # Execute with short timeout
-        result = printer_service.query_ams_status(test_printer_config,
-                                                  timeout=1)
+        result = printer_service.query_ams_status(test_printer_config, timeout=1)
 
         # Should return unsuccessful result due to timeout
         assert result.success is False
@@ -1143,27 +1080,22 @@ class TestAMSQuery:
                                 "type": "PLA",
                                 "color": "Red",
                                 "exist": True,
-                                "material_id": "BAMBU_PLA_RED"
+                                "material_id": "BAMBU_PLA_RED",
                             },
                             {
                                 "id": 1,
                                 "type": "PETG",
                                 "color": "#0000FF",
-                                "exist": True
-                            }
-                        ]
+                                "exist": True,
+                            },
+                        ],
                     },
                     {
                         "id": 1,
                         "tray": [
-                            {
-                                "id": 0,
-                                "type": "ABS",
-                                "color": "Green",
-                                "exist": True
-                            }
-                        ]
-                    }
+                            {"id": 0, "type": "ABS", "color": "Green", "exist": True}
+                        ],
+                    },
                 ]
             }
         }
@@ -1206,19 +1138,14 @@ class TestAMSQuery:
                     {
                         "id": 0,
                         "tray": [
-                            {
-                                "id": 0,
-                                "type": "PLA",
-                                "color": "Red",
-                                "exist": True
-                            },
+                            {"id": 0, "type": "PLA", "color": "Red", "exist": True},
                             {
                                 "id": 1,
                                 "type": "Unknown",
                                 "color": "Unknown",
-                                "exist": False  # Empty slot
-                            }
-                        ]
+                                "exist": False,  # Empty slot
+                            },
+                        ],
                     }
                 ]
             }
@@ -1261,15 +1188,13 @@ class TestMQTTIntegration:
     def test_printer_config(self):
         """Create a test printer configuration."""
         return PrinterConfig(
-            name="Test Printer",
-            ip="192.168.1.100",
-            access_code="test123"
+            name="Test Printer", ip="192.168.1.100", access_code="test123"
         )
 
-    @patch('paho.mqtt.client.Client')
-    def test_mqtt_print_initiation_workflow(self, mock_mqtt_client_class,
-                                            printer_service,
-                                            test_printer_config):
+    @patch("paho.mqtt.client.Client")
+    def test_mqtt_print_initiation_workflow(
+        self, mock_mqtt_client_class, printer_service, test_printer_config
+    ):
         """Test complete MQTT print initiation workflow."""
         # Mock MQTT client
         mock_client = Mock()
@@ -1281,27 +1206,27 @@ class TestMQTTIntegration:
         def track_call(name):
             def wrapper(*args, **kwargs):
                 call_sequence.append(name)
-                if name == 'loop_start':
+                if name == "loop_start":
                     # Simulate successful connection
                     mock_client.on_connect(mock_client, None, None, 0, None)
-                elif name == 'publish':
+                elif name == "publish":
                     # Simulate successful publish
                     mock_msg_info = Mock()
                     mock_msg_info.is_published.return_value = True
                     return mock_msg_info
+
             return wrapper
 
         # Set up method tracking
-        mock_client.username_pw_set.side_effect = track_call('username_pw_set')
-        mock_client.connect.side_effect = track_call('connect')
-        mock_client.loop_start.side_effect = track_call('loop_start')
-        mock_client.publish.side_effect = track_call('publish')
-        mock_client.loop_stop.side_effect = track_call('loop_stop')
-        mock_client.disconnect.side_effect = track_call('disconnect')
+        mock_client.username_pw_set.side_effect = track_call("username_pw_set")
+        mock_client.connect.side_effect = track_call("connect")
+        mock_client.loop_start.side_effect = track_call("loop_start")
+        mock_client.publish.side_effect = track_call("publish")
+        mock_client.loop_stop.side_effect = track_call("loop_stop")
+        mock_client.disconnect.side_effect = track_call("disconnect")
 
         # Execute the print start command
-        result = printer_service.start_print(
-            test_printer_config, "test_model.gcode")
+        result = printer_service.start_print(test_printer_config, "test_model.gcode")
 
         # Verify the result
         assert result.success is True
@@ -1309,12 +1234,12 @@ class TestMQTTIntegration:
 
         # Verify the correct sequence of MQTT operations
         expected_sequence = [
-            'username_pw_set',
-            'connect',
-            'loop_start',
-            'publish',
-            'loop_stop',
-            'disconnect'
+            "username_pw_set",
+            "connect",
+            "loop_start",
+            "publish",
+            "loop_stop",
+            "disconnect",
         ]
         assert call_sequence == expected_sequence
 
@@ -1325,15 +1250,15 @@ class TestMQTTIntegration:
 
         topic = args[0]
         message = args[1]
-        qos = kwargs.get('qos', 0)
+        qos = kwargs.get("qos", 0)
 
         # Check topic format
-        expected_topic = (
-            f"device/{test_printer_config.ip.replace('.', '_')}/request")
+        expected_topic = f"device/{test_printer_config.ip.replace('.', '_')}/request"
         assert topic == expected_topic
 
         # Check message content
         import json
+
         parsed_message = json.loads(message)
         assert "print" in parsed_message
         assert parsed_message["print"]["command"] == "project_file"
@@ -1344,9 +1269,9 @@ class TestMQTTIntegration:
 
     def test_mqtt_service_constants(self, printer_service):
         """Test that MQTT constants are properly defined."""
-        assert hasattr(printer_service, 'DEFAULT_MQTT_PORT')
-        assert hasattr(printer_service, 'DEFAULT_MQTT_TIMEOUT')
-        assert hasattr(printer_service, 'DEFAULT_MQTT_KEEPALIVE')
+        assert hasattr(printer_service, "DEFAULT_MQTT_PORT")
+        assert hasattr(printer_service, "DEFAULT_MQTT_TIMEOUT")
+        assert hasattr(printer_service, "DEFAULT_MQTT_KEEPALIVE")
 
         assert printer_service.DEFAULT_MQTT_PORT == 1883
         assert printer_service.DEFAULT_MQTT_TIMEOUT == 30

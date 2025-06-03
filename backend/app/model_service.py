@@ -14,11 +14,13 @@ import httpx
 
 class ModelValidationError(Exception):
     """Exception raised when model validation fails."""
+
     pass
 
 
 class ModelDownloadError(Exception):
     """Exception raised when model download fails."""
+
     pass
 
 
@@ -37,15 +39,15 @@ class ModelService:
         self.temp_dir.mkdir(parents=True, exist_ok=True)
 
         # Supported file extensions
-        self.supported_extensions = {'.stl', '.3mf'}
+        self.supported_extensions = {".stl", ".3mf"}
 
         # Content types for validation
         self.content_type_mapping = {
-            'application/octet-stream': True,  # Common for STL files
-            'application/vnd.ms-package.3dmanufacturing-3dmodel+xml': True,
-            'model/3mf': True,  # 3MF alternative
-            'model/stl': True,  # STL
-            'text/plain': True,  # Sometimes STL files are served as text
+            "application/octet-stream": True,  # Common for STL files
+            "application/vnd.ms-package.3dmanufacturing-3dmodel+xml": True,
+            "model/3mf": True,  # 3MF alternative
+            "model/stl": True,  # STL
+            "text/plain": True,  # Sometimes STL files are served as text
         }
 
     def validate_url(self, url: str) -> bool:
@@ -61,8 +63,10 @@ class ModelService:
         try:
             result = urlparse(url)
             # Check if URL has scheme and netloc
-            return all([result.scheme, result.netloc]) and \
-                result.scheme in ('http', 'https')
+            return all([result.scheme, result.netloc]) and result.scheme in (
+                "http",
+                "https",
+            )
         except Exception:
             return False
 
@@ -109,12 +113,12 @@ class ModelService:
         filename = Path(parsed_url.path).name
 
         # If no filename in URL or no extension, generate one
-        if not filename or '.' not in filename:
+        if not filename or "." not in filename:
             # Try to extract from URL path
-            path_parts = [part for part in parsed_url.path.split('/') if part]
+            path_parts = [part for part in parsed_url.path.split("/") if part]
             if path_parts:
                 potential_filename = path_parts[-1]
-                if '.' in potential_filename:
+                if "." in potential_filename:
                     filename = potential_filename
                 else:
                     filename = f"{potential_filename}.stl"  # Default to STL
@@ -146,28 +150,28 @@ class ModelService:
 
         # Validate file extension
         if not self.validate_file_extension(filename):
-            extensions = ', '.join(self.supported_extensions)
+            extensions = ", ".join(self.supported_extensions)
             raise ModelValidationError(
-                f"Unsupported file extension. File must be one of: "
-                f"{extensions}"
+                f"Unsupported file extension. File must be one of: " f"{extensions}"
             )
 
         # Generate unique temporary file path
         import uuid
+
         unique_filename = f"{uuid.uuid4().hex}_{filename}"
         temp_file_path = self.temp_dir / unique_filename
 
         try:
             # Download the file
             async with httpx.AsyncClient(timeout=30.0) as client:
-                async with client.stream('GET', url) as response:
+                async with client.stream("GET", url) as response:
                     response.raise_for_status()
 
                     # Check content-length if available
-                    content_length = response.headers.get('content-length')
+                    content_length = response.headers.get("content-length")
                     if content_length:
                         if int(content_length) > self.max_file_size_bytes:
-                            max_mb = self.max_file_size_bytes // (1024*1024)
+                            max_mb = self.max_file_size_bytes // (1024 * 1024)
                             raise ModelValidationError(
                                 f"File size exceeds maximum allowed size "
                                 f"of {max_mb}MB"
@@ -175,14 +179,13 @@ class ModelService:
 
                     # Download file in chunks
                     total_size = 0
-                    with open(temp_file_path, 'wb') as f:
+                    with open(temp_file_path, "wb") as f:
                         async for chunk in response.aiter_bytes():
                             total_size += len(chunk)
                             if total_size > self.max_file_size_bytes:
                                 # Clean up partial file
                                 temp_file_path.unlink(missing_ok=True)
-                                max_mb = self.max_file_size_bytes // \
-                                    (1024 * 1024)
+                                max_mb = self.max_file_size_bytes // (1024 * 1024)
                                 raise ModelValidationError(
                                     f"File size exceeds maximum allowed "
                                     f"size of {max_mb}MB"
@@ -209,7 +212,7 @@ class ModelService:
         # Final validation of downloaded file
         if not self.validate_file_size(temp_file_path):
             temp_file_path.unlink(missing_ok=True)
-            max_mb = self.max_file_size_bytes // (1024*1024)
+            max_mb = self.max_file_size_bytes // (1024 * 1024)
             raise ModelValidationError(
                 f"Downloaded file exceeds maximum allowed size of {max_mb}MB"
             )
@@ -246,7 +249,7 @@ class ModelService:
                 "size_bytes": stat.st_size,
                 "size_mb": round(stat.st_size / (1024 * 1024), 2),
                 "extension": file_path.suffix.lower(),
-                "path": str(file_path)
+                "path": str(file_path),
             }
         except OSError:
             return {}

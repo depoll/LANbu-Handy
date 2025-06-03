@@ -1,41 +1,43 @@
 interface FeatureCardProps {
-  title: string
-  description: string
-  icon: string
-  onClick: () => void
+  title: string;
+  description: string;
+  icon: string;
+  onClick: () => void;
 }
 
 function FeatureCard({ title, description, icon, onClick }: FeatureCardProps) {
   return (
     <div className="feature-card" onClick={onClick}>
-      <h3>{icon} {title}</h3>
+      <h3>
+        {icon} {title}
+      </h3>
       <p>{description}</p>
     </div>
-  )
+  );
 }
 
 interface FeaturesProps {
-  onFeatureClick: (featureName: string) => void
+  onFeatureClick: (featureName: string) => void;
 }
 
 function Features({ onFeatureClick }: FeaturesProps) {
   const features = [
     {
-      title: "URL to Print",
-      icon: "🔗",
-      description: "Provide a URL to your 3D model and start printing"
+      title: 'URL to Print',
+      icon: '🔗',
+      description: 'Provide a URL to your 3D model and start printing',
     },
     {
-      title: "Local Slicing",
-      icon: "⚙️",
-      description: "Uses embedded Bambu Studio CLI for reliable slicing"
+      title: 'Local Slicing',
+      icon: '⚙️',
+      description: 'Uses embedded Bambu Studio CLI for reliable slicing',
     },
     {
-      title: "LAN Only",
-      icon: "🏠",
-      description: "Operates entirely within your local network"
-    }
-  ]
+      title: 'LAN Only',
+      icon: '🏠',
+      description: 'Operates entirely within your local network',
+    },
+  ];
 
   return (
     <section className="features">
@@ -49,7 +51,7 @@ function Features({ onFeatureClick }: FeaturesProps) {
         />
       ))}
     </section>
-  )
+  );
 }
 
-export default Features
+export default Features;

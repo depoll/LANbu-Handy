@@ -45,7 +45,7 @@
         }
     },
     
-    "postCreateCommand": "echo 'Dev container ready for LANbu Handy development and testing' && echo 'Run scripts/test-dev-container.sh to validate the environment'",
+    "postCreateCommand": "/workspace/scripts/setup-dev-environment.sh --devcontainer",
     
     "remoteUser": "vscode"
 }
