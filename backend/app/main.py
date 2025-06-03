@@ -7,6 +7,7 @@ printing 3D models to Bambu Lab printers in LAN-only mode.
 
 from pathlib import Path
 import tempfile
+from typing import List
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -16,7 +17,7 @@ from app.model_service import (ModelService, ModelValidationError,
                                ModelDownloadError)
 from app.slicer_service import slice_model
 from app.printer_service import (PrinterService, PrinterCommunicationError,
-                                 PrinterMQTTError)
+                                 PrinterMQTTError, AMSStatusResult)
 from app.config import config
 
 app = FastAPI(
@@ -141,6 +142,25 @@ class JobStartResponse(BaseModel):
     success: bool
     message: str
     job_steps: dict = None
+    error_details: str = None
+
+
+class AMSFilamentResponse(BaseModel):
+    slot_id: int
+    filament_type: str
+    color: str
+    material_id: str = None
+
+
+class AMSUnitResponse(BaseModel):
+    unit_id: int
+    filaments: List[AMSFilamentResponse]
+
+
+class AMSStatusResponse(BaseModel):
+    success: bool
+    message: str
+    ams_units: List[AMSUnitResponse] = None
     error_details: str = None
 
 
@@ -495,4 +515,106 @@ async def start_basic_job(request: JobStartRequest):
         raise
     except Exception as e:
         msg = f"Internal server error during job orchestration: {str(e)}"
+        raise HTTPException(status_code=500, detail=msg)
+
+
+@app.get("/api/printer/{printer_id}/ams-status", response_model=AMSStatusResponse)
+async def get_ams_status(printer_id: str):
+    """
+    Query the printer's AMS status.
+
+    Retrieves the current status of all AMS units and their loaded filaments
+    from the specified printer via MQTT.
+
+    Args:
+        printer_id: The name or identifier of the printer to query
+
+    Returns:
+        AMSStatusResponse: AMS status with filament information for each slot
+
+    Raises:
+        HTTPException: If printer is not found, not configured, or query fails
+    """
+    try:
+        # Check if any printers are configured
+        if not config.is_printer_configured():
+            raise HTTPException(
+                status_code=400,
+                detail="No printers configured. Please configure a printer first."
+            )
+
+        # Find the printer by ID/name
+        printer_config = None
+        if printer_id.lower() == "default":
+            # Use the first/default printer
+            printer_config = config.get_default_printer()
+        else:
+            # Look for printer by name
+            printer_config = config.get_printer_by_name(printer_id)
+
+        if not printer_config:
+            # List available printers for helpful error message
+            available_printers = [p.name for p in config.get_printers()]
+            raise HTTPException(
+                status_code=404,
+                detail=f"Printer '{printer_id}' not found. "
+                       f"Available printers: {available_printers}"
+            )
+
+        # Query AMS status
+        try:
+            ams_result = printer_service.query_ams_status(printer_config)
+
+            if ams_result.success:
+                # Convert internal data structures to API response format
+                ams_units_response = []
+                if ams_result.ams_units:
+                    for ams_unit in ams_result.ams_units:
+                        filaments_response = []
+                        for filament in ams_unit.filaments:
+                            filament_response = AMSFilamentResponse(
+                                slot_id=filament.slot_id,
+                                filament_type=filament.filament_type,
+                                color=filament.color,
+                                material_id=filament.material_id
+                            )
+                            filaments_response.append(filament_response)
+
+                        unit_response = AMSUnitResponse(
+                            unit_id=ams_unit.unit_id,
+                            filaments=filaments_response
+                        )
+                        ams_units_response.append(unit_response)
+
+                return AMSStatusResponse(
+                    success=True,
+                    message=ams_result.message,
+                    ams_units=ams_units_response
+                )
+            else:
+                # Query failed
+                return AMSStatusResponse(
+                    success=False,
+                    message=ams_result.message,
+                    error_details=ams_result.error_details
+                )
+
+        except PrinterMQTTError as e:
+            return AMSStatusResponse(
+                success=False,
+                message="MQTT communication error",
+                error_details=str(e)
+            )
+        except PrinterCommunicationError as e:
+            return AMSStatusResponse(
+                success=False,
+                message="Printer communication error",
+                error_details=str(e)
+            )
+
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
+    except Exception as e:
+        msg = f"Internal server error during AMS status query: {str(e)}"
         raise HTTPException(status_code=500, detail=msg)
