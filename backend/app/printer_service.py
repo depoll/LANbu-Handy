@@ -250,8 +250,10 @@ class PrinterService:
 
         Args:
             printer_config: Configuration for the target printer
-            gcode_filename: Name of the G-code file to print (should be uploaded already)
-            timeout: MQTT operation timeout in seconds (defaults to DEFAULT_MQTT_TIMEOUT)
+            gcode_filename: Name of the G-code file to print (should be
+                uploaded already)
+            timeout: MQTT operation timeout in seconds (defaults to
+                DEFAULT_MQTT_TIMEOUT)
 
         Returns:
             MQTTResult: Result of the MQTT operation
@@ -277,21 +279,28 @@ class PrinterService:
                 nonlocal connection_successful, connection_error
                 if reason_code == 0:
                     connection_successful = True
-                    logger.debug(f"MQTT connected to printer {printer_config.ip}")
+                    logger.debug(
+                        f"MQTT connected to printer {printer_config.ip}")
                 else:
-                    connection_error = f"MQTT connection failed with reason code: {reason_code}"
+                    connection_error = (
+                        f"MQTT connection failed with reason code: "
+                        f"{reason_code}")
                     logger.error(connection_error)
 
             def on_publish(client, userdata, mid, reason_code, properties):
                 nonlocal publish_error
                 if reason_code != 0:
-                    publish_error = f"MQTT publish failed with reason code: {reason_code}"
+                    publish_error = (
+                        f"MQTT publish failed with reason code: "
+                        f"{reason_code}")
                     logger.error(publish_error)
                 else:
-                    logger.debug(f"MQTT message published successfully")
+                    logger.debug("MQTT message published successfully")
 
-            def on_disconnect(client, userdata, flags, reason_code, properties):
-                logger.debug(f"MQTT disconnected from printer {printer_config.ip}")
+            def on_disconnect(client, userdata, flags, reason_code,
+                              properties):
+                logger.debug(
+                    f"MQTT disconnected from printer {printer_config.ip}")
 
             # Set up MQTT callbacks
             client.on_connect = on_connect
@@ -299,12 +308,16 @@ class PrinterService:
             client.on_disconnect = on_disconnect
             # Set authentication if access code is provided
             if printer_config.access_code:
-                # Bambu Lab printers typically use "bblp" as username and access code as password
+                # Bambu Lab printers typically use "bblp" as username and
+                # access code as password
                 client.username_pw_set("bblp", printer_config.access_code)
 
             # Connect to MQTT broker
-            logger.debug(f"Connecting to MQTT broker at {printer_config.ip}:{self.DEFAULT_MQTT_PORT}")
-            client.connect(printer_config.ip, self.DEFAULT_MQTT_PORT, self.DEFAULT_MQTT_KEEPALIVE)
+            logger.debug(
+                f"Connecting to MQTT broker at "
+                f"{printer_config.ip}:{self.DEFAULT_MQTT_PORT}")
+            client.connect(printer_config.ip, self.DEFAULT_MQTT_PORT,
+                           self.DEFAULT_MQTT_KEEPALIVE)
 
             # Wait for connection
             start_time = time.time()
@@ -323,7 +336,8 @@ class PrinterService:
             # Prepare the print command message
             # Bambu Lab MQTT topic format: device/{serial}/request
             # For LAN mode, we can use a generic device ID or the printer IP
-            device_topic = f"device/{printer_config.ip.replace('.', '_')}/request"
+            device_topic = (
+                f"device/{printer_config.ip.replace('.', '_')}/request")
 
             # Bambu Lab print command JSON structure
             print_command = {
@@ -337,7 +351,8 @@ class PrinterService:
             }
 
             message = json.dumps(print_command)
-            logger.debug(f"Publishing MQTT message to topic {device_topic}: {message}")
+            logger.debug(
+                f"Publishing MQTT message to topic {device_topic}: {message}")
 
             # Publish the message
             msg_info = client.publish(device_topic, message, qos=1)
@@ -354,12 +369,15 @@ class PrinterService:
             if publish_error:
                 raise PrinterMQTTError(publish_error)
 
-            logger.info(f"Successfully sent print command to printer "
-                        f"{printer_config.name}")
+            logger.info(
+                f"Successfully sent print command to printer "
+                f"{printer_config.name}")
 
             return MQTTResult(
                 success=True,
-                message=f"Print command sent successfully to {printer_config.name}"
+                message=(
+                    f"Print command sent successfully to "
+                    f"{printer_config.name}")
             )
 
         except PrinterMQTTError:
@@ -378,7 +396,9 @@ class PrinterService:
                 if 'client' in locals():
                     client.loop_stop()
                     client.disconnect()
-                    logger.debug(f"MQTT client disconnected from {printer_config.ip}")
+                    logger.debug(
+                        f"MQTT client disconnected from "
+                        f"{printer_config.ip}")
             except Exception as e:
                 logger.debug(f"Error during MQTT cleanup: {e}")
 

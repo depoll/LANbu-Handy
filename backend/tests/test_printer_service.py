@@ -770,13 +770,15 @@ class TestStartPrint:
         topic = publish_call[0][0]
         message = publish_call[0][1]
 
-        assert topic == f"device/{test_printer_config.ip.replace('.', '_')}/request"
+        assert topic == (
+            f"device/{test_printer_config.ip.replace('.', '_')}/request")
         assert "test_model.gcode" in message
         assert "project_file" in message
 
     @patch('paho.mqtt.client.Client')
     def test_start_print_connection_failure(self, mock_mqtt_client_class,
-                                            printer_service, test_printer_config):
+                                            printer_service,
+                                            test_printer_config):
         """Test print start command with connection failure."""
         # Mock MQTT client
         mock_client = Mock()
@@ -791,9 +793,11 @@ class TestStartPrint:
         mock_client.loop_start.side_effect = simulate_connection_failure
 
         with pytest.raises(PrinterMQTTError) as exc_info:
-            printer_service.start_print(test_printer_config, "test_model.gcode")
+            printer_service.start_print(test_printer_config,
+                                        "test_model.gcode")
 
-        assert "MQTT connection failed with reason code: 1" in str(exc_info.value)
+        assert ("MQTT connection failed with reason code: 1"
+                in str(exc_info.value))
 
     @patch('paho.mqtt.client.Client')
     def test_start_print_publish_failure(self, mock_mqtt_client_class,
@@ -821,9 +825,11 @@ class TestStartPrint:
         mock_client.publish.side_effect = mock_publish
 
         with pytest.raises(PrinterMQTTError) as exc_info:
-            printer_service.start_print(test_printer_config, "test_model.gcode")
+            printer_service.start_print(test_printer_config,
+                                        "test_model.gcode")
 
-        assert "MQTT publish failed with reason code: 1" in str(exc_info.value)
+        assert ("MQTT publish failed with reason code: 1"
+                in str(exc_info.value))
 
     @patch('paho.mqtt.client.Client')
     def test_start_print_timeout(self, mock_mqtt_client_class,
@@ -844,19 +850,23 @@ class TestStartPrint:
 
     @patch('app.printer_service.mqtt.Client')
     def test_start_print_unexpected_error(self, mock_mqtt_client_class,
-                                          printer_service, test_printer_config):
+                                          printer_service,
+                                          test_printer_config):
         """Test print start command with unexpected error."""
         # Mock MQTT client to raise an exception during initialization
         mock_mqtt_client_class.side_effect = Exception("Unexpected error")
 
         with pytest.raises(PrinterMQTTError) as exc_info:
-            printer_service.start_print(test_printer_config, "test_model.gcode")
+            printer_service.start_print(test_printer_config,
+                                        "test_model.gcode")
 
-        assert "Unexpected error during MQTT operation" in str(exc_info.value)
+        assert ("Unexpected error during MQTT operation"
+                in str(exc_info.value))
 
     @patch('paho.mqtt.client.Client')
     def test_start_print_cleanup_on_error(self, mock_mqtt_client_class,
-                                          printer_service, test_printer_config):
+                                          printer_service,
+                                          test_printer_config):
         """Test that MQTT client is cleaned up even when error occurs."""
         # Mock MQTT client
         mock_client = Mock()
@@ -866,7 +876,8 @@ class TestStartPrint:
         mock_client.connect.side_effect = Exception("Connection error")
 
         with pytest.raises(PrinterMQTTError):
-            printer_service.start_print(test_printer_config, "test_model.gcode")
+            printer_service.start_print(test_printer_config,
+                                        "test_model.gcode")
 
         # Verify cleanup was attempted
         mock_client.loop_stop.assert_called_once()
@@ -892,7 +903,8 @@ class TestMQTTIntegration:
 
     @patch('paho.mqtt.client.Client')
     def test_mqtt_print_initiation_workflow(self, mock_mqtt_client_class,
-                                            printer_service, test_printer_config):
+                                            printer_service,
+                                            test_printer_config):
         """Test complete MQTT print initiation workflow."""
         # Mock MQTT client
         mock_client = Mock()
@@ -945,13 +957,14 @@ class TestMQTTIntegration:
         publish_call = mock_client.publish.call_args
         args = publish_call[0]
         kwargs = publish_call[1] if publish_call[1] else {}
-        
+
         topic = args[0]
         message = args[1]
         qos = kwargs.get('qos', 0)
 
         # Check topic format
-        expected_topic = f"device/{test_printer_config.ip.replace('.', '_')}/request"
+        expected_topic = (
+            f"device/{test_printer_config.ip.replace('.', '_')}/request")
         assert topic == expected_topic
 
         # Check message content
@@ -969,7 +982,7 @@ class TestMQTTIntegration:
         assert hasattr(printer_service, 'DEFAULT_MQTT_PORT')
         assert hasattr(printer_service, 'DEFAULT_MQTT_TIMEOUT')
         assert hasattr(printer_service, 'DEFAULT_MQTT_KEEPALIVE')
-        
+
         assert printer_service.DEFAULT_MQTT_PORT == 1883
         assert printer_service.DEFAULT_MQTT_TIMEOUT == 30
         assert printer_service.DEFAULT_MQTT_KEEPALIVE == 60
