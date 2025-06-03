@@ -130,7 +130,7 @@ class TestAMSDataStructures:
             AMSFilament(slot_id=0, filament_type="PLA", color="Red"),
             AMSFilament(slot_id=1, filament_type="PETG", color="Blue")
         ]
-        
+
         unit = AMSUnit(unit_id=0, filaments=filaments)
 
         assert unit.unit_id == 0
@@ -142,7 +142,7 @@ class TestAMSDataStructures:
         """Test successful AMSStatusResult."""
         filament = AMSFilament(slot_id=0, filament_type="PLA", color="Red")
         unit = AMSUnit(unit_id=0, filaments=[filament])
-        
+
         result = AMSStatusResult(
             success=True,
             message="AMS status retrieved successfully",
@@ -1238,13 +1238,13 @@ class TestAMSQuery:
         """Test parsing invalid AMS data."""
         # Missing AMS data
         response_data = {"status": "ok"}
-        
+
         ams_units = printer_service._parse_ams_data(response_data)
         assert len(ams_units) == 0
 
         # Malformed data
         response_data = {"ams": "invalid"}
-        
+
         ams_units = printer_service._parse_ams_data(response_data)
         assert len(ams_units) == 0
 

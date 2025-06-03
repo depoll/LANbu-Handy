@@ -12,7 +12,6 @@ from pathlib import Path
 from typing import Optional, List
 from dataclasses import dataclass
 import time
-import threading
 
 import paho.mqtt.client as mqtt
 
@@ -469,8 +468,8 @@ class PrinterService:
                     connection_successful = True
                     logger.debug(
                         f"MQTT connected to printer {printer_config.ip}")
-                    
-                    # Subscribe to the response topic immediately after connection
+
+                    # Subscribe to response topic immediately after connection
                     response_topic = (
                         f"device/{printer_config.ip.replace('.', '_')}/report"
                     )
@@ -488,16 +487,16 @@ class PrinterService:
                     # Parse the JSON response
                     payload = msg.payload.decode('utf-8')
                     logger.debug(f"Received MQTT message: {payload}")
-                    
+
                     response_json = json.loads(payload)
-                    
+
                     # Check if this message contains AMS data
                     # Bambu Lab printers typically send AMS data in "ams" field
                     if "ams" in response_json:
                         response_data = response_json
                         response_received = True
                         logger.debug("AMS status data received")
-                        
+
                 except json.JSONDecodeError as e:
                     logger.warning(f"Failed to parse MQTT message: {e}")
                 except Exception as e:
@@ -645,37 +644,37 @@ class PrinterService:
             List[AMSUnit]: List of AMS units with their filament information
         """
         ams_units = []
-        
+
         try:
             # Bambu Lab AMS data is typically structured as:
-            # {"ams": {"ams": [{"id": 0, "tray": [{"id": 0, "type": "PLA", ...}, ...]}, ...]}}
+            # {"ams": {"ams": [{"id": 0, "tray": [{"id": 0, ...}, ...]}, ...]}}
             ams_data = response_data.get("ams", {})
             ams_list = ams_data.get("ams", [])
-            
+
             for ams_unit_data in ams_list:
                 unit_id = ams_unit_data.get("id", 0)
                 filaments = []
-                
+
                 # Parse the trays (filament slots)
                 trays = ams_unit_data.get("tray", [])
                 for tray in trays:
                     slot_id = tray.get("id", 0)
-                    
+
                     # Extract filament information
                     filament_type = tray.get("type", "Unknown")
                     color = tray.get("color", "Unknown")
-                    
-                    # Some fields might be named differently in actual responses
+
+                    # Some fields might be named differently in responses
                     # Fallback to common alternatives
                     if filament_type == "Unknown":
                         filament_type = tray.get("material", "Unknown")
-                    
+
                     if color == "Unknown":
                         # Try to get color from hex code
                         hex_color = tray.get("color_hex", "")
                         if hex_color:
                             color = hex_color
-                    
+
                     # Only add filaments that are actually loaded
                     # Check for common indicators that a slot is empty
                     if tray.get("exist", True) and filament_type != "Unknown":
@@ -686,18 +685,18 @@ class PrinterService:
                             material_id=tray.get("material_id")
                         )
                         filaments.append(filament)
-                
+
                 # Create AMS unit with its filaments
                 ams_unit = AMSUnit(
                     unit_id=unit_id,
                     filaments=filaments
                 )
                 ams_units.append(ams_unit)
-            
+
         except Exception as e:
             logger.warning(f"Error parsing AMS data: {e}")
             # Return empty list on parsing error
-            
+
         return ams_units
 
     def test_connection(self, printer_config: PrinterConfig) -> bool:

@@ -7,7 +7,7 @@ printing 3D models to Bambu Lab printers in LAN-only mode.
 
 from pathlib import Path
 import tempfile
-from typing import List
+from typing import List, Optional
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -17,7 +17,7 @@ from app.model_service import (ModelService, ModelValidationError,
                                ModelDownloadError)
 from app.slicer_service import slice_model
 from app.printer_service import (PrinterService, PrinterCommunicationError,
-                                 PrinterMQTTError, AMSStatusResult)
+                                 PrinterMQTTError)
 from app.config import config
 
 app = FastAPI(
@@ -149,7 +149,7 @@ class AMSFilamentResponse(BaseModel):
     slot_id: int
     filament_type: str
     color: str
-    material_id: str = None
+    material_id: Optional[str] = None
 
 
 class AMSUnitResponse(BaseModel):
@@ -160,8 +160,8 @@ class AMSUnitResponse(BaseModel):
 class AMSStatusResponse(BaseModel):
     success: bool
     message: str
-    ams_units: List[AMSUnitResponse] = None
-    error_details: str = None
+    ams_units: Optional[List[AMSUnitResponse]] = None
+    error_details: Optional[str] = None
 
 
 @app.post("/api/model/submit-url", response_model=ModelSubmissionResponse)
@@ -518,7 +518,8 @@ async def start_basic_job(request: JobStartRequest):
         raise HTTPException(status_code=500, detail=msg)
 
 
-@app.get("/api/printer/{printer_id}/ams-status", response_model=AMSStatusResponse)
+@app.get("/api/printer/{printer_id}/ams-status",
+         response_model=AMSStatusResponse)
 async def get_ams_status(printer_id: str):
     """
     Query the printer's AMS status.
@@ -540,7 +541,8 @@ async def get_ams_status(printer_id: str):
         if not config.is_printer_configured():
             raise HTTPException(
                 status_code=400,
-                detail="No printers configured. Please configure a printer first."
+                detail="No printers configured. "
+                       "Please configure a printer first."
             )
 
         # Find the printer by ID/name
