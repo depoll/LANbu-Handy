@@ -1,3 +1,73 @@
+# Scripts Directory for LANbu Handy
+
+This directory contains various scripts and tools for the LANbu Handy project.
+
+## Pre-commit Hook Setup
+
+### What it does
+
+The pre-commit hook automatically runs `flake8` linting on Python code before each commit. If any linting errors are found, the commit is blocked until the issues are fixed.
+
+### Installation
+
+The hook is automatically installed in `.git/hooks/pre-commit` and should be working already. If you need to reinstall it:
+
+```bash
+# Copy the hook script to the git hooks directory
+cp scripts/pre-commit-hook.sh .git/hooks/pre-commit
+
+# Make it executable
+chmod +x .git/hooks/pre-commit
+```
+
+### Features
+
+- ✅ **Automatic linting**: Runs flake8 on Python files before each commit
+- ✅ **Smart detection**: Only runs when Python files are staged for commit
+- ✅ **Comprehensive checks**: Validates flake8 availability and provides helpful error messages
+- ✅ **Bypass option**: Can be temporarily bypassed with `git commit --no-verify`
+- ✅ **Colorized output**: Clear, colorized feedback for better user experience
+
+### Usage
+
+The hook runs automatically before each commit. No manual action required.
+
+#### Successful commit (clean code)
+```
+🔍 Running pre-commit linting checks...
+📁 Checking Python files in: backend/
+📝 Staged Python files:
+  - backend/app/main.py
+🔍 Running: python -m flake8 backend/
+✅ All linting checks passed!
+🚀 Proceeding with commit...
+```
+
+#### Blocked commit (linting errors)
+```
+🔍 Running pre-commit linting checks...
+📁 Checking Python files in: backend/
+📝 Staged Python files:
+  - backend/app/main.py
+🔍 Running: python -m flake8 backend/
+❌ Linting errors found:
+
+backend/app/main.py:10:80: E501 line too long (85 > 79 characters)
+backend/app/main.py:15:1: W293 blank line contains whitespace
+
+💡 Please fix the above linting errors before committing.
+💡 You can run 'python -m flake8 backend/' to see all issues.
+💡 To bypass this hook temporarily, use: git commit --no-verify
+```
+
+#### Bypassing the hook (when needed)
+```bash
+# Skip the pre-commit hook for this commit only
+git commit --no-verify -m "Emergency fix - will clean up linting later"
+```
+
+---
+
 # Bambu Studio CLI Installation
 
 This directory contains the installation script for adding Bambu Studio CLI to the LANbu Handy Docker image.
