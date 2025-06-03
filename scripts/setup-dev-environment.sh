@@ -27,9 +27,30 @@ setup_precommit() {
     fi
     
     echo "🔧 Installing pre-commit hooks..."
-    pre-commit install
+    # Install hooks with retries and better error handling
+    local max_attempts=3
+    local attempt=1
     
-    echo "✅ Pre-commit hooks configured!"
+    while [ $attempt -le $max_attempts ]; do
+        echo "Attempt $attempt/$max_attempts to install pre-commit hooks..."
+        
+        if pre-commit install --install-hooks; then
+            echo "✅ Pre-commit hooks configured!"
+            return 0
+        else
+            echo "⚠️  Attempt $attempt failed. Retrying in 5 seconds..."
+            sleep 5
+            attempt=$((attempt + 1))
+        fi
+    done
+    
+    echo "❌ Failed to install pre-commit hooks after $max_attempts attempts"
+    echo "ℹ️  You can try running 'pre-commit install --install-hooks' manually later"
+    echo "ℹ️  Or install without hooks using 'pre-commit install'"
+    
+    # Fallback: install git hooks without pre-installing hook environments
+    echo "🔄 Installing git hooks only (without pre-installing environments)..."
+    pre-commit install || echo "⚠️  Even basic hook installation failed"
 }
 
 # Function to setup backend dependencies
@@ -59,20 +80,35 @@ setup_pwa() {
 # Main setup
 echo "📁 Working directory: $REPO_ROOT"
 
+# Check if running in devcontainer mode
+DEVCONTAINER_MODE=false
+if [[ "$1" == "--devcontainer" ]]; then
+    DEVCONTAINER_MODE=true
+    echo "🐳 Running in devcontainer mode"
+fi
+
 # Always setup pre-commit hooks
 setup_precommit
 
-# Optional dependency installation
-read -p "🤔 Install backend dependencies? (y/N): " -n 1 -r
-echo
-if [[ $REPLY =~ ^[Yy]$ ]]; then
+# Handle dependency installation based on mode
+if [[ "$DEVCONTAINER_MODE" == "true" ]]; then
+    # In devcontainer, install all dependencies automatically
+    echo "🐳 Devcontainer detected - installing all dependencies automatically"
     setup_backend
-fi
-
-read -p "🤔 Install PWA dependencies? (y/N): " -n 1 -r  
-echo
-if [[ $REPLY =~ ^[Yy]$ ]]; then
     setup_pwa
+else
+    # Interactive mode for local development
+    read -p "🤔 Install backend dependencies? (y/N): " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        setup_backend
+    fi
+
+    read -p "🤔 Install PWA dependencies? (y/N): " -n 1 -r  
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        setup_pwa
+    fi
 fi
 
 echo ""

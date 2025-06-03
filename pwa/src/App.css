@@ -9,11 +9,11 @@
 
 /* Header */
 header {
-  background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%);
+  background: linear-gradient(135deg, #2196f3 0%, #1976d2 100%);
   color: white;
   padding: 1.5rem 1rem;
   text-align: center;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 header h1 {
@@ -77,7 +77,7 @@ main {
 
 .hero h2 {
   font-size: 1.5rem;
-  color: #1976D2;
+  color: #1976d2;
   margin-bottom: 1rem;
 }
 
@@ -100,20 +100,22 @@ main {
   background: white;
   padding: 1.5rem;
   border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   text-align: center;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
   cursor: pointer;
 }
 
 .feature-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .feature-card h3 {
   font-size: 1.1rem;
-  color: #1976D2;
+  color: #1976d2;
   margin-bottom: 0.5rem;
 }
 
@@ -141,23 +143,23 @@ footer p {
   header h1 {
     font-size: 2.2rem;
   }
-  
+
   header p {
     font-size: 1rem;
   }
-  
+
   .hero h2 {
     font-size: 1.8rem;
   }
-  
+
   .hero p {
     font-size: 1.1rem;
   }
-  
+
   .features {
     grid-template-columns: repeat(3, 1fr);
   }
-  
+
   main {
     padding: 3rem 2rem;
   }
@@ -167,11 +169,11 @@ footer p {
   .feature-card {
     padding: 2rem;
   }
-  
+
   .feature-card h3 {
     font-size: 1.2rem;
   }
-  
+
   .feature-card p {
     font-size: 1rem;
   }
@@ -181,7 +183,7 @@ footer p {
 .slice-and-print {
   background: white;
   border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   padding: 2rem;
   margin: 2rem 0;
   max-width: 800px;
@@ -195,7 +197,7 @@ footer p {
 }
 
 .slice-and-print-header h2 {
-  color: #1976D2;
+  color: #1976d2;
   font-size: 1.5rem;
   margin-bottom: 0.5rem;
 }
@@ -231,7 +233,7 @@ footer p {
 
 .model-url-input:focus {
   outline: none;
-  border-color: #2196F3;
+  border-color: #2196f3;
 }
 
 .model-url-input:disabled {
@@ -244,7 +246,7 @@ footer p {
   padding: 1rem 2rem;
   font-size: 1.1rem;
   font-weight: 600;
-  background-color: #1976D2;
+  background-color: #1976d2;
   color: white;
   border: none;
   border-radius: 6px;
@@ -253,7 +255,7 @@ footer p {
 }
 
 .slice-and-print-button:hover:not(:disabled) {
-  background-color: #1565C0;
+  background-color: #1565c0;
 }
 
 .slice-and-print-button:disabled {
@@ -300,11 +302,11 @@ footer p {
     margin: 1rem;
     padding: 1.5rem;
   }
-  
+
   .slice-and-print-header h2 {
     font-size: 1.3rem;
   }
-  
+
   .slice-and-print-header p {
     font-size: 0.9rem;
   }
