@@ -162,6 +162,92 @@ class TestModelSubmissionEndpoint:
         mock_download_model.assert_called_once_with("https://example.com/model.stl")
         mock_get_file_info.assert_called_once_with(mock_file_path)
 
+    @patch("app.main.model_service.parse_3mf_filament_requirements")
+    @patch("app.main.model_service.get_file_info")
+    @patch("app.main.model_service.download_model")
+    def test_submit_model_url_with_filament_requirements(
+        self, mock_download_model, mock_get_file_info, mock_parse_filament
+    ):
+        """Test model submission includes filament requirements for .3mf files."""
+        from pathlib import Path
+
+        from app.model_service import FilamentRequirement
+
+        # Mock successful download
+        mock_file_path = Path("/tmp/test.3mf")
+        mock_download_model.return_value = mock_file_path
+
+        # Mock file info
+        mock_get_file_info.return_value = {
+            "filename": "test.3mf",
+            "size_bytes": 1024,
+            "size_mb": 0.001,
+            "extension": ".3mf",
+            "path": str(mock_file_path),
+        }
+
+        # Mock filament requirements
+        mock_filament_req = FilamentRequirement(
+            filament_count=2,
+            filament_types=["PLA", "PETG"],
+            filament_colors=["#FF0000", "#00FF00"],
+        )
+        mock_parse_filament.return_value = mock_filament_req
+
+        response = client.post(
+            "/api/model/submit-url", json={"model_url": "https://example.com/model.3mf"}
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        assert data["filament_requirements"] is not None
+        assert data["filament_requirements"]["filament_count"] == 2
+        assert data["filament_requirements"]["filament_types"] == ["PLA", "PETG"]
+        assert data["filament_requirements"]["filament_colors"] == [
+            "#FF0000",
+            "#00FF00",
+        ]
+        assert data["filament_requirements"]["has_multicolor"] is True
+
+        mock_parse_filament.assert_called_once_with(mock_file_path)
+
+    @patch("app.main.model_service.parse_3mf_filament_requirements")
+    @patch("app.main.model_service.get_file_info")
+    @patch("app.main.model_service.download_model")
+    def test_submit_model_url_no_filament_requirements(
+        self, mock_download_model, mock_get_file_info, mock_parse_filament
+    ):
+        """Test model submission with STL file (no filament requirements)."""
+        from pathlib import Path
+
+        # Mock successful download
+        mock_file_path = Path("/tmp/test.stl")
+        mock_download_model.return_value = mock_file_path
+
+        # Mock file info
+        mock_get_file_info.return_value = {
+            "filename": "test.stl",
+            "size_bytes": 1024,
+            "size_mb": 0.001,
+            "extension": ".stl",
+            "path": str(mock_file_path),
+        }
+
+        # Mock no filament requirements (returns None for STL)
+        mock_parse_filament.return_value = None
+
+        response = client.post(
+            "/api/model/submit-url", json={"model_url": "https://example.com/model.stl"}
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        assert data["filament_requirements"] is None
+
+        mock_parse_filament.assert_called_once_with(mock_file_path)
+
     @patch("app.main.model_service.download_model")
     def test_submit_model_url_validation_error(self, mock_download_model):
         """Test model submission with validation error."""

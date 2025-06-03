@@ -8,7 +8,11 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import httpx
 import pytest
-from app.model_service import ModelDownloadError, ModelService, ModelValidationError
+from app.model_service import (
+    ModelDownloadError,
+    ModelService,
+    ModelValidationError,
+)
 
 
 class TestModelService:
@@ -159,6 +163,33 @@ class TestModelService:
 
         # Should not raise an exception
         service.cleanup_temp_file(non_existent_path)
+
+    def test_parse_3mf_filament_requirements_integration(self):
+        """Integration test for .3mf filament parsing."""
+        service = ModelService()
+
+        # Test with real .3mf files if they exist
+        test_files = [
+            Path(
+                "/home/runner/work/LANbu-Handy/LANbu-Handy/"
+                + "test_files/multicolor-test-coin.3mf"
+            ),
+            Path(
+                "/home/runner/work/LANbu-Handy/LANbu-Handy/"
+                + "test_files/Original3DBenchy3Dprintconceptsnormel.3mf"
+            ),
+        ]
+
+        for test_file in test_files:
+            if test_file.exists():
+                result = service.parse_3mf_filament_requirements(test_file)
+                # Should get some result for valid .3mf files
+                assert result is not None
+                assert result.filament_count >= 1
+                assert len(result.filament_types) >= 1
+                assert len(result.filament_colors) >= 1
+                # Multicolor should match filament count
+                assert result.has_multicolor == (result.filament_count > 1)
 
     def test_get_file_info(self):
         """Test getting file information."""
