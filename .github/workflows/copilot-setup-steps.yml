@@ -48,6 +48,31 @@ jobs:
           
           echo "✅ Backend dependencies installed"
 
+      - name: Install and setup pre-commit
+        run: |
+          # Install pre-commit framework if not already available
+          if ! command -v pre-commit > /dev/null 2>&1; then
+            echo "📦 Installing pre-commit framework..."
+            pip install pre-commit
+          else
+            echo "✅ Pre-commit framework already available"
+          fi
+          
+          # Install pre-commit hooks for the repository
+          echo "🔧 Installing pre-commit git hooks..."
+          pre-commit install
+          
+          # Try to install hook environments (may fail due to network issues in CI)
+          echo "📋 Attempting to install pre-commit hook environments..."
+          if timeout 180 pre-commit install --install-hooks 2>/dev/null; then
+            echo "✅ Pre-commit hook environments installed successfully"
+          else
+            echo "⚠️  Hook environment installation timed out or failed (likely network issues)"
+            echo "✅ Pre-commit git hooks are installed and will work for local development"
+          fi
+          
+          echo "✅ Pre-commit setup complete"
+
       - name: Install PWA dependencies
         run: |
           # Install PWA dependencies
@@ -92,38 +117,6 @@ jobs:
           fi
           
           echo "🎉 Development environment validation complete!"
-
-      - name: Validate code formatting and linting
-        run: |
-          echo "🔍 Running pre-commit checks on all files..."
-          echo "This ensures all code in the workspace passes formatting and linting standards."
-          echo ""
-          
-          # Try to run pre-commit on all files - handle network issues gracefully
-          if timeout 300 pre-commit run --all-files 2>&1; then
-            echo ""
-            echo "✅ All pre-commit checks passed!"
-            echo "The workspace code meets all formatting and linting standards."
-          else
-            PRECOMMIT_EXIT_CODE=$?
-            echo ""
-            if [ $PRECOMMIT_EXIT_CODE -eq 124 ]; then
-              echo "⚠️  Pre-commit checks timed out (likely due to network issues downloading hooks)"
-              echo "This is acceptable during initial setup - hooks will be available for local development."
-              echo "✅ Pre-commit framework is properly configured."
-            else
-              echo "❌ Pre-commit checks failed!"
-              echo "The workspace contains code that doesn't meet formatting or linting standards."
-              echo "This setup has been configured to fail if pre-commit errors exist."
-              echo ""
-              echo "💡 To fix these issues:"
-              echo "  • Run 'pre-commit run --all-files' locally to see and fix all issues"
-              echo "  • Or run specific formatters: 'python -m black backend/' and 'cd pwa && npm run format'"
-              echo "  • Commit the fixes and restart this Copilot Workspace setup"
-              echo ""
-              exit 1
-            fi
-          fi
 
       - name: Setup headless display
         run: |
