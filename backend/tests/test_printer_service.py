@@ -7,6 +7,7 @@ including connection, authentication, and file upload operations.
 
 import tempfile
 import os
+import json
 import pytest
 from pathlib import Path
 from unittest.mock import Mock, patch, mock_open
@@ -15,7 +16,7 @@ import ftplib
 from app.printer_service import (
     PrinterService, PrinterCommunicationError, PrinterConnectionError,
     PrinterAuthenticationError, PrinterFileTransferError, PrinterMQTTError,
-    FTPUploadResult, MQTTResult
+    FTPUploadResult, MQTTResult, AMSStatusResult, AMSUnit, AMSFilament
 )
 from app.config import PrinterConfig
 
@@ -91,6 +92,81 @@ class TestMQTTResult:
         assert result.success is False
         assert result.message == "MQTT operation failed"
         assert result.error_details == "Connection timeout"
+
+
+class TestAMSDataStructures:
+    """Test AMS-related data classes."""
+
+    def test_ams_filament_creation(self):
+        """Test AMSFilament creation."""
+        filament = AMSFilament(
+            slot_id=1,
+            filament_type="PLA",
+            color="Red",
+            material_id="BAMBU_PLA_RED"
+        )
+
+        assert filament.slot_id == 1
+        assert filament.filament_type == "PLA"
+        assert filament.color == "Red"
+        assert filament.material_id == "BAMBU_PLA_RED"
+
+    def test_ams_filament_minimal(self):
+        """Test AMSFilament with minimal required fields."""
+        filament = AMSFilament(
+            slot_id=0,
+            filament_type="PETG",
+            color="#FF0000"
+        )
+
+        assert filament.slot_id == 0
+        assert filament.filament_type == "PETG"
+        assert filament.color == "#FF0000"
+        assert filament.material_id is None
+
+    def test_ams_unit_creation(self):
+        """Test AMSUnit creation."""
+        filaments = [
+            AMSFilament(slot_id=0, filament_type="PLA", color="Red"),
+            AMSFilament(slot_id=1, filament_type="PETG", color="Blue")
+        ]
+
+        unit = AMSUnit(unit_id=0, filaments=filaments)
+
+        assert unit.unit_id == 0
+        assert len(unit.filaments) == 2
+        assert unit.filaments[0].filament_type == "PLA"
+        assert unit.filaments[1].filament_type == "PETG"
+
+    def test_ams_status_result_success(self):
+        """Test successful AMSStatusResult."""
+        filament = AMSFilament(slot_id=0, filament_type="PLA", color="Red")
+        unit = AMSUnit(unit_id=0, filaments=[filament])
+
+        result = AMSStatusResult(
+            success=True,
+            message="AMS status retrieved successfully",
+            ams_units=[unit]
+        )
+
+        assert result.success is True
+        assert result.message == "AMS status retrieved successfully"
+        assert len(result.ams_units) == 1
+        assert result.ams_units[0].unit_id == 0
+        assert result.error_details is None
+
+    def test_ams_status_result_failure(self):
+        """Test failed AMSStatusResult."""
+        result = AMSStatusResult(
+            success=False,
+            message="AMS query failed",
+            error_details="MQTT timeout"
+        )
+
+        assert result.success is False
+        assert result.message == "AMS query failed"
+        assert result.ams_units is None
+        assert result.error_details == "MQTT timeout"
 
 
 class TestPrinterService:
@@ -882,6 +958,295 @@ class TestStartPrint:
         # Verify cleanup was attempted
         mock_client.loop_stop.assert_called_once()
         mock_client.disconnect.assert_called_once()
+
+
+class TestAMSQuery:
+    """Test AMS status query functionality."""
+
+    @pytest.fixture
+    def printer_service(self):
+        """Create a printer service instance for testing."""
+        return PrinterService()
+
+    @pytest.fixture
+    def test_printer_config(self):
+        """Create a test printer configuration."""
+        return PrinterConfig(
+            name="Test Printer",
+            ip="192.168.1.100",
+            access_code="12345678"
+        )
+
+    @patch('paho.mqtt.client.Client')
+    def test_query_ams_status_successful(self, mock_mqtt_client_class,
+                                         printer_service, test_printer_config):
+        """Test successful AMS status query."""
+        # Mock MQTT client
+        mock_client = Mock()
+        mock_mqtt_client_class.return_value = mock_client
+
+        # Mock successful connection
+        def simulate_connection(*args, **kwargs):
+            if hasattr(mock_client, 'on_connect'):
+                mock_client.on_connect(mock_client, None, None, 0, None)
+
+        mock_client.loop_start.side_effect = simulate_connection
+
+        # Mock successful publish
+        def mock_publish(topic, payload, qos):
+            mock_msg_info = Mock()
+            mock_msg_info.is_published.return_value = True
+            return mock_msg_info
+
+        mock_client.publish.side_effect = mock_publish
+
+        # Mock AMS response message
+        def simulate_ams_response():
+            if hasattr(mock_client, 'on_message'):
+                # Create a mock message with AMS data
+                mock_msg = Mock()
+                ams_response = {
+                    "ams": {
+                        "ams": [
+                            {
+                                "id": 0,
+                                "tray": [
+                                    {
+                                        "id": 0,
+                                        "type": "PLA",
+                                        "color": "Red",
+                                        "exist": True,
+                                        "material_id": "BAMBU_PLA_RED"
+                                    },
+                                    {
+                                        "id": 1,
+                                        "type": "PETG",
+                                        "color": "Blue",
+                                        "exist": True,
+                                        "material_id": "BAMBU_PETG_BLUE"
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                }
+                mock_msg.payload.decode.return_value = json.dumps(ams_response)
+                mock_client.on_message(mock_client, None, mock_msg)
+
+        # Simulate the message arriving after a short delay
+        import threading
+        timer = threading.Timer(0.1, simulate_ams_response)
+        timer.start()
+
+        # Execute the AMS query
+        result = printer_service.query_ams_status(test_printer_config,
+                                                  timeout=5)
+
+        # Verify result
+        assert result.success is True
+        assert "AMS status retrieved successfully" in result.message
+        assert result.ams_units is not None
+        assert len(result.ams_units) == 1
+
+        # Verify AMS unit data
+        ams_unit = result.ams_units[0]
+        assert ams_unit.unit_id == 0
+        assert len(ams_unit.filaments) == 2
+
+        # Verify filament data
+        filament1 = ams_unit.filaments[0]
+        assert filament1.slot_id == 0
+        assert filament1.filament_type == "PLA"
+        assert filament1.color == "Red"
+        assert filament1.material_id == "BAMBU_PLA_RED"
+
+        filament2 = ams_unit.filaments[1]
+        assert filament2.slot_id == 1
+        assert filament2.filament_type == "PETG"
+        assert filament2.color == "Blue"
+        assert filament2.material_id == "BAMBU_PETG_BLUE"
+
+        # Verify MQTT operations
+        mock_client.username_pw_set.assert_called_once_with(
+            "bblp", test_printer_config.access_code)
+        mock_client.connect.assert_called_once()
+        mock_client.loop_start.assert_called_once()
+        mock_client.subscribe.assert_called_once()
+        mock_client.publish.assert_called_once()
+        mock_client.loop_stop.assert_called_once()
+        mock_client.disconnect.assert_called_once()
+
+    @patch('paho.mqtt.client.Client')
+    def test_query_ams_status_connection_failure(self, mock_mqtt_client_class,
+                                                 printer_service,
+                                                 test_printer_config):
+        """Test AMS query with connection failure."""
+        # Mock MQTT client
+        mock_client = Mock()
+        mock_mqtt_client_class.return_value = mock_client
+
+        # Mock connection failure
+        def simulate_connection_failure(*args, **kwargs):
+            if hasattr(mock_client, 'on_connect'):
+                mock_client.on_connect(mock_client, None, None, 1, None)
+
+        mock_client.loop_start.side_effect = simulate_connection_failure
+
+        with pytest.raises(PrinterMQTTError) as exc_info:
+            printer_service.query_ams_status(test_printer_config)
+
+        assert ("MQTT connection failed with reason code: 1"
+                in str(exc_info.value))
+
+    @patch('paho.mqtt.client.Client')
+    def test_query_ams_status_timeout(self, mock_mqtt_client_class,
+                                      printer_service, test_printer_config):
+        """Test AMS query with timeout."""
+        # Mock MQTT client
+        mock_client = Mock()
+        mock_mqtt_client_class.return_value = mock_client
+
+        # Mock successful connection but no response
+        def simulate_connection(*args, **kwargs):
+            if hasattr(mock_client, 'on_connect'):
+                mock_client.on_connect(mock_client, None, None, 0, None)
+
+        mock_client.loop_start.side_effect = simulate_connection
+
+        # Mock successful publish
+        def mock_publish(topic, payload, qos):
+            mock_msg_info = Mock()
+            mock_msg_info.is_published.return_value = True
+            return mock_msg_info
+
+        mock_client.publish.side_effect = mock_publish
+
+        # Execute with short timeout
+        result = printer_service.query_ams_status(test_printer_config,
+                                                  timeout=1)
+
+        # Should return unsuccessful result due to timeout
+        assert result.success is False
+        assert "No AMS status response received" in result.message
+        assert "Timeout after 1 seconds" in result.error_details
+
+    def test_parse_ams_data_valid(self, printer_service):
+        """Test parsing valid AMS data."""
+        response_data = {
+            "ams": {
+                "ams": [
+                    {
+                        "id": 0,
+                        "tray": [
+                            {
+                                "id": 0,
+                                "type": "PLA",
+                                "color": "Red",
+                                "exist": True,
+                                "material_id": "BAMBU_PLA_RED"
+                            },
+                            {
+                                "id": 1,
+                                "type": "PETG",
+                                "color": "#0000FF",
+                                "exist": True
+                            }
+                        ]
+                    },
+                    {
+                        "id": 1,
+                        "tray": [
+                            {
+                                "id": 0,
+                                "type": "ABS",
+                                "color": "Green",
+                                "exist": True
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+
+        ams_units = printer_service._parse_ams_data(response_data)
+
+        assert len(ams_units) == 2
+
+        # First AMS unit
+        unit1 = ams_units[0]
+        assert unit1.unit_id == 0
+        assert len(unit1.filaments) == 2
+
+        filament1 = unit1.filaments[0]
+        assert filament1.slot_id == 0
+        assert filament1.filament_type == "PLA"
+        assert filament1.color == "Red"
+        assert filament1.material_id == "BAMBU_PLA_RED"
+
+        filament2 = unit1.filaments[1]
+        assert filament2.slot_id == 1
+        assert filament2.filament_type == "PETG"
+        assert filament2.color == "#0000FF"
+
+        # Second AMS unit
+        unit2 = ams_units[1]
+        assert unit2.unit_id == 1
+        assert len(unit2.filaments) == 1
+
+        filament3 = unit2.filaments[0]
+        assert filament3.slot_id == 0
+        assert filament3.filament_type == "ABS"
+        assert filament3.color == "Green"
+
+    def test_parse_ams_data_empty_slots(self, printer_service):
+        """Test parsing AMS data with empty slots."""
+        response_data = {
+            "ams": {
+                "ams": [
+                    {
+                        "id": 0,
+                        "tray": [
+                            {
+                                "id": 0,
+                                "type": "PLA",
+                                "color": "Red",
+                                "exist": True
+                            },
+                            {
+                                "id": 1,
+                                "type": "Unknown",
+                                "color": "Unknown",
+                                "exist": False  # Empty slot
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+
+        ams_units = printer_service._parse_ams_data(response_data)
+
+        assert len(ams_units) == 1
+        unit = ams_units[0]
+        assert len(unit.filaments) == 1  # Only the loaded filament
+
+        filament = unit.filaments[0]
+        assert filament.slot_id == 0
+        assert filament.filament_type == "PLA"
+
+    def test_parse_ams_data_invalid(self, printer_service):
+        """Test parsing invalid AMS data."""
+        # Missing AMS data
+        response_data = {"status": "ok"}
+
+        ams_units = printer_service._parse_ams_data(response_data)
+        assert len(ams_units) == 0
+
+        # Malformed data
+        response_data = {"ams": "invalid"}
+
+        ams_units = printer_service._parse_ams_data(response_data)
+        assert len(ams_units) == 0
 
 
 class TestMQTTIntegration:

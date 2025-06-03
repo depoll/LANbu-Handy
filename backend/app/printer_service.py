@@ -9,7 +9,7 @@ import ftplib
 import json
 import logging
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 from dataclasses import dataclass
 import time
 
@@ -59,6 +59,31 @@ class MQTTResult:
     """Result of an MQTT operation."""
     success: bool
     message: str
+    error_details: str = None
+
+
+@dataclass
+class AMSFilament:
+    """Information about a filament in an AMS slot."""
+    slot_id: int
+    filament_type: str  # e.g., "PLA", "PETG", "ABS"
+    color: str  # e.g., "Red", "Blue", "#FF0000"
+    material_id: str = None  # Optional material identifier
+
+
+@dataclass
+class AMSUnit:
+    """Information about an AMS unit."""
+    unit_id: int
+    filaments: List[AMSFilament]
+
+
+@dataclass
+class AMSStatusResult:
+    """Result of an AMS status query."""
+    success: bool
+    message: str
+    ams_units: List[AMSUnit] = None
     error_details: str = None
 
 
@@ -401,6 +426,278 @@ class PrinterService:
                         f"{printer_config.ip}")
             except Exception as e:
                 logger.debug(f"Error during MQTT cleanup: {e}")
+
+    def query_ams_status(
+        self,
+        printer_config: PrinterConfig,
+        timeout: Optional[int] = None
+    ) -> AMSStatusResult:
+        """Query the printer's AMS status via MQTT.
+
+        Sends an MQTT query to get the current status of all AMS units and
+        their loaded filaments.
+
+        Args:
+            printer_config: Configuration for the target printer
+            timeout: MQTT operation timeout in seconds (defaults to
+                DEFAULT_MQTT_TIMEOUT)
+
+        Returns:
+            AMSStatusResult: Result with AMS units and filament information
+
+        Raises:
+            PrinterMQTTError: If MQTT operation fails
+        """
+        if timeout is None:
+            timeout = self.DEFAULT_MQTT_TIMEOUT
+
+        try:
+            # Variables to track operation state
+            connection_successful = False
+            connection_error = None
+            publish_error = None
+            response_data = None
+            response_received = False
+
+            # Create MQTT client
+            client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+
+            def on_connect(client, userdata, flags, reason_code, properties):
+                nonlocal connection_successful, connection_error
+                if reason_code == 0:
+                    connection_successful = True
+                    logger.debug(
+                        f"MQTT connected to printer {printer_config.ip}")
+
+                    # Subscribe to response topic immediately after connection
+                    response_topic = (
+                        f"device/{printer_config.ip.replace('.', '_')}/report"
+                    )
+                    client.subscribe(response_topic, qos=1)
+                    logger.debug(f"Subscribed to topic: {response_topic}")
+                else:
+                    connection_error = (
+                        f"MQTT connection failed with reason code: "
+                        f"{reason_code}")
+                    logger.error(connection_error)
+
+            def on_message(client, userdata, msg):
+                nonlocal response_data, response_received
+                try:
+                    # Parse the JSON response
+                    payload = msg.payload.decode('utf-8')
+                    logger.debug(f"Received MQTT message: {payload}")
+
+                    response_json = json.loads(payload)
+
+                    # Check if this message contains AMS data
+                    # Bambu Lab printers typically send AMS data in "ams" field
+                    if "ams" in response_json:
+                        response_data = response_json
+                        response_received = True
+                        logger.debug("AMS status data received")
+
+                except json.JSONDecodeError as e:
+                    logger.warning(f"Failed to parse MQTT message: {e}")
+                except Exception as e:
+                    logger.warning(f"Error processing MQTT message: {e}")
+
+            def on_publish(client, userdata, mid, reason_code, properties):
+                nonlocal publish_error
+                if reason_code != 0:
+                    publish_error = (
+                        f"MQTT publish failed with reason code: "
+                        f"{reason_code}")
+                    logger.error(publish_error)
+                else:
+                    logger.debug("MQTT AMS query published successfully")
+
+            def on_disconnect(client, userdata, flags, reason_code,
+                              properties):
+                logger.debug(
+                    f"MQTT disconnected from printer {printer_config.ip}")
+
+            # Set up MQTT callbacks
+            client.on_connect = on_connect
+            client.on_message = on_message
+            client.on_publish = on_publish
+            client.on_disconnect = on_disconnect
+
+            # Set authentication if access code is provided
+            if printer_config.access_code:
+                # Bambu Lab printers typically use "bblp" as username and
+                # access code as password
+                client.username_pw_set("bblp", printer_config.access_code)
+
+            # Connect to MQTT broker
+            logger.debug(
+                f"Connecting to MQTT broker at "
+                f"{printer_config.ip}:{self.DEFAULT_MQTT_PORT}")
+            client.connect(printer_config.ip, self.DEFAULT_MQTT_PORT,
+                           self.DEFAULT_MQTT_KEEPALIVE)
+
+            # Start the network loop
+            client.loop_start()
+
+            # Wait for connection
+            start_time = time.time()
+            while not connection_successful and connection_error is None:
+                if time.time() - start_time > timeout:
+                    raise PrinterMQTTError(
+                        f"MQTT connection timeout after {timeout} seconds"
+                    )
+                time.sleep(0.1)
+
+            if connection_error:
+                raise PrinterMQTTError(connection_error)
+
+            # Bambu Lab AMS status query command
+            # This requests the current printer status, which includes AMS info
+            device_topic = (
+                f"device/{printer_config.ip.replace('.', '_')}/request")
+
+            # Query command to get printer status including AMS
+            status_query = {
+                "pushing": {
+                    "sequence_id": "1",
+                    "command": "pushall"
+                }
+            }
+
+            message = json.dumps(status_query)
+            logger.debug(
+                f"Publishing AMS query to topic {device_topic}: {message}")
+
+            # Publish the query message
+            msg_info = client.publish(device_topic, message, qos=1)
+
+            # Wait for publish to complete
+            start_time = time.time()
+            while not msg_info.is_published() and publish_error is None:
+                if time.time() - start_time > timeout:
+                    raise PrinterMQTTError(
+                        f"MQTT publish timeout after {timeout} seconds"
+                    )
+                time.sleep(0.1)
+
+            if publish_error:
+                raise PrinterMQTTError(publish_error)
+
+            # Wait for response with AMS data
+            start_time = time.time()
+            while not response_received and time.time() - start_time < timeout:
+                time.sleep(0.1)
+
+            if not response_received:
+                logger.warning(
+                    f"No AMS status response received from printer "
+                    f"{printer_config.name} within {timeout} seconds")
+                return AMSStatusResult(
+                    success=False,
+                    message="No AMS status response received",
+                    error_details=f"Timeout after {timeout} seconds"
+                )
+
+            # Parse the AMS data from the response
+            ams_units = self._parse_ams_data(response_data)
+
+            logger.info(
+                f"Successfully retrieved AMS status from printer "
+                f"{printer_config.name}")
+
+            return AMSStatusResult(
+                success=True,
+                message=f"AMS status retrieved successfully from "
+                        f"{printer_config.name}",
+                ams_units=ams_units
+            )
+
+        except PrinterMQTTError:
+            # Re-raise our custom MQTT errors
+            raise
+
+        except Exception as e:
+            error_msg = f"Unexpected error during AMS query: {str(e)}"
+            logger.error(f"AMS query failed for {printer_config.name}: "
+                         f"{error_msg}")
+            raise PrinterMQTTError(error_msg)
+
+        finally:
+            # Always disconnect the MQTT client if it was created
+            try:
+                if 'client' in locals():
+                    client.loop_stop()
+                    client.disconnect()
+                    logger.debug(
+                        f"MQTT client disconnected from "
+                        f"{printer_config.ip}")
+            except Exception as e:
+                logger.debug(f"Error during MQTT cleanup: {e}")
+
+    def _parse_ams_data(self, response_data: dict) -> List[AMSUnit]:
+        """Parse AMS data from MQTT response.
+
+        Args:
+            response_data: The JSON response from the printer
+
+        Returns:
+            List[AMSUnit]: List of AMS units with their filament information
+        """
+        ams_units = []
+
+        try:
+            # Bambu Lab AMS data is typically structured as:
+            # {"ams": {"ams": [{"id": 0, "tray": [{"id": 0, ...}, ...]}, ...]}}
+            ams_data = response_data.get("ams", {})
+            ams_list = ams_data.get("ams", [])
+
+            for ams_unit_data in ams_list:
+                unit_id = ams_unit_data.get("id", 0)
+                filaments = []
+
+                # Parse the trays (filament slots)
+                trays = ams_unit_data.get("tray", [])
+                for tray in trays:
+                    slot_id = tray.get("id", 0)
+
+                    # Extract filament information
+                    filament_type = tray.get("type", "Unknown")
+                    color = tray.get("color", "Unknown")
+
+                    # Some fields might be named differently in responses
+                    # Fallback to common alternatives
+                    if filament_type == "Unknown":
+                        filament_type = tray.get("material", "Unknown")
+
+                    if color == "Unknown":
+                        # Try to get color from hex code
+                        hex_color = tray.get("color_hex", "")
+                        if hex_color:
+                            color = hex_color
+
+                    # Only add filaments that are actually loaded
+                    # Check for common indicators that a slot is empty
+                    if tray.get("exist", True) and filament_type != "Unknown":
+                        filament = AMSFilament(
+                            slot_id=slot_id,
+                            filament_type=filament_type,
+                            color=color,
+                            material_id=tray.get("material_id")
+                        )
+                        filaments.append(filament)
+
+                # Create AMS unit with its filaments
+                ams_unit = AMSUnit(
+                    unit_id=unit_id,
+                    filaments=filaments
+                )
+                ams_units.append(ams_unit)
+
+        except Exception as e:
+            logger.warning(f"Error parsing AMS data: {e}")
+            # Return empty list on parsing error
+
+        return ams_units
 
     def test_connection(self, printer_config: PrinterConfig) -> bool:
         """Test FTP connection to a printer without uploading.
