@@ -79,7 +79,16 @@ jobs:
         cd backend
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-        pip install flake8
+
+    - name: Run Python formatter (Black) check
+      run: |
+        cd backend
+        python -m black --check --config ../pyproject.toml .
+
+    - name: Run Python import sorting (isort) check
+      run: |
+        cd backend
+        python -m isort --profile black --check-only .
         
     - name: Run Python linter (flake8)
       run: |
@@ -110,6 +119,20 @@ jobs:
       run: |
         cd pwa
         npm install
+
+    - name: Run JavaScript/TypeScript formatter (Prettier) check
+      run: |
+        cd pwa
+        npx prettier --check .
+
+    - name: Run JavaScript/TypeScript linter (ESLint)
+      run: |
+        cd pwa
+        npm run lint
+        
+    - name: Build PWA
+      run: |
+        cd pwa
         npm run build
         
     - name: Set up Docker Buildx

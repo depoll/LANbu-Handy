@@ -1,0 +1,84 @@
+# Prettier ignore patterns
+
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Production build
+build/
+dist/
+coverage/
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+.lcov
+
+# nyc test coverage
+.nyc_output
+
+# Git
+.git/
+.gitignore
+
+# IDEs and editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.pytest_cache/
+
+# Docker
+*.log
+
+# Generated files that shouldn't be formatted
+*.min.js
+*.min.css
+*.bundle.js
+*.bundle.css
+
+# Documentation that might have special formatting
+LICENSE
+CHANGELOG.md
+
+# Specific files that have custom formatting requirements
+pwa/src/assets/
+test_files/
