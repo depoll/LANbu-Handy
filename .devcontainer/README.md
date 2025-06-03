@@ -4,6 +4,11 @@ This development container provides a complete environment for developing and te
 
 ## What's Included
 
+### Architecture Requirements
+
+- **Platform**: Forced to `linux/amd64` for Bambu Studio CLI compatibility
+- **Apple Silicon Macs**: Uses Rosetta emulation automatically via Docker Desktop
+
 ### System Dependencies
 
 - **Python 3.12** with FastAPI development environment
@@ -155,6 +160,37 @@ npm install --save-dev @testing-library/react @testing-library/jest-dom vitest
 
 ## Troubleshooting
 
+### Quick Diagnosis
+
+Run the troubleshooting script inside the dev container:
+
+```bash
+/workspace/.devcontainer/troubleshoot.sh
+```
+
+This script will check:
+
+- Architecture compatibility
+- Docker environment
+- Python and Node.js availability
+- Bambu Studio CLI installation
+- Workspace structure and permissions
+- Network connectivity
+
+### Architecture Issues (Apple Silicon Macs)
+
+If you encounter errors like "exit code 126" during Bambu Studio CLI installation:
+
+1. **Verify Docker Desktop Settings**: Ensure "Use Rosetta for x86_64/amd64 emulation on Apple Silicon" is enabled in Docker Desktop settings
+2. **Force Platform**: The devcontainer is configured to force `linux/amd64` platform, but you can verify with:
+   ```bash
+   docker compose config
+   ```
+3. **Manual Platform Override**: If needed, you can manually specify the platform:
+   ```bash
+   docker compose build --platform linux/amd64
+   ```
+
 ### Permission Issues
 
 If you encounter permission issues with npm or file access, ensure the container is running with appropriate user permissions.
@@ -169,3 +205,15 @@ docker compose down
 docker compose build --no-cache
 docker compose up -d
 ```
+
+### Bambu Studio CLI Issues
+
+If the CLI installation fails or shows warnings:
+
+1. **Check Architecture**: Run `uname -m` inside the container - it should show `x86_64`
+2. **Test CLI Availability**:
+   ```bash
+   which bambu-studio-cli
+   bambu-studio-cli --help
+   ```
+3. **AppImage Extraction Warnings**: It's normal for AppImage extraction to fail in containers, but the CLI wrapper should still work

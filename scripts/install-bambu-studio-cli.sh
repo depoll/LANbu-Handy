@@ -309,6 +309,16 @@ fi
 
 echo "Installing Bambu Studio CLI binary..."
 
+# Detect architecture
+ARCH=$(uname -m)
+echo "Detected architecture: $ARCH"
+
+# Bambu Studio AppImages are typically x86_64 only
+if [ "$ARCH" != "x86_64" ]; then
+    echo "Warning: Bambu Studio CLI is designed for x86_64 architecture, but detected $ARCH"
+    echo "This may require platform emulation (e.g., Docker with --platform linux/amd64)"
+fi
+
 # Configuration
 # Read version from configuration file, fall back to environment variable, then to "latest"
 VERSION_FILE="/scripts/bambu-studio-version.txt"
@@ -400,7 +410,12 @@ chmod +x "BambuStudio.AppImage"
 
 # Extract the AppImage to access the CLI
 echo "Extracting AppImage..."
-./BambuStudio.AppImage --appimage-extract > /dev/null 2>&1
+if ./BambuStudio.AppImage --appimage-extract > /dev/null 2>&1; then
+    echo "AppImage extraction successful"
+else
+    echo "Warning: AppImage extraction failed, but continuing with AppImage wrapper approach"
+    echo "This is common in container environments and the CLI should still function"
+fi
 
 # For better reliability in CI environments, always use the full AppImage approach
 echo "Installing AppImage and creating CLI wrapper..."

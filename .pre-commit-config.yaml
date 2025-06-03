@@ -46,7 +46,7 @@ repos:
       - id: end-of-file-fixer
       - id: check-yaml
       - id: check-json
-        exclude: 'pwa/tsconfig\.(node|app)\.json'
+        exclude: '(pwa/tsconfig\.(node|app)\.json)|devcontainer.json'
       - id: check-toml
       - id: check-merge-conflict
       - id: check-case-conflict

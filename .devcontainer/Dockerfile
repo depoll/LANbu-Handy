@@ -1,5 +1,6 @@
 # LANbu Handy - Development Container
 # This container includes all dependencies needed for development and testing
+# Note: Platform forced via docker-compose.yml for Bambu Studio CLI compatibility
 
 FROM python:3.12-slim
 
@@ -20,7 +21,19 @@ RUN apt-get update && apt-get install -y \
     # Build tools and dependencies
     build-essential \
     pkg-config \
+    # Locale support
+    locales \
+    # Docker CLI for hadolint pre-commit hook
+    docker.io \
     && rm -rf /var/lib/apt/lists/*
+
+# Configure locale
+RUN echo "en_US.UTF-8 UTF-8" > /etc/locale.gen && \
+    locale-gen en_US.UTF-8 && \
+    update-locale LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
+
+ENV LANG=en_US.UTF-8
+ENV LC_ALL=en_US.UTF-8
 
 # Install Node.js from Debian packages (version 18+ available in bookworm)
 RUN apt-get update && apt-get install -y nodejs npm \
@@ -30,7 +43,8 @@ RUN apt-get update && apt-get install -y nodejs npm \
 RUN groupadd --gid $USER_GID $USERNAME \
     && useradd --uid $USER_UID --gid $USER_GID -m $USERNAME \
     && echo $USERNAME ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/$USERNAME \
-    && chmod 0440 /etc/sudoers.d/$USERNAME
+    && chmod 0440 /etc/sudoers.d/$USERNAME \
+    && usermod -aG docker $USERNAME
 
 # Install Python development dependencies
 COPY ../backend/requirements.txt /tmp/backend-requirements.txt

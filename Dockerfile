@@ -1,4 +1,5 @@
 # LANbu Handy - All-in-One Docker Image (Multi-stage Build)
+# Note: Platform forced via docker-compose.yml for Bambu Studio CLI compatibility
 
 # Stage 1: PWA Build Stage
 FROM node:18-slim AS pwa-builder

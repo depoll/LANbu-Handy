@@ -1,6 +1,10 @@
 services:
   lanbuhandy:
-    build: .
+    build:
+      context: .
+      platforms:
+        - linux/amd64
+    platform: linux/amd64
     ports:
       - '8080:8000'
     restart: unless-stopped
