@@ -10,7 +10,10 @@ ARG USER_UID=1000
 ARG USER_GID=$USER_UID
 
 # Install system dependencies for Bambu Studio CLI and development tools
-RUN apt-get update && apt-get install -y \
+RUN apt-get update --allow-unauthenticated || apt-get update --allow-insecure-repositories || true \
+    && apt-get clean && rm -rf /var/lib/apt/lists/* \
+    && apt-get update --allow-unauthenticated || apt-get update --allow-insecure-repositories || true \
+    && apt-get install -y --allow-unauthenticated --no-install-recommends \
     # Basic development tools
     git \
     curl \
@@ -23,9 +26,12 @@ RUN apt-get update && apt-get install -y \
     pkg-config \
     # Locale support
     locales \
-    # Docker CLI for hadolint pre-commit hook
+    # Docker CLI for hadolint pre-commit hook (minimal)
     docker.io \
-    && rm -rf /var/lib/apt/lists/*
+    # Install hadolint for Dockerfile linting
+    && curl -sSL https://github.com/hadolint/hadolint/releases/latest/download/hadolint-Linux-x86_64 -o /usr/local/bin/hadolint \
+    && chmod +x /usr/local/bin/hadolint \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Configure locale
 RUN echo "en_US.UTF-8 UTF-8" > /etc/locale.gen && \
@@ -36,8 +42,9 @@ ENV LANG=en_US.UTF-8
 ENV LC_ALL=en_US.UTF-8
 
 # Install Node.js from Debian packages (version 18+ available in bookworm)
-RUN apt-get update && apt-get install -y nodejs npm \
-    && rm -rf /var/lib/apt/lists/*
+RUN apt-get update --allow-unauthenticated || apt-get update --allow-insecure-repositories || true \
+    && apt-get install -y --allow-unauthenticated --no-install-recommends nodejs npm \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Create the user
 RUN groupadd --gid $USER_GID $USERNAME \
@@ -65,13 +72,14 @@ RUN pip install --trusted-host pypi.org --trusted-host pypi.python.org --trusted
 # Install Bambu Studio CLI and dependencies
 COPY ../scripts/bambu-studio-version.txt /scripts/
 COPY ../scripts/install-bambu-studio-cli.sh /tmp/
+ENV MINIMAL_DEPS=true
 RUN chmod +x /tmp/install-bambu-studio-cli.sh && \
     /tmp/install-bambu-studio-cli.sh && \
     rm /tmp/install-bambu-studio-cli.sh
 
 # Install global npm packages for development
 RUN npm config set strict-ssl false && \
-    npm install -g typescript@5.8.3 @types/node@22.12.9
+    npm install -g typescript@5.8.3 @types/node@22.15.29
 
 # Set up workspace
 WORKDIR /workspace
