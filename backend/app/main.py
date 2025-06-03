@@ -211,10 +211,8 @@ async def submit_model_url(request: ModelURLRequest):
         file_info = model_service.get_file_info(file_path)
 
         # Parse filament requirements if it's a .3mf file
-        filament_requirements = model_service.parse_3mf_filament_requirements(
-            file_path
-        )
-        
+        filament_requirements = model_service.parse_3mf_filament_requirements(file_path)
+
         # Convert to response model if requirements were found
         filament_requirements_response = None
         if filament_requirements:
@@ -222,7 +220,7 @@ async def submit_model_url(request: ModelURLRequest):
                 filament_count=filament_requirements.filament_count,
                 filament_types=filament_requirements.filament_types,
                 filament_colors=filament_requirements.filament_colors,
-                has_multicolor=filament_requirements.has_multicolor
+                has_multicolor=filament_requirements.has_multicolor,
             )
 
         # Generate file ID (using the filename without UUID prefix
@@ -234,7 +232,7 @@ async def submit_model_url(request: ModelURLRequest):
             message="Model downloaded and validated successfully",
             file_id=file_id,
             file_info=file_info,
-            filament_requirements=filament_requirements_response
+            filament_requirements=filament_requirements_response,
         )
 
     except ModelValidationError as e:

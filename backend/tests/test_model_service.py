@@ -168,13 +168,17 @@ class TestModelService:
     def test_parse_3mf_filament_requirements_integration(self):
         """Integration test for .3mf filament parsing."""
         service = ModelService()
-        
+
         # Test with real .3mf files if they exist
         test_files = [
-            Path("/home/runner/work/LANbu-Handy/LANbu-Handy/test_files/multicolor-test-coin.3mf"),
-            Path("/home/runner/work/LANbu-Handy/LANbu-Handy/test_files/Original3DBenchy3Dprintconceptsnormel.3mf"),
+            Path(
+                "/home/runner/work/LANbu-Handy/LANbu-Handy/test_files/multicolor-test-coin.3mf"
+            ),
+            Path(
+                "/home/runner/work/LANbu-Handy/LANbu-Handy/test_files/Original3DBenchy3Dprintconceptsnormel.3mf"
+            ),
         ]
-        
+
         for test_file in test_files:
             if test_file.exists():
                 result = service.parse_3mf_filament_requirements(test_file)

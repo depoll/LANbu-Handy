@@ -31,11 +31,12 @@ class ModelDownloadError(Exception):
 @dataclass
 class FilamentRequirement:
     """Information about filament requirements for a 3D model."""
+
     filament_count: int
     filament_types: List[str]
     filament_colors: List[str]
     has_multicolor: bool = False
-    
+
     def __post_init__(self):
         """Ensure consistency in the data."""
         self.has_multicolor = self.filament_count > 1
@@ -272,8 +273,7 @@ class ModelService:
             return {}
 
     def parse_3mf_filament_requirements(
-        self, 
-        file_path: Path
+        self, file_path: Path
     ) -> Optional[FilamentRequirement]:
         """
         Parse filament requirements from a .3mf file.
@@ -282,17 +282,17 @@ class ModelService:
             file_path: Path to the .3mf file
 
         Returns:
-            FilamentRequirement object with extracted filament info, 
+            FilamentRequirement object with extracted filament info,
             or None if parsing fails or file is not .3mf
         """
         # Only process .3mf files
-        if file_path.suffix.lower() != '.3mf':
+        if file_path.suffix.lower() != ".3mf":
             return None
 
         try:
-            with zipfile.ZipFile(file_path, 'r') as zip_file:
+            with zipfile.ZipFile(file_path, "r") as zip_file:
                 # Check if project_settings.config exists
-                config_path = 'Metadata/project_settings.config'
+                config_path = "Metadata/project_settings.config"
                 if config_path not in zip_file.namelist():
                     # No project settings found, can't determine requirements
                     return None
@@ -302,22 +302,22 @@ class ModelService:
                     config_data = json.load(config_file)
 
                 # Extract filament information
-                filament_types = config_data.get('filament_type', [])
-                filament_colors = config_data.get('filament_colour', [])
+                filament_types = config_data.get("filament_type", [])
+                filament_colors = config_data.get("filament_colour", [])
 
                 # Filter out empty/unknown types and colors
                 valid_types = [
-                    ftype for ftype in filament_types 
-                    if ftype and ftype.strip() and ftype.lower() != 'unknown'
+                    ftype
+                    for ftype in filament_types
+                    if ftype and ftype.strip() and ftype.lower() != "unknown"
                 ]
                 valid_colors = [
-                    color for color in filament_colors 
-                    if color and color.strip()
+                    color for color in filament_colors if color and color.strip()
                 ]
 
                 # Ensure we have at least some filament types
                 if not valid_types:
-                    valid_types = ['PLA']  # Default assumption
+                    valid_types = ["PLA"]  # Default assumption
 
                 # The filament count is based on the number of valid types
                 # If there are more colors than types, we still use types count
@@ -326,12 +326,12 @@ class ModelService:
 
                 # Ensure colors list is same length as types
                 while len(valid_colors) < filament_count:
-                    valid_colors.append('#000000')  # Default to black
+                    valid_colors.append("#000000")  # Default to black
 
                 return FilamentRequirement(
                     filament_count=filament_count,
                     filament_types=valid_types,
-                    filament_colors=valid_colors[:filament_count]
+                    filament_colors=valid_colors[:filament_count],
                 )
 
         except (zipfile.BadZipFile, json.JSONDecodeError, KeyError, OSError):
