@@ -19,7 +19,7 @@ install_system_dependencies() {
 # Function to install minimal dependencies for CLI-only operation
 install_minimal_dependencies() {
     echo "Installing minimal system dependencies for Bambu Studio CLI..."
-    
+
     # Check if we're running as root or can use sudo
     if [ "$EUID" -eq 0 ]; then
         APT_CMD="apt-get"
@@ -30,10 +30,10 @@ install_minimal_dependencies() {
         echo "Please run as root or ensure sudo is available"
         exit 1
     fi
-    
+
     # Update package list
     $APT_CMD update
-    
+
     # Minimal dependencies required for CLI operations
     # Based on AppImage requirements and basic functionality
     MINIMAL_DEPS_LIST=(
@@ -43,26 +43,26 @@ install_minimal_dependencies() {
         ca-certificates
         fuse
         libfuse2
-        
+
         # Required for AppImage execution
         binutils
-        
+
         # Basic locale support (prevents locale warnings)
         locales
-        
+
         # Basic SSL/TLS support for downloads
         libssl3
-        
+
         # Basic system utilities
         file
     )
-    
+
     # Function to install a list of packages, continuing on failure
     install_package_list() {
         local desc="$1"
         shift
         local packages=("$@")
-        
+
         echo "Installing $desc..."
         for package in "${packages[@]}"; do
             if $APT_CMD install -y "$package" 2>/dev/null; then
@@ -72,9 +72,9 @@ install_minimal_dependencies() {
             fi
         done
     }
-    
+
     install_package_list "minimal CLI dependencies" "${MINIMAL_DEPS_LIST[@]}"
-    
+
     echo "Minimal system dependencies installation completed"
     echo "Note: CLI may show warnings about missing GUI libraries, but core functionality should work"
 }
@@ -82,7 +82,7 @@ install_minimal_dependencies() {
 # Function to install full dependencies for debugging and development
 install_full_dependencies() {
     echo "Installing full system dependencies for Bambu Studio CLI..."
-    
+
     # Check if we're running as root or can use sudo
     if [ "$EUID" -eq 0 ]; then
         APT_CMD="apt-get"
@@ -93,10 +93,10 @@ install_full_dependencies() {
         echo "Please run as root or ensure sudo is available"
         exit 1
     fi
-    
+
     # Update package list
     $APT_CMD update
-    
+
     # Core build dependencies (always required)
     CORE_DEPS=(
         autoconf
@@ -109,7 +109,7 @@ install_full_dependencies() {
         ca-certificates
         gnupg
     )
-    
+
     # GUI and graphics dependencies
     GUI_DEPS=(
         xvfb
@@ -142,7 +142,7 @@ install_full_dependencies() {
         libxinerama1
         libwebkit2gtk-4.1-0
     )
-    
+
     # GStreamer dependencies
     GSTREAMER_DEPS=(
         gstreamer1.0-plugins-bad
@@ -152,7 +152,7 @@ install_full_dependencies() {
         libgstreamer1.0-0
         libgstreamer-plugins-base1.0-0
     )
-    
+
     # X11 and window system dependencies
     X11_DEPS=(
         libxcb1
@@ -171,7 +171,7 @@ install_full_dependencies() {
         libxkbcommon-x11-0
         libxkbcommon0
     )
-    
+
     # Network and security dependencies
     NETWORK_DEPS=(
         libcurl4-openssl-dev
@@ -184,7 +184,7 @@ install_full_dependencies() {
         libudev-dev
         libgssapi-krb5-2
     )
-    
+
     # Additional system dependencies
     SYSTEM_DEPS=(
         locales
@@ -196,7 +196,7 @@ install_full_dependencies() {
         fuse
         libfuse2
     )
-    
+
     # Optional dependencies that might not be available on all systems
     OPTIONAL_DEPS=(
         eglexternalplatform-dev
@@ -204,13 +204,13 @@ install_full_dependencies() {
         wayland-protocols
         libgstreamerd-3-dev
     )
-    
+
     # Function to install a list of packages, continuing on failure
     install_package_list() {
         local desc="$1"
         shift
         local packages=("$@")
-        
+
         echo "Installing $desc..."
         for package in "${packages[@]}"; do
             if $APT_CMD install -y "$package" 2>/dev/null; then
@@ -220,7 +220,7 @@ install_full_dependencies() {
             fi
         done
     }
-    
+
     # Install packages in groups
     install_package_list "core dependencies" "${CORE_DEPS[@]}"
     install_package_list "GUI and graphics dependencies" "${GUI_DEPS[@]}"
@@ -229,7 +229,7 @@ install_full_dependencies() {
     install_package_list "network and security dependencies" "${NETWORK_DEPS[@]}"
     install_package_list "system dependencies" "${SYSTEM_DEPS[@]}"
     install_package_list "optional dependencies" "${OPTIONAL_DEPS[@]}"
-    
+
     echo "Full system dependencies installation completed"
 }
 
@@ -309,6 +309,16 @@ fi
 
 echo "Installing Bambu Studio CLI binary..."
 
+# Detect architecture
+ARCH=$(uname -m)
+echo "Detected architecture: $ARCH"
+
+# Bambu Studio AppImages are typically x86_64 only
+if [ "$ARCH" != "x86_64" ]; then
+    echo "Warning: Bambu Studio CLI is designed for x86_64 architecture, but detected $ARCH"
+    echo "This may require platform emulation (e.g., Docker with --platform linux/amd64)"
+fi
+
 # Configuration
 # Read version from configuration file, fall back to environment variable, then to "latest"
 VERSION_FILE="/scripts/bambu-studio-version.txt"
@@ -327,13 +337,13 @@ echo "Temporary directory: $TEMP_DIR"
 # If version is "latest", try to get the latest release version
 if [ "$BAMBU_VERSION" = "latest" ]; then
     echo "Attempting to fetch latest release version..."
-    
+
     # Try to get latest release info from GitHub API
     LATEST_VERSION=""
     if command -v curl >/dev/null 2>&1; then
         LATEST_VERSION=$(curl -s --max-time 10 "https://api.github.com/repos/bambulab/BambuStudio/releases/latest" 2>/dev/null | grep '"tag_name"' | cut -d'"' -f4 || echo "")
     fi
-    
+
     if [ -n "$LATEST_VERSION" ]; then
         echo "Found latest version: $LATEST_VERSION"
         BAMBU_VERSION="$LATEST_VERSION"
@@ -343,7 +353,7 @@ if [ "$BAMBU_VERSION" = "latest" ]; then
         echo "Build failed: Unable to determine latest Bambu Studio version."
         exit 1
     fi
-    
+
     echo "Using version: $BAMBU_VERSION"
 fi
 
@@ -370,7 +380,7 @@ DOWNLOAD_SUCCESSFUL=false
 for FILENAME in "${POSSIBLE_NAMES[@]}"; do
     APPIMAGE_URL="https://github.com/bambulab/BambuStudio/releases/download/${BAMBU_VERSION}/${FILENAME}"
     echo "Trying download URL: $APPIMAGE_URL"
-    
+
     if curl -L --insecure --fail --max-time 30 -o "BambuStudio.AppImage" "$APPIMAGE_URL"; then
         echo "Successfully downloaded: $FILENAME"
         DOWNLOAD_SUCCESSFUL=true
@@ -400,7 +410,12 @@ chmod +x "BambuStudio.AppImage"
 
 # Extract the AppImage to access the CLI
 echo "Extracting AppImage..."
-./BambuStudio.AppImage --appimage-extract > /dev/null 2>&1
+if ./BambuStudio.AppImage --appimage-extract > /dev/null 2>&1; then
+    echo "AppImage extraction successful"
+else
+    echo "Warning: AppImage extraction failed, but continuing with AppImage wrapper approach"
+    echo "This is common in container environments and the CLI should still function"
+fi
 
 # For better reliability in CI environments, always use the full AppImage approach
 echo "Installing AppImage and creating CLI wrapper..."

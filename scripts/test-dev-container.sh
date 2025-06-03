@@ -87,7 +87,7 @@ if [ $CLI_AVAILABLE -eq 0 ]; then
         print_status 1 "CLI help command fails with unexpected error"
         ERRORS=$((ERRORS + 1))
     fi
-    
+
     # Test version command
     VERSION_OUTPUT=$(timeout 5 bambu-studio-cli --version 2>&1)
     VERSION_EXIT_CODE=$?
@@ -124,7 +124,7 @@ if [ -d "$WORKSPACE/backend" ]; then
     if [ $CLI_AVAILABLE -eq 0 ]; then
         python -m pytest tests/test_slicer_service.py::TestEndToEndSlicing::test_cli_availability_check -v --tb=short > /dev/null 2>&1
         print_status $? "Integration test (CLI availability)"
-        
+
         # Test with actual 3MF file if available
         if [ -f "$WORKSPACE/test_files/Original3DBenchy3Dprintconceptsnormel.3mf" ]; then
             python -m pytest tests/test_slicer_service.py::TestEndToEndSlicing::test_slice_3mf_benchy_model -v --tb=short > /dev/null 2>&1

@@ -3,14 +3,18 @@ services:
     build:
       context: ..
       dockerfile: .devcontainer/Dockerfile
+      platforms:
+        - linux/amd64
+    platform: linux/amd64
     volumes:
       - ..:/workspace:cached
       - /workspace/node_modules
       - /workspace/pwa/node_modules
+      - /var/run/docker.sock:/var/run/docker.sock
     command: sleep infinity
     ports:
-      - "8000:8000"
-      - "3000:3000"
+      - '8000:8000'
+      - '3000:3000'
     environment:
       - PYTHONPATH=/workspace/backend
       - NODE_ENV=development
