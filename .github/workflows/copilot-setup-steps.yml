@@ -48,31 +48,6 @@ jobs:
           
           echo "✅ Backend dependencies installed"
 
-      - name: Install and setup pre-commit
-        run: |
-          # Install pre-commit framework if not already available
-          if ! command -v pre-commit > /dev/null 2>&1; then
-            echo "📦 Installing pre-commit framework..."
-            pip install pre-commit
-          else
-            echo "✅ Pre-commit framework already available"
-          fi
-          
-          # Install pre-commit hooks for the repository
-          echo "🔧 Installing pre-commit git hooks..."
-          pre-commit install
-          
-          # Try to install hook environments (may fail due to network issues in CI)
-          echo "📋 Attempting to install pre-commit hook environments..."
-          if timeout 180 pre-commit install --install-hooks 2>/dev/null; then
-            echo "✅ Pre-commit hook environments installed successfully"
-          else
-            echo "⚠️  Hook environment installation timed out or failed (likely network issues)"
-            echo "✅ Pre-commit git hooks are installed and will work for local development"
-          fi
-          
-          echo "✅ Pre-commit setup complete"
-
       - name: Install PWA dependencies
         run: |
           # Install PWA dependencies
