@@ -128,6 +128,63 @@ For development setup and contribution guidelines, see:
 - **Backend Development**: See backend tests and FastAPI application structure
 - **Frontend Development**: See the [PWA README](pwa/README.md) for React development workflow
 
+### Code Formatting and Linting
+
+LANbu Handy uses automated code formatting to maintain consistent code style across the project:
+
+#### Python (Backend)
+- **Black**: Code formatter with 88-character line length
+- **isort**: Import sorting compatible with Black
+- **flake8**: Linting with Black-compatible rules
+
+#### JavaScript/TypeScript (PWA)
+- **Prettier**: Code formatter for JS/TS/CSS/HTML/JSON/Markdown
+- **ESLint**: Linting for TypeScript and React
+
+#### Setup for Local Development
+
+1. **Install dependencies**:
+   ```bash
+   # Backend
+   cd backend && pip install -r requirements.txt
+   
+   # PWA
+   cd pwa && npm install
+   ```
+
+2. **Install pre-commit hooks** (recommended):
+   ```bash
+   # Install pre-commit
+   pip install pre-commit
+   
+   # Install hooks
+   pre-commit install
+   ```
+
+3. **Manual formatting** (if not using pre-commit):
+   ```bash
+   # Format Python code
+   python -m black backend/
+   python -m isort --profile black backend/
+   
+   # Format PWA code
+   cd pwa && npm run format
+   ```
+
+4. **Check formatting**:
+   ```bash
+   # Python
+   python -m black --check backend/
+   python -m isort --profile black --check-only backend/
+   python -m flake8 backend/
+   
+   # PWA
+   cd pwa && npm run format:check
+   cd pwa && npm run lint
+   ```
+
+The pre-commit hooks will automatically format your code before each commit, reducing linting errors and maintaining consistent style. All formatting checks are also run in CI.
+
 ### Running Tests
 
 ```bash

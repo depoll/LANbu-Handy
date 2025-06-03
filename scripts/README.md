@@ -4,13 +4,55 @@ This directory contains various scripts and tools for the LANbu Handy project.
 
 ## Pre-commit Hook Setup
 
-### What it does
+### Modern Pre-commit Framework (Recommended)
 
-The pre-commit hook automatically runs `flake8` linting on Python code before each commit. If any linting errors are found, the commit is blocked until the issues are fixed.
+LANbu Handy now uses the [pre-commit framework](https://pre-commit.com/) for automated code formatting and linting. This provides consistent formatting across Python, JavaScript/TypeScript, CSS, and other file types.
 
-### Installation
+#### Installation
 
-The hook is automatically installed in `.git/hooks/pre-commit` and should be working already. If you need to reinstall it:
+```bash
+# Install pre-commit
+pip install pre-commit
+
+# Install the hooks (from repository root)
+pre-commit install
+```
+
+#### What it does
+
+The modern pre-commit setup automatically:
+- **Formats Python code** with Black and isort
+- **Formats JavaScript/TypeScript/CSS/HTML/JSON/Markdown** with Prettier  
+- **Runs linting** with flake8 (Python) and ESLint (JS/TS)
+- **Performs general file checks** (trailing whitespace, file endings, etc.)
+- **Optional**: Lints Dockerfiles with hadolint
+
+#### Usage
+
+Once installed, hooks run automatically before each commit:
+
+```bash
+# Normal commit - hooks run automatically
+git commit -m "Your changes"
+
+# Skip hooks if needed (not recommended)
+git commit --no-verify -m "Emergency fix"
+
+# Run hooks manually on all files
+pre-commit run --all-files
+```
+
+### Legacy Pre-commit Hook (Deprecated)
+
+The original bash-based pre-commit hook (`scripts/pre-commit-hook.sh`) is still available for reference but is deprecated in favor of the pre-commit framework.
+
+#### What it does
+
+The legacy pre-commit hook automatically runs `flake8` linting on Python code before each commit. If any linting errors are found, the commit is blocked until the issues are fixed.
+
+#### Installation
+
+The hook can be manually installed in `.git/hooks/pre-commit`:
 
 ```bash
 # Copy the hook script to the git hooks directory
@@ -20,7 +62,7 @@ cp scripts/pre-commit-hook.sh .git/hooks/pre-commit
 chmod +x .git/hooks/pre-commit
 ```
 
-### Features
+#### Features
 
 - ✅ **Automatic linting**: Runs flake8 on Python files before each commit
 - ✅ **Smart detection**: Only runs when Python files are staged for commit
