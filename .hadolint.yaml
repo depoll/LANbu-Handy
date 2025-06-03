@@ -1,5 +1,5 @@
 ignored:
-  - DL3008  # Pin versions in apt get install
-  - DL3009  # Delete the apt-get lists after installing something
-  - DL3015  # Avoid additional packages by specifying --no-install-recommends
-  - DL3059  # Multiple consecutive RUN instructions
+  - DL3008 # Pin versions in apt get install
+  - DL3009 # Delete the apt-get lists after installing something
+  - DL3015 # Avoid additional packages by specifying --no-install-recommends
+  - DL3059 # Multiple consecutive RUN instructions

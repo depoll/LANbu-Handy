@@ -18,22 +18,22 @@ command_exists() {
 # Function to install pre-commit and hooks
 setup_precommit() {
     echo "📋 Setting up pre-commit hooks..."
-    
+
     if ! command_exists pre-commit; then
         echo "📦 Installing pre-commit framework..."
         pip install pre-commit
     else
         echo "✅ pre-commit already installed"
     fi
-    
+
     echo "🔧 Installing pre-commit hooks..."
     # Install hooks with retries and better error handling
     local max_attempts=3
     local attempt=1
-    
+
     while [ $attempt -le $max_attempts ]; do
         echo "Attempt $attempt/$max_attempts to install pre-commit hooks..."
-        
+
         if pre-commit install --install-hooks; then
             echo "✅ Pre-commit hooks configured!"
             return 0
@@ -43,11 +43,11 @@ setup_precommit() {
             attempt=$((attempt + 1))
         fi
     done
-    
+
     echo "❌ Failed to install pre-commit hooks after $max_attempts attempts"
     echo "ℹ️  You can try running 'pre-commit install --install-hooks' manually later"
     echo "ℹ️  Or install without hooks using 'pre-commit install'"
-    
+
     # Fallback: install git hooks without pre-installing hook environments
     echo "🔄 Installing git hooks only (without pre-installing environments)..."
     pre-commit install || echo "⚠️  Even basic hook installation failed"
@@ -104,7 +104,7 @@ else
         setup_backend
     fi
 
-    read -p "🤔 Install PWA dependencies? (y/N): " -n 1 -r  
+    read -p "🤔 Install PWA dependencies? (y/N): " -n 1 -r
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
         setup_pwa

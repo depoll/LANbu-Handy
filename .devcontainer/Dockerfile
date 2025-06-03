@@ -38,15 +38,15 @@ RUN pip install --trusted-host pypi.org --trusted-host pypi.python.org --trusted
 
 # Install additional Python development and testing tools
 RUN pip install --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host files.pythonhosted.org --no-cache-dir \
-    pytest \
-    pytest-asyncio \
-    pytest-cov \
-    black \
-    flake8 \
-    mypy \
-    isort \
-    httpx \
-    requests
+    pytest==8.3.4 \
+    pytest-asyncio==0.24.0 \
+    pytest-cov==6.0.0 \
+    black==25.1.0 \
+    flake8==7.2.0 \
+    mypy==1.14.0 \
+    isort==6.0.1 \
+    httpx==0.28.1 \
+    requests==2.32.3
 
 # Install Bambu Studio CLI and dependencies
 COPY ../scripts/bambu-studio-version.txt /scripts/
@@ -57,7 +57,7 @@ RUN chmod +x /tmp/install-bambu-studio-cli.sh && \
 
 # Install global npm packages for development
 RUN npm config set strict-ssl false && \
-    npm install -g typescript@5.8.3 @types/node
+    npm install -g typescript@5.8.3 @types/node@22.12.9
 
 # Set up workspace
 WORKDIR /workspace

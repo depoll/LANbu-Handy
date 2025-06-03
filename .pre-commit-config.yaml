@@ -12,7 +12,7 @@ repos:
     rev: 6.0.1
     hooks:
       - id: isort
-        args: ["--profile", "black"]
+        args: ['--profile', 'black']
         types: [python]
 
   - repo: https://github.com/pycqa/flake8
@@ -26,7 +26,8 @@ repos:
     rev: v4.0.0-alpha.8
     hooks:
       - id: prettier
-        types_or: [javascript, jsx, ts, tsx, css, scss, json, yaml, html, markdown]
+        types_or:
+          [javascript, jsx, ts, tsx, css, scss, json, yaml, html, markdown]
         additional_dependencies:
           - prettier@3.5.3
         exclude: |
@@ -45,6 +46,7 @@ repos:
       - id: end-of-file-fixer
       - id: check-yaml
       - id: check-json
+        exclude: 'pwa/tsconfig\.(node|app)\.json'
       - id: check-toml
       - id: check-merge-conflict
       - id: check-case-conflict

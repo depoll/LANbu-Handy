@@ -5,12 +5,14 @@ This development container provides a complete environment for developing and te
 ## What's Included
 
 ### System Dependencies
+
 - **Python 3.12** with FastAPI development environment
 - **Node.js 18.x** with npm for PWA development
 - **Bambu Studio CLI** (same as production environment)
 - Development tools: git, vim, nano, curl, wget
 
 ### Python Development Tools
+
 - **FastAPI & Uvicorn** (backend framework)
 - **pytest & pytest-asyncio** (testing framework)
 - **pytest-cov** (test coverage)
@@ -21,6 +23,7 @@ This development container provides a complete environment for developing and te
 - **httpx & requests** (HTTP clients for testing)
 
 ### Frontend Development Tools
+
 - **TypeScript 5.8.3** (globally installed)
 - **@types/node** (TypeScript definitions)
 
@@ -153,9 +156,11 @@ npm install --save-dev @testing-library/react @testing-library/jest-dom vitest
 ## Troubleshooting
 
 ### Permission Issues
+
 If you encounter permission issues with npm or file access, ensure the container is running with appropriate user permissions.
 
 ### Rebuilding the Container
+
 If you need to rebuild the container with changes:
 
 ```bash

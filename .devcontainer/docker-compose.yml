@@ -9,8 +9,8 @@ services:
       - /workspace/pwa/node_modules
     command: sleep infinity
     ports:
-      - "8000:8000"
-      - "3000:3000"
+      - '8000:8000'
+      - '3000:3000'
     environment:
       - PYTHONPATH=/workspace/backend
       - NODE_ENV=development

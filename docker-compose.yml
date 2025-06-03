@@ -2,11 +2,11 @@ services:
   lanbuhandy:
     build: .
     ports:
-      - "8080:8000"
+      - '8080:8000'
     restart: unless-stopped
     environment:
       # Configure Bambu printers for LAN-only mode communication
-      
+
       # NEW FORMAT (Recommended): Multiple printers with JSON configuration
       # Set BAMBU_PRINTERS with a JSON array of printer configurations:
       # Each printer needs: name, ip, and access_code
@@ -15,13 +15,13 @@ services:
       # Example for single printer:
       # - BAMBU_PRINTERS=[{"name":"My Printer","ip":"192.168.1.100","access_code":"12345678"}]
       - BAMBU_PRINTERS=${BAMBU_PRINTERS:-}
-      
+
       # LEGACY FORMAT (Still supported): Single printer configuration
       # Use these if you only have one printer and prefer the old format:
       # - BAMBU_PRINTER_IP=192.168.1.100
       # - BAMBU_PRINTER_ACCESS_CODE=12345678
       - BAMBU_PRINTER_IP=${BAMBU_PRINTER_IP:-}
       - BAMBU_PRINTER_ACCESS_CODE=${BAMBU_PRINTER_ACCESS_CODE:-}
-      
+
       # Other settings
       - LOG_LEVEL=${LOG_LEVEL:-info}
