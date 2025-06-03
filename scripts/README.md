@@ -2,6 +2,27 @@
 
 This directory contains various scripts and tools for the LANbu Handy project.
 
+## Development Environment Setup
+
+### Quick Setup (One Command)
+
+For new developers or to reset your environment:
+
+```bash
+# Run the complete setup script
+./scripts/setup-dev-environment.sh
+```
+
+This script automatically:
+- Installs the pre-commit framework
+- Sets up pre-commit hooks for the repository
+- Optionally installs backend and PWA dependencies
+- Provides helpful next steps and tips
+
+### DevContainer (Automatic)
+
+If you're using the devcontainer (VS Code or GitHub Codespaces), pre-commit hooks are **automatically configured** when the container starts. No manual setup required!
+
 ## Pre-commit Hook Setup
 
 ### Modern Pre-commit Framework (Recommended)

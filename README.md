@@ -141,23 +141,27 @@ LANbu Handy uses automated code formatting to maintain consistent code style acr
 - **Prettier**: Code formatter for JS/TS/CSS/HTML/JSON/Markdown
 - **ESLint**: Linting for TypeScript and React
 
-#### Setup for Local Development
+#### Setup for Development
 
-1. **Install dependencies**:
+**DevContainer Users (Automatic Setup)**:
+If you're using the devcontainer (VS Code or GitHub Codespaces), pre-commit hooks are **automatically configured** when the container starts. No manual setup required!
+
+**Local Development Setup**:
+
+1. **Quick setup** (one command):
    ```bash
-   # Backend
-   cd backend && pip install -r requirements.txt
-   
-   # PWA
-   cd pwa && npm install
+   # Automated setup script
+   ./scripts/setup-dev-environment.sh
    ```
 
-2. **Install pre-commit hooks** (recommended):
+2. **Manual setup**:
    ```bash
-   # Install pre-commit
-   pip install pre-commit
+   # Install dependencies
+   cd backend && pip install -r requirements.txt
+   cd pwa && npm install
    
-   # Install hooks
+   # Install pre-commit hooks
+   pip install pre-commit
    pre-commit install
    ```
 
