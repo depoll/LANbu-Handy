@@ -2,10 +2,10 @@
 # This file initializes the development environment with all required dependencies
 # for working on the LANbu Handy PWA and backend services.
 
-name: "Copilot Setup Steps"
+name: 'Copilot Setup Steps'
 
 # Allow testing of the setup steps from your repository's "Actions" tab.
-"on": workflow_dispatch
+'on': workflow_dispatch
 
 jobs:
   # The job MUST be called `copilot-setup-steps` or it will not be picked up by Copilot.
@@ -23,29 +23,29 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        
+
       - name: Set up Python with cache
         uses: actions/setup-python@v4
         with:
           python-version: '3.12'
           cache: 'pip'
           cache-dependency-path: 'backend/requirements.txt'
-          
+
       - name: Set up Node.js with cache
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
           cache-dependency-path: 'pwa/package-lock.json'
-      - name: Install backend dependencies  
+      - name: Install backend dependencies
         run: |
           # Install core backend dependencies
           cd backend
           pip install -r requirements.txt
-          
+
           # Install additional development and testing tools
           pip install flake8 black mypy isort pytest-asyncio httpx requests
-          
+
           echo "✅ Backend dependencies installed"
 
       - name: Install and setup pre-commit
@@ -57,11 +57,11 @@ jobs:
           else
             echo "✅ Pre-commit framework already available"
           fi
-          
+
           # Install pre-commit hooks for the repository
           echo "🔧 Installing pre-commit git hooks..."
           pre-commit install
-          
+
           # Try to install hook environments (may fail due to network issues in CI)
           echo "📋 Attempting to install pre-commit hook environments..."
           if timeout 180 pre-commit install --install-hooks 2>/dev/null; then
@@ -70,7 +70,7 @@ jobs:
             echo "⚠️  Hook environment installation timed out or failed (likely network issues)"
             echo "✅ Pre-commit git hooks are installed and will work for local development"
           fi
-          
+
           echo "✅ Pre-commit setup complete"
 
       - name: Install PWA dependencies
@@ -78,35 +78,35 @@ jobs:
           # Install PWA dependencies
           cd pwa
           npm install
-          
+
           echo "✅ PWA dependencies installed"
 
       - name: Install Bambu Studio CLI
         run: |
           # Make installation script executable
           chmod +x scripts/install-bambu-studio-cli.sh
-          
+
           # Install Bambu Studio CLI with all dependencies
           scripts/install-bambu-studio-cli.sh
-          
+
           echo "✅ Bambu Studio CLI installed"
 
       - name: Verify installations
         run: |
           echo "🧪 Validating development environment..."
-          
+
           # Test Python environment
           echo "Testing Python environment..."
           python3 -c "import fastapi, uvicorn, pytest; print('✅ Core Python packages available')" || echo "❌ Some core Python packages missing"
-          
+
           # Test linting tools
           echo "Testing Python linting tools..."
           python3 -c "import flake8, black, mypy, isort; print('✅ Python linting tools available')" || echo "❌ Some Python linting tools missing"
-          
+
           # Test Node.js environment
           echo "Testing Node.js environment..."
           (cd pwa && npm list react react-dom typescript vite > /dev/null 2>&1 && echo "✅ Core PWA packages available") || echo "❌ Some PWA packages missing"
-          
+
           # Test Bambu Studio CLI (if available)
           echo "Testing Bambu Studio CLI..."
           if command -v bambu-studio-cli > /dev/null 2>&1; then
@@ -115,7 +115,7 @@ jobs:
           else
             echo "⚠️  Bambu Studio CLI not in PATH (this is expected if installation failed)"
           fi
-          
+
           echo "🎉 Development environment validation complete!"
 
       - name: Setup headless display
@@ -133,7 +133,7 @@ jobs:
                 echo "⚠️  Could not install Xvfb automatically"
               fi
             fi
-            
+
             # Start virtual display for testing
             export DISPLAY=:99
             Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &

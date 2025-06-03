@@ -1,4 +1,5 @@
 # LANbu Handy - All-in-One Docker Image (Multi-stage Build)
+# Note: Platform forced via docker-compose.yml for Bambu Studio CLI compatibility
 
 # Stage 1: PWA Build Stage
 FROM node:18-slim AS pwa-builder
@@ -12,7 +13,7 @@ COPY pwa/package*.json ./
 RUN npm config set strict-ssl false && \
     npm config set registry https://registry.npmjs.org/ && \
     npm install -g typescript@5.8.3 && \
-    npm ci --no-audit --no-fund --prefer-offline --progress=false || npm install --no-audit --no-fund
+    (npm ci --no-audit --no-fund --prefer-offline --progress=false || npm install --no-audit --no-fund)
 
 # Copy PWA source and build
 COPY pwa/ ./

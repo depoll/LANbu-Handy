@@ -14,6 +14,7 @@ For new developers or to reset your environment:
 ```
 
 This script automatically:
+
 - Installs the pre-commit framework
 - Sets up pre-commit hooks for the repository
 - Optionally installs backend and PWA dependencies
@@ -42,8 +43,9 @@ pre-commit install
 #### What it does
 
 The modern pre-commit setup automatically:
+
 - **Formats Python code** with Black and isort
-- **Formats JavaScript/TypeScript/CSS/HTML/JSON/Markdown** with Prettier  
+- **Formats JavaScript/TypeScript/CSS/HTML/JSON/Markdown** with Prettier
 - **Runs linting** with flake8 (Python) and ESLint (JS/TS)
 - **Performs general file checks** (trailing whitespace, file endings, etc.)
 - **Optional**: Lints Dockerfiles with hadolint
@@ -96,6 +98,7 @@ chmod +x .git/hooks/pre-commit
 The hook runs automatically before each commit. No manual action required.
 
 #### Successful commit (clean code)
+
 ```
 🔍 Running pre-commit linting checks...
 📁 Checking Python files in: backend/
@@ -107,6 +110,7 @@ The hook runs automatically before each commit. No manual action required.
 ```
 
 #### Blocked commit (linting errors)
+
 ```
 🔍 Running pre-commit linting checks...
 📁 Checking Python files in: backend/
@@ -124,6 +128,7 @@ backend/app/main.py:15:1: W293 blank line contains whitespace
 ```
 
 #### Bypassing the hook (when needed)
+
 ```bash
 # Skip the pre-commit hook for this commit only
 git commit --no-verify -m "Emergency fix - will clean up linting later"
@@ -148,6 +153,7 @@ The installation infrastructure is complete and working. The Docker build proces
 ## Current Implementation
 
 The installation script now:
+
 - **Installs minimal system dependencies by default** for faster CI builds (9 packages vs 90+ in full mode)
 - Downloads the actual Bambu Studio AppImage from GitHub releases (https://github.com/bambulab/BambuStudio/releases)
 - **Defaults to the latest version** automatically by fetching from GitHub API
@@ -167,6 +173,7 @@ The project uses a version tracking approach for maintainability:
 ### Version Configuration File
 
 The version is controlled by `scripts/bambu-studio-version.txt`:
+
 - Contains either "latest" for automatic latest version detection
 - Or a specific version tag like "v1.8.4"
 - When updated, triggers new builds and releases
@@ -180,6 +187,7 @@ The version is controlled by `scripts/bambu-studio-version.txt`:
 ### Latest Version Detection
 
 When version is set to "latest":
+
 - Script attempts to fetch the latest release from GitHub API
 - Falls back to a known stable version if API is unavailable
 - Handles network restrictions gracefully
@@ -207,6 +215,7 @@ BAMBU_VERSION=v1.8.4 ./scripts/install-bambu-studio-cli.sh
 ```
 
 The script is designed to work in multiple environments:
+
 - **Docker containers** (CI, production, development)
 - **CI environments** (GitHub Actions)
 - **Local development setups**
@@ -217,38 +226,46 @@ The script is designed to work in multiple environments:
 The script now supports two dependency modes:
 
 ### Minimal Mode (Default)
+
 For faster CI builds and CLI-only operation (~9 packages):
+
 ```bash
 wget curl ca-certificates fuse libfuse2 binutils locales libssl3 file
 ```
 
 ### Full Mode (--full-deps flag)
+
 The script installs a comprehensive list of dependencies based on the official Bambu Studio Dockerfile (~90 packages):
 
 ### Build and Development Tools
+
 ```bash
 autoconf build-essential cmake curl xvfb extra-cmake-modules file git
 ```
 
-### Graphics and GUI Libraries  
+### Graphics and GUI Libraries
+
 ```bash
 libcairo2-dev libglew-dev libglu1-mesa-dev libgtk-3-dev libosmesa6-dev
 libwayland-dev libxkbcommon-dev libwebkit2gtk-4.1-dev
 ```
 
 ### Media and Streaming
+
 ```bash
 gstreamer1.0-plugins-bad gstreamer1.0-libav libgstreamer1.0-dev
 libgstreamer-plugins-base1.0-dev libgstreamer-plugins-good1.0-dev
 ```
 
 ### Security and Networking
+
 ```bash
 libcurl4-openssl-dev libssl3 libssl-dev libsecret-1-dev libsoup2.4-dev
 ca-certificates gnupg
 ```
 
 ### X11 and Display Support
+
 ```bash
 libxcb1 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0
 libxcb-render-util0 libxcb-render0 libxcb-shape0 libxcb-sync1
@@ -257,11 +274,13 @@ libxkbcommon-x11-0 libxkbcommon0
 ```
 
 ### AppImage Support
+
 ```bash
 binutils fuse libfuse2
 ```
 
 ### Runtime Libraries
+
 ```bash
 libegl1 libegl-mesa0 libgl1-mesa-dri libopengl0 libgstreamer1.0-0
 libgstreamer-plugins-base1.0-0 libsoup-2.4-1 libgtk-3-0t64
@@ -277,16 +296,19 @@ The minimal mode ensures the Bambu Studio CLI works for slicing operations in he
 You can specify a different Bambu Studio version in several ways:
 
 #### 1. Update Version File (Recommended)
+
 Edit `scripts/bambu-studio-version.txt`:
+
 ```bash
 # For latest version
 echo "latest" > scripts/bambu-studio-version.txt
 
-# For specific version  
+# For specific version
 echo "v1.8.4" > scripts/bambu-studio-version.txt
 ```
 
 #### 2. Environment Variable
+
 ```bash
 # In Dockerfile or build environment
 ENV BAMBU_VERSION=v1.8.4
@@ -296,6 +318,7 @@ docker build --build-arg BAMBU_VERSION=v1.8.2 -t lanbu-handy .
 ```
 
 #### 3. Build-time Override
+
 ```bash
 # Override both file and default
 docker build --build-arg BAMBU_VERSION=latest -t lanbu-handy .
@@ -304,6 +327,7 @@ docker build --build-arg BAMBU_VERSION=latest -t lanbu-handy .
 ### Download Process
 
 The script:
+
 1. Downloads the AppImage from: `https://github.com/bambulab/BambuStudio/releases/download/{VERSION}/BambuStudio_ubu64.AppImage`
 2. Makes it executable and extracts the contents
 3. Locates the CLI binary within the extracted files
@@ -335,10 +359,10 @@ import subprocess
 
 # Example CLI usage
 result = subprocess.run([
-    'bambu-studio-cli', 
-    '--slice', 
-    'input.stl', 
-    '--output', 
+    'bambu-studio-cli',
+    '--slice',
+    'input.stl',
+    '--output',
     'output.gcode'
 ], capture_output=True, text=True)
 ```
@@ -346,6 +370,7 @@ result = subprocess.run([
 ## Troubleshooting
 
 If a specific version fails to download:
+
 1. Check available versions at: https://github.com/bambulab/BambuStudio/releases
 2. Update `scripts/bambu-studio-version.txt` or the `BAMBU_VERSION` environment variable to a valid release tag
 3. Rebuild the Docker image
@@ -353,6 +378,7 @@ If a specific version fails to download:
 ### When "latest" Version Detection Fails
 
 If automatic latest version detection fails (due to network restrictions):
+
 - The script falls back to a known stable version (v1.8.4)
 - Manual version specification still works via the version file or environment variable
 - Check the build logs for specific error messages
@@ -369,8 +395,9 @@ The `test-dev-container.sh` script provides comprehensive validation of the dev 
 ```
 
 This script tests:
+
 - **Python environment**: Verifies Python 3 and backend dependencies (FastAPI, pytest)
-- **Node.js environment**: Checks Node.js and npm availability  
+- **Node.js environment**: Checks Node.js and npm availability
 - **Bambu Studio CLI**: Tests CLI installation and basic functionality
 - **Backend tests**: Runs unit tests and integration tests
 - **Workspace configuration**: Validates file permissions and test files
@@ -386,6 +413,7 @@ python -m pytest tests/test_slicer_service.py::TestEndToEndSlicing -v
 ```
 
 This runs 7 integration tests that:
+
 1. **Process real 3MF files** from the `test_files/` directory
 2. **Generate G-code output** using the actual Bambu Studio CLI
 3. **Validate the complete slicing pipeline** end-to-end
@@ -393,6 +421,7 @@ This runs 7 integration tests that:
 ### CI Environment
 
 The same CLI installation and testing approach is used in GitHub Actions CI:
+
 - Integration tests run in CI (not skipped)
 - CLI works in headless environments with Xvfb
 - All test files are properly validated
