@@ -176,3 +176,136 @@ footer p {
     font-size: 1rem;
   }
 }
+
+/* Slice and Print Component */
+.slice-and-print {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  padding: 2rem;
+  margin: 2rem 0;
+  max-width: 800px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.slice-and-print-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.slice-and-print-header h2 {
+  color: #1976D2;
+  font-size: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.slice-and-print-header p {
+  color: #666;
+  font-size: 0.95rem;
+}
+
+.slice-and-print-form {
+  margin-bottom: 2rem;
+}
+
+.input-group {
+  margin-bottom: 1.5rem;
+}
+
+.input-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+  color: #333;
+}
+
+.model-url-input {
+  width: 100%;
+  padding: 0.75rem;
+  border: 2px solid #e0e0e0;
+  border-radius: 6px;
+  font-size: 1rem;
+  transition: border-color 0.2s ease;
+}
+
+.model-url-input:focus {
+  outline: none;
+  border-color: #2196F3;
+}
+
+.model-url-input:disabled {
+  background-color: #f5f5f5;
+  cursor: not-allowed;
+}
+
+.slice-and-print-button {
+  width: 100%;
+  padding: 1rem 2rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+  background-color: #1976D2;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.slice-and-print-button:hover:not(:disabled) {
+  background-color: #1565C0;
+}
+
+.slice-and-print-button:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+}
+
+.status-display {
+  border-top: 1px solid #e0e0e0;
+  padding-top: 2rem;
+}
+
+.status-display h3 {
+  color: #333;
+  font-size: 1.2rem;
+  margin-bottom: 1rem;
+}
+
+.status-messages {
+  background-color: #f8f9fa;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  padding: 1rem;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.status-message {
+  font-family: 'Courier New', monospace;
+  font-size: 0.9rem;
+  margin-bottom: 0.5rem;
+  padding: 0.25rem 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.status-message:last-child {
+  margin-bottom: 0;
+}
+
+/* Mobile responsiveness for slice and print */
+@media (max-width: 768px) {
+  .slice-and-print {
+    margin: 1rem;
+    padding: 1.5rem;
+  }
+  
+  .slice-and-print-header h2 {
+    font-size: 1.3rem;
+  }
+  
+  .slice-and-print-header p {
+    font-size: 0.9rem;
+  }
+}
