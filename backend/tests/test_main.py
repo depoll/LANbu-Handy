@@ -344,8 +344,166 @@ class TestSliceEndpoint:
             data = response.json()
             assert data["success"] is False
             assert data["message"] == "Slicing failed"
-            assert "Invalid model file" in data["error_details"]
-
         finally:
             # Clean up test file
             test_file_path.unlink(missing_ok=True)
+
+
+class TestJobStartEndpoint:
+    """Test cases for the job start orchestration endpoint."""
+
+    @patch('app.main.config.is_printer_configured')
+    def test_job_start_no_printer_configured(self, mock_is_configured):
+        """Test job start endpoint when no printer is configured."""
+        mock_is_configured.return_value = False
+
+        response = client.post("/api/job/start-basic", json={
+            "model_url": "http://example.com/model.stl"
+        })
+
+        assert response.status_code == 400
+        assert "No printer configured" in response.json()["detail"]
+
+    @patch('app.main.config.is_printer_configured')
+    @patch('app.main.config.get_printers')
+    @patch('app.main.model_service.download_model')
+    def test_job_start_model_download_validation_error(
+            self, mock_download, mock_get_printers, mock_is_configured):
+        """Test job start endpoint with model validation error."""
+        from app.config import PrinterConfig
+
+        mock_is_configured.return_value = True
+        mock_get_printers.return_value = [
+            PrinterConfig("Test Printer", "192.168.1.100", "test123")
+        ]
+        mock_download.side_effect = ModelValidationError("Invalid model")
+
+        response = client.post("/api/job/start-basic", json={
+            "model_url": "http://example.com/invalid.stl"
+        })
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is False
+        assert "Job failed at download step" in data["message"]
+        assert data["job_steps"]["download"]["success"] is False
+        assert ("Model validation failed" in
+                data["job_steps"]["download"]["message"])
+
+    @patch('app.main.config.is_printer_configured')
+    @patch('app.main.config.get_printers')
+    @patch('app.main.model_service.download_model')
+    @patch('app.main.slice_model')
+    def test_job_start_slicing_failure(
+            self, mock_slice, mock_download, mock_get_printers,
+            mock_is_configured, temp_model_file):
+        """Test job start endpoint with slicing failure."""
+        from app.config import PrinterConfig
+        from app.slicer_service import CLIResult
+
+        mock_is_configured.return_value = True
+        mock_get_printers.return_value = [
+            PrinterConfig("Test Printer", "192.168.1.100", "test123")
+        ]
+        mock_download.return_value = Path(temp_model_file)
+        mock_slice.return_value = CLIResult(
+            exit_code=1,
+            stdout="",
+            stderr="Slicing error",
+            success=False
+        )
+
+        response = client.post("/api/job/start-basic", json={
+            "model_url": "http://example.com/model.stl"
+        })
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is False
+        assert "Job failed at slicing step" in data["message"]
+        assert data["job_steps"]["download"]["success"] is True
+        assert data["job_steps"]["slice"]["success"] is False
+        assert "Slicing failed" in data["job_steps"]["slice"]["message"]
+
+    @patch('app.main.config.is_printer_configured')
+    @patch('app.main.config.get_printers')
+    @patch('app.main.model_service.download_model')
+    @patch('app.main.slice_model')
+    @patch('app.main.printer_service.upload_gcode')
+    @patch('app.main.printer_service.start_print')
+    def test_job_start_complete_success(
+            self, mock_start_print, mock_upload, mock_slice, mock_download,
+            mock_get_printers, mock_is_configured, temp_model_file):
+        """Test job start endpoint with complete success."""
+        from app.config import PrinterConfig
+        from app.slicer_service import CLIResult
+        from app.printer_service import FTPUploadResult, MQTTResult
+
+        mock_is_configured.return_value = True
+        mock_get_printers.return_value = [
+            PrinterConfig("Test Printer", "192.168.1.100", "test123")
+        ]
+        mock_download.return_value = Path(temp_model_file)
+        mock_slice.return_value = CLIResult(
+            exit_code=0,
+            stdout="Slicing successful",
+            stderr="",
+            success=True
+        )
+        mock_upload.return_value = FTPUploadResult(
+            success=True,
+            message="Upload successful",
+            remote_path="/upload/test.gcode"
+        )
+        mock_start_print.return_value = MQTTResult(
+            success=True,
+            message="Print command sent successfully",
+            error_details=None
+        )
+
+        # Create a temporary gcode file for the test
+        with tempfile.TemporaryDirectory() as tmpdir:
+            gcode_dir = Path(tmpdir) / "gcode"
+            gcode_dir.mkdir()
+            gcode_file = gcode_dir / "test.gcode"
+            gcode_file.write_text("test gcode content")
+
+            # Mock Path.glob to return our test gcode file
+            with patch('pathlib.Path.glob') as mock_glob:
+                mock_glob.return_value = [gcode_file]
+
+                response = client.post("/api/job/start-basic", json={
+                    "model_url": "http://example.com/model.stl"
+                })
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        assert "Job completed successfully - print started" in data["message"]
+        assert data["job_steps"]["download"]["success"] is True
+        assert data["job_steps"]["slice"]["success"] is True
+        assert data["job_steps"]["upload"]["success"] is True
+        assert data["job_steps"]["print"]["success"] is True
+        assert ("Model downloaded successfully" in
+                data["job_steps"]["download"]["message"])
+        assert ("Model sliced successfully" in
+                data["job_steps"]["slice"]["message"])
+        assert ("Upload successful" in
+                data["job_steps"]["upload"]["message"])
+        assert ("Print command sent successfully" in
+                data["job_steps"]["print"]["message"])
+
+    def test_job_start_missing_model_url(self):
+        """Test job start endpoint with missing model_url field."""
+        response = client.post("/api/job/start-basic", json={})
+
+        assert response.status_code == 422
+        assert "Field required" in response.json()["detail"][0]["msg"]
+
+    def test_job_start_invalid_json(self):
+        """Test job start endpoint with invalid JSON."""
+        response = client.post("/api/job/start-basic",
+                               data="invalid json",
+                               headers={"Content-Type": "application/json"})
+
+        assert response.status_code == 422

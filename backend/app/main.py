@@ -6,6 +6,7 @@ printing 3D models to Bambu Lab printers in LAN-only mode.
 """
 
 from pathlib import Path
+import tempfile
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -14,6 +15,9 @@ from pydantic import BaseModel
 from app.model_service import (ModelService, ModelValidationError,
                                ModelDownloadError)
 from app.slicer_service import slice_model
+from app.printer_service import (PrinterService, PrinterCommunicationError,
+                                 PrinterMQTTError)
+from app.config import config
 
 app = FastAPI(
     title="LANbu Handy",
@@ -24,6 +28,9 @@ app = FastAPI(
 
 # Initialize model service
 model_service = ModelService()
+
+# Initialize printer service
+printer_service = PrinterService()
 
 # Path to the PWA static files directory
 # In Docker, this will be /app/static_pwa, but for local testing we use a
@@ -123,6 +130,17 @@ class SliceResponse(BaseModel):
     success: bool
     message: str
     gcode_path: str = None
+    error_details: str = None
+
+
+class JobStartRequest(BaseModel):
+    model_url: str
+
+
+class JobStartResponse(BaseModel):
+    success: bool
+    message: str
+    job_steps: dict = None
     error_details: str = None
 
 
@@ -247,4 +265,234 @@ async def slice_model_with_defaults(request: SliceRequest):
         raise
     except Exception as e:
         msg = f"Internal server error during slicing: {str(e)}"
+        raise HTTPException(status_code=500, detail=msg)
+
+
+@app.post("/api/job/start-basic", response_model=JobStartResponse)
+async def start_basic_job(request: JobStartRequest):
+    """
+    Orchestrate the complete slice and print workflow.
+
+    Accepts a model URL and orchestrates the entire end-to-end flow:
+    1. Download the model from the URL
+    2. Slice the model with default settings
+    3. Upload G-code to the configured printer
+    4. Initiate the print command
+
+    Args:
+        request: JobStartRequest containing the model_url
+
+    Returns:
+        JobStartResponse with consolidated job status and step details
+
+    Raises:
+        HTTPException: If any step fails or printer is not configured
+    """
+    job_steps = {
+        "download": {"success": False, "message": "", "details": ""},
+        "slice": {"success": False, "message": "", "details": ""},
+        "upload": {"success": False, "message": "", "details": ""},
+        "print": {"success": False, "message": "", "details": ""}
+    }
+
+    try:
+        # Check if printer is configured
+        if not config.is_printer_configured():
+            raise HTTPException(
+                status_code=400,
+                detail="No printer configured. Please configure a printer "
+                       "first."
+            )
+
+        # Get the first configured printer
+        printers = config.get_printers()
+        printer_config = printers[0]
+
+        # Step 1: Download model
+        try:
+            file_path = await model_service.download_model(request.model_url)
+            job_steps["download"]["success"] = True
+            job_steps["download"]["message"] = "Model downloaded successfully"
+            job_steps["download"]["details"] = f"File: {file_path.name}"
+        except ModelValidationError as e:
+            job_steps["download"]["message"] = "Model validation failed"
+            job_steps["download"]["details"] = str(e)
+            return JobStartResponse(
+                success=False,
+                message="Job failed at download step",
+                job_steps=job_steps,
+                error_details=str(e)
+            )
+        except ModelDownloadError as e:
+            job_steps["download"]["message"] = "Model download failed"
+            job_steps["download"]["details"] = str(e)
+            return JobStartResponse(
+                success=False,
+                message="Job failed at download step",
+                job_steps=job_steps,
+                error_details=str(e)
+            )
+
+        # Step 2: Slice model
+        try:
+            # Create output directory for G-code
+            output_dir = Path(tempfile.gettempdir()) / "lanbu-handy" / "gcode"
+            output_dir.mkdir(parents=True, exist_ok=True)
+
+            # Use default slicing settings for PLA
+            default_options = {
+                "profile": "pla",
+                "layer-height": "0.2",
+                "infill": "15",
+                "support": "auto"
+            }
+
+            # Slice the model
+            result = slice_model(
+                input_path=file_path,
+                output_dir=output_dir,
+                options=default_options
+            )
+
+            if result.success:
+                # Find the generated G-code file
+                gcode_files = list(output_dir.glob("*.gcode"))
+                if gcode_files:
+                    gcode_path = gcode_files[0]
+                    job_steps["slice"]["success"] = True
+                    job_steps["slice"]["message"] = "Model sliced successfully"
+                    job_steps["slice"]["details"] = (
+                        f"G-code: {gcode_path.name}"
+                    )
+                else:
+                    job_steps["slice"]["message"] = "No G-code file generated"
+                    job_steps["slice"]["details"] = (
+                        "Slicing completed but no output found"
+                    )
+                    return JobStartResponse(
+                        success=False,
+                        message="Job failed at slicing step",
+                        job_steps=job_steps,
+                        error_details="No G-code file generated"
+                    )
+            else:
+                job_steps["slice"]["message"] = "Slicing failed"
+                job_steps["slice"]["details"] = (
+                    f"CLI Error: {result.stderr}"
+                    if result.stderr else result.stdout
+                )
+                return JobStartResponse(
+                    success=False,
+                    message="Job failed at slicing step",
+                    job_steps=job_steps,
+                    error_details=job_steps["slice"]["details"]
+                )
+        except Exception as e:
+            job_steps["slice"]["message"] = "Slicing error"
+            job_steps["slice"]["details"] = str(e)
+            return JobStartResponse(
+                success=False,
+                message="Job failed at slicing step",
+                job_steps=job_steps,
+                error_details=str(e)
+            )
+
+        # Step 3: Upload G-code to printer
+        try:
+            upload_result = printer_service.upload_gcode(
+                printer_config=printer_config,
+                gcode_file_path=gcode_path
+            )
+
+            if upload_result.success:
+                job_steps["upload"]["success"] = True
+                job_steps["upload"]["message"] = upload_result.message
+                job_steps["upload"]["details"] = (
+                    f"Remote path: {upload_result.remote_path}"
+                )
+                gcode_filename = gcode_path.name
+            else:
+                job_steps["upload"]["message"] = "G-code upload failed"
+                job_steps["upload"]["details"] = (
+                    upload_result.error_details or upload_result.message
+                )
+                return JobStartResponse(
+                    success=False,
+                    message="Job failed at upload step",
+                    job_steps=job_steps,
+                    error_details=job_steps["upload"]["details"]
+                )
+        except PrinterCommunicationError as e:
+            job_steps["upload"]["message"] = "Printer communication error"
+            job_steps["upload"]["details"] = str(e)
+            return JobStartResponse(
+                success=False,
+                message="Job failed at upload step",
+                job_steps=job_steps,
+                error_details=str(e)
+            )
+        except Exception as e:
+            job_steps["upload"]["message"] = "Upload error"
+            job_steps["upload"]["details"] = str(e)
+            return JobStartResponse(
+                success=False,
+                message="Job failed at upload step",
+                job_steps=job_steps,
+                error_details=str(e)
+            )
+
+        # Step 4: Start print
+        try:
+            print_result = printer_service.start_print(
+                printer_config=printer_config,
+                gcode_filename=gcode_filename
+            )
+
+            if print_result.success:
+                job_steps["print"]["success"] = True
+                job_steps["print"]["message"] = print_result.message
+                job_steps["print"]["details"] = (
+                    f"Print started for: {gcode_filename}"
+                )
+
+                return JobStartResponse(
+                    success=True,
+                    message="Job completed successfully - print started",
+                    job_steps=job_steps
+                )
+            else:
+                job_steps["print"]["message"] = "Print start failed"
+                job_steps["print"]["details"] = (
+                    print_result.error_details or print_result.message
+                )
+                return JobStartResponse(
+                    success=False,
+                    message="Job failed at print initiation step",
+                    job_steps=job_steps,
+                    error_details=job_steps["print"]["details"]
+                )
+        except PrinterMQTTError as e:
+            job_steps["print"]["message"] = "MQTT communication error"
+            job_steps["print"]["details"] = str(e)
+            return JobStartResponse(
+                success=False,
+                message="Job failed at print initiation step",
+                job_steps=job_steps,
+                error_details=str(e)
+            )
+        except Exception as e:
+            job_steps["print"]["message"] = "Print start error"
+            job_steps["print"]["details"] = str(e)
+            return JobStartResponse(
+                success=False,
+                message="Job failed at print initiation step",
+                job_steps=job_steps,
+                error_details=str(e)
+            )
+
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
+    except Exception as e:
+        msg = f"Internal server error during job orchestration: {str(e)}"
         raise HTTPException(status_code=500, detail=msg)
