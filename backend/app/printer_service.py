@@ -6,10 +6,14 @@ including G-code file uploads and basic error handling.
 """
 
 import ftplib
+import json
 import logging
 from pathlib import Path
 from typing import Optional
 from dataclasses import dataclass
+import time
+
+import paho.mqtt.client as mqtt
 
 from app.config import PrinterConfig
 
@@ -36,6 +40,11 @@ class PrinterFileTransferError(PrinterCommunicationError):
     pass
 
 
+class PrinterMQTTError(PrinterCommunicationError):
+    """Exception raised when MQTT communication fails."""
+    pass
+
+
 @dataclass
 class FTPUploadResult:
     """Result of an FTP upload operation."""
@@ -45,13 +54,26 @@ class FTPUploadResult:
     error_details: str = None
 
 
+@dataclass
+class MQTTResult:
+    """Result of an MQTT operation."""
+    success: bool
+    message: str
+    error_details: str = None
+
+
 class PrinterService:
-    """Service for communicating with Bambu Lab printers via FTP."""
+    """Service for communicating with Bambu Lab printers via FTP and MQTT."""
 
     # Default FTP settings for Bambu Lab printers
     DEFAULT_FTP_PORT = 21
     DEFAULT_FTP_TIMEOUT = 30
     DEFAULT_UPLOAD_PATH = "/upload"  # Common path for Bambu printers
+
+    # Default MQTT settings for Bambu Lab printers
+    DEFAULT_MQTT_PORT = 1883
+    DEFAULT_MQTT_TIMEOUT = 30
+    DEFAULT_MQTT_KEEPALIVE = 60
 
     def __init__(self, timeout: int = DEFAULT_FTP_TIMEOUT):
         """Initialize the printer service.
@@ -216,7 +238,169 @@ class PrinterService:
                     try:
                         ftp.close()
                     except Exception:
-                        pass  # Ignore errors during cleanup
+                        pass
+
+    def start_print(
+        self,
+        printer_config: PrinterConfig,
+        gcode_filename: str,
+        timeout: Optional[int] = None
+    ) -> MQTTResult:
+        """Send a start print command to the printer via MQTT.
+
+        Args:
+            printer_config: Configuration for the target printer
+            gcode_filename: Name of the G-code file to print (should be
+                uploaded already)
+            timeout: MQTT operation timeout in seconds (defaults to
+                DEFAULT_MQTT_TIMEOUT)
+
+        Returns:
+            MQTTResult: Result of the MQTT operation
+
+        Raises:
+            PrinterMQTTError: If MQTT operation fails
+        """
+        if timeout is None:
+            timeout = self.DEFAULT_MQTT_TIMEOUT
+
+        logger.info(f"Starting print on printer {printer_config.name} "
+                    f"({printer_config.ip}): {gcode_filename}")
+
+        connection_error = None
+        publish_error = None
+        connection_successful = False
+
+        try:
+            # Create MQTT client
+            client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+
+            def on_connect(client, userdata, flags, reason_code, properties):
+                nonlocal connection_successful, connection_error
+                if reason_code == 0:
+                    connection_successful = True
+                    logger.debug(
+                        f"MQTT connected to printer {printer_config.ip}")
+                else:
+                    connection_error = (
+                        f"MQTT connection failed with reason code: "
+                        f"{reason_code}")
+                    logger.error(connection_error)
+
+            def on_publish(client, userdata, mid, reason_code, properties):
+                nonlocal publish_error
+                if reason_code != 0:
+                    publish_error = (
+                        f"MQTT publish failed with reason code: "
+                        f"{reason_code}")
+                    logger.error(publish_error)
+                else:
+                    logger.debug("MQTT message published successfully")
+
+            def on_disconnect(client, userdata, flags, reason_code,
+                              properties):
+                logger.debug(
+                    f"MQTT disconnected from printer {printer_config.ip}")
+
+            # Set up MQTT callbacks
+            client.on_connect = on_connect
+            client.on_publish = on_publish
+            client.on_disconnect = on_disconnect
+            # Set authentication if access code is provided
+            if printer_config.access_code:
+                # Bambu Lab printers typically use "bblp" as username and
+                # access code as password
+                client.username_pw_set("bblp", printer_config.access_code)
+
+            # Connect to MQTT broker
+            logger.debug(
+                f"Connecting to MQTT broker at "
+                f"{printer_config.ip}:{self.DEFAULT_MQTT_PORT}")
+            client.connect(printer_config.ip, self.DEFAULT_MQTT_PORT,
+                           self.DEFAULT_MQTT_KEEPALIVE)
+
+            # Wait for connection
+            start_time = time.time()
+            client.loop_start()
+
+            while not connection_successful and connection_error is None:
+                if time.time() - start_time > timeout:
+                    raise PrinterMQTTError(
+                        f"MQTT connection timeout after {timeout} seconds"
+                    )
+                time.sleep(0.1)
+
+            if connection_error:
+                raise PrinterMQTTError(connection_error)
+
+            # Prepare the print command message
+            # Bambu Lab MQTT topic format: device/{serial}/request
+            # For LAN mode, we can use a generic device ID or the printer IP
+            device_topic = (
+                f"device/{printer_config.ip.replace('.', '_')}/request")
+
+            # Bambu Lab print command JSON structure
+            print_command = {
+                "print": {
+                    "command": "project_file",
+                    "param": gcode_filename,
+                    "subtask_name": "",
+                    "task_id": "",
+                    "project_id": "0"
+                }
+            }
+
+            message = json.dumps(print_command)
+            logger.debug(
+                f"Publishing MQTT message to topic {device_topic}: {message}")
+
+            # Publish the message
+            msg_info = client.publish(device_topic, message, qos=1)
+
+            # Wait for publish to complete
+            start_time = time.time()
+            while not msg_info.is_published() and publish_error is None:
+                if time.time() - start_time > timeout:
+                    raise PrinterMQTTError(
+                        f"MQTT publish timeout after {timeout} seconds"
+                    )
+                time.sleep(0.1)
+
+            if publish_error:
+                raise PrinterMQTTError(publish_error)
+
+            logger.info(
+                f"Successfully sent print command to printer "
+                f"{printer_config.name}")
+
+            return MQTTResult(
+                success=True,
+                message=(
+                    f"Print command sent successfully to "
+                    f"{printer_config.name}")
+            )
+
+        except PrinterMQTTError:
+            # Re-raise our custom MQTT errors
+            raise
+
+        except Exception as e:
+            error_msg = f"Unexpected error during MQTT operation: {str(e)}"
+            logger.error(f"MQTT operation failed for {printer_config.name}: "
+                         f"{error_msg}")
+            raise PrinterMQTTError(error_msg)
+
+        finally:
+            # Always disconnect the MQTT client if it was created
+            try:
+                if 'client' in locals():
+                    client.loop_stop()
+                    client.disconnect()
+                    logger.debug(
+                        f"MQTT client disconnected from "
+                        f"{printer_config.ip}")
+            except Exception as e:
+                logger.debug(f"Error during MQTT cleanup: {e}")
 
     def test_connection(self, printer_config: PrinterConfig) -> bool:
         """Test FTP connection to a printer without uploading.

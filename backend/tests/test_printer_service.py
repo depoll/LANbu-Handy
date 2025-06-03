@@ -14,7 +14,8 @@ import ftplib
 
 from app.printer_service import (
     PrinterService, PrinterCommunicationError, PrinterConnectionError,
-    PrinterAuthenticationError, PrinterFileTransferError, FTPUploadResult
+    PrinterAuthenticationError, PrinterFileTransferError, PrinterMQTTError,
+    FTPUploadResult, MQTTResult
 )
 from app.config import PrinterConfig
 
@@ -27,10 +28,12 @@ class TestPrinterServiceExceptions:
         connection_error = PrinterConnectionError("test")
         auth_error = PrinterAuthenticationError("test")
         transfer_error = PrinterFileTransferError("test")
+        mqtt_error = PrinterMQTTError("test")
 
         assert isinstance(connection_error, PrinterCommunicationError)
         assert isinstance(auth_error, PrinterCommunicationError)
         assert isinstance(transfer_error, PrinterCommunicationError)
+        assert isinstance(mqtt_error, PrinterCommunicationError)
 
 
 class TestFTPUploadResult:
@@ -60,6 +63,33 @@ class TestFTPUploadResult:
         assert result.success is False
         assert result.message == "Upload failed"
         assert result.remote_path is None
+        assert result.error_details == "Connection timeout"
+
+
+class TestMQTTResult:
+    """Test MQTT result dataclass."""
+
+    def test_mqtt_result_success(self):
+        """Test successful MQTT result."""
+        result = MQTTResult(
+            success=True,
+            message="Print command sent successfully"
+        )
+
+        assert result.success is True
+        assert result.message == "Print command sent successfully"
+        assert result.error_details is None
+
+    def test_mqtt_result_failure(self):
+        """Test failed MQTT result."""
+        result = MQTTResult(
+            success=False,
+            message="MQTT operation failed",
+            error_details="Connection timeout"
+        )
+
+        assert result.success is False
+        assert result.message == "MQTT operation failed"
         assert result.error_details == "Connection timeout"
 
 
@@ -676,3 +706,283 @@ M84 ; disable steppers
         # Verify it's the right exception type
         assert isinstance(exc_info.value, PrinterFileTransferError)
         assert isinstance(exc_info.value, PrinterCommunicationError)
+
+
+class TestStartPrint:
+    """Test MQTT print initiation functionality."""
+
+    @pytest.fixture
+    def printer_service(self):
+        """Create a printer service instance for testing."""
+        return PrinterService(timeout=10)
+
+    @pytest.fixture
+    def test_printer_config(self):
+        """Create a test printer configuration."""
+        return PrinterConfig(
+            name="Test Printer",
+            ip="192.168.1.100",
+            access_code="test123"
+        )
+
+    @patch('paho.mqtt.client.Client')
+    def test_start_print_successful(self, mock_mqtt_client_class,
+                                    printer_service, test_printer_config):
+        """Test successful print start command."""
+        # Mock MQTT client
+        mock_client = Mock()
+        mock_mqtt_client_class.return_value = mock_client
+
+        # Mock successful connection
+        mock_client.connect = Mock()
+
+        # Mock successful publish
+        mock_msg_info = Mock()
+        mock_msg_info.is_published.return_value = True
+        mock_client.publish.return_value = mock_msg_info
+
+        # Simulate the connection workflow
+        def simulate_connection(*args, **kwargs):
+            # Call the on_connect callback to simulate successful connection
+            if hasattr(mock_client, 'on_connect'):
+                mock_client.on_connect(mock_client, None, None, 0, None)
+
+        mock_client.loop_start.side_effect = simulate_connection
+
+        result = printer_service.start_print(
+            test_printer_config, "test_model.gcode")
+
+        assert result.success is True
+        assert "Print command sent successfully" in result.message
+        assert result.error_details is None
+
+        # Verify MQTT client was used correctly
+        mock_client.username_pw_set.assert_called_once_with(
+            "bblp", test_printer_config.access_code)
+        mock_client.connect.assert_called_once()
+        mock_client.loop_start.assert_called_once()
+        mock_client.publish.assert_called_once()
+        mock_client.loop_stop.assert_called_once()
+        mock_client.disconnect.assert_called_once()
+
+        # Check the published message
+        publish_call = mock_client.publish.call_args
+        topic = publish_call[0][0]
+        message = publish_call[0][1]
+
+        assert topic == (
+            f"device/{test_printer_config.ip.replace('.', '_')}/request")
+        assert "test_model.gcode" in message
+        assert "project_file" in message
+
+    @patch('paho.mqtt.client.Client')
+    def test_start_print_connection_failure(self, mock_mqtt_client_class,
+                                            printer_service,
+                                            test_printer_config):
+        """Test print start command with connection failure."""
+        # Mock MQTT client
+        mock_client = Mock()
+        mock_mqtt_client_class.return_value = mock_client
+
+        # Mock connection failure
+        def simulate_connection_failure(*args, **kwargs):
+            # Call the on_connect callback to simulate connection failure
+            if hasattr(mock_client, 'on_connect'):
+                mock_client.on_connect(mock_client, None, None, 1, None)
+
+        mock_client.loop_start.side_effect = simulate_connection_failure
+
+        with pytest.raises(PrinterMQTTError) as exc_info:
+            printer_service.start_print(test_printer_config,
+                                        "test_model.gcode")
+
+        assert ("MQTT connection failed with reason code: 1"
+                in str(exc_info.value))
+
+    @patch('paho.mqtt.client.Client')
+    def test_start_print_publish_failure(self, mock_mqtt_client_class,
+                                         printer_service, test_printer_config):
+        """Test print start command with publish failure."""
+        # Mock MQTT client
+        mock_client = Mock()
+        mock_mqtt_client_class.return_value = mock_client
+
+        # Mock successful connection but publish failure
+        def simulate_connection(*args, **kwargs):
+            if hasattr(mock_client, 'on_connect'):
+                mock_client.on_connect(mock_client, None, None, 0, None)
+
+        mock_client.loop_start.side_effect = simulate_connection
+
+        # Mock publish that calls on_publish with error code
+        def mock_publish(topic, payload, qos):
+            if hasattr(mock_client, 'on_publish'):
+                mock_client.on_publish(mock_client, None, None, 1, None)
+            mock_msg_info = Mock()
+            mock_msg_info.is_published.return_value = False
+            return mock_msg_info
+
+        mock_client.publish.side_effect = mock_publish
+
+        with pytest.raises(PrinterMQTTError) as exc_info:
+            printer_service.start_print(test_printer_config,
+                                        "test_model.gcode")
+
+        assert ("MQTT publish failed with reason code: 1"
+                in str(exc_info.value))
+
+    @patch('paho.mqtt.client.Client')
+    def test_start_print_timeout(self, mock_mqtt_client_class,
+                                 printer_service, test_printer_config):
+        """Test print start command with timeout."""
+        # Mock MQTT client
+        mock_client = Mock()
+        mock_mqtt_client_class.return_value = mock_client
+
+        # Mock connection that never completes (don't call on_connect)
+        mock_client.loop_start = Mock()  # Do nothing, simulating no connection
+
+        with pytest.raises(PrinterMQTTError) as exc_info:
+            printer_service.start_print(
+                test_printer_config, "test_model.gcode", timeout=1)
+
+        assert "MQTT connection timeout" in str(exc_info.value)
+
+    @patch('app.printer_service.mqtt.Client')
+    def test_start_print_unexpected_error(self, mock_mqtt_client_class,
+                                          printer_service,
+                                          test_printer_config):
+        """Test print start command with unexpected error."""
+        # Mock MQTT client to raise an exception during initialization
+        mock_mqtt_client_class.side_effect = Exception("Unexpected error")
+
+        with pytest.raises(PrinterMQTTError) as exc_info:
+            printer_service.start_print(test_printer_config,
+                                        "test_model.gcode")
+
+        assert ("Unexpected error during MQTT operation"
+                in str(exc_info.value))
+
+    @patch('paho.mqtt.client.Client')
+    def test_start_print_cleanup_on_error(self, mock_mqtt_client_class,
+                                          printer_service,
+                                          test_printer_config):
+        """Test that MQTT client is cleaned up even when error occurs."""
+        # Mock MQTT client
+        mock_client = Mock()
+        mock_mqtt_client_class.return_value = mock_client
+
+        # Mock connection that raises an exception
+        mock_client.connect.side_effect = Exception("Connection error")
+
+        with pytest.raises(PrinterMQTTError):
+            printer_service.start_print(test_printer_config,
+                                        "test_model.gcode")
+
+        # Verify cleanup was attempted
+        mock_client.loop_stop.assert_called_once()
+        mock_client.disconnect.assert_called_once()
+
+
+class TestMQTTIntegration:
+    """Integration tests for MQTT functionality."""
+
+    @pytest.fixture
+    def printer_service(self):
+        """Create a printer service instance for testing."""
+        return PrinterService(timeout=10)
+
+    @pytest.fixture
+    def test_printer_config(self):
+        """Create a test printer configuration."""
+        return PrinterConfig(
+            name="Test Printer",
+            ip="192.168.1.100",
+            access_code="test123"
+        )
+
+    @patch('paho.mqtt.client.Client')
+    def test_mqtt_print_initiation_workflow(self, mock_mqtt_client_class,
+                                            printer_service,
+                                            test_printer_config):
+        """Test complete MQTT print initiation workflow."""
+        # Mock MQTT client
+        mock_client = Mock()
+        mock_mqtt_client_class.return_value = mock_client
+
+        # Track the sequence of calls
+        call_sequence = []
+
+        def track_call(name):
+            def wrapper(*args, **kwargs):
+                call_sequence.append(name)
+                if name == 'loop_start':
+                    # Simulate successful connection
+                    mock_client.on_connect(mock_client, None, None, 0, None)
+                elif name == 'publish':
+                    # Simulate successful publish
+                    mock_msg_info = Mock()
+                    mock_msg_info.is_published.return_value = True
+                    return mock_msg_info
+            return wrapper
+
+        # Set up method tracking
+        mock_client.username_pw_set.side_effect = track_call('username_pw_set')
+        mock_client.connect.side_effect = track_call('connect')
+        mock_client.loop_start.side_effect = track_call('loop_start')
+        mock_client.publish.side_effect = track_call('publish')
+        mock_client.loop_stop.side_effect = track_call('loop_stop')
+        mock_client.disconnect.side_effect = track_call('disconnect')
+
+        # Execute the print start command
+        result = printer_service.start_print(
+            test_printer_config, "test_model.gcode")
+
+        # Verify the result
+        assert result.success is True
+        assert "Print command sent successfully" in result.message
+
+        # Verify the correct sequence of MQTT operations
+        expected_sequence = [
+            'username_pw_set',
+            'connect',
+            'loop_start',
+            'publish',
+            'loop_stop',
+            'disconnect'
+        ]
+        assert call_sequence == expected_sequence
+
+        # Verify MQTT message content
+        publish_call = mock_client.publish.call_args
+        args = publish_call[0]
+        kwargs = publish_call[1] if publish_call[1] else {}
+
+        topic = args[0]
+        message = args[1]
+        qos = kwargs.get('qos', 0)
+
+        # Check topic format
+        expected_topic = (
+            f"device/{test_printer_config.ip.replace('.', '_')}/request")
+        assert topic == expected_topic
+
+        # Check message content
+        import json
+        parsed_message = json.loads(message)
+        assert "print" in parsed_message
+        assert parsed_message["print"]["command"] == "project_file"
+        assert parsed_message["print"]["param"] == "test_model.gcode"
+
+        # Check QoS level
+        assert qos == 1
+
+    def test_mqtt_service_constants(self, printer_service):
+        """Test that MQTT constants are properly defined."""
+        assert hasattr(printer_service, 'DEFAULT_MQTT_PORT')
+        assert hasattr(printer_service, 'DEFAULT_MQTT_TIMEOUT')
+        assert hasattr(printer_service, 'DEFAULT_MQTT_KEEPALIVE')
+
+        assert printer_service.DEFAULT_MQTT_PORT == 1883
+        assert printer_service.DEFAULT_MQTT_TIMEOUT == 30
+        assert printer_service.DEFAULT_MQTT_KEEPALIVE == 60
