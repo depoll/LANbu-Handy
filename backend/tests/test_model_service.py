@@ -9,7 +9,6 @@ from unittest.mock import AsyncMock, Mock, patch
 import httpx
 import pytest
 from app.model_service import (
-    FilamentRequirement,
     ModelDownloadError,
     ModelService,
     ModelValidationError,
@@ -172,10 +171,12 @@ class TestModelService:
         # Test with real .3mf files if they exist
         test_files = [
             Path(
-                "/home/runner/work/LANbu-Handy/LANbu-Handy/test_files/multicolor-test-coin.3mf"
+                "/home/runner/work/LANbu-Handy/LANbu-Handy/"
+                + "test_files/multicolor-test-coin.3mf"
             ),
             Path(
-                "/home/runner/work/LANbu-Handy/LANbu-Handy/test_files/Original3DBenchy3Dprintconceptsnormel.3mf"
+                "/home/runner/work/LANbu-Handy/LANbu-Handy/"
+                + "test_files/Original3DBenchy3Dprintconceptsnormel.3mf"
             ),
         ]
 

@@ -5,7 +5,6 @@ import tempfile
 import zipfile
 from pathlib import Path
 
-import pytest
 from app.model_service import FilamentRequirement, ModelService
 
 
@@ -256,7 +255,8 @@ class TestParse3MFFilamentRequirements:
 
         # Test multicolor coin file
         multicolor_file = Path(
-            "/home/runner/work/LANbu-Handy/LANbu-Handy/test_files/multicolor-test-coin.3mf"
+            "/home/runner/work/LANbu-Handy/LANbu-Handy/"
+            + "test_files/multicolor-test-coin.3mf"
         )
         if multicolor_file.exists():
             result = service.parse_3mf_filament_requirements(multicolor_file)
@@ -267,7 +267,8 @@ class TestParse3MFFilamentRequirements:
 
         # Test single color benchy file
         benchy_file = Path(
-            "/home/runner/work/LANbu-Handy/LANbu-Handy/test_files/Original3DBenchy3Dprintconceptsnormel.3mf"
+            "/home/runner/work/LANbu-Handy/LANbu-Handy/"
+            + "test_files/Original3DBenchy3Dprintconceptsnormel.3mf"
         )
         if benchy_file.exists():
             result = service.parse_3mf_filament_requirements(benchy_file)

@@ -11,7 +11,6 @@ from typing import List, Optional
 
 from app.config import config
 from app.model_service import (
-    FilamentRequirement,
     ModelDownloadError,
     ModelService,
     ModelValidationError,
