@@ -14,7 +14,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from app.model_service import (ModelService, ModelValidationError,
-                               ModelDownloadError)
+                               ModelDownloadError, FilamentRequirement)
 from app.slicer_service import slice_model
 from app.printer_service import (PrinterService, PrinterCommunicationError,
                                  PrinterMQTTError)
@@ -116,11 +116,19 @@ class ModelURLRequest(BaseModel):
     model_url: str
 
 
+class FilamentRequirementResponse(BaseModel):
+    filament_count: int
+    filament_types: List[str]
+    filament_colors: List[str]
+    has_multicolor: bool
+
+
 class ModelSubmissionResponse(BaseModel):
     success: bool
     message: str
     file_id: str = None
     file_info: dict = None
+    filament_requirements: Optional[FilamentRequirementResponse] = None
 
 
 class SliceRequest(BaseModel):
@@ -188,6 +196,21 @@ async def submit_model_url(request: ModelURLRequest):
         # Get file information
         file_info = model_service.get_file_info(file_path)
 
+        # Parse filament requirements if it's a .3mf file
+        filament_requirements = model_service.parse_3mf_filament_requirements(
+            file_path
+        )
+        
+        # Convert to response model if requirements were found
+        filament_requirements_response = None
+        if filament_requirements:
+            filament_requirements_response = FilamentRequirementResponse(
+                filament_count=filament_requirements.filament_count,
+                filament_types=filament_requirements.filament_types,
+                filament_colors=filament_requirements.filament_colors,
+                has_multicolor=filament_requirements.has_multicolor
+            )
+
         # Generate file ID (using the filename without UUID prefix
         # for user display)
         file_id = file_path.name
@@ -196,7 +219,8 @@ async def submit_model_url(request: ModelURLRequest):
             success=True,
             message="Model downloaded and validated successfully",
             file_id=file_id,
-            file_info=file_info
+            file_info=file_info,
+            filament_requirements=filament_requirements_response
         )
 
     except ModelValidationError as e:

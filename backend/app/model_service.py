@@ -5,8 +5,12 @@ This module provides functionality for downloading 3D model files from URLs,
 validating them, and storing them temporarily for processing.
 """
 
+import json
 import tempfile
+import zipfile
+from dataclasses import dataclass
 from pathlib import Path
+from typing import List, Optional
 from urllib.parse import urlparse
 
 import httpx
@@ -20,6 +24,19 @@ class ModelValidationError(Exception):
 class ModelDownloadError(Exception):
     """Exception raised when model download fails."""
     pass
+
+
+@dataclass
+class FilamentRequirement:
+    """Information about filament requirements for a 3D model."""
+    filament_count: int
+    filament_types: List[str]
+    filament_colors: List[str]
+    has_multicolor: bool = False
+    
+    def __post_init__(self):
+        """Ensure consistency in the data."""
+        self.has_multicolor = self.filament_count > 1
 
 
 class ModelService:
@@ -250,3 +267,74 @@ class ModelService:
             }
         except OSError:
             return {}
+
+    def parse_3mf_filament_requirements(
+        self, 
+        file_path: Path
+    ) -> Optional[FilamentRequirement]:
+        """
+        Parse filament requirements from a .3mf file.
+
+        Args:
+            file_path: Path to the .3mf file
+
+        Returns:
+            FilamentRequirement object with extracted filament info, 
+            or None if parsing fails or file is not .3mf
+        """
+        # Only process .3mf files
+        if file_path.suffix.lower() != '.3mf':
+            return None
+
+        try:
+            with zipfile.ZipFile(file_path, 'r') as zip_file:
+                # Check if project_settings.config exists
+                config_path = 'Metadata/project_settings.config'
+                if config_path not in zip_file.namelist():
+                    # No project settings found, can't determine requirements
+                    return None
+
+                # Read and parse the project settings JSON
+                with zip_file.open(config_path) as config_file:
+                    config_data = json.load(config_file)
+
+                # Extract filament information
+                filament_types = config_data.get('filament_type', [])
+                filament_colors = config_data.get('filament_colour', [])
+
+                # Filter out empty/unknown types and colors
+                valid_types = [
+                    ftype for ftype in filament_types 
+                    if ftype and ftype.strip() and ftype.lower() != 'unknown'
+                ]
+                valid_colors = [
+                    color for color in filament_colors 
+                    if color and color.strip()
+                ]
+
+                # Ensure we have at least some filament types
+                if not valid_types:
+                    valid_types = ['PLA']  # Default assumption
+
+                # The filament count is based on the number of valid types
+                # If there are more colors than types, we still use types count
+                # If there are fewer colors, we pad with defaults
+                filament_count = len(valid_types)
+
+                # Ensure colors list is same length as types
+                while len(valid_colors) < filament_count:
+                    valid_colors.append('#000000')  # Default to black
+
+                return FilamentRequirement(
+                    filament_count=filament_count,
+                    filament_types=valid_types,
+                    filament_colors=valid_colors[:filament_count]
+                )
+
+        except (zipfile.BadZipFile, json.JSONDecodeError, KeyError, OSError):
+            # If there's any error in parsing, return None
+            # This includes corrupted zip files, invalid JSON, missing keys, etc.
+            return None
+        except Exception:
+            # Catch any other unexpected errors
+            return None
