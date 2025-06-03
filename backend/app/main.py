@@ -5,26 +5,33 @@ FastAPI application for LANbu Handy - a self-hosted PWA for slicing and
 printing 3D models to Bambu Lab printers in LAN-only mode.
 """
 
-from pathlib import Path
 import tempfile
+from pathlib import Path
 from typing import List, Optional
-from fastapi import FastAPI, HTTPException
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
-from pydantic import BaseModel
 
-from app.model_service import (ModelService, ModelValidationError,
-                               ModelDownloadError, FilamentRequirement)
-from app.slicer_service import slice_model
-from app.printer_service import (PrinterService, PrinterCommunicationError,
-                                 PrinterMQTTError)
 from app.config import config
+from app.model_service import (
+    FilamentRequirement,
+    ModelDownloadError,
+    ModelService,
+    ModelValidationError,
+)
+from app.printer_service import (
+    PrinterCommunicationError,
+    PrinterMQTTError,
+    PrinterService,
+)
+from app.slicer_service import slice_model
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 
 app = FastAPI(
     title="LANbu Handy",
     description="Self-hosted PWA for slicing and printing 3D models to "
-                "Bambu Lab printers in LAN-only mode",
-    version="0.1.0"
+    "Bambu Lab printers in LAN-only mode",
+    version="0.1.0",
 )
 
 # Initialize model service
@@ -40,13 +47,15 @@ printer_service = PrinterService()
 DOCKER_STATIC_PWA_DIR = Path("/app/static_pwa")
 LOCAL_STATIC_PWA_DIR = Path(__file__).parent.parent / "static_pwa"
 
-STATIC_PWA_DIR = (DOCKER_STATIC_PWA_DIR if DOCKER_STATIC_PWA_DIR.exists()
-                  else LOCAL_STATIC_PWA_DIR)
+STATIC_PWA_DIR = (
+    DOCKER_STATIC_PWA_DIR if DOCKER_STATIC_PWA_DIR.exists() else LOCAL_STATIC_PWA_DIR
+)
 
 # Mount static files for PWA assets (CSS, JS, etc.)
 if STATIC_PWA_DIR.exists():
-    app.mount("/assets", StaticFiles(directory=STATIC_PWA_DIR / "assets"),
-              name="assets")
+    app.mount(
+        "/assets", StaticFiles(directory=STATIC_PWA_DIR / "assets"), name="assets"
+    )
 
 
 @app.get("/")
@@ -59,8 +68,11 @@ async def serve_pwa():
         return FileResponse(index_path)
     else:
         # Fallback if PWA files are not available
-        return {"message": "LANbu Handy", "status": "PWA files not found",
-                "version": "0.1.0"}
+        return {
+            "message": "LANbu Handy",
+            "status": "PWA files not found",
+            "version": "0.1.0",
+        }
 
 
 @app.get("/api/health")
@@ -76,8 +88,7 @@ async def status():
     """
     Basic backend status endpoint.
     """
-    return {"status": "ok", "application_name": "LANbu Handy",
-            "version": "0.0.1"}
+    return {"status": "ok", "application_name": "LANbu Handy", "version": "0.0.1"}
 
 
 @app.get("/api/config")
@@ -94,20 +105,23 @@ async def get_config():
     printers_info = []
 
     for printer in printers:
-        printers_info.append({
-            "name": printer.name,
-            "ip": printer.ip,
-            # Don't expose access codes in API for security
-            "has_access_code": bool(printer.access_code)
-        })
+        printers_info.append(
+            {
+                "name": printer.name,
+                "ip": printer.ip,
+                # Don't expose access codes in API for security
+                "has_access_code": bool(printer.access_code),
+            }
+        )
 
     return {
         "printer_configured": config.is_printer_configured(),
         "printers": printers_info,
         "printer_count": len(printers),
         # Legacy fields for backward compatibility
-        "printer_ip": (config.get_printer_ip()
-                       if config.is_printer_configured() else None)
+        "printer_ip": (
+            config.get_printer_ip() if config.is_printer_configured() else None
+        ),
     }
 
 
@@ -255,12 +269,12 @@ async def slice_model_with_defaults(request: SliceRequest):
 
         if not model_file_path.exists():
             raise HTTPException(
-                status_code=404,
-                detail=f"Model file not found: {request.file_id}"
+                status_code=404, detail=f"Model file not found: {request.file_id}"
             )
 
         # Create output directory for G-code
         import tempfile
+
         output_dir = Path(tempfile.gettempdir()) / "lanbu-handy" / "gcode"
         output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -269,14 +283,12 @@ async def slice_model_with_defaults(request: SliceRequest):
             "profile": "pla",
             "layer-height": "0.2",
             "infill": "15",
-            "support": "auto"
+            "support": "auto",
         }
 
         # Slice the model
         result = slice_model(
-            input_path=model_file_path,
-            output_dir=output_dir,
-            options=default_options
+            input_path=model_file_path, output_dir=output_dir, options=default_options
         )
 
         if result.success:
@@ -292,16 +304,15 @@ async def slice_model_with_defaults(request: SliceRequest):
             return SliceResponse(
                 success=True,
                 message="Model sliced successfully with default settings",
-                gcode_path=gcode_path
+                gcode_path=gcode_path,
             )
         else:
             # Return slicing failure
-            error_details = (f"CLI Error: {result.stderr}"
-                             if result.stderr else result.stdout)
+            error_details = (
+                f"CLI Error: {result.stderr}" if result.stderr else result.stdout
+            )
             return SliceResponse(
-                success=False,
-                message="Slicing failed",
-                error_details=error_details
+                success=False, message="Slicing failed", error_details=error_details
             )
 
     except HTTPException:
@@ -336,7 +347,7 @@ async def start_basic_job(request: JobStartRequest):
         "download": {"success": False, "message": "", "details": ""},
         "slice": {"success": False, "message": "", "details": ""},
         "upload": {"success": False, "message": "", "details": ""},
-        "print": {"success": False, "message": "", "details": ""}
+        "print": {"success": False, "message": "", "details": ""},
     }
 
     try:
@@ -344,8 +355,7 @@ async def start_basic_job(request: JobStartRequest):
         if not config.is_printer_configured():
             raise HTTPException(
                 status_code=400,
-                detail="No printer configured. Please configure a printer "
-                       "first."
+                detail="No printer configured. Please configure a printer " "first.",
             )
 
         # Get the first configured printer
@@ -365,7 +375,7 @@ async def start_basic_job(request: JobStartRequest):
                 success=False,
                 message="Job failed at download step",
                 job_steps=job_steps,
-                error_details=str(e)
+                error_details=str(e),
             )
         except ModelDownloadError as e:
             job_steps["download"]["message"] = "Model download failed"
@@ -374,7 +384,7 @@ async def start_basic_job(request: JobStartRequest):
                 success=False,
                 message="Job failed at download step",
                 job_steps=job_steps,
-                error_details=str(e)
+                error_details=str(e),
             )
 
         # Step 2: Slice model
@@ -388,14 +398,12 @@ async def start_basic_job(request: JobStartRequest):
                 "profile": "pla",
                 "layer-height": "0.2",
                 "infill": "15",
-                "support": "auto"
+                "support": "auto",
             }
 
             # Slice the model
             result = slice_model(
-                input_path=file_path,
-                output_dir=output_dir,
-                options=default_options
+                input_path=file_path, output_dir=output_dir, options=default_options
             )
 
             if result.success:
@@ -405,31 +413,28 @@ async def start_basic_job(request: JobStartRequest):
                     gcode_path = gcode_files[0]
                     job_steps["slice"]["success"] = True
                     job_steps["slice"]["message"] = "Model sliced successfully"
-                    job_steps["slice"]["details"] = (
-                        f"G-code: {gcode_path.name}"
-                    )
+                    job_steps["slice"]["details"] = f"G-code: {gcode_path.name}"
                 else:
                     job_steps["slice"]["message"] = "No G-code file generated"
-                    job_steps["slice"]["details"] = (
-                        "Slicing completed but no output found"
-                    )
+                    job_steps["slice"][
+                        "details"
+                    ] = "Slicing completed but no output found"
                     return JobStartResponse(
                         success=False,
                         message="Job failed at slicing step",
                         job_steps=job_steps,
-                        error_details="No G-code file generated"
+                        error_details="No G-code file generated",
                     )
             else:
                 job_steps["slice"]["message"] = "Slicing failed"
                 job_steps["slice"]["details"] = (
-                    f"CLI Error: {result.stderr}"
-                    if result.stderr else result.stdout
+                    f"CLI Error: {result.stderr}" if result.stderr else result.stdout
                 )
                 return JobStartResponse(
                     success=False,
                     message="Job failed at slicing step",
                     job_steps=job_steps,
-                    error_details=job_steps["slice"]["details"]
+                    error_details=job_steps["slice"]["details"],
                 )
         except Exception as e:
             job_steps["slice"]["message"] = "Slicing error"
@@ -438,22 +443,21 @@ async def start_basic_job(request: JobStartRequest):
                 success=False,
                 message="Job failed at slicing step",
                 job_steps=job_steps,
-                error_details=str(e)
+                error_details=str(e),
             )
 
         # Step 3: Upload G-code to printer
         try:
             upload_result = printer_service.upload_gcode(
-                printer_config=printer_config,
-                gcode_file_path=gcode_path
+                printer_config=printer_config, gcode_file_path=gcode_path
             )
 
             if upload_result.success:
                 job_steps["upload"]["success"] = True
                 job_steps["upload"]["message"] = upload_result.message
-                job_steps["upload"]["details"] = (
-                    f"Remote path: {upload_result.remote_path}"
-                )
+                job_steps["upload"][
+                    "details"
+                ] = f"Remote path: {upload_result.remote_path}"
                 gcode_filename = gcode_path.name
             else:
                 job_steps["upload"]["message"] = "G-code upload failed"
@@ -464,7 +468,7 @@ async def start_basic_job(request: JobStartRequest):
                     success=False,
                     message="Job failed at upload step",
                     job_steps=job_steps,
-                    error_details=job_steps["upload"]["details"]
+                    error_details=job_steps["upload"]["details"],
                 )
         except PrinterCommunicationError as e:
             job_steps["upload"]["message"] = "Printer communication error"
@@ -473,7 +477,7 @@ async def start_basic_job(request: JobStartRequest):
                 success=False,
                 message="Job failed at upload step",
                 job_steps=job_steps,
-                error_details=str(e)
+                error_details=str(e),
             )
         except Exception as e:
             job_steps["upload"]["message"] = "Upload error"
@@ -482,27 +486,24 @@ async def start_basic_job(request: JobStartRequest):
                 success=False,
                 message="Job failed at upload step",
                 job_steps=job_steps,
-                error_details=str(e)
+                error_details=str(e),
             )
 
         # Step 4: Start print
         try:
             print_result = printer_service.start_print(
-                printer_config=printer_config,
-                gcode_filename=gcode_filename
+                printer_config=printer_config, gcode_filename=gcode_filename
             )
 
             if print_result.success:
                 job_steps["print"]["success"] = True
                 job_steps["print"]["message"] = print_result.message
-                job_steps["print"]["details"] = (
-                    f"Print started for: {gcode_filename}"
-                )
+                job_steps["print"]["details"] = f"Print started for: {gcode_filename}"
 
                 return JobStartResponse(
                     success=True,
                     message="Job completed successfully - print started",
-                    job_steps=job_steps
+                    job_steps=job_steps,
                 )
             else:
                 job_steps["print"]["message"] = "Print start failed"
@@ -513,7 +514,7 @@ async def start_basic_job(request: JobStartRequest):
                     success=False,
                     message="Job failed at print initiation step",
                     job_steps=job_steps,
-                    error_details=job_steps["print"]["details"]
+                    error_details=job_steps["print"]["details"],
                 )
         except PrinterMQTTError as e:
             job_steps["print"]["message"] = "MQTT communication error"
@@ -522,7 +523,7 @@ async def start_basic_job(request: JobStartRequest):
                 success=False,
                 message="Job failed at print initiation step",
                 job_steps=job_steps,
-                error_details=str(e)
+                error_details=str(e),
             )
         except Exception as e:
             job_steps["print"]["message"] = "Print start error"
@@ -531,7 +532,7 @@ async def start_basic_job(request: JobStartRequest):
                 success=False,
                 message="Job failed at print initiation step",
                 job_steps=job_steps,
-                error_details=str(e)
+                error_details=str(e),
             )
 
     except HTTPException:
@@ -542,8 +543,7 @@ async def start_basic_job(request: JobStartRequest):
         raise HTTPException(status_code=500, detail=msg)
 
 
-@app.get("/api/printer/{printer_id}/ams-status",
-         response_model=AMSStatusResponse)
+@app.get("/api/printer/{printer_id}/ams-status", response_model=AMSStatusResponse)
 async def get_ams_status(printer_id: str):
     """
     Query the printer's AMS status.
@@ -565,8 +565,7 @@ async def get_ams_status(printer_id: str):
         if not config.is_printer_configured():
             raise HTTPException(
                 status_code=400,
-                detail="No printers configured. "
-                       "Please configure a printer first."
+                detail="No printers configured. " "Please configure a printer first.",
             )
 
         # Find the printer by ID/name
@@ -584,7 +583,7 @@ async def get_ams_status(printer_id: str):
             raise HTTPException(
                 status_code=404,
                 detail=f"Printer '{printer_id}' not found. "
-                       f"Available printers: {available_printers}"
+                f"Available printers: {available_printers}",
             )
 
         # Query AMS status
@@ -602,40 +601,37 @@ async def get_ams_status(printer_id: str):
                                 slot_id=filament.slot_id,
                                 filament_type=filament.filament_type,
                                 color=filament.color,
-                                material_id=filament.material_id
+                                material_id=filament.material_id,
                             )
                             filaments_response.append(filament_response)
 
                         unit_response = AMSUnitResponse(
-                            unit_id=ams_unit.unit_id,
-                            filaments=filaments_response
+                            unit_id=ams_unit.unit_id, filaments=filaments_response
                         )
                         ams_units_response.append(unit_response)
 
                 return AMSStatusResponse(
                     success=True,
                     message=ams_result.message,
-                    ams_units=ams_units_response
+                    ams_units=ams_units_response,
                 )
             else:
                 # Query failed
                 return AMSStatusResponse(
                     success=False,
                     message=ams_result.message,
-                    error_details=ams_result.error_details
+                    error_details=ams_result.error_details,
                 )
 
         except PrinterMQTTError as e:
             return AMSStatusResponse(
-                success=False,
-                message="MQTT communication error",
-                error_details=str(e)
+                success=False, message="MQTT communication error", error_details=str(e)
             )
         except PrinterCommunicationError as e:
             return AMSStatusResponse(
                 success=False,
                 message="Printer communication error",
-                error_details=str(e)
+                error_details=str(e),
             )
 
     except HTTPException:

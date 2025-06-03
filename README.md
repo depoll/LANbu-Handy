@@ -128,6 +128,67 @@ For development setup and contribution guidelines, see:
 - **Backend Development**: See backend tests and FastAPI application structure
 - **Frontend Development**: See the [PWA README](pwa/README.md) for React development workflow
 
+### Code Formatting and Linting
+
+LANbu Handy uses automated code formatting to maintain consistent code style across the project:
+
+#### Python (Backend)
+- **Black**: Code formatter with 88-character line length
+- **isort**: Import sorting compatible with Black
+- **flake8**: Linting with Black-compatible rules
+
+#### JavaScript/TypeScript (PWA)
+- **Prettier**: Code formatter for JS/TS/CSS/HTML/JSON/Markdown
+- **ESLint**: Linting for TypeScript and React
+
+#### Setup for Development
+
+**DevContainer Users (Automatic Setup)**:
+If you're using the devcontainer (VS Code or GitHub Codespaces), pre-commit hooks are **automatically configured** when the container starts. No manual setup required!
+
+**Local Development Setup**:
+
+1. **Quick setup** (one command):
+   ```bash
+   # Automated setup script
+   ./scripts/setup-dev-environment.sh
+   ```
+
+2. **Manual setup**:
+   ```bash
+   # Install dependencies
+   cd backend && pip install -r requirements.txt
+   cd pwa && npm install
+   
+   # Install pre-commit hooks
+   pip install pre-commit
+   pre-commit install
+   ```
+
+3. **Manual formatting** (if not using pre-commit):
+   ```bash
+   # Format Python code
+   python -m black backend/
+   python -m isort --profile black backend/
+   
+   # Format PWA code
+   cd pwa && npm run format
+   ```
+
+4. **Check formatting**:
+   ```bash
+   # Python
+   python -m black --check backend/
+   python -m isort --profile black --check-only backend/
+   python -m flake8 backend/
+   
+   # PWA
+   cd pwa && npm run format:check
+   cd pwa && npm run lint
+   ```
+
+The pre-commit hooks will automatically format your code before each commit, reducing linting errors and maintaining consistent style. All formatting checks are also run in CI.
+
 ### Running Tests
 
 ```bash
