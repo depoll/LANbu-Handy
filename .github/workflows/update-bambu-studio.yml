@@ -16,6 +16,9 @@ on:
     - cron: '0 * * * *'
   workflow_dispatch: # Allow manual trigger for testing
 
+permissions:
+  contents: write
+
 jobs:
   check-for-updates:
     runs-on: ubuntu-latest
@@ -40,13 +43,44 @@ jobs:
     - name: Get latest Bambu Studio release
       id: latest-version
       run: |
-        # Get the latest release version from GitHub API
+        # Get the latest release version from GitHub API with retry logic
         echo "Fetching latest Bambu Studio release..."
-        latest_version=$(curl -s --max-time 30 "https://api.github.com/repos/bambulab/BambuStudio/releases/latest" | grep '"tag_name"' | cut -d'"' -f4)
+        
+        latest_version=""
+        max_attempts=5
+        attempt=1
+        
+        while [ $attempt -le $max_attempts ] && [ -z "$latest_version" ]; do
+          echo "Attempt $attempt of $max_attempts..."
+          
+          # Try to fetch the latest release
+          api_response=$(curl -s --max-time 30 "https://api.github.com/repos/bambulab/BambuStudio/releases/latest" 2>/dev/null)
+          
+          if [ $? -eq 0 ] && [ -n "$api_response" ]; then
+            latest_version=$(echo "$api_response" | grep '"tag_name"' | cut -d'"' -f4)
+            
+            if [ -n "$latest_version" ]; then
+              echo "✅ Successfully fetched latest version: $latest_version"
+              break
+            else
+              echo "⚠️ API response received but could not parse tag_name"
+            fi
+          else
+            echo "⚠️ Failed to get API response (curl error or timeout)"
+          fi
+          
+          if [ $attempt -lt $max_attempts ]; then
+            sleep_time=$((attempt * 2))  # Exponential backoff: 2, 4, 6, 8 seconds
+            echo "Waiting ${sleep_time} seconds before retry..."
+            sleep $sleep_time
+          fi
+          
+          attempt=$((attempt + 1))
+        done
         
         if [ -z "$latest_version" ]; then
-          echo "Error: Could not fetch latest version from GitHub API"
-          echo "This may be due to network issues or API rate limits"
+          echo "❌ Error: Could not fetch latest version from GitHub API after $max_attempts attempts"
+          echo "This may be due to network issues, API rate limits, or service unavailability"
           exit 1
         fi
         
