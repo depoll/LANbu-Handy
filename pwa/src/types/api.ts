@@ -37,3 +37,23 @@ export interface ModelSubmissionResponse {
   file_info?: Record<string, unknown>;
   filament_requirements?: FilamentRequirement;
 }
+
+// Filament Mapping and Configuration Types
+export interface FilamentMapping {
+  filament_index: number; // Index in the model's filament requirements
+  ams_unit_id: number;
+  ams_slot_id: number;
+}
+
+export interface ConfiguredSliceRequest {
+  file_id: string;
+  filament_mappings: FilamentMapping[];
+  build_plate_type: string;
+}
+
+export interface SliceResponse {
+  success: boolean;
+  message: string;
+  gcode_path?: string;
+  error_details?: string;
+}
