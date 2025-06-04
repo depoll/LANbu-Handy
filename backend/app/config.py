@@ -185,7 +185,9 @@ class Config:
             return self.runtime_active_printer
         return self.printers[0] if self.printers else None
 
-    def set_active_printer(self, ip: str, access_code: str = "", name: str = None) -> PrinterConfig:
+    def set_active_printer(
+        self, ip: str, access_code: str = "", name: str = None
+    ) -> PrinterConfig:
         """Set the active printer for the current session.
 
         Args:
@@ -201,16 +203,14 @@ class Config:
         """
         if not ip or not ip.strip():
             raise ValueError("Printer IP cannot be empty")
-        
+
         if name is None:
             name = "Active Printer"
-            
+
         printer_config = PrinterConfig(
-            name=name,
-            ip=ip.strip(),
-            access_code=access_code.strip()
+            name=name, ip=ip.strip(), access_code=access_code.strip()
         )
-        
+
         self.runtime_active_printer = printer_config
         logger.info(f"Set active printer: {printer_config.name} at {printer_config.ip}")
         return printer_config

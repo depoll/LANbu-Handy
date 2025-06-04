@@ -891,9 +891,7 @@ async def set_active_printer(request: SetActivePrinterRequest):
         # Basic IP format validation
         ip_parts = ip.split(".")
         if len(ip_parts) != 4:
-            raise HTTPException(
-                status_code=400, detail="Invalid IP address format"
-            )
+            raise HTTPException(status_code=400, detail="Invalid IP address format")
 
         try:
             for part in ip_parts:
@@ -901,16 +899,14 @@ async def set_active_printer(request: SetActivePrinterRequest):
                 if part_int < 0 or part_int > 255:
                     raise ValueError("IP part out of range")
         except ValueError:
-            raise HTTPException(
-                status_code=400, detail="Invalid IP address format"
-            )
+            raise HTTPException(status_code=400, detail="Invalid IP address format")
 
         # Set the active printer
         try:
             printer_config = config.set_active_printer(
                 ip=ip,
                 access_code=request.access_code,
-                name=request.name or f"Printer at {ip}"
+                name=request.name or f"Printer at {ip}",
             )
 
             # Optional: Test connection to validate the printer
@@ -926,7 +922,7 @@ async def set_active_printer(request: SetActivePrinterRequest):
                     "name": printer_config.name,
                     "ip": printer_config.ip,
                     "has_access_code": bool(printer_config.access_code),
-                }
+                },
             )
 
         except ValueError as e:

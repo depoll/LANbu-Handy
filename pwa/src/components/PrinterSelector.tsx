@@ -19,17 +19,24 @@ interface PrinterSelectorProps {
   className?: string;
 }
 
-function PrinterSelector({ onPrinterChange, className = '' }: PrinterSelectorProps) {
+function PrinterSelector({
+  onPrinterChange,
+  className = '',
+}: PrinterSelectorProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isDiscovering, setIsDiscovering] = useState(false);
-  const [discoveredPrinters, setDiscoveredPrinters] = useState<DiscoveredPrinter[]>([]);
+  const [discoveredPrinters, setDiscoveredPrinters] = useState<
+    DiscoveredPrinter[]
+  >([]);
   const [discoveryError, setDiscoveryError] = useState<string>('');
   const [manualIp, setManualIp] = useState('');
   const [manualAccessCode, setManualAccessCode] = useState('');
   const [manualName, setManualName] = useState('');
   const [isSettingPrinter, setIsSettingPrinter] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
-  const [currentPrinter, setCurrentPrinter] = useState<PrinterInfo | null>(null);
+  const [currentPrinter, setCurrentPrinter] = useState<PrinterInfo | null>(
+    null
+  );
 
   // Load current printer configuration on component mount
   useEffect(() => {
@@ -71,7 +78,7 @@ function PrinterSelector({ onPrinterChange, className = '' }: PrinterSelectorPro
 
     try {
       const response = await fetch('/api/printers/discover');
-      
+
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
@@ -91,7 +98,8 @@ function PrinterSelector({ onPrinterChange, className = '' }: PrinterSelectorPro
         setDiscoveredPrinters([]);
       }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
       setDiscoveryError(`Discovery error: ${errorMessage}`);
       setStatusMessage('Discovery failed');
       setDiscoveredPrinters([]);
@@ -109,7 +117,8 @@ function PrinterSelector({ onPrinterChange, className = '' }: PrinterSelectorPro
       const request: SetActivePrinterRequest = {
         ip: printer.ip,
         access_code: '', // Discovered printers don't have access codes initially
-        name: printer.hostname || `${printer.model || 'Printer'} at ${printer.ip}`,
+        name:
+          printer.hostname || `${printer.model || 'Printer'} at ${printer.ip}`,
       };
 
       await setPrinter(request);
@@ -135,7 +144,7 @@ function PrinterSelector({ onPrinterChange, className = '' }: PrinterSelectorPro
       };
 
       await setPrinter(request);
-      
+
       // Clear manual input fields on success
       setManualIp('');
       setManualAccessCode('');
@@ -169,13 +178,13 @@ function PrinterSelector({ onPrinterChange, className = '' }: PrinterSelectorPro
             ...result.printer_info,
             is_runtime_set: true,
           });
-          
+
           // Notify parent component
           if (onPrinterChange) {
             onPrinterChange(result.printer_info);
           }
         }
-        
+
         // Collapse the selector after successful selection
         setTimeout(() => {
           setIsExpanded(false);
@@ -187,7 +196,8 @@ function PrinterSelector({ onPrinterChange, className = '' }: PrinterSelectorPro
         }
       }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
       setStatusMessage(`❌ Failed to set printer: ${errorMessage}`);
       console.error('Set printer error:', error);
     }
@@ -221,7 +231,7 @@ function PrinterSelector({ onPrinterChange, className = '' }: PrinterSelectorPro
               <span className="no-printer-text">No printer selected</span>
             </div>
           )}
-          
+
           <button
             onClick={() => setIsExpanded(!isExpanded)}
             className="expand-button"
@@ -260,7 +270,9 @@ function PrinterSelector({ onPrinterChange, className = '' }: PrinterSelectorPro
                     <div className="printer-details">
                       <div className="printer-primary">
                         <span className="printer-ip">{printer.ip}</span>
-                        <span className="printer-hostname">{printer.hostname}</span>
+                        <span className="printer-hostname">
+                          {printer.hostname}
+                        </span>
                       </div>
                       {printer.model && (
                         <div className="printer-model">{printer.model}</div>
@@ -279,9 +291,7 @@ function PrinterSelector({ onPrinterChange, className = '' }: PrinterSelectorPro
             )}
 
             {discoveryError && (
-              <div className="discovery-error">
-                ❌ {discoveryError}
-              </div>
+              <div className="discovery-error">❌ {discoveryError}</div>
             )}
           </div>
 
@@ -299,7 +309,7 @@ function PrinterSelector({ onPrinterChange, className = '' }: PrinterSelectorPro
                   id="manual-ip"
                   type="text"
                   value={manualIp}
-                  onChange={(e) => setManualIp(e.target.value)}
+                  onChange={e => setManualIp(e.target.value)}
                   onKeyPress={handleKeyPress}
                   placeholder="192.168.1.100"
                   disabled={isSettingPrinter}
@@ -313,7 +323,7 @@ function PrinterSelector({ onPrinterChange, className = '' }: PrinterSelectorPro
                   id="manual-access-code"
                   type="text"
                   value={manualAccessCode}
-                  onChange={(e) => setManualAccessCode(e.target.value)}
+                  onChange={e => setManualAccessCode(e.target.value)}
                   onKeyPress={handleKeyPress}
                   placeholder="Access code (optional)"
                   disabled={isSettingPrinter}
@@ -327,7 +337,7 @@ function PrinterSelector({ onPrinterChange, className = '' }: PrinterSelectorPro
                   id="manual-name"
                   type="text"
                   value={manualName}
-                  onChange={(e) => setManualName(e.target.value)}
+                  onChange={e => setManualName(e.target.value)}
                   onKeyPress={handleKeyPress}
                   placeholder="My Printer (optional)"
                   disabled={isSettingPrinter}
@@ -347,9 +357,7 @@ function PrinterSelector({ onPrinterChange, className = '' }: PrinterSelectorPro
 
           {/* Status Messages */}
           {statusMessage && (
-            <div className="status-message">
-              {statusMessage}
-            </div>
+            <div className="status-message">{statusMessage}</div>
           )}
         </div>
       )}
