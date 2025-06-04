@@ -27,13 +27,14 @@ class PrinterConfig:
             raise ValueError("Printer name cannot be empty")
         if not self.ip or not self.ip.strip():
             raise ValueError("Printer IP cannot be empty")
-        if not self.access_code or not self.access_code.strip():
-            raise ValueError("Printer access code cannot be empty")
+        # Access code can be empty for LAN-only mode
+        # if not self.access_code or not self.access_code.strip():
+        #     raise ValueError("Printer access code cannot be empty")
 
         # Strip whitespace
         self.name = self.name.strip()
         self.ip = self.ip.strip()
-        self.access_code = self.access_code.strip()
+        self.access_code = self.access_code.strip() if self.access_code else ""
 
 
 class Config:
