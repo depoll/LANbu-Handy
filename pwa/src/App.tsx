@@ -4,6 +4,7 @@ import Hero from './components/Hero';
 import Features from './components/Features';
 import SliceAndPrint from './components/SliceAndPrint';
 import Footer from './components/Footer';
+import { ToastProvider } from './components/ToastProvider';
 import './App.css';
 
 interface AppStatus {
@@ -67,39 +68,41 @@ function App() {
   };
 
   return (
-    <div className={`app ${appStatus.status === 'ready' ? 'app-ready' : ''}`}>
-      <Header />
+    <ToastProvider>
+      <div className={`app ${appStatus.status === 'ready' ? 'app-ready' : ''}`}>
+        <Header />
 
-      {/* Backend Status Display */}
-      <div className="status-bar">
-        {appStatus.status === 'initializing' && (
-          <div className="status-message status-loading">
-            Connecting to backend...
-          </div>
-        )}
+        {/* Backend Status Display */}
+        <div className="status-bar">
+          {appStatus.status === 'initializing' && (
+            <div className="status-message status-loading">
+              Connecting to backend...
+            </div>
+          )}
 
-        {appStatus.status === 'ready' && appStatus.backendData && (
-          <div className="status-message status-success">
-            ✓ {appStatus.backendData.application_name} v
-            {appStatus.backendData.version} - Status:{' '}
-            {appStatus.backendData.status}
-          </div>
-        )}
+          {appStatus.status === 'ready' && appStatus.backendData && (
+            <div className="status-message status-success">
+              ✓ {appStatus.backendData.application_name} v
+              {appStatus.backendData.version} - Status:{' '}
+              {appStatus.backendData.status}
+            </div>
+          )}
 
-        {appStatus.status === 'error' && (
-          <div className="status-message status-error">
-            ⚠ {appStatus.message}
-          </div>
-        )}
+          {appStatus.status === 'error' && (
+            <div className="status-message status-error">
+              ⚠ {appStatus.message}
+            </div>
+          )}
+        </div>
+
+        <main>
+          <Hero />
+          <SliceAndPrint />
+          <Features onFeatureClick={handleFeatureClick} />
+        </main>
+        <Footer />
       </div>
-
-      <main>
-        <Hero />
-        <SliceAndPrint />
-        <Features onFeatureClick={handleFeatureClick} />
-      </main>
-      <Footer />
-    </div>
+    </ToastProvider>
   );
 }
 
