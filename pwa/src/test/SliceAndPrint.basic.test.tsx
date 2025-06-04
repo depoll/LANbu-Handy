@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import SliceAndPrint from '../components/SliceAndPrint';
+import { ToastProvider } from '../components/ToastProvider';
 
 describe('SliceAndPrint Basic Tests', () => {
   beforeEach(() => {
@@ -8,13 +9,17 @@ describe('SliceAndPrint Basic Tests', () => {
     global.fetch = vi.fn();
   });
 
+  const renderWithToast = (component: React.ReactElement) => {
+    return render(<ToastProvider>{component}</ToastProvider>);
+  };
+
   it('renders without crashing', () => {
-    render(<SliceAndPrint />);
+    renderWithToast(<SliceAndPrint />);
     expect(screen.getByText('Slice and Print')).toBeInTheDocument();
   });
 
   it('renders model URL input', () => {
-    render(<SliceAndPrint />);
+    renderWithToast(<SliceAndPrint />);
     expect(
       screen.getByPlaceholderText('https://example.com/model.stl')
     ).toBeInTheDocument();
