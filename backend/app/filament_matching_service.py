@@ -231,24 +231,36 @@ class FilamentMatchingService:
             FilamentMatch with quality and confidence scores,
             or None if no match possible
         """
-        # Type matching
-        type_match = self._types_match(req_type, ams_filament.filament_type)
+        # Type compatibility check
+        type_compatibility = self._types_compatible(
+            req_type, ams_filament.filament_type
+        )
 
         # Color matching
         color_similarity = self._calculate_color_similarity(
             req_color, ams_filament.color
         )
 
-        # Determine match quality and confidence
-        if type_match and color_similarity > 0.8:
+        # Determine match quality and confidence based on type compatibility
+        # and color similarity
+        if type_compatibility == "exact" and color_similarity > 0.8:
             match_quality = "perfect"
             confidence = (1.0 + color_similarity) / 2.0  # Bias towards perfect matches
-        elif type_match and color_similarity > 0.5:
+        elif type_compatibility == "exact" and color_similarity > 0.5:
             match_quality = "perfect"
             confidence = color_similarity
-        elif type_match:
+        elif type_compatibility == "close" and color_similarity > 0.8:
+            match_quality = "perfect"
+            confidence = color_similarity * 0.95  # Slightly lower than exact type match
+        elif type_compatibility == "close" and color_similarity > 0.5:
+            match_quality = "perfect"
+            confidence = color_similarity * 0.9  # Good close match
+        elif type_compatibility == "exact":
             match_quality = "type_only"
-            confidence = 0.7  # Good type match but poor color
+            confidence = 0.7  # Good exact type match but poor color
+        elif type_compatibility == "close":
+            match_quality = "type_only"
+            confidence = 0.65  # Good close type match but poor color
         elif color_similarity > 0.8:
             match_quality = "fallback"
             confidence = color_similarity * 0.5  # Lower confidence for type mismatch
@@ -267,16 +279,62 @@ class FilamentMatchingService:
 
     def _types_match(self, req_type: str, ams_type: str) -> bool:
         """
-        Check if two filament types match.
+        Check if two filament types match exactly.
 
         Args:
             req_type: Required filament type
             ams_type: AMS filament type
 
         Returns:
-            True if types match (case-insensitive)
+            True if types match exactly (case-insensitive)
         """
         return req_type.upper().strip() == ams_type.upper().strip()
+
+    def _types_compatible(self, req_type: str, ams_type: str) -> str:
+        """
+        Check filament type compatibility level.
+
+        Args:
+            req_type: Required filament type
+            ams_type: AMS filament type
+
+        Returns:
+            "exact" for exact match, "close" for compatible variants,
+            "none" for incompatible
+        """
+        req_clean = req_type.upper().strip()
+        ams_clean = ams_type.upper().strip()
+
+        # Exact match first
+        if req_clean == ams_clean:
+            return "exact"
+
+        # Define base types and their common variants
+        type_variants = {
+            "PLA": ["PLA+", "PLA-HF", "PLAHF", "PLA BASIC", "PLA MATTE", "PLA SILK"],
+            "PETG": ["PETG-HF", "PETGHF", "PETG-CF", "PETG BASIC"],
+            "ABS": ["ABS+", "ABS-HF", "ABSHF", "ABS BASIC"],
+            "TPU": ["TPU95A", "TPU95", "TPU85A", "TPU85", "TPU-HF"],
+            "ASA": ["ASA+", "ASA-HF", "ASAHF"],
+            "PC": ["PC-CF", "PC-ABS"],
+            "PA": ["PA-CF", "PA-GF", "PA11-CF", "PA12-CF"],
+            "PET": ["PETG", "PETG-HF", "PET-CF"],
+        }
+
+        # Check if ams_type is a variant of req_type
+        for base_type, variants in type_variants.items():
+            if req_clean == base_type and ams_clean in variants:
+                return "close"
+            # Also check reverse - if req is variant and ams is base
+            if ams_clean == base_type and req_clean in variants:
+                return "close"
+
+        # Check for bidirectional variant matching
+        for base_type, variants in type_variants.items():
+            if req_clean in variants and ams_clean in variants:
+                return "close"
+
+        return "none"
 
     def _calculate_color_similarity(self, req_color: str, ams_color: str) -> float:
         """

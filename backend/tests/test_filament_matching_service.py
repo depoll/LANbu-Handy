@@ -438,3 +438,210 @@ class TestIntegration:
 
         assert white_match.ams_slot_id == 0  # White slot
         assert red_match.ams_slot_id == 2  # Red slot
+
+
+class TestCloseTypeMatching:
+    """Test close filament type matching functionality."""
+
+    def test_types_compatible_exact_match(self, service):
+        """Test exact type matching."""
+        assert service._types_compatible("PLA", "PLA") == "exact"
+        assert service._types_compatible("PETG", "PETG") == "exact"
+        assert service._types_compatible("ABS", "ABS") == "exact"
+
+    def test_types_compatible_case_insensitive(self, service):
+        """Test case-insensitive exact matching."""
+        assert service._types_compatible("pla", "PLA") == "exact"
+        assert service._types_compatible("PLA", "pla") == "exact"
+        assert service._types_compatible("petg", "PETG") == "exact"
+
+    def test_types_compatible_close_match_variants(self, service):
+        """Test close matching for common filament variants."""
+        # PLA variants
+        assert service._types_compatible("PLA", "PLA+") == "close"
+        assert service._types_compatible("PLA", "PLA-HF") == "close"
+        assert service._types_compatible("PLA", "PLAHF") == "close"
+        assert service._types_compatible("PLA", "PLA BASIC") == "close"
+
+        # PETG variants
+        assert service._types_compatible("PETG", "PETG-HF") == "close"
+        assert service._types_compatible("PETG", "PETGHF") == "close"
+        assert service._types_compatible("PETG", "PETG-CF") == "close"
+
+        # ABS variants
+        assert service._types_compatible("ABS", "ABS+") == "close"
+        assert service._types_compatible("ABS", "ABS-HF") == "close"
+
+        # TPU variants
+        assert service._types_compatible("TPU", "TPU95A") == "close"
+        assert service._types_compatible("TPU", "TPU85A") == "close"
+
+    def test_types_compatible_reverse_matching(self, service):
+        """Test that variant to base type also works."""
+        assert service._types_compatible("PLA+", "PLA") == "close"
+        assert service._types_compatible("PETG-HF", "PETG") == "close"
+        assert service._types_compatible("ABS+", "ABS") == "close"
+
+    def test_types_compatible_variant_to_variant(self, service):
+        """Test matching between variants of the same base type."""
+        assert service._types_compatible("PLA+", "PLA-HF") == "close"
+        assert service._types_compatible("PETG-HF", "PETG-CF") == "close"
+        assert service._types_compatible("TPU95A", "TPU85A") == "close"
+
+    def test_types_compatible_incompatible(self, service):
+        """Test incompatible types return 'none'."""
+        assert service._types_compatible("PLA", "PETG") == "none"
+        assert service._types_compatible("ABS", "TPU") == "none"
+        assert service._types_compatible("PETG", "ABS") == "none"
+
+    def test_close_type_matching_with_good_color(self, service):
+        """Test close type match with good color similarity."""
+        # AMS has PETG-HF Red, model requires PETG Red
+        filaments = [
+            AMSFilament(
+                slot_id=0, filament_type="PETG-HF", color="#FF0000"
+            ),  # Red PETG-HF
+        ]
+        ams_unit = AMSUnit(unit_id=0, filaments=filaments)
+        ams_status = AMSStatusResult(
+            success=True, message="AMS status retrieved", ams_units=[ams_unit]
+        )
+
+        requirements = FilamentRequirement(
+            filament_count=1,
+            filament_types=["PETG"],
+            filament_colors=["#FF0000"],  # Red
+        )
+
+        result = service.match_filaments(requirements, ams_status)
+
+        assert result.success is True
+        assert len(result.matches) == 1
+        assert result.matches[0].match_quality == "perfect"
+        assert (
+            result.matches[0].confidence > 0.9
+        )  # High confidence for close type + good color
+        assert result.matches[0].ams_filament.filament_type == "PETG-HF"
+
+    def test_close_type_matching_poor_color(self, service):
+        """Test close type match with poor color match."""
+        # AMS has PLA+ Red, model requires PLA Blue
+        filaments = [
+            AMSFilament(slot_id=0, filament_type="PLA+", color="#FF0000"),  # Red PLA+
+        ]
+        ams_unit = AMSUnit(unit_id=0, filaments=filaments)
+        ams_status = AMSStatusResult(
+            success=True, message="AMS status retrieved", ams_units=[ams_unit]
+        )
+
+        requirements = FilamentRequirement(
+            filament_count=1,
+            filament_types=["PLA"],
+            filament_colors=["#0000FF"],  # Blue
+        )
+
+        result = service.match_filaments(requirements, ams_status)
+
+        assert result.success is True
+        assert len(result.matches) == 1
+        assert result.matches[0].match_quality == "type_only"
+        assert (
+            result.matches[0].confidence == 0.65
+        )  # Lower confidence for close type + poor color
+        assert result.matches[0].ams_filament.filament_type == "PLA+"
+
+    def test_close_type_prioritization(self, service):
+        """Test that exact type matches are preferred over close type matches."""
+        # AMS has both PLA and PLA+, model requires PLA
+        filaments = [
+            AMSFilament(slot_id=0, filament_type="PLA+", color="#FF0000"),  # Red PLA+
+            AMSFilament(
+                slot_id=1, filament_type="PLA", color="#FF0000"
+            ),  # Red PLA (exact)
+        ]
+        ams_unit = AMSUnit(unit_id=0, filaments=filaments)
+        ams_status = AMSStatusResult(
+            success=True, message="AMS status retrieved", ams_units=[ams_unit]
+        )
+
+        requirements = FilamentRequirement(
+            filament_count=1, filament_types=["PLA"], filament_colors=["#FF0000"]  # Red
+        )
+
+        result = service.match_filaments(requirements, ams_status)
+
+        assert result.success is True
+        assert len(result.matches) == 1
+        # Should prefer exact PLA match over PLA+ close match
+        assert result.matches[0].ams_slot_id == 1  # Exact PLA slot
+        assert result.matches[0].ams_filament.filament_type == "PLA"
+
+    def test_multiple_close_matches(self, service):
+        """Test handling multiple close type matches."""
+        # AMS has PETG-HF and PETG-CF, model requires PETG twice
+        filaments = [
+            AMSFilament(
+                slot_id=0, filament_type="PETG-HF", color="#FF0000"
+            ),  # Red PETG-HF
+            AMSFilament(
+                slot_id=1, filament_type="PETG-CF", color="#00FF00"
+            ),  # Green PETG-CF
+        ]
+        ams_unit = AMSUnit(unit_id=0, filaments=filaments)
+        ams_status = AMSStatusResult(
+            success=True, message="AMS status retrieved", ams_units=[ams_unit]
+        )
+
+        requirements = FilamentRequirement(
+            filament_count=2,
+            filament_types=["PETG", "PETG"],
+            filament_colors=["#FF0000", "#00FF00"],  # Red, Green
+        )
+
+        result = service.match_filaments(requirements, ams_status)
+
+        assert result.success is True
+        assert len(result.matches) == 2
+        assert all(m.match_quality == "perfect" for m in result.matches)
+
+        # Both should be close matches but with high confidence due to good color match
+        for match in result.matches:
+            assert match.confidence > 0.9
+
+    def test_mixed_exact_and_close_matches(self, service):
+        """Test handling mix of exact and close type matches."""
+        # AMS has PLA (exact) and PETG-HF (close), model requires PLA and PETG
+        filaments = [
+            AMSFilament(
+                slot_id=0, filament_type="PLA", color="#FF0000"
+            ),  # Red PLA (exact)
+            AMSFilament(
+                slot_id=1, filament_type="PETG-HF", color="#00FF00"
+            ),  # Green PETG-HF (close)
+        ]
+        ams_unit = AMSUnit(unit_id=0, filaments=filaments)
+        ams_status = AMSStatusResult(
+            success=True, message="AMS status retrieved", ams_units=[ams_unit]
+        )
+
+        requirements = FilamentRequirement(
+            filament_count=2,
+            filament_types=["PLA", "PETG"],
+            filament_colors=["#FF0000", "#00FF00"],  # Red, Green
+        )
+
+        result = service.match_filaments(requirements, ams_status)
+
+        assert result.success is True
+        assert len(result.matches) == 2
+
+        # Find matches by requirement index
+        pla_match = next(m for m in result.matches if m.requirement_index == 0)
+        petg_match = next(m for m in result.matches if m.requirement_index == 1)
+
+        # PLA should be exact match with higher confidence
+        assert pla_match.ams_filament.filament_type == "PLA"
+        assert pla_match.confidence > petg_match.confidence
+
+        # PETG should match to PETG-HF (close match)
+        assert petg_match.ams_filament.filament_type == "PETG-HF"
