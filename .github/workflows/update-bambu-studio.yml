@@ -140,15 +140,12 @@ jobs:
           git fetch origin
           git checkout auto-update/bambu-studio-${{ steps.latest-version.outputs.version }}
 
-          # Create a simple timestamp file to track the update
+          # Create an empty commit to trigger CI workflows
           # This is necessary because PRs created by actions don't trigger workflows by default
-          echo "$(date -u +"%Y-%m-%d %H:%M:%S UTC")" > .last-bambu-update
-
-          git add .last-bambu-update
-          git commit -m "ci: trigger workflow checks for Bambu Studio update"
+          git commit --allow-empty -m "ci: trigger workflow checks for Bambu Studio update"
           git push origin auto-update/bambu-studio-${{ steps.latest-version.outputs.version }}
 
-          echo "✅ Pushed commit to trigger CI checks"
+          echo "✅ Pushed empty commit to trigger CI checks"
 
       - name: Enable auto-merge
         if: steps.check-update.outputs.needs_update == 'true' && steps.create-pr.outputs.pull-request-number

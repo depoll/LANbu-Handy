@@ -72,6 +72,3 @@ Thumbs.db
 
 # Build artifacts
 backend/static_pwa/
-
-# Auto-update tracking files
-.last-bambu-update
