@@ -887,6 +887,246 @@ footer p {
   }
 }
 
+/* Configuration Summary Styles */
+.configuration-summary {
+  margin: 1.5rem 0;
+  padding: 1rem;
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+}
+
+.summary-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid #dee2e6;
+}
+
+.summary-header h4 {
+  margin: 0;
+  color: #495057;
+  font-size: 1.1rem;
+}
+
+.config-status {
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.status-complete {
+  color: #155724;
+  background: #d4edda;
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  border: 1px solid #c3e6cb;
+}
+
+.status-incomplete {
+  color: #856404;
+  background: #fff3cd;
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  border: 1px solid #ffeaa7;
+}
+
+.summary-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.summary-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.section-label {
+  font-weight: 600;
+  color: #495057;
+  font-size: 0.95rem;
+}
+
+.section-value {
+  font-size: 0.9rem;
+  color: #6c757d;
+}
+
+.build-plate-value {
+  background: #e7f3ff;
+  color: #0056b3;
+  padding: 0.5rem;
+  border-radius: 4px;
+  font-weight: 500;
+  border: 1px solid #b3d4fc;
+}
+
+.filament-mappings-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.mapping-summary-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem;
+  background: white;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+}
+
+.required-info,
+.assigned-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+}
+
+.filament-number {
+  background: #6c757d;
+  color: white;
+  padding: 0.25rem 0.5rem;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  min-width: 28px;
+  text-align: center;
+}
+
+.required-type,
+.ams-type {
+  background: #e3f2fd;
+  color: #1565c0;
+  padding: 0.25rem 0.5rem;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.ams-slot {
+  background: #f3e5f5;
+  color: #7b1fa2;
+  padding: 0.25rem 0.5rem;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.color-swatch.small {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid #ddd;
+  flex-shrink: 0;
+}
+
+.not-assigned {
+  color: #dc3545;
+  font-style: italic;
+  font-size: 0.9rem;
+}
+
+.mapping-arrow {
+  color: #6c757d;
+  font-weight: bold;
+}
+
+/* Mobile responsiveness for configuration summary */
+@media (max-width: 768px) {
+  .summary-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+
+  .mapping-summary-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+
+  .mapping-arrow {
+    transform: rotate(90deg);
+    align-self: center;
+  }
+
+  .required-info,
+  .assigned-info {
+    justify-content: center;
+  }
+}
+
+/* Workflow Loading Indicator */
+.workflow-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: #e3f2fd;
+  border: 1px solid #90caf9;
+  border-radius: 6px;
+  margin-bottom: 1rem;
+}
+
+.loading-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #e3f2fd;
+  border-top: 2px solid #1976d2;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.loading-text {
+  color: #1976d2;
+  font-weight: 500;
+  font-size: 0.95rem;
+}
+
+/* Enhanced button states for better feedback */
+.slice-and-print-button:disabled,
+.secondary-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  position: relative;
+}
+
+.slice-and-print-button:disabled::after,
+.secondary-button:disabled::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 1rem;
+  width: 16px;
+  height: 16px;
+  border: 2px solid transparent;
+  border-top: 2px solid currentColor;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  display: none;
+}
+
+.slice-and-print-button:disabled[data-loading='true']::after,
+.secondary-button:disabled[data-loading='true']::after {
+  display: block;
+}
+
 .workflow-section {
   margin: 1.5rem 0;
 }
