@@ -66,7 +66,7 @@ function SliceAndPrint() {
     addStatusMessage('Submitting model for analysis...');
 
     try {
-      const requestBody = { url: modelUrl.trim() };
+      const requestBody = { model_url: modelUrl.trim() };
 
       const response = await fetch('/api/model/submit-url', {
         method: 'POST',
