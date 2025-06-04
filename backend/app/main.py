@@ -5,8 +5,8 @@ FastAPI application for LANbu Handy - a self-hosted PWA for slicing and
 printing 3D models to Bambu Lab printers in LAN-only mode.
 """
 
-import tempfile
 import logging
+import tempfile
 from pathlib import Path
 from typing import Dict, List, Optional
 

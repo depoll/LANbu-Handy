@@ -953,21 +953,19 @@ class TestPrinterDiscoveryEndpoint:
                 hostname="bambu-x1",
                 model="X1 Carbon",
                 service_name="X1Carbon._printer._tcp.local.",
-                port=21
+                port=21,
             ),
             DiscoveredPrinter(
                 ip="192.168.1.101",
                 hostname="bambu-a1",
                 model="A1 Mini",
                 service_name="A1Mini._printer._tcp.local.",
-                port=21
-            )
+                port=21,
+            ),
         ]
 
         mock_result = PrinterDiscoveryResult(
-            success=True,
-            message="Found 2 Bambu printer(s)",
-            printers=mock_printers
+            success=True, message="Found 2 Bambu printer(s)", printers=mock_printers
         )
 
         with patch("app.main.printer_service.discover_printers") as mock_discover:
@@ -1004,9 +1002,7 @@ class TestPrinterDiscoveryEndpoint:
         from app.printer_service import PrinterDiscoveryResult
 
         mock_result = PrinterDiscoveryResult(
-            success=True,
-            message="No Bambu printers found on the network",
-            printers=[]
+            success=True, message="No Bambu printers found on the network", printers=[]
         )
 
         with patch("app.main.printer_service.discover_printers") as mock_discover:
@@ -1029,7 +1025,7 @@ class TestPrinterDiscoveryEndpoint:
         mock_result = PrinterDiscoveryResult(
             success=False,
             message="mDNS discovery failed",
-            error_details="Network interface not available"
+            error_details="Network interface not available",
         )
 
         with patch("app.main.printer_service.discover_printers") as mock_discover:
