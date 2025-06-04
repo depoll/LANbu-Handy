@@ -6,6 +6,7 @@ printing 3D models to Bambu Lab printers in LAN-only mode.
 """
 
 import tempfile
+import logging
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -25,6 +26,8 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="LANbu Handy",
@@ -195,6 +198,21 @@ class ConfiguredSliceRequest(BaseModel):
     file_id: str
     filament_mappings: List[FilamentMapping]
     build_plate_type: str
+
+
+class DiscoveredPrinterResponse(BaseModel):
+    ip: str
+    hostname: str
+    model: Optional[str] = None
+    service_name: Optional[str] = None
+    port: Optional[int] = None
+
+
+class PrinterDiscoveryResponse(BaseModel):
+    success: bool
+    message: str
+    printers: Optional[List[DiscoveredPrinterResponse]] = None
+    error_details: Optional[str] = None
 
 
 @app.post("/api/model/submit-url", response_model=ModelSubmissionResponse)
@@ -762,4 +780,58 @@ async def get_ams_status(printer_id: str):
         raise
     except Exception as e:
         msg = f"Internal server error during AMS status query: {str(e)}"
+        raise HTTPException(status_code=500, detail=msg)
+
+
+@app.get("/api/printers/discover", response_model=PrinterDiscoveryResponse)
+async def discover_printers():
+    """
+    Discover Bambu Lab printers on the local network using mDNS.
+
+    Attempts to find printers advertising Bambu Lab services on the LAN using
+    mDNS/Bonjour discovery. Returns a list of discovered printers with their
+    IP addresses, hostnames, and model information if available.
+
+    Returns:
+        PrinterDiscoveryResponse: Discovery results with list of found printers
+
+    Raises:
+        HTTPException: If discovery fails due to internal server error
+    """
+    try:
+        logger.info("Starting printer discovery via mDNS")
+
+        # Perform mDNS discovery with a reasonable timeout
+        discovery_result = printer_service.discover_printers(timeout=10)
+
+        if discovery_result.success:
+            # Convert internal data structures to API response format
+            printers_response = []
+            if discovery_result.printers:
+                for printer in discovery_result.printers:
+                    printer_response = DiscoveredPrinterResponse(
+                        ip=printer.ip,
+                        hostname=printer.hostname,
+                        model=printer.model,
+                        service_name=printer.service_name,
+                        port=printer.port,
+                    )
+                    printers_response.append(printer_response)
+
+            return PrinterDiscoveryResponse(
+                success=True,
+                message=discovery_result.message,
+                printers=printers_response,
+            )
+        else:
+            # Discovery failed
+            return PrinterDiscoveryResponse(
+                success=False,
+                message=discovery_result.message,
+                error_details=discovery_result.error_details,
+            )
+
+    except Exception as e:
+        msg = f"Internal server error during printer discovery: {str(e)}"
+        logger.error(msg)
         raise HTTPException(status_code=500, detail=msg)

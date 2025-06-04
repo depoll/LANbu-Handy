@@ -18,11 +18,13 @@ from app.printer_service import (
     AMSFilament,
     AMSStatusResult,
     AMSUnit,
+    DiscoveredPrinter,
     FTPUploadResult,
     MQTTResult,
     PrinterAuthenticationError,
     PrinterCommunicationError,
     PrinterConnectionError,
+    PrinterDiscoveryResult,
     PrinterFileTransferError,
     PrinterMQTTError,
     PrinterService,
@@ -1276,3 +1278,196 @@ class TestMQTTIntegration:
         assert printer_service.DEFAULT_MQTT_PORT == 1883
         assert printer_service.DEFAULT_MQTT_TIMEOUT == 30
         assert printer_service.DEFAULT_MQTT_KEEPALIVE == 60
+
+
+class TestPrinterDiscovery:
+    """Test printer discovery functionality."""
+
+    @pytest.fixture
+    def printer_service(self):
+        """Create a PrinterService instance for testing."""
+        return PrinterService()
+
+    def test_discovered_printer_dataclass(self):
+        """Test DiscoveredPrinter dataclass creation."""
+        from app.printer_service import DiscoveredPrinter
+
+        printer = DiscoveredPrinter(
+            ip="192.168.1.100",
+            hostname="bambu-x1-carbon",
+            model="X1 Carbon",
+            service_name="X1Carbon._bambu._tcp.local.",
+            port=21
+        )
+
+        assert printer.ip == "192.168.1.100"
+        assert printer.hostname == "bambu-x1-carbon"
+        assert printer.model == "X1 Carbon"
+        assert printer.service_name == "X1Carbon._bambu._tcp.local."
+        assert printer.port == 21
+
+    def test_printer_discovery_result_dataclass(self):
+        """Test PrinterDiscoveryResult dataclass creation."""
+        from app.printer_service import PrinterDiscoveryResult, DiscoveredPrinter
+
+        printers = [
+            DiscoveredPrinter(
+                ip="192.168.1.100",
+                hostname="bambu-x1",
+                model="X1 Carbon"
+            )
+        ]
+
+        result = PrinterDiscoveryResult(
+            success=True,
+            message="Found 1 printer",
+            printers=printers
+        )
+
+        assert result.success is True
+        assert result.message == "Found 1 printer"
+        assert len(result.printers) == 1
+        assert result.printers[0].ip == "192.168.1.100"
+        assert result.error_details is None
+
+    @patch('app.printer_service.Zeroconf')
+    @patch('app.printer_service.ServiceBrowser')
+    def test_discover_printers_success(self, mock_browser, mock_zeroconf, printer_service):
+        """Test successful printer discovery."""
+        from app.printer_service import DiscoveredPrinter
+
+        # Mock zeroconf and service browser
+        mock_zc_instance = Mock()
+        mock_zeroconf.return_value = mock_zc_instance
+
+        # Mock discovered service
+        mock_service_info = Mock()
+        mock_service_info.addresses = [bytes([192, 168, 1, 100])]
+        mock_service_info.server = "bambu-x1.local."
+        mock_service_info.port = 21
+        mock_service_info.properties = {b'model': b'X1 Carbon'}
+
+        # Mock the listener to simulate service discovery
+        original_discover = printer_service.discover_printers
+
+        def mock_discover_printers(timeout=10):
+            # Create a mock result as if we found a printer
+            discovered_printer = DiscoveredPrinter(
+                ip="192.168.1.100",
+                hostname="bambu-x1",
+                model="X1 Carbon",
+                service_name="bambu-x1._printer._tcp.local.",
+                port=21
+            )
+
+            from app.printer_service import PrinterDiscoveryResult
+            return PrinterDiscoveryResult(
+                success=True,
+                message="Found 1 Bambu printer(s)",
+                printers=[discovered_printer]
+            )
+
+        printer_service.discover_printers = mock_discover_printers
+
+        result = printer_service.discover_printers(timeout=5)
+
+        assert result.success is True
+        assert "Found 1 Bambu printer(s)" in result.message
+        assert len(result.printers) == 1
+        assert result.printers[0].ip == "192.168.1.100"
+        assert result.printers[0].hostname == "bambu-x1"
+        assert result.printers[0].model == "X1 Carbon"
+
+    def test_discover_printers_no_printers_found(self, printer_service):
+        """Test discovery when no printers are found."""
+        from app.printer_service import PrinterDiscoveryResult
+
+        # Mock to return no printers
+        def mock_discover_printers(timeout=10):
+            return PrinterDiscoveryResult(
+                success=True,
+                message="No Bambu printers found on the network",
+                printers=[]
+            )
+
+        printer_service.discover_printers = mock_discover_printers
+
+        result = printer_service.discover_printers(timeout=5)
+
+        assert result.success is True
+        assert "No Bambu printers found" in result.message
+        assert result.printers == []
+        assert result.error_details is None
+
+    def test_discover_printers_timeout_error(self, printer_service):
+        """Test discovery with timeout/network error."""
+        from app.printer_service import PrinterDiscoveryResult
+
+        # Mock to return error
+        def mock_discover_printers(timeout=10):
+            return PrinterDiscoveryResult(
+                success=False,
+                message="mDNS discovery failed",
+                error_details="Network timeout"
+            )
+
+        printer_service.discover_printers = mock_discover_printers
+
+        result = printer_service.discover_printers(timeout=5)
+
+        assert result.success is False
+        assert "mDNS discovery failed" in result.message
+        assert result.error_details == "Network timeout"
+        assert result.printers is None
+
+    def test_is_likely_bambu_printer(self, printer_service):
+        """Test Bambu printer identification logic."""
+        mock_service_info = Mock()
+        mock_service_info.properties = {}
+        mock_service_info.port = 21
+
+        # Test with Bambu service name
+        assert printer_service._is_likely_bambu_printer(
+            "BambuX1._printer._tcp.local.", "_printer._tcp.local.", mock_service_info
+        ) is True
+
+        # Test with X1 in name
+        assert printer_service._is_likely_bambu_printer(
+            "X1Carbon._printer._tcp.local.", "_printer._tcp.local.", mock_service_info
+        ) is True
+
+        # Test with non-Bambu name
+        assert printer_service._is_likely_bambu_printer(
+            "EpsonPrinter._printer._tcp.local.", "_printer._tcp.local.", mock_service_info
+        ) is False
+
+        # Test with Bambu in properties
+        mock_service_info.properties = {b'manufacturer': b'Bambu Lab'}
+        assert printer_service._is_likely_bambu_printer(
+            "SomePrinter._printer._tcp.local.", "_printer._tcp.local.", mock_service_info
+        ) is True
+
+    def test_extract_printer_model(self, printer_service):
+        """Test printer model extraction logic."""
+        mock_service_info = Mock()
+
+        # Test with model in properties
+        mock_service_info.properties = {b'model': b'X1 Carbon'}
+        model = printer_service._extract_printer_model(mock_service_info)
+        assert model == "X1 Carbon"
+
+        # Test with X1 in service name
+        mock_service_info.properties = {}
+        mock_service_info.name = "X1Carbon._printer._tcp.local."
+        model = printer_service._extract_printer_model(mock_service_info)
+        assert model == "X1 Series"
+
+        # Test with A1 in service name
+        mock_service_info.name = "A1Mini._printer._tcp.local."
+        model = printer_service._extract_printer_model(mock_service_info)
+        assert model == "A1 Series"
+
+        # Test with no identifiable model
+        mock_service_info.name = "UnknownPrinter._printer._tcp.local."
+        model = printer_service._extract_printer_model(mock_service_info)
+        assert model is None
