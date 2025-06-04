@@ -1479,6 +1479,47 @@ footer p {
   cursor: not-allowed;
 }
 
+.ip-input-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ip-input-group .ip-input {
+  flex: 1;
+}
+
+.clear-saved-ip-button {
+  background: #dc3545;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition: background-color 0.3s ease;
+  flex-shrink: 0;
+}
+
+.clear-saved-ip-button:hover:not(:disabled) {
+  background: #c82333;
+}
+
+.clear-saved-ip-button:disabled {
+  background: #6c757d;
+  cursor: not-allowed;
+}
+
+.saved-ip-indicator {
+  color: #28a745;
+  font-size: 0.8rem;
+  font-weight: normal;
+}
+
 .set-manual-button {
   background: #2196f3;
   color: white;

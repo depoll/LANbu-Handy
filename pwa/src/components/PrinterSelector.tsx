@@ -6,6 +6,7 @@ import {
   SetActivePrinterResponse,
   PrinterConfigResponse,
 } from '../types/api';
+import { usePrinterIPPersistence } from '../hooks/usePrinterIPPersistence';
 
 interface PrinterInfo {
   name: string;
@@ -38,10 +39,20 @@ function PrinterSelector({
     null
   );
 
-  // Load current printer configuration on component mount
+  // Initialize printer IP persistence hook
+  const { getSavedIP, saveIP, clearSavedIP, hasSavedIP } =
+    usePrinterIPPersistence();
+
+  // Load current printer configuration and saved IP on component mount
   useEffect(() => {
     loadCurrentPrinter();
-  }, []);
+
+    // Load saved IP and pre-fill manual input if no current printer is set
+    const savedIP = getSavedIP();
+    if (savedIP && savedIP.trim()) {
+      setManualIp(savedIP);
+    }
+  }, [getSavedIP]);
 
   const loadCurrentPrinter = async () => {
     try {
@@ -179,6 +190,9 @@ function PrinterSelector({
             is_runtime_set: true,
           });
 
+          // Save IP to Local Storage for future use
+          saveIP(result.printer_info.ip);
+
           // Notify parent component
           if (onPrinterChange) {
             onPrinterChange(result.printer_info);
@@ -304,17 +318,38 @@ function PrinterSelector({
 
             <div className="manual-form">
               <div className="form-row">
-                <label htmlFor="manual-ip">IP Address *</label>
-                <input
-                  id="manual-ip"
-                  type="text"
-                  value={manualIp}
-                  onChange={e => setManualIp(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  placeholder="192.168.1.100"
-                  disabled={isSettingPrinter}
-                  className="ip-input"
-                />
+                <label htmlFor="manual-ip">
+                  IP Address *
+                  {hasSavedIP() && (
+                    <span className="saved-ip-indicator"> (saved)</span>
+                  )}
+                </label>
+                <div className="ip-input-group">
+                  <input
+                    id="manual-ip"
+                    type="text"
+                    value={manualIp}
+                    onChange={e => setManualIp(e.target.value)}
+                    onKeyPress={handleKeyPress}
+                    placeholder="192.168.1.100"
+                    disabled={isSettingPrinter}
+                    className="ip-input"
+                  />
+                  {hasSavedIP() && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        clearSavedIP();
+                        setManualIp('');
+                      }}
+                      disabled={isSettingPrinter}
+                      className="clear-saved-ip-button"
+                      title="Clear saved IP address"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
               </div>
 
               <div className="form-row">
