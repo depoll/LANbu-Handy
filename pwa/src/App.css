@@ -311,3 +311,351 @@ footer p {
     font-size: 0.9rem;
   }
 }
+
+/* AMS Status Display Component */
+.ams-status-display {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  padding: 1.5rem;
+  margin: 1rem 0;
+  border: 1px solid #e0e0e0;
+}
+
+.status-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid #e0e0e0;
+  padding-bottom: 0.5rem;
+}
+
+.status-header h3 {
+  color: #1976d2;
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.refresh-button {
+  background: #2196f3;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background-color 0.2s;
+}
+
+.refresh-button:hover:not(:disabled) {
+  background: #1976d2;
+}
+
+.refresh-button:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+.ams-content .status-message {
+  color: #155724;
+  background: #d4edda;
+  padding: 0.5rem;
+  border-radius: 4px;
+  margin-bottom: 1rem;
+  border: 1px solid #c3e6cb;
+}
+
+.ams-units {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.ams-unit {
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 1rem;
+  background: #fafafa;
+}
+
+.ams-unit h4 {
+  margin: 0 0 0.75rem 0;
+  color: #333;
+  font-size: 1rem;
+}
+
+.filament-slots {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.75rem;
+}
+
+.filament-slot {
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 0.75rem;
+}
+
+.slot-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.slot-id {
+  font-weight: 600;
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.filament-type {
+  background: #e3f2fd;
+  color: #1565c0;
+  padding: 0.25rem 0.5rem;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.color-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.color-swatch {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid #ddd;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.color-label {
+  font-size: 0.9rem;
+  color: #333;
+}
+
+.material-id {
+  font-size: 0.8rem;
+  color: #666;
+  margin-top: 0.25rem;
+}
+
+.no-filaments,
+.no-ams,
+.loading,
+.error,
+.no-data {
+  text-align: center;
+  padding: 1rem;
+  color: #666;
+  font-style: italic;
+}
+
+.error {
+  color: #721c24;
+  background: #f8d7da;
+  border: 1px solid #f5c6cb;
+  border-radius: 4px;
+}
+
+.ams-error .error-message {
+  color: #721c24;
+  margin-bottom: 0.5rem;
+}
+
+.ams-error .error-details {
+  color: #856404;
+  font-size: 0.9rem;
+}
+
+/* Filament Requirements Display Component */
+.filament-requirements-display {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  padding: 1.5rem;
+  margin: 1rem 0;
+  border: 1px solid #e0e0e0;
+}
+
+.requirements-header {
+  border-bottom: 1px solid #e0e0e0;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+}
+
+.requirements-header h3 {
+  color: #1976d2;
+  margin: 0 0 0.5rem 0;
+  font-size: 1.2rem;
+}
+
+.requirements-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.requirement-count {
+  color: #333;
+  font-weight: 500;
+}
+
+.multicolor-badge {
+  background: #ff9800;
+  color: white;
+  padding: 0.25rem 0.5rem;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  margin-left: 0.5rem;
+}
+
+.no-count {
+  color: #666;
+  font-style: italic;
+}
+
+.requirements-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.filament-requirement {
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 6px;
+  padding: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.requirement-index {
+  font-weight: 600;
+  color: #495057;
+  min-width: 100px;
+}
+
+.requirement-details {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex: 1;
+}
+
+.requirement-type {
+  background: #e3f2fd;
+  color: #1565c0;
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.requirement-color .color-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.requirement-color .color-swatch {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  border: 2px solid #ddd;
+}
+
+.color-name {
+  color: #495057;
+  font-weight: 500;
+}
+
+.no-requirements {
+  text-align: center;
+  padding: 1rem;
+  color: #666;
+  font-style: italic;
+}
+
+/* Mobile responsiveness for new components */
+@media (max-width: 768px) {
+  .ams-status-display,
+  .filament-requirements-display {
+    margin: 1rem;
+    padding: 1rem;
+  }
+
+  .status-header {
+    flex-direction: column;
+    gap: 0.5rem;
+    align-items: stretch;
+  }
+
+  .filament-slots {
+    grid-template-columns: 1fr;
+  }
+
+  .filament-requirement {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .requirement-details {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+}
+
+/* Button group and secondary button styles */
+.button-group {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.secondary-button {
+  background: #6c757d;
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 500;
+  transition: background-color 0.3s ease;
+}
+
+.secondary-button:hover:not(:disabled) {
+  background: #5a6268;
+}
+
+.secondary-button:disabled {
+  background: #cccccc;
+  cursor: not-allowed;
+}
+
+.workflow-section {
+  margin: 1.5rem 0;
+}
+
+@media (max-width: 768px) {
+  .button-group {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .secondary-button,
+  .slice-and-print-button {
+    width: 100%;
+  }
+}
