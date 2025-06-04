@@ -96,3 +96,4 @@ By following these guidelines, Copilot Workspace can be a powerful assistant in 
 - Any new code must pass existing checks (CI, Linting, etc.) -- validate this before committing any change.
 - As much as feasible, do your work within the dev container for the project and keep the dev container definition up to date as requirements change.
 - When possible, include screenshots of any UI changes in the PR after implementing.
+- If you change UI, provide screenshots of the changes in the PR.
