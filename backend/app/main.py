@@ -116,10 +116,22 @@ async def get_config():
             }
         )
 
+    # Get active printer information
+    active_printer = config.get_active_printer()
+    active_printer_info = None
+    if active_printer:
+        active_printer_info = {
+            "name": active_printer.name,
+            "ip": active_printer.ip,
+            "has_access_code": bool(active_printer.access_code),
+            "is_runtime_set": True,  # Indicates this was set via API, not env vars
+        }
+
     return {
         "printer_configured": config.is_printer_configured(),
         "printers": printers_info,
         "printer_count": len(printers),
+        "active_printer": active_printer_info,
         # Legacy fields for backward compatibility
         "printer_ip": (
             config.get_printer_ip() if config.is_printer_configured() else None
@@ -212,6 +224,19 @@ class PrinterDiscoveryResponse(BaseModel):
     success: bool
     message: str
     printers: Optional[List[DiscoveredPrinterResponse]] = None
+    error_details: Optional[str] = None
+
+
+class SetActivePrinterRequest(BaseModel):
+    ip: str
+    access_code: str = ""
+    name: Optional[str] = None
+
+
+class SetActivePrinterResponse(BaseModel):
+    success: bool
+    message: str
+    printer_info: Optional[Dict] = None
     error_details: Optional[str] = None
 
 
@@ -833,5 +858,84 @@ async def discover_printers():
 
     except Exception as e:
         msg = f"Internal server error during printer discovery: {str(e)}"
+        logger.error(msg)
+        raise HTTPException(status_code=500, detail=msg)
+
+
+@app.post("/api/printer/set-active", response_model=SetActivePrinterResponse)
+async def set_active_printer(request: SetActivePrinterRequest):
+    """
+    Set the active printer for the current session.
+
+    Allows setting a printer IP address (and optional access code) as the active
+    printer for the current session. This printer will be used for subsequent
+    printing operations until changed or the session ends.
+
+    Args:
+        request: SetActivePrinterRequest containing IP, access code, and optional name
+
+    Returns:
+        SetActivePrinterResponse: Success status and printer information
+
+    Raises:
+        HTTPException: If the printer configuration is invalid
+    """
+    try:
+        # Validate IP address format (basic validation)
+        ip = request.ip.strip()
+        if not ip:
+            raise HTTPException(
+                status_code=400, detail="Printer IP address cannot be empty"
+            )
+
+        # Basic IP format validation
+        ip_parts = ip.split(".")
+        if len(ip_parts) != 4:
+            raise HTTPException(
+                status_code=400, detail="Invalid IP address format"
+            )
+
+        try:
+            for part in ip_parts:
+                part_int = int(part)
+                if part_int < 0 or part_int > 255:
+                    raise ValueError("IP part out of range")
+        except ValueError:
+            raise HTTPException(
+                status_code=400, detail="Invalid IP address format"
+            )
+
+        # Set the active printer
+        try:
+            printer_config = config.set_active_printer(
+                ip=ip,
+                access_code=request.access_code,
+                name=request.name or f"Printer at {ip}"
+            )
+
+            # Optional: Test connection to validate the printer
+            # This is commented out for now as it might be slow
+            # connection_test = printer_service.test_connection(printer_config)
+            # if not connection_test:
+            #     logger.warning(f"Could not connect to printer at {ip}")
+
+            return SetActivePrinterResponse(
+                success=True,
+                message=f"Active printer set to {printer_config.ip}",
+                printer_info={
+                    "name": printer_config.name,
+                    "ip": printer_config.ip,
+                    "has_access_code": bool(printer_config.access_code),
+                }
+            )
+
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
+    except Exception as e:
+        msg = f"Internal server error while setting active printer: {str(e)}"
         logger.error(msg)
         raise HTTPException(status_code=500, detail=msg)
