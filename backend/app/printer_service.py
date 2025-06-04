@@ -949,12 +949,12 @@ class PrinterService:
                     # Check both string and bytes versions of the key
                     key_bytes = key.encode("utf-8")
                     value = None
-                    
+
                     if key in props:
                         value = props[key]
                     elif key_bytes in props:
                         value = props[key_bytes]
-                    
+
                     if value:
                         if isinstance(value, bytes):
                             value = value.decode("utf-8", errors="ignore")
