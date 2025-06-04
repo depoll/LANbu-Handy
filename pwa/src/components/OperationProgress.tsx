@@ -15,10 +15,17 @@ interface OperationProgressProps {
   className?: string;
 }
 
-function OperationProgress({ title, steps, className = '' }: OperationProgressProps) {
-  const completedSteps = steps.filter(step => step.status === 'completed').length;
+function OperationProgress({
+  title,
+  steps,
+  className = '',
+}: OperationProgressProps) {
+  const completedSteps = steps.filter(
+    step => step.status === 'completed'
+  ).length;
   const totalSteps = steps.length;
-  const overallProgress = totalSteps > 0 ? (completedSteps / totalSteps) * 100 : 0;
+  const overallProgress =
+    totalSteps > 0 ? (completedSteps / totalSteps) * 100 : 0;
 
   const getStepIcon = (step: OperationStep) => {
     switch (step.status) {
@@ -67,7 +74,10 @@ function OperationProgress({ title, steps, className = '' }: OperationProgressPr
 
       <div className="operation-steps">
         {steps.map((step, index) => (
-          <div key={step.id} className={`operation-step ${getStepStatusClass(step)}`}>
+          <div
+            key={step.id}
+            className={`operation-step ${getStepStatusClass(step)}`}
+          >
             <div className="operation-step-header">
               <div className="operation-step-indicator">
                 <span className="operation-step-icon">{getStepIcon(step)}</span>

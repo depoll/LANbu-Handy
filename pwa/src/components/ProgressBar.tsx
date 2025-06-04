@@ -28,7 +28,9 @@ function ProgressBar({
           )}
         </div>
       )}
-      <div className={`progress-bar progress-bar-${size} progress-bar-${color}`}>
+      <div
+        className={`progress-bar progress-bar-${size} progress-bar-${color}`}
+      >
         <div
           className={`progress-bar-fill ${isIndeterminate ? 'progress-bar-indeterminate' : ''}`}
           style={

@@ -38,7 +38,9 @@ describe('Toast Component', () => {
       ...defaultToast,
       type: 'success',
     };
-    const { container } = render(<Toast toast={successToast} onClose={mockOnClose} />);
+    const { container } = render(
+      <Toast toast={successToast} onClose={mockOnClose} />
+    );
     expect(container.querySelector('.toast-success')).toBeInTheDocument();
   });
 
@@ -47,7 +49,9 @@ describe('Toast Component', () => {
       ...defaultToast,
       autoClose: true,
     };
-    const { container } = render(<Toast toast={autoCloseToast} onClose={mockOnClose} />);
+    const { container } = render(
+      <Toast toast={autoCloseToast} onClose={mockOnClose} />
+    );
     expect(container.querySelector('.toast-progress')).toBeInTheDocument();
   });
 
@@ -56,7 +60,9 @@ describe('Toast Component', () => {
       ...defaultToast,
       autoClose: false,
     };
-    const { container } = render(<Toast toast={manualCloseToast} onClose={mockOnClose} />);
+    const { container } = render(
+      <Toast toast={manualCloseToast} onClose={mockOnClose} />
+    );
     expect(container.querySelector('.toast-progress')).not.toBeInTheDocument();
   });
 });

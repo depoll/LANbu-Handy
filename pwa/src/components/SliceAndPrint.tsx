@@ -125,17 +125,21 @@ function SliceAndPrint() {
     setIsProcessing(true);
     setCurrentWorkflowStep('Analyzing model');
     setStatusMessages([]);
-    
+
     // Initialize operation progress
-    initializeOperationSteps(['Download Model', 'Analyze Structure', 'Extract Requirements']);
-    
+    initializeOperationSteps([
+      'Download Model',
+      'Analyze Structure',
+      'Extract Requirements',
+    ]);
+
     addStatusMessage('📂 Submitting model for analysis...');
     showInfo('Starting model analysis...', 'Model Analysis');
 
     try {
       // Step 1: Download Model
       updateOperationStep(0, 'running', 'Downloading model from URL...');
-      
+
       const requestBody = { model_url: modelUrl.trim() };
 
       const response = await fetch('/api/model/submit-url', {
@@ -170,7 +174,9 @@ function SliceAndPrint() {
 
         if (result.filament_requirements) {
           setFilamentRequirements(result.filament_requirements);
-          updateOperationStep(2, 'completed', 
+          updateOperationStep(
+            2,
+            'completed',
             `Found ${result.filament_requirements.filament_count} filament requirement(s)`,
             `Filament types detected and analyzed`
           );
@@ -183,9 +189,16 @@ function SliceAndPrint() {
             'Analysis Complete'
           );
         } else {
-          updateOperationStep(2, 'completed', 'No specific requirements detected');
+          updateOperationStep(
+            2,
+            'completed',
+            'No specific requirements detected'
+          );
           addStatusMessage('ℹ No specific filament requirements detected');
-          showInfo('No specific filament requirements detected', 'Analysis Complete');
+          showInfo(
+            'No specific filament requirements detected',
+            'Analysis Complete'
+          );
         }
 
         setModelSubmitted(true);
@@ -194,18 +207,28 @@ function SliceAndPrint() {
       } else {
         updateOperationStep(2, 'error', 'Analysis failed', result.message);
         addStatusMessage(`❌ Model analysis failed: ${result.message}`);
-        showError(`Model analysis failed: ${result.message}`, 'Analysis Failed');
+        showError(
+          `Model analysis failed: ${result.message}`,
+          'Analysis Failed'
+        );
       }
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error occurred';
-      
+
       // Update the current running step to error
-      const runningStepIndex = operationSteps.findIndex(step => step.status === 'running');
+      const runningStepIndex = operationSteps.findIndex(
+        step => step.status === 'running'
+      );
       if (runningStepIndex >= 0) {
-        updateOperationStep(runningStepIndex, 'error', 'Operation failed', errorMessage);
+        updateOperationStep(
+          runningStepIndex,
+          'error',
+          'Operation failed',
+          errorMessage
+        );
       }
-      
+
       addStatusMessage(`❌ Model submission error: ${errorMessage}`);
       showError(`Model submission failed: ${errorMessage}`, 'Error');
       console.error('Model submission error:', error);
@@ -270,12 +293,19 @@ function SliceAndPrint() {
 
     setIsProcessing(true);
     setCurrentWorkflowStep('Slicing with configuration');
-    
+
     // Initialize slicing operation steps
-    initializeOperationSteps(['Prepare Configuration', 'Generate G-code', 'Validate Output']);
-    
+    initializeOperationSteps([
+      'Prepare Configuration',
+      'Generate G-code',
+      'Validate Output',
+    ]);
+
     addStatusMessage('🔧 Starting configured slicing with your settings...');
-    showInfo('Starting slicing process with your configuration...', 'Slicing Started');
+    showInfo(
+      'Starting slicing process with your configuration...',
+      'Slicing Started'
+    );
 
     // Add configuration details to status
     addStatusMessage(`📋 Build plate: ${selectedBuildPlate}`);
@@ -288,7 +318,7 @@ function SliceAndPrint() {
     try {
       // Step 1: Prepare Configuration
       updateOperationStep(0, 'running', 'Preparing slice configuration...');
-      
+
       const request: ConfiguredSliceRequest = {
         file_id: currentFileId,
         filament_mappings: filamentMappings,
@@ -298,7 +328,12 @@ function SliceAndPrint() {
       updateOperationStep(0, 'completed', 'Configuration prepared');
 
       // Step 2: Generate G-code
-      updateOperationStep(1, 'running', 'Generating G-code...', 'This may take a few minutes');
+      updateOperationStep(
+        1,
+        'running',
+        'Generating G-code...',
+        'This may take a few minutes'
+      );
 
       const response = await fetch('/api/slice/configured', {
         method: 'POST',
@@ -323,7 +358,12 @@ function SliceAndPrint() {
       updateOperationStep(2, 'running', 'Validating sliced output...');
 
       if (result.success) {
-        updateOperationStep(2, 'completed', 'Slice validation complete', 'Ready for printing');
+        updateOperationStep(
+          2,
+          'completed',
+          'Slice validation complete',
+          'Ready for printing'
+        );
         addStatusMessage(
           `✅ Slicing completed successfully: ${result.message}`
         );
@@ -331,7 +371,10 @@ function SliceAndPrint() {
         addStatusMessage(
           '🎯 Model is now ready for printing with your configured settings'
         );
-        showSuccess('Model sliced successfully and ready for printing!', 'Slicing Complete');
+        showSuccess(
+          'Model sliced successfully and ready for printing!',
+          'Slicing Complete'
+        );
       } else {
         updateOperationStep(2, 'error', 'Validation failed', result.message);
         addStatusMessage(`❌ Slicing failed: ${result.message}`);
@@ -343,13 +386,20 @@ function SliceAndPrint() {
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error occurred';
-      
+
       // Update the current running step to error
-      const runningStepIndex = operationSteps.findIndex(step => step.status === 'running');
+      const runningStepIndex = operationSteps.findIndex(
+        step => step.status === 'running'
+      );
       if (runningStepIndex >= 0) {
-        updateOperationStep(runningStepIndex, 'error', 'Operation failed', errorMessage);
+        updateOperationStep(
+          runningStepIndex,
+          'error',
+          'Operation failed',
+          errorMessage
+        );
       }
-      
+
       addStatusMessage(`❌ Slicing error: ${errorMessage}`);
       showError(`Slicing failed: ${errorMessage}`, 'Error');
       console.error('Configured slicing error:', error);
