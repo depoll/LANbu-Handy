@@ -113,7 +113,12 @@ function AMSStatusDisplay({
             Loading...
           </button>
         </div>
-        <div className="loading">Fetching AMS status...</div>
+        <div className="workflow-loading">
+          <div className="loading-spinner"></div>
+          <span className="loading-text">
+            Fetching AMS status from printer...
+          </span>
+        </div>
       </div>
     );
   }

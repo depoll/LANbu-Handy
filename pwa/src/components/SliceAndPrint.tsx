@@ -3,6 +3,7 @@ import AMSStatusDisplay from './AMSStatusDisplay';
 import FilamentRequirementsDisplay from './FilamentRequirementsDisplay';
 import FilamentMappingConfig from './FilamentMappingConfig';
 import BuildPlateSelector from './BuildPlateSelector';
+import ConfigurationSummary from './ConfigurationSummary';
 import {
   ModelSubmissionResponse,
   FilamentRequirement,
@@ -53,6 +54,9 @@ function SliceAndPrint() {
   // Default printer ID - in future this could be configurable
   const defaultPrinterId = 'default';
 
+  // Add workflow step tracking
+  const [currentWorkflowStep, setCurrentWorkflowStep] = useState<string>('');
+
   console.log('Current AMS status:', amsStatus); // For debugging, will be used for filament mapping in future
 
   const addStatusMessage = (message: string) => {
@@ -72,6 +76,7 @@ function SliceAndPrint() {
     setSelectedBuildPlate('auto');
     setIsSliced(false);
     setSliceResponse(null);
+    setCurrentWorkflowStep('');
   };
 
   const handleModelSubmit = async () => {
@@ -81,8 +86,9 @@ function SliceAndPrint() {
     }
 
     setIsProcessing(true);
+    setCurrentWorkflowStep('Analyzing model');
     setStatusMessages([]);
-    addStatusMessage('Submitting model for analysis...');
+    addStatusMessage('📂 Submitting model for analysis...');
 
     try {
       const requestBody = { model_url: modelUrl.trim() };
@@ -103,19 +109,24 @@ function SliceAndPrint() {
       const result: ModelSubmissionResponse = await response.json();
 
       if (result.success) {
-        addStatusMessage(`✅ ${result.message}`);
+        addStatusMessage(`✅ Model analysis completed: ${result.message}`);
         setCurrentFileId(result.file_id || '');
 
         if (result.filament_requirements) {
           setFilamentRequirements(result.filament_requirements);
-          addStatusMessage('✅ Filament requirements detected');
+          addStatusMessage('✅ Filament requirements detected and analyzed');
+          addStatusMessage(
+            `🎨 Model requires ${result.filament_requirements.filament_count} filament(s)`
+          );
         } else {
           addStatusMessage('ℹ No specific filament requirements detected');
         }
 
         setModelSubmitted(true);
+        setCurrentWorkflowStep('');
+        addStatusMessage('📡 Ready to query AMS status...');
       } else {
-        addStatusMessage(`❌ ${result.message}`);
+        addStatusMessage(`❌ Model analysis failed: ${result.message}`);
       }
     } catch (error) {
       const errorMessage =
@@ -124,15 +135,27 @@ function SliceAndPrint() {
       console.error('Model submission error:', error);
     } finally {
       setIsProcessing(false);
+      setCurrentWorkflowStep('');
     }
   };
 
   const handleAMSStatusUpdate = (status: AMSStatusResponse) => {
     setAmsStatus(status);
     if (status.success) {
-      addStatusMessage('✅ AMS status updated successfully');
+      addStatusMessage('✅ AMS status retrieved successfully');
+      if (status.ams_units && status.ams_units.length > 0) {
+        const totalFilaments = status.ams_units.reduce(
+          (total, unit) => total + unit.filaments.length,
+          0
+        );
+        addStatusMessage(
+          `📊 Found ${status.ams_units.length} AMS unit(s) with ${totalFilaments} loaded filament(s)`
+        );
+      } else {
+        addStatusMessage('⚠ No AMS units or filaments detected');
+      }
     } else {
-      addStatusMessage(`❌ AMS status error: ${status.message}`);
+      addStatusMessage(`❌ AMS status query failed: ${status.message}`);
     }
   };
 
@@ -157,14 +180,23 @@ function SliceAndPrint() {
 
       if (missingMappings.length > 0) {
         addStatusMessage(
-          `Error: Please map filaments for positions: ${missingMappings.join(', ')}`
+          `❌ Configuration incomplete: Please map filaments for positions: ${missingMappings.join(', ')}`
         );
         return;
       }
     }
 
     setIsProcessing(true);
-    addStatusMessage('Starting configured slicing...');
+    setCurrentWorkflowStep('Slicing with configuration');
+    addStatusMessage('🔧 Starting configured slicing with your settings...');
+
+    // Add configuration details to status
+    addStatusMessage(`📋 Build plate: ${selectedBuildPlate}`);
+    if (filamentMappings.length > 0) {
+      addStatusMessage(
+        `🎨 Using ${filamentMappings.length} mapped filament(s) from AMS`
+      );
+    }
 
     try {
       const request: ConfiguredSliceRequest = {
@@ -190,13 +222,17 @@ function SliceAndPrint() {
       setSliceResponse(result);
 
       if (result.success) {
-        addStatusMessage(`✅ ${result.message}`);
+        addStatusMessage(
+          `✅ Slicing completed successfully: ${result.message}`
+        );
         setIsSliced(true);
-        addStatusMessage('✅ Model ready for printing');
+        addStatusMessage(
+          '🎯 Model is now ready for printing with your configured settings'
+        );
       } else {
-        addStatusMessage(`❌ ${result.message}`);
+        addStatusMessage(`❌ Slicing failed: ${result.message}`);
         if (result.error_details) {
-          addStatusMessage(`Details: ${result.error_details}`);
+          addStatusMessage(`🔍 Details: ${result.error_details}`);
         }
       }
     } catch (error) {
@@ -206,17 +242,20 @@ function SliceAndPrint() {
       console.error('Configured slicing error:', error);
     } finally {
       setIsProcessing(false);
+      setCurrentWorkflowStep('');
     }
   };
 
   const handlePrintJob = async () => {
     if (!sliceResponse?.success) {
-      addStatusMessage('Error: No valid slice available for printing');
+      addStatusMessage('❌ Error: No valid slice available for printing');
       return;
     }
 
     setIsProcessing(true);
-    addStatusMessage('Starting print job...');
+    setCurrentWorkflowStep('Starting print');
+    addStatusMessage('🚀 Initiating print job...');
+    addStatusMessage('📤 Preparing to send G-code to printer...');
 
     try {
       // TODO: This is a temporary implementation.
@@ -227,7 +266,7 @@ function SliceAndPrint() {
 
       addStatusMessage('⚠ Note: Using basic print workflow as fallback');
       addStatusMessage(
-        '📋 The configured slice is complete, initiating print...'
+        '📋 The configured slice is complete, initiating print with basic workflow...'
       );
 
       const requestBody = { model_url: modelUrl.trim() };
@@ -249,11 +288,11 @@ function SliceAndPrint() {
 
       // Display main result
       if (result.success) {
-        addStatusMessage(`✅ ${result.message}`);
+        addStatusMessage(`✅ Print job completed: ${result.message}`);
       } else {
-        addStatusMessage(`❌ ${result.message}`);
+        addStatusMessage(`❌ Print job failed: ${result.message}`);
         if (result.error_details) {
-          addStatusMessage(`Details: ${result.error_details}`);
+          addStatusMessage(`🔍 Details: ${result.error_details}`);
         }
       }
 
@@ -265,11 +304,13 @@ function SliceAndPrint() {
           const step = result.job_steps[stepName];
           if (step && step.message) {
             const status = step.success ? '✅' : '❌';
+            const stepNameCapitalized =
+              stepName.charAt(0).toUpperCase() + stepName.slice(1);
             addStatusMessage(
-              `${status} ${stepName.charAt(0).toUpperCase() + stepName.slice(1)}: ${step.message}`
+              `${status} ${stepNameCapitalized}: ${step.message}`
             );
             if (step.details && step.details !== step.message) {
-              addStatusMessage(`   Details: ${step.details}`);
+              addStatusMessage(`   📝 Details: ${step.details}`);
             }
           }
         }
@@ -277,10 +318,11 @@ function SliceAndPrint() {
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error occurred';
-      addStatusMessage(`❌ Print error: ${errorMessage}`);
+      addStatusMessage(`❌ Print job error: ${errorMessage}`);
       console.error('Print job error:', error);
     } finally {
       setIsProcessing(false);
+      setCurrentWorkflowStep('');
     }
   };
 
@@ -390,6 +432,14 @@ function SliceAndPrint() {
         </div>
 
         <div className="button-group">
+          {/* Loading Indicator */}
+          {isProcessing && currentWorkflowStep && (
+            <div className="workflow-loading">
+              <div className="loading-spinner"></div>
+              <span className="loading-text">{currentWorkflowStep}...</span>
+            </div>
+          )}
+
           {!modelSubmitted ? (
             <button
               onClick={handleModelSubmit}
@@ -466,8 +516,24 @@ function SliceAndPrint() {
             disabled={isProcessing}
           />
 
+          {/* Configuration Summary */}
+          <ConfigurationSummary
+            filamentRequirements={filamentRequirements}
+            amsStatus={amsStatus}
+            filamentMappings={filamentMappings}
+            selectedBuildPlate={selectedBuildPlate}
+          />
+
           {/* Slice and Print Controls */}
           <div className="slice-print-controls">
+            {/* Loading Indicator for Configuration Actions */}
+            {isProcessing && currentWorkflowStep && (
+              <div className="workflow-loading">
+                <div className="loading-spinner"></div>
+                <span className="loading-text">{currentWorkflowStep}...</span>
+              </div>
+            )}
+
             {!isSliced ? (
               <button
                 onClick={handleConfiguredSlice}
