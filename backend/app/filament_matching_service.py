@@ -190,12 +190,9 @@ class FilamentMatchingService:
         candidates = []
 
         for ams_filament, unit_id, slot_id in available_filaments:
-            # Skip already used slots
-            if (unit_id, slot_id) in used_slots:
-                continue
-
+            # Allow double assignment but evaluate with used_slots context
             match = self._evaluate_match(
-                req_type, req_color, ams_filament, unit_id, slot_id
+                req_type, req_color, ams_filament, unit_id, slot_id, used_slots
             )
             if match:
                 candidates.append(match)
@@ -223,9 +220,18 @@ class FilamentMatchingService:
         ams_filament: AMSFilament,
         unit_id: int,
         slot_id: int,
+        used_slots: set = None,
     ) -> Optional[FilamentMatch]:
         """
         Evaluate how well an AMS filament matches a requirement.
+
+        Args:
+            req_type: Required filament type
+            req_color: Required color (hex or name)
+            ams_filament: AMS filament to evaluate
+            unit_id: AMS unit ID
+            slot_id: AMS slot ID
+            used_slots: Set of already used (unit_id, slot_id) tuples
 
         Returns:
             FilamentMatch with quality and confidence scores,
@@ -267,6 +273,11 @@ class FilamentMatchingService:
         else:
             # Very poor match - don't suggest it
             return None
+
+        # Apply penalty for double assignment (using already used slots)
+        if used_slots and (unit_id, slot_id) in used_slots:
+            confidence = confidence * 0.6  # Significant penalty for double assignment
+            # Don't change match_quality, but heavily penalize confidence
 
         return FilamentMatch(
             requirement_index=-1,  # Will be set by caller

@@ -322,8 +322,8 @@ class TestErrorHandling:
 class TestAdvancedScenarios:
     """Test advanced matching scenarios."""
 
-    def test_avoid_double_assignment(self, service, simple_ams_status):
-        """Test that the same AMS slot isn't assigned twice."""
+    def test_allow_double_assignment_with_penalty(self, service, simple_ams_status):
+        """Test that double assignment is allowed but with lower confidence."""
         requirements = FilamentRequirement(
             filament_count=2,
             filament_types=["PLA", "PLA"],
@@ -335,12 +335,65 @@ class TestAdvancedScenarios:
         assert result.success is True
         assert len(result.matches) == 2
 
-        # Ensure different slots are used
-        used_slots = set()
-        for match in result.matches:
-            slot_key = (match.ams_unit_id, match.ams_slot_id)
-            assert slot_key not in used_slots
-            used_slots.add(slot_key)
+        # Check that both requirements are matched
+        req_indices = {match.requirement_index for match in result.matches}
+        assert req_indices == {0, 1}
+
+        # If there's a better match available, it should be preferred
+        # But if there's double assignment, the second one should have lower confidence
+        matches_by_req = {match.requirement_index: match for match in result.matches}
+        match_0 = matches_by_req[0]
+        match_1 = matches_by_req[1]
+
+        # One should be the preferred match, the other might be double assignment
+        if match_0.ams_slot_id == match_1.ams_slot_id:
+            # Double assignment occurred - one should have lower confidence
+            confidences = [match_0.confidence, match_1.confidence]
+            confidences.sort(reverse=True)
+            # The lower confidence should be significantly lower (60% penalty)
+            assert confidences[1] < confidences[0] * 0.7
+        else:
+            # Different slots used - both should have similar high confidence
+            assert match_0.confidence > 0.8
+            assert match_1.confidence > 0.8
+
+    def test_forced_double_assignment(self, service):
+        """Test double assignment when there's only one suitable slot."""
+        # AMS with only one PLA filament
+        filaments = [
+            AMSFilament(slot_id=0, filament_type="PLA", color="#FF0000"),  # Red PLA
+            AMSFilament(slot_id=1, filament_type="PETG", color="#00FF00"),  # Green PETG
+        ]
+        ams_unit = AMSUnit(unit_id=0, filaments=filaments)
+        ams_status = AMSStatusResult(
+            success=True, message="AMS status retrieved", ams_units=[ams_unit]
+        )
+
+        # Model requires two PLA filaments
+        requirements = FilamentRequirement(
+            filament_count=2,
+            filament_types=["PLA", "PLA"],
+            filament_colors=["#FF0000", "#FF0000"],  # Both want red PLA
+        )
+
+        result = service.match_filaments(requirements, ams_status)
+
+        assert result.success is True
+        assert len(result.matches) == 2
+
+        # Both should use the same slot (double assignment)
+        assert result.matches[0].ams_slot_id == result.matches[1].ams_slot_id == 0
+
+        # One should have full confidence, the other reduced
+        confidences = [result.matches[0].confidence, result.matches[1].confidence]
+        confidences.sort(reverse=True)
+
+        # First match should have normal confidence
+        assert confidences[0] > 0.8
+
+        # Second match should have reduced confidence (60% penalty)
+        expected_reduced = confidences[0] * 0.6
+        assert abs(confidences[1] - expected_reduced) < 0.05
 
     def test_multi_unit_matching(self, service, multi_unit_ams_status):
         """Test matching across multiple AMS units."""
