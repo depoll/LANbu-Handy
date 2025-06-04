@@ -40,12 +40,13 @@ function PrinterSelector({
   );
 
   // Initialize printer IP persistence hook
-  const { getSavedIP, saveIP, clearSavedIP, hasSavedIP } = usePrinterIPPersistence();
+  const { getSavedIP, saveIP, clearSavedIP, hasSavedIP } =
+    usePrinterIPPersistence();
 
   // Load current printer configuration and saved IP on component mount
   useEffect(() => {
     loadCurrentPrinter();
-    
+
     // Load saved IP and pre-fill manual input if no current printer is set
     const savedIP = getSavedIP();
     if (savedIP && savedIP.trim()) {

@@ -12,10 +12,8 @@ interface PrinterIPData {
  * @returns Object with methods to get, save, and clear persisted printer IP
  */
 export function usePrinterIPPersistence() {
-  const [printerData, setPrinterData, clearPrinterData] = useLocalStorage<PrinterIPData | null>(
-    PRINTER_IP_STORAGE_KEY,
-    null
-  );
+  const [printerData, setPrinterData, clearPrinterData] =
+    useLocalStorage<PrinterIPData | null>(PRINTER_IP_STORAGE_KEY, null);
 
   const getSavedIP = (): string | null => {
     return printerData?.ip ?? null;

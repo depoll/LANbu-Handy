@@ -32,16 +32,17 @@ describe('PrinterSelector IP Persistence', () => {
   beforeEach(() => {
     localStorageMock.clear();
     vi.clearAllMocks();
-    
+
     // Mock default API responses
     mockFetch.mockImplementation((url: string) => {
       if (url === '/api/config') {
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({
-            active_printer: null,
-            printers: []
-          })
+          json: () =>
+            Promise.resolve({
+              active_printer: null,
+              printers: [],
+            }),
         });
       }
       return Promise.reject(new Error('Unknown endpoint'));
@@ -51,10 +52,13 @@ describe('PrinterSelector IP Persistence', () => {
   it('should load saved IP and pre-fill manual input', async () => {
     // Set up saved IP in localStorage
     const savedIP = '192.168.1.100';
-    localStorageMock.setItem('lanbu-handy-printer-ip', JSON.stringify({
-      ip: savedIP,
-      lastUsed: Date.now()
-    }));
+    localStorageMock.setItem(
+      'lanbu-handy-printer-ip',
+      JSON.stringify({
+        ip: savedIP,
+        lastUsed: Date.now(),
+      })
+    );
 
     render(<PrinterSelector />);
 
@@ -72,10 +76,13 @@ describe('PrinterSelector IP Persistence', () => {
   it('should show saved IP indicator when IP is saved', async () => {
     // Set up saved IP in localStorage
     const savedIP = '192.168.1.100';
-    localStorageMock.setItem('lanbu-handy-printer-ip', JSON.stringify({
-      ip: savedIP,
-      lastUsed: Date.now()
-    }));
+    localStorageMock.setItem(
+      'lanbu-handy-printer-ip',
+      JSON.stringify({
+        ip: savedIP,
+        lastUsed: Date.now(),
+      })
+    );
 
     render(<PrinterSelector />);
 
@@ -92,10 +99,13 @@ describe('PrinterSelector IP Persistence', () => {
   it('should show clear button when IP is saved', async () => {
     // Set up saved IP in localStorage
     const savedIP = '192.168.1.100';
-    localStorageMock.setItem('lanbu-handy-printer-ip', JSON.stringify({
-      ip: savedIP,
-      lastUsed: Date.now()
-    }));
+    localStorageMock.setItem(
+      'lanbu-handy-printer-ip',
+      JSON.stringify({
+        ip: savedIP,
+        lastUsed: Date.now(),
+      })
+    );
 
     render(<PrinterSelector />);
 
@@ -113,10 +123,13 @@ describe('PrinterSelector IP Persistence', () => {
   it('should clear saved IP when clear button is clicked', async () => {
     // Set up saved IP in localStorage
     const savedIP = '192.168.1.100';
-    localStorageMock.setItem('lanbu-handy-printer-ip', JSON.stringify({
-      ip: savedIP,
-      lastUsed: Date.now()
-    }));
+    localStorageMock.setItem(
+      'lanbu-handy-printer-ip',
+      JSON.stringify({
+        ip: savedIP,
+        lastUsed: Date.now(),
+      })
+    );
 
     render(<PrinterSelector />);
 
@@ -131,8 +144,10 @@ describe('PrinterSelector IP Persistence', () => {
     });
 
     // Check that localStorage removeItem was called
-    expect(localStorageMock.removeItem).toHaveBeenCalledWith('lanbu-handy-printer-ip');
-    
+    expect(localStorageMock.removeItem).toHaveBeenCalledWith(
+      'lanbu-handy-printer-ip'
+    );
+
     // Check that manual IP input is cleared
     const manualIpInput = screen.getByPlaceholderText('192.168.1.100');
     expect(manualIpInput).toHaveValue('');
@@ -150,18 +165,19 @@ describe('PrinterSelector IP Persistence', () => {
     fireEvent.change(manualIpInput, { target: { value: '192.168.1.100' } });
 
     // Mock successful printer set response
-    mockFetch.mockImplementationOnce(() => 
+    mockFetch.mockImplementationOnce(() =>
       Promise.resolve({
         ok: true,
-        json: () => Promise.resolve({
-          success: true,
-          message: 'Printer set successfully',
-          printer_info: {
-            ip: '192.168.1.100',
-            name: 'Test Printer',
-            has_access_code: false
-          }
-        })
+        json: () =>
+          Promise.resolve({
+            success: true,
+            message: 'Printer set successfully',
+            printer_info: {
+              ip: '192.168.1.100',
+              name: 'Test Printer',
+              has_access_code: false,
+            },
+          }),
       })
     );
 
@@ -192,6 +208,8 @@ describe('PrinterSelector IP Persistence', () => {
 
     // Check that saved indicator and clear button are not present
     expect(screen.queryByText('(saved)')).not.toBeInTheDocument();
-    expect(screen.queryByTitle('Clear saved IP address')).not.toBeInTheDocument();
+    expect(
+      screen.queryByTitle('Clear saved IP address')
+    ).not.toBeInTheDocument();
   });
 });
