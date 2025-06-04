@@ -7,7 +7,17 @@ describe('AMSStatusDisplay Basic Tests', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
-    global.fetch = vi.fn();
+    
+    // Mock fetch with proper Response object
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: vi.fn().mockResolvedValue({
+        success: true,
+        message: 'AMS status retrieved successfully',
+        ams_units: []
+      })
+    } as unknown as Response);
   });
 
   it('renders AMS status header', () => {

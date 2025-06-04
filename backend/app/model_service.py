@@ -6,6 +6,7 @@ validating them, and storing them temporarily for processing.
 """
 
 import json
+import logging
 import tempfile
 import zipfile
 from dataclasses import dataclass
@@ -14,6 +15,8 @@ from typing import List, Optional
 from urllib.parse import urlparse
 
 import httpx
+
+logger = logging.getLogger(__name__)
 
 
 class ModelValidationError(Exception):
@@ -179,6 +182,9 @@ class ModelService:
         unique_filename = f"{uuid.uuid4().hex}_{filename}"
         temp_file_path = self.temp_dir / unique_filename
 
+        logger.info(f"Starting download from URL: {url}")
+        logger.debug(f"Target file path: {temp_file_path}")
+
         try:
             # Download the file
             async with httpx.AsyncClient(timeout=30.0) as client:
@@ -212,29 +218,39 @@ class ModelService:
 
         except httpx.HTTPStatusError as e:
             msg = f"Failed to download file: HTTP {e.response.status_code}"
+            logger.error(f"HTTP error downloading {url}: {msg}")
             raise ModelDownloadError(msg)
         except httpx.RequestError as e:
-            raise ModelDownloadError(f"Failed to download file: {str(e)}")
+            msg = f"Failed to download file: {str(e)}"
+            logger.error(f"Request error downloading {url}: {msg}")
+            raise ModelDownloadError(msg)
         except ModelValidationError:
             # Re-raise validation errors as-is
             # (don't convert to download error)
             # Clean up partial file if it exists
             temp_file_path.unlink(missing_ok=True)
+            logger.warning(f"Validation failed for {url}")
             raise
         except Exception as e:
             # Clean up partial file if it exists
             temp_file_path.unlink(missing_ok=True)
             msg = f"Unexpected error during download: {str(e)}"
+            logger.error(f"Unexpected error downloading {url}: {msg}")
             raise ModelDownloadError(msg)
 
         # Final validation of downloaded file
         if not self.validate_file_size(temp_file_path):
             temp_file_path.unlink(missing_ok=True)
             max_mb = self.max_file_size_bytes // (1024 * 1024)
+            logger.error(f"Downloaded file {url} exceeds size limit: {max_mb}MB")
             raise ModelValidationError(
                 f"Downloaded file exceeds maximum allowed size of {max_mb}MB"
             )
 
+        logger.info(
+            f"Successfully downloaded and validated file from {url}: "
+            f"{temp_file_path.name}"
+        )
         return temp_file_path
 
     def cleanup_temp_file(self, file_path: Path) -> None:

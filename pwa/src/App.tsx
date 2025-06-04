@@ -37,6 +37,11 @@ function App() {
         console.log('Fetching backend status...');
         const response = await fetch('/api/status');
 
+        // Check if response exists and is valid
+        if (!response) {
+          throw new Error('No response received from server');
+        }
+
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }

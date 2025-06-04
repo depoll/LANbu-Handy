@@ -5,12 +5,15 @@ This module provides a wrapper interface for the Bambu Studio CLI,
 allowing programmatic construction and execution of slicing commands.
 """
 
+import logging
 import os
 import subprocess
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional, Union
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -57,6 +60,7 @@ class BambuStudioCLIWrapper:
             CLIResult object containing execution results
         """
         command = [self.cli_command] + args
+        logger.debug(f"Executing CLI command: {' '.join(command)}")
 
         try:
             result = subprocess.run(
@@ -67,6 +71,10 @@ class BambuStudioCLIWrapper:
                 cwd=self.temp_dir,
             )
 
+            logger.debug(f"CLI command completed with exit code: {result.returncode}")
+            if result.returncode != 0:
+                logger.warning(f"CLI command failed: {result.stderr}")
+
             return CLIResult(
                 exit_code=result.returncode,
                 stdout=result.stdout,
@@ -75,24 +83,30 @@ class BambuStudioCLIWrapper:
             )
 
         except subprocess.TimeoutExpired:
+            error_msg = f"Command timed out after {timeout} seconds"
+            logger.error(f"CLI command timeout: {error_msg}")
             return CLIResult(
                 exit_code=-1,
                 stdout="",
-                stderr=f"Command timed out after {timeout} seconds",
+                stderr=error_msg,
                 success=False,
             )
         except FileNotFoundError:
+            error_msg = f"CLI command not found: {self.cli_command}"
+            logger.error(f"CLI command not found: {error_msg}")
             return CLIResult(
                 exit_code=-1,
                 stdout="",
-                stderr=f"CLI command not found: {self.cli_command}",
+                stderr=error_msg,
                 success=False,
             )
         except Exception as e:
+            error_msg = f"Unexpected error: {str(e)}"
+            logger.error(f"CLI command unexpected error: {error_msg}")
             return CLIResult(
                 exit_code=-1,
                 stdout="",
-                stderr=f"Unexpected error: {str(e)}",
+                stderr=error_msg,
                 success=False,
             )
 
