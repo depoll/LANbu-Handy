@@ -2,7 +2,7 @@
 # This container includes all dependencies needed for development and testing
 # Note: Platform forced via docker-compose.yml for Bambu Studio CLI compatibility
 
-FROM python:3.12-slim
+FROM python:3.13.3
 
 # Create a non-root user for development
 ARG USERNAME=vscode
@@ -26,11 +26,10 @@ RUN apt-get update --allow-unauthenticated || apt-get update --allow-insecure-re
     pkg-config \
     # Locale support
     locales \
-    # Docker CLI for hadolint pre-commit hook (minimal)
+    gnupg2 \
+    openssh-client \
+    # Docker CLI (minimal)
     docker.io \
-    # Install hadolint for Dockerfile linting
-    && curl -sSL https://github.com/hadolint/hadolint/releases/latest/download/hadolint-Linux-x86_64 -o /usr/local/bin/hadolint \
-    && chmod +x /usr/local/bin/hadolint \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Configure locale
@@ -81,11 +80,11 @@ RUN chmod +x /tmp/install-bambu-studio-cli.sh && \
 RUN npm config set strict-ssl false && \
     npm install -g typescript@5.8.3 @types/node@22.15.29
 
-# Set up workspace
-WORKDIR /workspace
-
 # Switch to non-root user
 USER $USERNAME
+
+# Set up workspace
+WORKDIR /workspace
 
 # Set environment variables for development
 ENV PYTHONPATH=/workspace/backend

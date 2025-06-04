@@ -48,7 +48,6 @@ The modern pre-commit setup automatically:
 - **Formats JavaScript/TypeScript/CSS/HTML/JSON/Markdown** with Prettier
 - **Runs linting** with flake8 (Python) and ESLint (JS/TS)
 - **Performs general file checks** (trailing whitespace, file endings, etc.)
-- **Optional**: Lints Dockerfiles with hadolint
 
 #### Usage
 

@@ -28,7 +28,8 @@
         "editor.formatOnSave": true,
         "editor.codeActionsOnSave": {
           "source.organizeImports": "explicit"
-        }
+        },
+        "terminal.integrated.defaultProfile.linux": "bash"
       }
     }
   },
@@ -45,8 +46,9 @@
     }
   },
 
-  "postCreateCommand": "/workspace/scripts/setup-dev-environment.sh --devcontainer",
+  "postCreateCommand": "./scripts/setup-dev-environment.sh --devcontainer",
   "postStartCommand": "sudo chgrp docker /var/run/docker.sock || true",
 
-  "remoteUser": "vscode"
+  "remoteUser": "vscode",
+  "containerUser": "vscode"
 }
