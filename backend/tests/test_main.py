@@ -422,6 +422,174 @@ class TestSliceEndpoint:
             test_file_path.unlink(missing_ok=True)
 
 
+class TestConfiguredSliceEndpoint:
+    """Test cases for the configured slice endpoint."""
+
+    def test_configured_slice_missing_fields(self):
+        """Test configured slice request missing required fields."""
+        response = client.post("/api/slice/configured", json={})
+        assert response.status_code == 422  # Validation error
+
+    def test_configured_slice_missing_filament_mappings(self):
+        """Test configured slice request missing filament_mappings."""
+        response = client.post(
+            "/api/slice/configured",
+            json={"file_id": "test.stl", "build_plate_type": "Textured PEI Plate"},
+        )
+        assert response.status_code == 422  # Validation error
+
+    def test_configured_slice_missing_build_plate_type(self):
+        """Test configured slice request missing build_plate_type."""
+        response = client.post(
+            "/api/slice/configured",
+            json={
+                "file_id": "test.stl",
+                "filament_mappings": [
+                    {"filament_index": 0, "ams_unit_id": 0, "ams_slot_id": 0}
+                ],
+            },
+        )
+        assert response.status_code == 422  # Validation error
+
+    def test_configured_slice_file_not_found(self):
+        """Test configured slice request with non-existent file_id."""
+        response = client.post(
+            "/api/slice/configured",
+            json={
+                "file_id": "nonexistent_file.stl",
+                "filament_mappings": [
+                    {"filament_index": 0, "ams_unit_id": 0, "ams_slot_id": 0}
+                ],
+                "build_plate_type": "Textured PEI Plate",
+            },
+        )
+        assert response.status_code == 404
+        assert "Model file not found" in response.json()["detail"]
+
+    @patch("app.main.slice_model")
+    def test_configured_slice_success(self, mock_slice_model, temp_model_file):
+        """Test successful configured slicing with mocked CLI."""
+        from app.slicer_service import CLIResult
+
+        # Mock successful slicing
+        mock_slice_model.return_value = CLIResult(
+            exit_code=0, stdout="G-code generated successfully", stderr="", success=True
+        )
+
+        # Create a temporary file in the model service directory
+        import shutil
+
+        from app.main import model_service
+
+        test_file_id = f"test_{Path(temp_model_file).name}"
+        test_file_path = model_service.temp_dir / test_file_id
+        shutil.copy(temp_model_file, test_file_path)
+
+        try:
+            filament_mappings = [
+                {"filament_index": 0, "ams_unit_id": 0, "ams_slot_id": 1},
+                {"filament_index": 1, "ams_unit_id": 0, "ams_slot_id": 2},
+            ]
+
+            response = client.post(
+                "/api/slice/configured",
+                json={
+                    "file_id": test_file_id,
+                    "filament_mappings": filament_mappings,
+                    "build_plate_type": "Textured PEI Plate",
+                },
+            )
+
+            assert response.status_code == 200
+            data = response.json()
+            assert data["success"] is True
+            assert "sliced successfully with user configuration" in data["message"]
+            assert data["gcode_path"] is not None
+
+            # Verify the slice_model was called with correct arguments
+            mock_slice_model.assert_called_once()
+            call_args = mock_slice_model.call_args
+            assert str(call_args[1]["input_path"]).endswith(test_file_id)
+
+            # Verify configured options were passed
+            options = call_args[1]["options"]
+            assert options["build-plate"] == "Textured PEI Plate"
+            assert options["filament-slot-0"] == "0-1"
+            assert options["filament-slot-1"] == "0-2"
+
+        finally:
+            # Clean up test file
+            test_file_path.unlink(missing_ok=True)
+
+    @patch("app.main.slice_model")
+    def test_configured_slice_failure(self, mock_slice_model, temp_model_file):
+        """Test configured slicing failure with mocked CLI."""
+        from app.slicer_service import CLIResult
+
+        # Mock failed slicing
+        mock_slice_model.return_value = CLIResult(
+            exit_code=1, stdout="", stderr="Error: Invalid configuration", success=False
+        )
+
+        # Create a temporary file in the model service directory
+        import shutil
+
+        from app.main import model_service
+
+        test_file_id = f"test_{Path(temp_model_file).name}"
+        test_file_path = model_service.temp_dir / test_file_id
+        shutil.copy(temp_model_file, test_file_path)
+
+        try:
+            response = client.post(
+                "/api/slice/configured",
+                json={
+                    "file_id": test_file_id,
+                    "filament_mappings": [
+                        {"filament_index": 0, "ams_unit_id": 0, "ams_slot_id": 1}
+                    ],
+                    "build_plate_type": "Textured PEI Plate",
+                },
+            )
+
+            assert response.status_code == 200
+            data = response.json()
+            assert data["success"] is False
+            assert data["message"] == "Slicing failed"
+            assert "Error: Invalid configuration" in data["error_details"]
+
+        finally:
+            # Clean up test file
+            test_file_path.unlink(missing_ok=True)
+
+    def test_build_slicing_options_from_config(self):
+        """Test the helper function that builds CLI options from configuration."""
+        from app.main import FilamentMapping, _build_slicing_options_from_config
+
+        filament_mappings = [
+            FilamentMapping(filament_index=0, ams_unit_id=0, ams_slot_id=1),
+            FilamentMapping(filament_index=1, ams_unit_id=1, ams_slot_id=3),
+        ]
+        build_plate_type = "Cool Plate"
+
+        options = _build_slicing_options_from_config(
+            filament_mappings, build_plate_type
+        )
+
+        assert options["build-plate"] == "Cool Plate"
+        assert options["filament-slot-0"] == "0-1"
+        assert options["filament-slot-1"] == "1-3"
+
+    def test_build_slicing_options_empty_mappings(self):
+        """Test the helper function with empty filament mappings."""
+        from app.main import _build_slicing_options_from_config
+
+        options = _build_slicing_options_from_config([], "Smooth PEI Plate")
+
+        assert options["build-plate"] == "Smooth PEI Plate"
+        assert len(options) == 1  # Only build plate option
+
+
 class TestJobStartEndpoint:
     """Test cases for the job start orchestration endpoint."""
 

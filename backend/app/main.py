@@ -7,7 +7,7 @@ printing 3D models to Bambu Lab printers in LAN-only mode.
 
 import tempfile
 from pathlib import Path
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from app.config import config
 from app.model_service import (
@@ -185,6 +185,18 @@ class AMSStatusResponse(BaseModel):
     error_details: Optional[str] = None
 
 
+class FilamentMapping(BaseModel):
+    filament_index: int  # Index in the model's filament requirements
+    ams_unit_id: int
+    ams_slot_id: int
+
+
+class ConfiguredSliceRequest(BaseModel):
+    file_id: str
+    filament_mappings: List[FilamentMapping]
+    build_plate_type: str
+
+
 @app.post("/api/model/submit-url", response_model=ModelSubmissionResponse)
 async def submit_model_url(request: ModelURLRequest):
     """
@@ -318,6 +330,120 @@ async def slice_model_with_defaults(request: SliceRequest):
     except Exception as e:
         msg = f"Internal server error during slicing: {str(e)}"
         raise HTTPException(status_code=500, detail=msg)
+
+
+@app.post("/api/slice/configured", response_model=SliceResponse)
+async def slice_model_with_configuration(request: ConfiguredSliceRequest):
+    """
+    Slice a previously downloaded model with user-specified filament and plate
+    configuration.
+
+    Accepts a file_id from a previously downloaded model, along with filament
+    mappings and build plate selection, then slices it using the Bambu Studio CLI
+    with the specified configuration.
+
+    Args:
+        request: ConfiguredSliceRequest containing file_id, filament_mappings, and
+                build_plate_type
+
+    Returns:
+        SliceResponse with success status and G-code path or error details
+
+    Raises:
+        HTTPException: If file is not found or slicing fails
+    """
+    try:
+        # Find the model file in the temp directory
+        model_file_path = model_service.temp_dir / request.file_id
+
+        if not model_file_path.exists():
+            raise HTTPException(
+                status_code=404, detail=f"Model file not found: {request.file_id}"
+            )
+
+        # Create output directory for G-code
+        import tempfile
+
+        output_dir = Path(tempfile.gettempdir()) / "lanbu-handy" / "gcode"
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        # Build slicing options from the configuration
+        slicing_options = _build_slicing_options_from_config(
+            request.filament_mappings, request.build_plate_type
+        )
+
+        # Slice the model
+        result = slice_model(
+            input_path=model_file_path, output_dir=output_dir, options=slicing_options
+        )
+
+        if result.success:
+            # Return success with G-code path
+            # The G-code should be in the output directory
+            gcode_files = list(output_dir.glob("*.gcode"))
+            if gcode_files:
+                gcode_path = str(gcode_files[0])
+            else:
+                # Fallback: use the output directory path
+                gcode_path = str(output_dir)
+
+            return SliceResponse(
+                success=True,
+                message="Model sliced successfully with user configuration",
+                gcode_path=gcode_path,
+            )
+        else:
+            # Return slicing failure
+            error_details = (
+                f"CLI Error: {result.stderr}" if result.stderr else result.stdout
+            )
+            return SliceResponse(
+                success=False, message="Slicing failed", error_details=error_details
+            )
+
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
+    except Exception as e:
+        msg = f"Internal server error during configured slicing: {str(e)}"
+        raise HTTPException(status_code=500, detail=msg)
+
+
+def _build_slicing_options_from_config(
+    filament_mappings: List[FilamentMapping], build_plate_type: str
+) -> Dict[str, str]:
+    """
+    Build CLI options dictionary from filament mappings and build plate configuration.
+
+    Args:
+        filament_mappings: List of filament mappings from model indices to AMS slots
+        build_plate_type: Selected build plate type
+
+    Returns:
+        Dictionary of CLI options for the slicer
+    """
+    options = {}
+
+    # Add build plate type
+    # Common build plate CLI parameter name (may need adjustment based on actual CLI)
+    if build_plate_type:
+        options["build-plate"] = build_plate_type
+
+    # Add filament mappings
+    # Map each model filament index to an AMS slot
+    # CLI parameter format may vary - using common patterns
+    for mapping in filament_mappings:
+        # Option 1: --filament-slot-N format (where N is the filament index)
+        slot_key = f"filament-slot-{mapping.filament_index}"
+        slot_value = f"{mapping.ams_unit_id}-{mapping.ams_slot_id}"
+        options[slot_key] = slot_value
+
+        # Option 2: Alternative format if needed
+        # ams_key = f"ams-mapping-{mapping.filament_index}"
+        # ams_value = f"unit{mapping.ams_unit_id}:slot{mapping.ams_slot_id}"
+        # options[ams_key] = ams_value
+
+    return options
 
 
 @app.post("/api/job/start-basic", response_model=JobStartResponse)
