@@ -27,13 +27,14 @@ class PrinterConfig:
             raise ValueError("Printer name cannot be empty")
         if not self.ip or not self.ip.strip():
             raise ValueError("Printer IP cannot be empty")
-        if not self.access_code or not self.access_code.strip():
-            raise ValueError("Printer access code cannot be empty")
+        # Access code can be empty for LAN-only mode
+        # if not self.access_code or not self.access_code.strip():
+        #     raise ValueError("Printer access code cannot be empty")
 
         # Strip whitespace
         self.name = self.name.strip()
         self.ip = self.ip.strip()
-        self.access_code = self.access_code.strip()
+        self.access_code = self.access_code.strip() if self.access_code else ""
 
 
 class Config:
@@ -42,6 +43,7 @@ class Config:
     def __init__(self):
         """Initialize configuration by reading environment variables."""
         self.printers: List[PrinterConfig] = self._load_printers()
+        self.runtime_active_printer: Optional[PrinterConfig] = None
 
     def _load_printers(self) -> List[PrinterConfig]:
         """Load Bambu printer configurations from environment variables.
@@ -142,9 +144,10 @@ class Config:
         """Check if any printers are configured.
 
         Returns:
-            bool: True if at least one printer is configured, False otherwise
+            bool: True if at least one printer is configured or if an active
+                 printer is set, False otherwise
         """
-        return len(self.printers) > 0
+        return len(self.printers) > 0 or self.runtime_active_printer is not None
 
     def get_printers(self) -> List[PrinterConfig]:
         """Get all configured printers.
@@ -171,11 +174,60 @@ class Config:
     def get_default_printer(self) -> Optional[PrinterConfig]:
         """Get the default (first) printer configuration.
 
+        Returns the runtime active printer if set, otherwise the first
+        configured printer.
+
         Returns:
-            PrinterConfig: The first printer configuration if any exists,
+            PrinterConfig: The active printer configuration if any exists,
                          None otherwise
         """
+        if self.runtime_active_printer:
+            return self.runtime_active_printer
         return self.printers[0] if self.printers else None
+
+    def set_active_printer(
+        self, ip: str, access_code: str = "", name: str = None
+    ) -> PrinterConfig:
+        """Set the active printer for the current session.
+
+        Args:
+            ip: Printer IP address
+            access_code: Optional printer access code
+            name: Optional printer name (defaults to "Active Printer")
+
+        Returns:
+            PrinterConfig: The newly set active printer configuration
+
+        Raises:
+            ValueError: If the IP address is invalid
+        """
+        if not ip or not ip.strip():
+            raise ValueError("Printer IP cannot be empty")
+
+        if name is None:
+            name = "Active Printer"
+
+        printer_config = PrinterConfig(
+            name=name, ip=ip.strip(), access_code=access_code.strip()
+        )
+
+        self.runtime_active_printer = printer_config
+        logger.info(f"Set active printer: {printer_config.name} at {printer_config.ip}")
+        return printer_config
+
+    def get_active_printer(self) -> Optional[PrinterConfig]:
+        """Get the currently active printer.
+
+        Returns:
+            PrinterConfig: The active printer if set, None otherwise
+        """
+        return self.runtime_active_printer
+
+    def clear_active_printer(self) -> None:
+        """Clear the currently active printer."""
+        if self.runtime_active_printer:
+            logger.info(f"Cleared active printer: {self.runtime_active_printer.name}")
+            self.runtime_active_printer = None
 
     # Legacy methods for backward compatibility
     def get_printer_ip(self) -> Optional[str]:

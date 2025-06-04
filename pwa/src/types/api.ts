@@ -57,3 +57,53 @@ export interface SliceResponse {
   gcode_path?: string;
   error_details?: string;
 }
+
+// Printer Discovery and Selection Types
+export interface DiscoveredPrinter {
+  ip: string;
+  hostname: string;
+  model?: string;
+  service_name?: string;
+  port?: number;
+}
+
+export interface PrinterDiscoveryResponse {
+  success: boolean;
+  message: string;
+  printers?: DiscoveredPrinter[];
+  error_details?: string;
+}
+
+export interface SetActivePrinterRequest {
+  ip: string;
+  access_code?: string;
+  name?: string;
+}
+
+export interface SetActivePrinterResponse {
+  success: boolean;
+  message: string;
+  printer_info?: {
+    name: string;
+    ip: string;
+    has_access_code: boolean;
+  };
+  error_details?: string;
+}
+
+export interface PrinterConfigResponse {
+  printer_configured: boolean;
+  printers: {
+    name: string;
+    ip: string;
+    has_access_code: boolean;
+  }[];
+  printer_count: number;
+  active_printer?: {
+    name: string;
+    ip: string;
+    has_access_code: boolean;
+    is_runtime_set: boolean;
+  };
+  printer_ip?: string; // Legacy field
+}

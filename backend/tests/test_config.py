@@ -44,9 +44,11 @@ class TestPrinterConfig:
             PrinterConfig(name="Test", ip="", access_code="12345678")
 
     def test_printer_config_empty_access_code(self):
-        """Test that empty access code raises ValueError."""
-        with pytest.raises(ValueError, match="Printer access code cannot be empty"):
-            PrinterConfig(name="Test", ip="192.168.1.100", access_code="")
+        """Test that empty access code is allowed (for LAN-only mode)."""
+        config = PrinterConfig(name="Test", ip="192.168.1.100", access_code="")
+        assert config.name == "Test"
+        assert config.ip == "192.168.1.100"
+        assert config.access_code == ""
 
 
 class TestConfig:
