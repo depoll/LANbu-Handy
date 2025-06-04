@@ -129,11 +129,32 @@ jobs:
           branch: auto-update/bambu-studio-${{ steps.latest-version.outputs.version }}
           delete-branch: true
 
+      - name: Trigger CI checks
+        if: steps.check-update.outputs.needs_update == 'true' && steps.create-pr.outputs.pull-request-number
+        run: |
+          # Configure git for the action
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Checkout the PR branch that was just created
+          git fetch origin
+          git checkout auto-update/bambu-studio-${{ steps.latest-version.outputs.version }}
+
+          # Create a simple timestamp file to track the update
+          # This is necessary because PRs created by actions don't trigger workflows by default
+          echo "$(date -u +"%Y-%m-%d %H:%M:%S UTC")" > .last-bambu-update
+
+          git add .last-bambu-update
+          git commit -m "ci: trigger workflow checks for Bambu Studio update"
+          git push origin auto-update/bambu-studio-${{ steps.latest-version.outputs.version }}
+
+          echo "✅ Pushed commit to trigger CI checks"
+
       - name: Enable auto-merge
         if: steps.check-update.outputs.needs_update == 'true' && steps.create-pr.outputs.pull-request-number
         run: |
-          # Wait a moment for the PR to be fully created
-          sleep 5
+          # Wait a moment for the CI to be triggered
+          sleep 10
 
           # Enable auto-merge for the PR
           echo "Enabling auto-merge for PR #${{ steps.create-pr.outputs.pull-request-number }}"
