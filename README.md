@@ -91,12 +91,279 @@ LANbu Handy provides a streamlined workflow from model URL to print initiation, 
 
 ### Usage
 
-1. Enter a URL to your 3D model file (`.3mf` or `.stl`)
-2. Select your target printer (if multiple configured)
-3. Review and map AMS filaments to model requirements
-4. Choose your build plate type
-5. Click "Slice" to process the model
-6. Click "Print" to start the print job
+1. **Enter Model URL**: Provide a direct URL to your 3D model file (`.3mf` or `.stl` format)
+   - Supported sources: GitHub releases, file sharing services, direct HTTP/HTTPS links
+   - Model files should be publicly accessible without authentication
+
+2. **Select Printer**: Choose your target printer from the dropdown (if multiple configured)
+   - The interface will show printer status and availability
+   - Printer must be powered on and connected to your network
+
+3. **Configure AMS Filaments**: Review and map AMS filaments to model requirements
+   - The system queries your printer's current AMS status
+   - Map each model color/material requirement to available AMS slots
+   - Override material types if needed (PLA, PETG, ABS, etc.)
+
+4. **Choose Build Plate**: Select the appropriate build plate for your material
+   - Cool Plate: PLA, PETG
+   - Engineering Plate: ABS, ASA, PC
+   - High Temp Plate: PA, PEI
+   - Textured PEI Plate: PETG, TPU
+
+5. **Slice Model**: Click "Slice" to process the model with Bambu Studio CLI
+   - Monitor slicing progress in the interface
+   - Review estimated print time and material usage
+   - Slicing respects embedded `.3mf` settings with selective overrides
+
+6. **Start Print**: Click "Print" to transfer G-code and start the print job
+   - G-code is transferred via FTP to your printer
+   - Print job starts automatically once transfer completes
+   - Monitor initial print status in the interface
+
+## Troubleshooting
+
+### Container and Installation Issues
+
+**Container won't start:**
+```bash
+# Check container logs
+docker compose logs lanbuhandy
+
+# Check if port 8080 is already in use
+sudo netstat -tulpn | grep :8080
+# or on macOS:
+lsof -i :8080
+
+# If port is in use, modify docker-compose.yml to use different port:
+# ports:
+#   - '8081:8000'  # Change 8080 to 8081
+```
+
+**Permission issues with Docker:**
+```bash
+# Add user to docker group (Linux)
+sudo usermod -aG docker $USER
+# Log out and back in, or:
+newgrp docker
+
+# Or run with sudo
+sudo docker compose up -d
+```
+
+**Build failures:**
+```bash
+# Clean build (removes cached layers)
+docker compose build --no-cache
+
+# Check disk space
+df -h
+
+# Update Docker and Docker Compose to latest versions
+```
+
+### Printer Connection Issues
+
+**Printer not detected or "Connection failed":**
+
+1. **Verify LAN-only mode is enabled:**
+   - Go to printer Settings → Network → LAN-Only Mode
+   - Enable LAN-Only Mode and note the Access Code
+
+2. **Check network connectivity:**
+   ```bash
+   # Test if printer IP is reachable
+   ping 192.168.1.100  # Replace with your printer IP
+   
+   # Test MQTT port (8883 for secure, 1883 for non-secure)
+   telnet 192.168.1.100 8883
+   
+   # Test FTP port  
+   telnet 192.168.1.100 990
+   ```
+
+3. **Verify configuration:**
+   - Double-check printer IP address in your `.env` file
+   - Verify Access Code is exactly as shown on printer screen (8 digits)
+   - Ensure no extra spaces or characters in configuration
+
+4. **Multiple printers configuration:**
+   ```bash
+   # Correct JSON format for multiple printers:
+   BAMBU_PRINTERS=[{"name":"Printer 1","ip":"192.168.1.100","access_code":"12345678"},{"name":"Printer 2","ip":"192.168.1.101","access_code":"87654321"}]
+   
+   # Common mistakes:
+   # - Missing quotes around strings
+   # - Extra commas at the end
+   # - Spaces in JSON keys
+   ```
+
+**MQTT connection timeouts:**
+- Some routers block MQTT traffic - check firewall settings
+- Try power cycling the printer
+- Verify printer firmware is up to date
+
+### Model Download and File Issues
+
+**"Failed to download model" errors:**
+
+1. **URL format issues:**
+   ```bash
+   # ✅ Correct: Direct file URLs
+   https://github.com/user/repo/releases/download/v1.0/model.3mf
+   https://example.com/files/model.stl
+   
+   # ❌ Incorrect: Repository or webpage URLs  
+   https://github.com/user/repo/blob/main/model.3mf
+   https://thingiverse.com/thing/123456
+   ```
+
+2. **Authentication required:**
+   - Ensure URLs are publicly accessible
+   - For GitHub, use "releases" URLs, not repository file URLs
+   - Test URL in browser's private/incognito mode
+
+3. **File format issues:**
+   ```bash
+   # Supported formats:
+   .3mf  # Preferred - includes print settings
+   .stl  # Supported - requires manual configuration
+   
+   # Unsupported formats:
+   .obj, .ply, .amf, .zip archives
+   ```
+
+**Large file downloads:**
+- Files over 100MB may timeout - check your network connection
+- Consider hosting files on faster CDN if possible
+
+### Slicing Issues
+
+**Bambu Studio CLI errors:**
+
+1. **"Command not found" or CLI missing:**
+   ```bash
+   # Rebuild container to reinstall CLI
+   docker compose down
+   docker compose build --no-cache
+   docker compose up -d
+   ```
+
+2. **Slicing fails with memory errors:**
+   - Increase Docker memory allocation to at least 4GB
+   - For complex models, allocate 8GB+ RAM to Docker
+
+3. **Invalid model errors:**
+   ```bash
+   # Common model issues:
+   # - Non-manifold geometry
+   # - Corrupt STL files  
+   # - Models with zero volume
+   
+   # Try repairing model in:
+   # - Meshmixer (free)
+   # - Netfabb (Windows built-in)
+   # - Online repair services
+   ```
+
+**Slicing configuration problems:**
+- `.3mf` files contain embedded settings - these are preserved during slicing
+- Manual overrides (filament, plate type) take precedence over embedded settings
+- Check material compatibility with selected build plate
+
+### PWA and Interface Issues
+
+**Can't access web interface:**
+
+1. **Check container status:**
+   ```bash
+   docker compose ps
+   # Should show lanbuhandy as "Up"
+   
+   docker compose logs lanbuhandy
+   # Look for "Uvicorn running on http://0.0.0.0:8000"
+   ```
+
+2. **Network access:**
+   ```bash
+   # Try different URLs:
+   http://localhost:8080        # If running on same machine
+   http://192.168.1.50:8080    # Replace with your server IP
+   http://<hostname>:8080       # Using hostname
+   ```
+
+3. **Firewall issues:**
+   ```bash
+   # Linux: Allow port 8080
+   sudo ufw allow 8080
+   
+   # Check if firewall is blocking:
+   sudo iptables -L | grep 8080
+   ```
+
+**Mobile browser compatibility:**
+- Use modern browsers: Chrome 80+, Safari 13+, Firefox 75+
+- Enable JavaScript and cookies
+- Try refreshing with Ctrl+F5 (or Cmd+Shift+R on Mac)
+
+**PWA installation issues:**
+- Look for "Add to Home Screen" in browser menu
+- Ensure HTTPS is not required (should work on local network with HTTP)
+- Clear browser cache if PWA features aren't working
+
+### Performance Issues
+
+**Slow slicing:**
+- Increase Docker CPU allocation
+- Close other resource-intensive applications
+- Consider using simpler print profiles for testing
+
+**Interface lag:**
+- Clear browser cache and cookies
+- Disable browser extensions
+- Check network latency to server
+
+**High memory usage:**
+- Restart container periodically: `docker compose restart lanbuhandy`
+- Monitor with: `docker stats lanbuhandy`
+
+### Getting Help
+
+**Enable debug logging:**
+```bash
+# Add to your .env file or docker-compose.yml:
+LOG_LEVEL=debug
+
+# Restart container
+docker compose restart lanbuhandy
+
+# View detailed logs
+docker compose logs -f lanbuhandy
+```
+
+**Collect diagnostic information:**
+```bash
+# System info
+docker --version
+docker compose version
+uname -a
+
+# Container status
+docker compose ps
+docker compose logs --tail=50 lanbuhandy
+
+# Network connectivity
+ping <printer_ip>
+traceroute <printer_ip>
+```
+
+**Common solutions checklist:**
+- [ ] Printer is powered on and connected to network
+- [ ] LAN-only mode is enabled with correct access code
+- [ ] Docker container is running (`docker compose ps`)
+- [ ] No firewall blocking ports 8080, 8883, 990
+- [ ] Model URL is direct link to `.3mf` or `.stl` file
+- [ ] Sufficient disk space and memory available
+- [ ] Using supported browser with JavaScript enabled
 
 ## Project Structure
 
