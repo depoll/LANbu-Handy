@@ -521,3 +521,4 @@ This project is licensed under the Apache License, Version 2.0. See the [LICENSE
 ## Disclaimer
 
 LANbu Handy is an independent project and is not affiliated with, endorsed by, or sponsored by Bambu Lab. Bambu Lab, Bambu Studio, and related trademarks are the property of their respective owners.
+# Tag v0.1.0 created and ready for release
