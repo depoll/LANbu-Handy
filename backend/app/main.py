@@ -427,6 +427,59 @@ async def upload_model_file(file: UploadFile = File(...)):
         raise handle_model_errors(e)
 
 
+@app.get("/api/model/preview/{file_id}")
+async def get_model_preview(file_id: str):
+    """
+    Serve a model file for preview rendering.
+
+    Returns the raw model file content for client-side 3D rendering.
+    Supports both STL and 3MF files for Three.js preview.
+
+    Args:
+        file_id: The file ID from model submission
+
+    Returns:
+        FileResponse with the model file content
+
+    Raises:
+        HTTPException: If file is not found or access is denied
+    """
+    try:
+        # Find the model file in the temp directory
+        model_file_path = model_service.temp_dir / file_id
+
+        if not model_file_path.exists():
+            raise HTTPException(
+                status_code=404, detail=f"Model file not found: {file_id}"
+            )
+
+        # Validate file extension for security
+        if not model_service.validate_file_extension(model_file_path.name):
+            raise HTTPException(
+                status_code=400, detail="Invalid file type for preview"
+            )
+
+        # Determine media type based on file extension
+        media_type = "application/octet-stream"
+        if model_file_path.suffix.lower() == ".stl":
+            media_type = "model/stl"
+        elif model_file_path.suffix.lower() == ".3mf":
+            media_type = "model/3mf"
+
+        return FileResponse(
+            path=model_file_path,
+            media_type=media_type,
+            filename=model_file_path.name
+        )
+
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
+    except Exception as e:
+        msg = f"Internal server error serving model preview: {str(e)}"
+        raise HTTPException(status_code=500, detail=msg)
+
+
 @app.post("/api/slice/defaults", response_model=SliceResponse)
 async def slice_model_with_defaults(request: SliceRequest):
     """
