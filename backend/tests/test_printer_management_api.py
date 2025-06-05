@@ -107,9 +107,9 @@ class TestPrinterManagementAPI:
         assert config_data["printers"][0]["name"] == "Persistent Printer"
 
     def test_add_printer_invalid_ip(self):
-        """Test adding a printer with invalid IP address."""
+        """Test adding a printer with invalid IP address or hostname."""
         request_data = {
-            "ip": "invalid.ip.address",
+            "ip": "300.400.500.600",  # Invalid IP address
             "access_code": "12345678",
             "name": "Invalid Printer",
             "save_permanently": False,
@@ -119,6 +119,22 @@ class TestPrinterManagementAPI:
 
         assert response.status_code == 400
         assert "Invalid IP address" in response.text
+
+    def test_add_printer_valid_hostname(self):
+        """Test adding a printer with valid hostname."""
+        request_data = {
+            "ip": "printer.local",
+            "access_code": "12345678",
+            "name": "Hostname Printer",
+            "save_permanently": False,
+        }
+
+        response = self.client.post("/api/printers/add", json=request_data)
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "Hostname Printer set as active for current session" in data["message"]
+        assert data["printer_info"]["ip"] == "printer.local"
 
     def test_add_printer_duplicate_ip_persistent(self):
         """Test adding a printer with duplicate IP to persistent storage."""

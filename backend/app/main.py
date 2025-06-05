@@ -33,7 +33,7 @@ from app.utils import (
     get_default_slicing_options,
     get_gcode_output_dir,
     handle_model_errors,
-    validate_ip_address,
+    validate_ip_or_hostname,
 )
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
@@ -920,8 +920,8 @@ async def set_active_printer(request: SetActivePrinterRequest):
         HTTPException: If the printer configuration is invalid
     """
     try:
-        # Validate IP address format
-        ip = validate_ip_address(request.ip)
+        # Validate IP address or hostname format
+        ip = validate_ip_or_hostname(request.ip)
 
         # Set the active printer
         try:
@@ -978,8 +978,8 @@ async def add_printer(request: AddPrinterRequest):
         HTTPException: If the printer configuration is invalid or already exists
     """
     try:
-        # Validate IP address format
-        ip = validate_ip_address(request.ip)
+        # Validate IP address or hostname format
+        ip = validate_ip_or_hostname(request.ip)
 
         # Create printer configuration
         printer_config = PrinterConfig(
@@ -1042,8 +1042,8 @@ async def remove_printer(request: RemovePrinterRequest):
         HTTPException: If removal fails due to internal server error
     """
     try:
-        # Validate IP address format
-        ip = validate_ip_address(request.ip)
+        # Validate IP address or hostname format
+        ip = validate_ip_or_hostname(request.ip)
 
         # Remove from persistent storage
         removed = config.remove_persistent_printer(ip)

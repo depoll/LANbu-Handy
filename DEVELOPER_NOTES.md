@@ -47,7 +47,7 @@ LANbu Handy is designed as a self-contained Progressive Web Application (PWA) th
 ### Communication Patterns
 
 1. **PWA ↔ Backend**: RESTful API over HTTP/HTTPS
-2. **Backend ↔ CLI**: Subprocess execution with stdin/stdout communication  
+2. **Backend ↔ CLI**: Subprocess execution with stdin/stdout communication
 3. **Backend ↔ Printer**: MQTT for commands/status, FTP for file transfer
 4. **Backend ↔ External**: HTTP for model file downloads
 
@@ -58,16 +58,19 @@ LANbu Handy is designed as a self-contained Progressive Web Application (PWA) th
 The project includes a complete development container setup that provides all dependencies and tools pre-configured.
 
 **VS Code Users:**
+
 1. Open the project in VS Code
 2. Install the "Remote - Containers" extension
 3. Click "Reopen in Container" when prompted
 4. The container will build and configure automatically
 
 **GitHub Codespaces:**
+
 1. Open the repository in GitHub Codespaces
 2. The environment will be ready after initialization
 
 **Benefits:**
+
 - Pre-commit hooks automatically configured
 - All dependencies installed
 - Consistent development environment
@@ -76,11 +79,13 @@ The project includes a complete development container setup that provides all de
 ### Option 2: Local Development Setup
 
 **Prerequisites:**
-- Python 3.9+ 
+
+- Python 3.9+
 - Node.js 18+
 - Docker and Docker Compose
 
 **Quick Setup:**
+
 ```bash
 # Clone the repository
 git clone https://github.com/depoll/LANbu-Handy.git
@@ -91,11 +96,12 @@ cd LANbu-Handy
 ```
 
 **Manual Setup:**
+
 ```bash
 # Backend dependencies
 cd backend && pip install -r requirements.txt
 
-# Frontend dependencies  
+# Frontend dependencies
 cd pwa && npm install
 
 # Pre-commit hooks (optional but recommended)
@@ -124,7 +130,7 @@ app = FastAPI(title="LANbu Handy Backend")
 
 # Route organization
 @app.post("/api/submit-model-url")  # Model submission
-@app.post("/api/slice")             # Basic slicing  
+@app.post("/api/slice")             # Basic slicing
 @app.post("/api/configured-slice")  # Advanced slicing
 @app.post("/api/start-print")       # Print initiation
 @app.get("/api/printer/ams-status") # Printer queries
@@ -139,7 +145,7 @@ Each service module encapsulates specific domain logic:
 class BambuStudioCLI:
     def __init__(self, cli_path: str = "/opt/bambu-studio/bambu-studio-cli"):
         self.cli_path = cli_path
-    
+
     async def slice_model(self, model_path: str, options: SlicingOptions) -> str:
         # Subprocess management, error handling, output parsing
         pass
@@ -160,7 +166,7 @@ class BambuStudioCLI:
 ### Testing Approach
 
 - **Unit Tests**: Individual service method testing with mocks
-- **Integration Tests**: End-to-end workflow testing 
+- **Integration Tests**: End-to-end workflow testing
 - **Edge Case Tests**: Error conditions and input validation
 - **Real CLI Tests**: Actual Bambu Studio CLI interaction (when available)
 
@@ -199,11 +205,11 @@ API interactions are encapsulated in custom hooks:
 export const useModelSubmission = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+
   const submitModel = async (url: string) => {
     // API call logic with error handling
   };
-  
+
   return { submitModel, loading, error };
 };
 ```
@@ -227,11 +233,13 @@ export const useModelSubmission = () => {
 ### Python (Backend)
 
 **Formatting Tools:**
+
 - **Black**: Code formatter with 88-character line length
-- **isort**: Import sorting compatible with Black  
+- **isort**: Import sorting compatible with Black
 - **flake8**: Linting with Black-compatible rules
 
 **Configuration:**
+
 ```ini
 # .flake8
 [flake8]
@@ -240,6 +248,7 @@ extend-ignore = E203, W503
 ```
 
 **Running Linters:**
+
 ```bash
 cd backend
 python -m black app/ tests/
@@ -250,10 +259,12 @@ python -m flake8 app/ tests/
 ### TypeScript/React (PWA)
 
 **Formatting Tools:**
+
 - **Prettier**: Code formatter for TS/JS/CSS/HTML/JSON
 - **ESLint**: TypeScript and React linting
 
 **Running Linters:**
+
 ```bash
 cd pwa
 npm run format      # Format code
@@ -273,12 +284,12 @@ repos:
     hooks:
       - id: black
         language_version: python3
-        
-  - repo: https://github.com/pycqa/isort  
+
+  - repo: https://github.com/pycqa/isort
     rev: 5.14.0
     hooks:
       - id: isort
-        args: ["--profile", "black"]
+        args: ['--profile', 'black']
 ```
 
 ## Docker Build and Deployment
@@ -296,7 +307,7 @@ RUN npm ci --no-audit --no-fund
 COPY pwa/ ./
 RUN npm run build
 
-# Stage 2: Python Runtime  
+# Stage 2: Python Runtime
 FROM python:3.12-slim
 WORKDIR /app
 
@@ -345,6 +356,7 @@ The embedded Bambu Studio CLI version is managed through:
 3. **Docker Build**: CLI is installed during the Docker build process
 
 **To update the CLI version (for development builds):**
+
 ```bash
 # Edit the version file
 echo "01.10.01.05" > scripts/bambu-studio-version.txt
@@ -373,13 +385,13 @@ docker compose -f docker-compose.dev.yml up -d
 services:
   lanbu-handy:
     build: .
-    platform: linux/amd64  # Required for Bambu Studio CLI
+    platform: linux/amd64 # Required for Bambu Studio CLI
     ports:
-      - "8080:8000"
+      - '8080:8000'
     environment:
       - BAMBU_PRINTERS=${BAMBU_PRINTERS:-}
     tmpfs:
-      - /tmp:noexec,nosuid,size=1g  # Temporary file storage
+      - /tmp:noexec,nosuid,size=1g # Temporary file storage
 ```
 
 ## Contributing Guidelines

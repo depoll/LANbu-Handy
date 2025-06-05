@@ -18,6 +18,7 @@ from app.utils import (
     handle_model_errors,
     handle_printer_errors,
     validate_ip_address,
+    validate_ip_or_hostname,
 )
 from fastapi import HTTPException
 
@@ -297,3 +298,127 @@ class TestIPValidation:
 
         assert exc_info.value.status_code == 400
         assert "Invalid IP address format" in str(exc_info.value.detail)
+
+
+class TestIPOrHostnameValidation:
+    """Test cases for IP address and hostname validation."""
+
+    def test_validate_ip_or_hostname_valid_ips(self):
+        """Test validation of valid IP addresses."""
+        valid_ips = [
+            "192.168.1.100",
+            "10.0.0.1",
+            "172.16.0.50",
+            "127.0.0.1",
+            "255.255.255.255",
+            "0.0.0.0",
+        ]
+
+        for ip in valid_ips:
+            result = validate_ip_or_hostname(ip)
+            assert result == ip
+
+    def test_validate_ip_or_hostname_valid_hostnames(self):
+        """Test validation of valid hostnames."""
+        valid_hostnames = [
+            "bambu-printer",
+            "printer.local",
+            "my-printer-01",
+            "X1-Carbon-123",
+            "printer123",
+            "localhost",
+            "printer",
+            "multi.level.domain.example",
+            "x1c",
+            "a1-mini",
+        ]
+
+        for hostname in valid_hostnames:
+            result = validate_ip_or_hostname(hostname)
+            assert result == hostname
+
+    def test_validate_ip_or_hostname_with_whitespace(self):
+        """Test validation strips whitespace."""
+        address_with_spaces = "  bambu-printer.local  "
+
+        result = validate_ip_or_hostname(address_with_spaces)
+
+        assert result == "bambu-printer.local"
+
+    def test_validate_ip_or_hostname_empty(self):
+        """Test validation of empty address."""
+        with pytest.raises(HTTPException) as exc_info:
+            validate_ip_or_hostname("")
+
+        assert exc_info.value.status_code == 400
+        assert "cannot be empty" in str(exc_info.value.detail)
+
+    def test_validate_ip_or_hostname_whitespace_only(self):
+        """Test validation of whitespace-only address."""
+        with pytest.raises(HTTPException) as exc_info:
+            validate_ip_or_hostname("   ")
+
+        assert exc_info.value.status_code == 400
+        assert "cannot be empty" in str(exc_info.value.detail)
+
+    def test_validate_ip_or_hostname_invalid_hostname_start_hyphen(self):
+        """Test validation of hostname starting with hyphen."""
+        with pytest.raises(HTTPException) as exc_info:
+            validate_ip_or_hostname("-invalid")
+
+        assert exc_info.value.status_code == 400
+        assert "Invalid IP address or hostname format" in str(exc_info.value.detail)
+
+    def test_validate_ip_or_hostname_invalid_hostname_end_hyphen(self):
+        """Test validation of hostname ending with hyphen."""
+        with pytest.raises(HTTPException) as exc_info:
+            validate_ip_or_hostname("invalid-")
+
+        assert exc_info.value.status_code == 400
+        assert "Invalid IP address or hostname format" in str(exc_info.value.detail)
+
+    def test_validate_ip_or_hostname_invalid_hostname_double_dot(self):
+        """Test validation of hostname with consecutive dots."""
+        with pytest.raises(HTTPException) as exc_info:
+            validate_ip_or_hostname("invalid..double.dot")
+
+        assert exc_info.value.status_code == 400
+        assert "Invalid IP address or hostname format" in str(exc_info.value.detail)
+
+    def test_validate_ip_or_hostname_invalid_hostname_underscore(self):
+        """Test validation of hostname with underscore (not RFC compliant)."""
+        with pytest.raises(HTTPException) as exc_info:
+            validate_ip_or_hostname("invalid_underscore")
+
+        assert exc_info.value.status_code == 400
+        assert "Invalid IP address or hostname format" in str(exc_info.value.detail)
+
+    def test_validate_ip_or_hostname_invalid_hostname_too_long(self):
+        """Test validation of hostname that is too long."""
+        # Create a hostname longer than 253 characters
+        long_hostname = "a" * 250 + ".com"
+
+        with pytest.raises(HTTPException) as exc_info:
+            validate_ip_or_hostname(long_hostname)
+
+        assert exc_info.value.status_code == 400
+        assert "Invalid IP address or hostname format" in str(exc_info.value.detail)
+
+    def test_validate_ip_or_hostname_invalid_hostname_label_too_long(self):
+        """Test validation of hostname with label longer than 63 characters."""
+        # Create a label longer than 63 characters
+        long_label = "a" * 64
+        long_hostname = f"{long_label}.local"
+
+        with pytest.raises(HTTPException) as exc_info:
+            validate_ip_or_hostname(long_hostname)
+
+        assert exc_info.value.status_code == 400
+        assert "Invalid IP address or hostname format" in str(exc_info.value.detail)
+
+    def test_validate_ip_or_hostname_fqdn_with_trailing_dot(self):
+        """Test validation of FQDN with trailing dot."""
+        result = validate_ip_or_hostname("printer.local.")
+
+        # Should remove the trailing dot
+        assert result == "printer.local."

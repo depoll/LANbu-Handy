@@ -144,9 +144,9 @@ class TestPrinterEndpointEdgeCases:
     """Test edge cases for printer-related endpoints."""
 
     def test_set_active_printer_invalid_ip_format(self):
-        """Test setting active printer with invalid IP format."""
+        """Test setting active printer with invalid IP or hostname format."""
         request_data = {
-            "ip": "not.an.ip.address",
+            "ip": "300.400.500.600",  # Invalid IP address
             "access_code": "12345678",
             "name": "Test Printer",
         }
@@ -154,7 +154,7 @@ class TestPrinterEndpointEdgeCases:
         response = client.post("/api/printer/set-active", json=request_data)
 
         assert response.status_code == 400
-        assert "Invalid IP address format" in response.json()["detail"]
+        assert "Invalid IP address or hostname format" in response.json()["detail"]
 
     def test_set_active_printer_empty_ip(self):
         """Test setting active printer with empty IP."""
