@@ -71,7 +71,7 @@ LANbu Handy provides a streamlined workflow from model URL to print initiation, 
    ```yaml
    services:
      lanbuhandy:
-       image: ghcr.io/depoll/lanbu-handy:latest
+       image: depoll/lanbu-handy:latest
        platform: linux/amd64
        ports:
          - '8080:8000'
@@ -127,7 +127,7 @@ To use a specific release version instead of the latest:
 ```yaml
 services:
   lanbuhandy:
-    image: ghcr.io/depoll/lanbu-handy:v1.0.0  # Replace with desired version
+    image: depoll/lanbu-handy:v1.0.0  # Replace with desired version
     # ... rest of configuration
 ```
 
