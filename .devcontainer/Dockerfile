@@ -32,6 +32,13 @@ RUN apt-get update --allow-unauthenticated || apt-get update --allow-insecure-re
     docker.io \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
+# Install Docker Compose V2 plugin (latest stable version)
+RUN DOCKER_COMPOSE_VERSION="v2.32.1" \
+    && mkdir -p /usr/local/lib/docker/cli-plugins \
+    && curl -L "https://github.com/docker/compose/releases/download/${DOCKER_COMPOSE_VERSION}/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/lib/docker/cli-plugins/docker-compose \
+    && chmod +x /usr/local/lib/docker/cli-plugins/docker-compose \
+    && docker compose version
+
 # Configure locale
 RUN echo "en_US.UTF-8 UTF-8" > /etc/locale.gen && \
     locale-gen en_US.UTF-8 && \
@@ -54,6 +61,8 @@ RUN groupadd --gid $USER_GID $USERNAME \
 
 # Install Python development dependencies
 COPY ../backend/requirements.txt /tmp/backend-requirements.txt
+COPY ../backend/requirements-prod.txt /tmp/requirements-prod.txt
+COPY ../backend/requirements-dev.txt /tmp/requirements-dev.txt
 RUN pip install --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host files.pythonhosted.org --no-cache-dir -r /tmp/backend-requirements.txt
 
 # Install additional Python development and testing tools
