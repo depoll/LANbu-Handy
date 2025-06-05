@@ -61,8 +61,15 @@ header p {
 }
 
 .header-printer-selector .runtime-badge {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.9);
+  color: #0d47a1;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.header-printer-selector .persistent-badge {
+  background: rgba(76, 175, 80, 0.9);
   color: white;
+  border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
 .header-printer-selector .expand-button {
@@ -1367,8 +1374,24 @@ footer p {
   font-family: monospace;
 }
 
+.printer-badges {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
 .runtime-badge {
   background: #17a2b8;
+  color: white;
+  padding: 0.125rem 0.5rem;
+  border-radius: 12px;
+  font-size: 0.7rem;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.persistent-badge {
+  background: #4caf50;
   color: white;
   padding: 0.125rem 0.5rem;
   border-radius: 12px;
