@@ -12,5 +12,11 @@ export default defineConfig({
     typecheck: {
       tsconfig: './tsconfig.test.json',
     },
+    exclude: [
+      '**/node_modules/**',
+      '**/dist/**',
+      '**/tests-playwright/**', // Exclude Playwright tests
+      '**/*.spec.ts', // Exclude .spec.ts files (Playwright convention)
+    ],
   },
 });

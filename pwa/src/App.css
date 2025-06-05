@@ -66,14 +66,14 @@ header p {
 }
 
 .header-printer-selector .expand-button {
-  background: rgba(255, 255, 255, 0.25); /* Slightly darker/more opaque */
-  color: #0d47a1; /* Darker blue for text */
+  background: rgba(255, 255, 255, 0.9); /* More opaque for better contrast */
+  color: #0d47a1; /* Darker blue for full WCAG AA compliance */
   border: 1px solid rgba(255, 255, 255, 0.3);
   font-weight: 500; /* Increased font weight */
 }
 
 .header-printer-selector .expand-button:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.95); /* Slight opacity increase on hover */
 }
 
 /* Status bar */
@@ -423,7 +423,7 @@ footer p {
 
 .slice-and-print-button:disabled {
   background-color: #b0b0b0; /* Darker grey for disabled background */
-  color: #757575; /* Darker text for disabled state */
+  color: #3e3e3e; /* Even darker text for full WCAG AA compliance (ratio: 4.84) */
   cursor: not-allowed;
 }
 
@@ -517,7 +517,8 @@ footer p {
 }
 
 .refresh-button:disabled {
-  background: #ccc;
+  background: #cccccc;
+  color: #3e3e3e; /* Dark text for proper contrast on light background */
   cursor: not-allowed;
 }
 
@@ -805,6 +806,7 @@ footer p {
 
 .secondary-button:disabled {
   background: #cccccc;
+  color: #3e3e3e; /* Consistent with primary button for better contrast */
   cursor: not-allowed;
 }
 
@@ -1400,6 +1402,7 @@ footer p {
 
 .expand-button:disabled {
   background: #cccccc;
+  color: #3e3e3e; /* Dark text for proper contrast on light background */
   cursor: not-allowed;
 }
 
@@ -1469,6 +1472,7 @@ footer p {
 
 .discover-button:disabled {
   background: #cccccc;
+  color: #3e3e3e; /* Dark text for proper contrast on light background */
   cursor: not-allowed;
 }
 
@@ -1539,6 +1543,7 @@ footer p {
 
 .select-printer-button:disabled {
   background: #cccccc;
+  color: #3e3e3e; /* Dark text for proper contrast on light background */
   cursor: not-allowed;
 }
 
@@ -1655,6 +1660,7 @@ footer p {
 
 .set-manual-button:disabled {
   background: #cccccc;
+  color: #3e3e3e; /* Dark text for proper contrast on light background */
   cursor: not-allowed;
 }
 
