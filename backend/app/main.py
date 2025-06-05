@@ -6,11 +6,16 @@ printing 3D models to Bambu Lab printers in LAN-only mode.
 """
 
 import logging
-import tempfile
 from pathlib import Path
 from typing import Dict, List, Optional
 
 from app.config import config
+from app.job_orchestration import (
+    download_model_step,
+    slice_model_step,
+    start_print_step,
+    upload_gcode_step,
+)
 from app.model_service import (
     ModelDownloadError,
     ModelService,
@@ -22,6 +27,14 @@ from app.printer_service import (
     PrinterService,
 )
 from app.slicer_service import slice_model
+from app.utils import (
+    build_slicing_options_from_config,
+    find_gcode_file,
+    get_default_slicing_options,
+    get_gcode_output_dir,
+    handle_model_errors,
+    validate_ip_address,
+)
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -289,13 +302,8 @@ async def submit_model_url(request: ModelURLRequest):
             filament_requirements=filament_requirements_response,
         )
 
-    except ModelValidationError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except ModelDownloadError as e:
-        raise HTTPException(status_code=422, detail=str(e))
-    except Exception as e:
-        msg = f"Internal server error: {str(e)}"
-        raise HTTPException(status_code=500, detail=msg)
+    except (ModelValidationError, ModelDownloadError, Exception) as e:
+        raise handle_model_errors(e)
 
 
 @app.post("/api/slice/defaults", response_model=SliceResponse)
@@ -325,18 +333,10 @@ async def slice_model_with_defaults(request: SliceRequest):
             )
 
         # Create output directory for G-code
-        import tempfile
+        output_dir = get_gcode_output_dir()
 
-        output_dir = Path(tempfile.gettempdir()) / "lanbu-handy" / "gcode"
-        output_dir.mkdir(parents=True, exist_ok=True)
-
-        # Hardcoded default slicing settings for PLA
-        default_options = {
-            "profile": "pla",
-            "layer-height": "0.2",
-            "infill": "15",
-            "support": "auto",
-        }
+        # Get default slicing settings
+        default_options = get_default_slicing_options()
 
         # Slice the model
         result = slice_model(
@@ -344,20 +344,19 @@ async def slice_model_with_defaults(request: SliceRequest):
         )
 
         if result.success:
-            # Return success with G-code path
-            # The G-code should be in the output directory
-            gcode_files = list(output_dir.glob("*.gcode"))
-            if gcode_files:
-                gcode_path = str(gcode_files[0])
-            else:
-                # Fallback: use the output directory path
-                gcode_path = str(output_dir)
-
-            return SliceResponse(
-                success=True,
-                message="Model sliced successfully with default settings",
-                gcode_path=gcode_path,
-            )
+            try:
+                gcode_path = str(find_gcode_file(output_dir))
+                return SliceResponse(
+                    success=True,
+                    message="Model sliced successfully with default settings",
+                    gcode_path=gcode_path,
+                )
+            except FileNotFoundError:
+                return SliceResponse(
+                    success=False,
+                    message="Slicing completed but no G-code file generated",
+                    error_details="No output found in expected location",
+                )
         else:
             # Return slicing failure
             error_details = (
@@ -405,13 +404,10 @@ async def slice_model_with_configuration(request: ConfiguredSliceRequest):
             )
 
         # Create output directory for G-code
-        import tempfile
-
-        output_dir = Path(tempfile.gettempdir()) / "lanbu-handy" / "gcode"
-        output_dir.mkdir(parents=True, exist_ok=True)
+        output_dir = get_gcode_output_dir()
 
         # Build slicing options from the configuration
-        slicing_options = _build_slicing_options_from_config(
+        slicing_options = build_slicing_options_from_config(
             request.filament_mappings, request.build_plate_type
         )
 
@@ -421,20 +417,19 @@ async def slice_model_with_configuration(request: ConfiguredSliceRequest):
         )
 
         if result.success:
-            # Return success with G-code path
-            # The G-code should be in the output directory
-            gcode_files = list(output_dir.glob("*.gcode"))
-            if gcode_files:
-                gcode_path = str(gcode_files[0])
-            else:
-                # Fallback: use the output directory path
-                gcode_path = str(output_dir)
-
-            return SliceResponse(
-                success=True,
-                message="Model sliced successfully with user configuration",
-                gcode_path=gcode_path,
-            )
+            try:
+                gcode_path = str(find_gcode_file(output_dir))
+                return SliceResponse(
+                    success=True,
+                    message="Model sliced successfully with user configuration",
+                    gcode_path=gcode_path,
+                )
+            except FileNotFoundError:
+                return SliceResponse(
+                    success=False,
+                    message="Slicing completed but no G-code file generated",
+                    error_details="No output found in expected location",
+                )
         else:
             # Return slicing failure
             error_details = (
@@ -450,43 +445,6 @@ async def slice_model_with_configuration(request: ConfiguredSliceRequest):
     except Exception as e:
         msg = f"Internal server error during configured slicing: {str(e)}"
         raise HTTPException(status_code=500, detail=msg)
-
-
-def _build_slicing_options_from_config(
-    filament_mappings: List[FilamentMapping], build_plate_type: str
-) -> Dict[str, str]:
-    """
-    Build CLI options dictionary from filament mappings and build plate configuration.
-
-    Args:
-        filament_mappings: List of filament mappings from model indices to AMS slots
-        build_plate_type: Selected build plate type
-
-    Returns:
-        Dictionary of CLI options for the slicer
-    """
-    options = {}
-
-    # Add build plate type
-    # Common build plate CLI parameter name (may need adjustment based on actual CLI)
-    if build_plate_type:
-        options["build-plate"] = build_plate_type
-
-    # Add filament mappings
-    # Map each model filament index to an AMS slot
-    # CLI parameter format may vary - using common patterns
-    for mapping in filament_mappings:
-        # Option 1: --filament-slot-N format (where N is the filament index)
-        slot_key = f"filament-slot-{mapping.filament_index}"
-        slot_value = f"{mapping.ams_unit_id}-{mapping.ams_slot_id}"
-        options[slot_key] = slot_value
-
-        # Option 2: Alternative format if needed
-        # ams_key = f"ams-mapping-{mapping.filament_index}"
-        # ams_value = f"unit{mapping.ams_unit_id}:slot{mapping.ams_slot_id}"
-        # options[ams_key] = ams_value
-
-    return options
 
 
 @app.post("/api/job/start-basic", response_model=JobStartResponse)
@@ -529,176 +487,87 @@ async def start_basic_job(request: JobStartRequest):
         printer_config = printers[0]
 
         # Step 1: Download model
-        try:
-            file_path = await model_service.download_model(request.model_url)
-            job_steps["download"]["success"] = True
-            job_steps["download"]["message"] = "Model downloaded successfully"
-            job_steps["download"]["details"] = f"File: {file_path.name}"
-        except ModelValidationError as e:
-            job_steps["download"]["message"] = "Model validation failed"
-            job_steps["download"]["details"] = str(e)
+        download_result = await download_model_step(model_service, request.model_url)
+        job_steps["download"].update(
+            {
+                "success": download_result["success"],
+                "message": download_result["message"],
+                "details": download_result["details"],
+            }
+        )
+
+        if not download_result["success"]:
             return JobStartResponse(
                 success=False,
                 message="Job failed at download step",
                 job_steps=job_steps,
-                error_details=str(e),
+                error_details=download_result["details"],
             )
-        except ModelDownloadError as e:
-            job_steps["download"]["message"] = "Model download failed"
-            job_steps["download"]["details"] = str(e)
-            return JobStartResponse(
-                success=False,
-                message="Job failed at download step",
-                job_steps=job_steps,
-                error_details=str(e),
-            )
+
+        file_path = download_result["file_path"]
 
         # Step 2: Slice model
-        try:
-            # Create output directory for G-code
-            output_dir = Path(tempfile.gettempdir()) / "lanbu-handy" / "gcode"
-            output_dir.mkdir(parents=True, exist_ok=True)
-
-            # Use default slicing settings for PLA
-            default_options = {
-                "profile": "pla",
-                "layer-height": "0.2",
-                "infill": "15",
-                "support": "auto",
+        slice_result = slice_model_step(file_path)
+        job_steps["slice"].update(
+            {
+                "success": slice_result["success"],
+                "message": slice_result["message"],
+                "details": slice_result["details"],
             }
+        )
 
-            # Slice the model
-            result = slice_model(
-                input_path=file_path, output_dir=output_dir, options=default_options
-            )
-
-            if result.success:
-                # Find the generated G-code file
-                gcode_files = list(output_dir.glob("*.gcode"))
-                if gcode_files:
-                    gcode_path = gcode_files[0]
-                    job_steps["slice"]["success"] = True
-                    job_steps["slice"]["message"] = "Model sliced successfully"
-                    job_steps["slice"]["details"] = f"G-code: {gcode_path.name}"
-                else:
-                    job_steps["slice"]["message"] = "No G-code file generated"
-                    job_steps["slice"][
-                        "details"
-                    ] = "Slicing completed but no output found"
-                    return JobStartResponse(
-                        success=False,
-                        message="Job failed at slicing step",
-                        job_steps=job_steps,
-                        error_details="No G-code file generated",
-                    )
-            else:
-                job_steps["slice"]["message"] = "Slicing failed"
-                job_steps["slice"]["details"] = (
-                    f"CLI Error: {result.stderr}" if result.stderr else result.stdout
-                )
-                return JobStartResponse(
-                    success=False,
-                    message="Job failed at slicing step",
-                    job_steps=job_steps,
-                    error_details=job_steps["slice"]["details"],
-                )
-        except Exception as e:
-            job_steps["slice"]["message"] = "Slicing error"
-            job_steps["slice"]["details"] = str(e)
+        if not slice_result["success"]:
             return JobStartResponse(
                 success=False,
                 message="Job failed at slicing step",
                 job_steps=job_steps,
-                error_details=str(e),
+                error_details=slice_result["details"],
             )
+
+        gcode_path = slice_result["gcode_path"]
 
         # Step 3: Upload G-code to printer
-        try:
-            upload_result = printer_service.upload_gcode(
-                printer_config=printer_config, gcode_file_path=gcode_path
+        upload_result = upload_gcode_step(printer_service, printer_config, gcode_path)
+        job_steps["upload"].update(
+            {
+                "success": upload_result["success"],
+                "message": upload_result["message"],
+                "details": upload_result["details"],
+            }
+        )
+
+        if not upload_result["success"]:
+            return JobStartResponse(
+                success=False,
+                message="Job failed at upload step",
+                job_steps=job_steps,
+                error_details=upload_result["details"],
             )
 
-            if upload_result.success:
-                job_steps["upload"]["success"] = True
-                job_steps["upload"]["message"] = upload_result.message
-                job_steps["upload"][
-                    "details"
-                ] = f"Remote path: {upload_result.remote_path}"
-                gcode_filename = gcode_path.name
-            else:
-                job_steps["upload"]["message"] = "G-code upload failed"
-                job_steps["upload"]["details"] = (
-                    upload_result.error_details or upload_result.message
-                )
-                return JobStartResponse(
-                    success=False,
-                    message="Job failed at upload step",
-                    job_steps=job_steps,
-                    error_details=job_steps["upload"]["details"],
-                )
-        except PrinterCommunicationError as e:
-            job_steps["upload"]["message"] = "Printer communication error"
-            job_steps["upload"]["details"] = str(e)
-            return JobStartResponse(
-                success=False,
-                message="Job failed at upload step",
-                job_steps=job_steps,
-                error_details=str(e),
-            )
-        except Exception as e:
-            job_steps["upload"]["message"] = "Upload error"
-            job_steps["upload"]["details"] = str(e)
-            return JobStartResponse(
-                success=False,
-                message="Job failed at upload step",
-                job_steps=job_steps,
-                error_details=str(e),
-            )
+        gcode_filename = upload_result["gcode_filename"]
 
         # Step 4: Start print
-        try:
-            print_result = printer_service.start_print(
-                printer_config=printer_config, gcode_filename=gcode_filename
+        print_result = start_print_step(printer_service, printer_config, gcode_filename)
+        job_steps["print"].update(
+            {
+                "success": print_result["success"],
+                "message": print_result["message"],
+                "details": print_result["details"],
+            }
+        )
+
+        if print_result["success"]:
+            return JobStartResponse(
+                success=True,
+                message="Job completed successfully - print started",
+                job_steps=job_steps,
             )
-
-            if print_result.success:
-                job_steps["print"]["success"] = True
-                job_steps["print"]["message"] = print_result.message
-                job_steps["print"]["details"] = f"Print started for: {gcode_filename}"
-
-                return JobStartResponse(
-                    success=True,
-                    message="Job completed successfully - print started",
-                    job_steps=job_steps,
-                )
-            else:
-                job_steps["print"]["message"] = "Print start failed"
-                job_steps["print"]["details"] = (
-                    print_result.error_details or print_result.message
-                )
-                return JobStartResponse(
-                    success=False,
-                    message="Job failed at print initiation step",
-                    job_steps=job_steps,
-                    error_details=job_steps["print"]["details"],
-                )
-        except PrinterMQTTError as e:
-            job_steps["print"]["message"] = "MQTT communication error"
-            job_steps["print"]["details"] = str(e)
+        else:
             return JobStartResponse(
                 success=False,
                 message="Job failed at print initiation step",
                 job_steps=job_steps,
-                error_details=str(e),
-            )
-        except Exception as e:
-            job_steps["print"]["message"] = "Print start error"
-            job_steps["print"]["details"] = str(e)
-            return JobStartResponse(
-                success=False,
-                message="Job failed at print initiation step",
-                job_steps=job_steps,
-                error_details=str(e),
+                error_details=print_result["details"],
             )
 
     except HTTPException:
@@ -881,25 +750,8 @@ async def set_active_printer(request: SetActivePrinterRequest):
         HTTPException: If the printer configuration is invalid
     """
     try:
-        # Validate IP address format (basic validation)
-        ip = request.ip.strip()
-        if not ip:
-            raise HTTPException(
-                status_code=400, detail="Printer IP address cannot be empty"
-            )
-
-        # Basic IP format validation
-        ip_parts = ip.split(".")
-        if len(ip_parts) != 4:
-            raise HTTPException(status_code=400, detail="Invalid IP address format")
-
-        try:
-            for part in ip_parts:
-                part_int = int(part)
-                if part_int < 0 or part_int > 255:
-                    raise ValueError("IP part out of range")
-        except ValueError:
-            raise HTTPException(status_code=400, detail="Invalid IP address format")
+        # Validate IP address format
+        ip = validate_ip_address(request.ip)
 
         # Set the active printer
         try:
