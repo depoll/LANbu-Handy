@@ -35,7 +35,7 @@ from app.utils import (
     handle_model_errors,
     validate_ip_address,
 )
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -303,6 +303,87 @@ async def submit_model_url(request: ModelURLRequest):
         )
 
     except (ModelValidationError, ModelDownloadError, Exception) as e:
+        raise handle_model_errors(e)
+
+
+@app.post("/api/model/upload-file", response_model=ModelSubmissionResponse)
+async def upload_model_file(file: UploadFile = File(...)):
+    """
+    Upload a model file for validation and processing.
+
+    Accepts a file upload (multipart/form-data) containing a 3D model file,
+    validates it, and stores it temporarily for processing.
+
+    Args:
+        file: UploadFile containing the 3D model file (.stl or .3mf)
+
+    Returns:
+        ModelSubmissionResponse with success status and file information
+
+    Raises:
+        HTTPException: If validation fails or upload processing fails
+    """
+    try:
+        # Validate file extension
+        if not file.filename:
+            raise ModelValidationError("No filename provided")
+
+        if not model_service.validate_file_extension(file.filename):
+            extensions = ", ".join(model_service.supported_extensions)
+            raise ModelValidationError(
+                f"Unsupported file extension. File must be one of: {extensions}"
+            )
+
+        # Check file size (FastAPI doesn't provide direct size, so we'll
+        # check during read)
+        content = await file.read()
+
+        if len(content) > model_service.max_file_size_bytes:
+            max_mb = model_service.max_file_size_bytes // (1024 * 1024)
+            raise ModelValidationError(
+                f"File size exceeds maximum allowed size of {max_mb}MB"
+            )
+
+        # Generate unique filename and save to temp directory
+        import uuid
+
+        unique_filename = f"{uuid.uuid4().hex}_{file.filename}"
+        temp_file_path = model_service.temp_dir / unique_filename
+
+        # Write uploaded content to temporary file
+        with open(temp_file_path, "wb") as f:
+            f.write(content)
+
+        # Get file information
+        file_info = model_service.get_file_info(temp_file_path)
+
+        # Parse filament requirements if it's a .3mf file
+        filament_requirements = model_service.parse_3mf_filament_requirements(
+            temp_file_path
+        )
+
+        # Convert to response model if requirements were found
+        filament_requirements_response = None
+        if filament_requirements:
+            filament_requirements_response = FilamentRequirementResponse(
+                filament_count=filament_requirements.filament_count,
+                filament_types=filament_requirements.filament_types,
+                filament_colors=filament_requirements.filament_colors,
+                has_multicolor=filament_requirements.has_multicolor,
+            )
+
+        # Generate file ID (using the filename with UUID prefix for storage)
+        file_id = temp_file_path.name
+
+        return ModelSubmissionResponse(
+            success=True,
+            message="Model uploaded and validated successfully",
+            file_id=file_id,
+            file_info=file_info,
+            filament_requirements=filament_requirements_response,
+        )
+
+    except (ModelValidationError, Exception) as e:
         raise handle_model_errors(e)
 
 
