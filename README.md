@@ -56,11 +56,29 @@ LANbu Handy provides a streamlined workflow from model URL to print initiation, 
 
 ### Installation
 
-1. **Clone the repository**:
+#### Option 1: Using Pre-built Docker Image (Recommended)
+
+1. **Download the Docker Compose configuration**:
 
    ```bash
-   git clone https://github.com/depoll/LANbu-Handy.git
-   cd LANbu-Handy
+   curl -O https://raw.githubusercontent.com/depoll/LANbu-Handy/main/docker-compose.yml
+   ```
+
+   Or create a `docker-compose.yml` file with this content:
+
+   ```yaml
+   services:
+     lanbuhandy:
+       image: ghcr.io/depoll/lanbu-handy:latest
+       platform: linux/amd64
+       ports:
+         - '8080:8000'
+       restart: unless-stopped
+       environment:
+         - BAMBU_PRINTERS=${BAMBU_PRINTERS:-}
+         - BAMBU_PRINTER_IP=${BAMBU_PRINTER_IP:-}
+         - BAMBU_PRINTER_ACCESS_CODE=${BAMBU_PRINTER_ACCESS_CODE:-}
+         - LOG_LEVEL=${LOG_LEVEL:-info}
    ```
 
 2. **Configure your printer(s)**:
@@ -88,6 +106,37 @@ LANbu Handy provides a streamlined workflow from model URL to print initiation, 
 
 4. **Access the PWA**:
    Open your mobile browser and navigate to `http://[your-server-ip]:8080`
+
+#### Option 2: Build from Source (For Development)
+
+1. **Clone the repository**:
+
+   ```bash
+   git clone https://github.com/depoll/LANbu-Handy.git
+   cd LANbu-Handy
+   ```
+
+2. **Configure your printer(s)** (same as above):
+
+   Create a `.env` file or set environment variables as described in Option 1.
+
+3. **Build and start the application**:
+
+   ```bash
+   # This will build the image locally instead of using the pre-built one
+   docker compose -f docker-compose.dev.yml up -d --build
+   ```
+
+#### Using Specific Versions
+
+To use a specific release version instead of the latest:
+
+```yaml
+services:
+  lanbuhandy:
+    image: ghcr.io/depoll/lanbu-handy:v1.0.0  # Replace with desired version
+    # ... rest of configuration
+```
 
 ### Usage
 
@@ -152,8 +201,11 @@ sudo docker compose up -d
 
 **Build failures:**
 ```bash
+# If using the pre-built image (recommended), build issues should not occur
+# If building from source, try:
+
 # Clean build (removes cached layers)
-docker compose build --no-cache
+docker compose -f docker-compose.dev.yml build --no-cache
 
 # Check disk space
 df -h
@@ -242,10 +294,14 @@ df -h
 
 1. **"Command not found" or CLI missing:**
    ```bash
-   # Rebuild container to reinstall CLI
-   docker compose down
-   docker compose build --no-cache
+   # If using pre-built image, try pulling the latest version
+   docker compose pull
    docker compose up -d
+
+   # If building from source, rebuild container to reinstall CLI
+   docker compose -f docker-compose.dev.yml down
+   docker compose -f docker-compose.dev.yml build --no-cache
+   docker compose -f docker-compose.dev.yml up -d
    ```
 
 2. **Slicing fails with memory errors:**
@@ -480,8 +536,8 @@ cd backend && python -m pytest
 # Frontend linting
 cd pwa && npm run lint
 
-# Full Docker build test
-docker compose build
+# Docker image test (when building from source)
+docker compose -f docker-compose.dev.yml build
 ```
 
 ## Target Audience
