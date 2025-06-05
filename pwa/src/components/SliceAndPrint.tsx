@@ -5,6 +5,7 @@ import FilamentMappingConfig from './FilamentMappingConfig';
 import BuildPlateSelector from './BuildPlateSelector';
 import ConfigurationSummary from './ConfigurationSummary';
 import OperationProgress, { OperationStep } from './OperationProgress';
+import ModelPreview from './ModelPreview';
 import { useToast } from '../hooks/useToast';
 import {
   ModelSubmissionResponse,
@@ -948,6 +949,16 @@ function SliceAndPrint() {
       {modelSubmitted && filamentRequirements && (
         <FilamentRequirementsDisplay
           requirements={filamentRequirements}
+          className="workflow-section"
+        />
+      )}
+
+      {/* Model Preview */}
+      {modelSubmitted && currentFileId && (
+        <ModelPreview
+          fileId={currentFileId}
+          filamentRequirements={filamentRequirements || undefined}
+          filamentMappings={filamentMappings}
           className="workflow-section"
         />
       )}
