@@ -4,22 +4,22 @@ Tests for the utils module.
 Tests utility functions for error handling, validation, and configuration.
 """
 
-import pytest
 import tempfile
 from pathlib import Path
-from fastapi import HTTPException
 
+import pytest
+from app.model_service import ModelDownloadError, ModelValidationError
+from app.printer_service import PrinterCommunicationError, PrinterMQTTError
 from app.utils import (
-    get_gcode_output_dir,
+    build_slicing_options_from_config,
+    find_gcode_file,
     get_default_slicing_options,
+    get_gcode_output_dir,
     handle_model_errors,
     handle_printer_errors,
     validate_ip_address,
-    find_gcode_file,
-    build_slicing_options_from_config,
 )
-from app.model_service import ModelDownloadError, ModelValidationError
-from app.printer_service import PrinterCommunicationError, PrinterMQTTError
+from fastapi import HTTPException
 
 
 class TestUtilityFunctions:

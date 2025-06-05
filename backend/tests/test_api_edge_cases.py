@@ -6,9 +6,9 @@ that may not be covered in the main API tests.
 """
 
 from unittest.mock import patch
-from fastapi.testclient import TestClient
 
 from app.main import app
+from fastapi.testclient import TestClient
 
 client = TestClient(app)
 
@@ -31,6 +31,7 @@ class TestSliceEndpointEdgeCases:
     ):
         """Test slicing when no G-code file is generated."""
         from pathlib import Path
+
         from app.slicer_service import CLIResult
 
         # Setup mocks

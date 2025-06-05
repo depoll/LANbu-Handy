@@ -4,14 +4,15 @@ Tests for the job orchestration module.
 Tests the workflow steps for downloading, slicing, uploading and printing models.
 """
 
-import pytest
 from pathlib import Path
 from unittest.mock import AsyncMock, Mock, patch
+
+import pytest
 from app.job_orchestration import (
     download_model_step,
     slice_model_step,
-    upload_gcode_step,
     start_print_step,
+    upload_gcode_step,
 )
 from app.model_service import ModelDownloadError, ModelValidationError
 from app.slicer_service import CLIResult
