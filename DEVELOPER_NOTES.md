@@ -360,7 +360,7 @@ docker compose -f docker-compose.dev.yml build --no-cache
 docker compose -f docker-compose.dev.yml up -d
 ```
 
-**Note**: Pre-built images from GitHub Container Registry include the CLI version that was current at build time. For the latest CLI version, use development builds or wait for the next release.
+**Note**: Pre-built images from Docker Hub include the CLI version that was current at build time. For the latest CLI version, use development builds or wait for the next release.
 
 ### Production Deployment Considerations
 
