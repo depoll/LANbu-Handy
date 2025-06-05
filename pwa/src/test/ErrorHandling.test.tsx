@@ -22,11 +22,15 @@ describe('Error Handling Tests', () => {
 
     // Wait for the error to appear
     await waitFor(() => {
-      expect(screen.getByText(/Failed to fetch AMS status/)).toBeInTheDocument();
+      expect(
+        screen.getByText(/Failed to fetch AMS status/)
+      ).toBeInTheDocument();
     });
 
     // Check that the error message includes the appropriate details
-    expect(screen.getByText(/No response received from server/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/No response received from server/)
+    ).toBeInTheDocument();
   });
 
   it('handles fetch network errors gracefully', async () => {
@@ -42,7 +46,9 @@ describe('Error Handling Tests', () => {
 
     // Wait for the error to appear
     await waitFor(() => {
-      expect(screen.getByText(/Failed to fetch AMS status/)).toBeInTheDocument();
+      expect(
+        screen.getByText(/Failed to fetch AMS status/)
+      ).toBeInTheDocument();
     });
 
     // Check that the error message includes the network error
@@ -54,7 +60,7 @@ describe('Error Handling Tests', () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: false,
       status: 500,
-      statusText: 'Internal Server Error'
+      statusText: 'Internal Server Error',
     } as Response);
 
     render(
@@ -66,7 +72,9 @@ describe('Error Handling Tests', () => {
 
     // Wait for the error to appear
     await waitFor(() => {
-      expect(screen.getByText(/Failed to fetch AMS status/)).toBeInTheDocument();
+      expect(
+        screen.getByText(/Failed to fetch AMS status/)
+      ).toBeInTheDocument();
     });
 
     // Check that the error message includes the HTTP status
@@ -89,12 +97,12 @@ describe('Error Handling Tests', () => {
                 slot_id: 1,
                 filament_type: 'PLA',
                 color: 'Red',
-                material_id: 'PLA_001'
-              }
-            ]
-          }
-        ]
-      })
+                material_id: 'PLA_001',
+              },
+            ],
+          },
+        ],
+      }),
     } as unknown as Response);
 
     render(
@@ -106,7 +114,9 @@ describe('Error Handling Tests', () => {
 
     // Wait for the success message to appear
     await waitFor(() => {
-      expect(screen.getByText(/AMS status retrieved successfully/)).toBeInTheDocument();
+      expect(
+        screen.getByText(/AMS status retrieved successfully/)
+      ).toBeInTheDocument();
     });
 
     // Check that the AMS data is displayed

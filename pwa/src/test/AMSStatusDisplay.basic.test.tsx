@@ -7,7 +7,7 @@ describe('AMSStatusDisplay Basic Tests', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
-    
+
     // Mock fetch with proper Response object
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
@@ -15,8 +15,8 @@ describe('AMSStatusDisplay Basic Tests', () => {
       json: vi.fn().mockResolvedValue({
         success: true,
         message: 'AMS status retrieved successfully',
-        ams_units: []
-      })
+        ams_units: [],
+      }),
     } as unknown as Response);
   });
 

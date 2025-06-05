@@ -57,13 +57,13 @@ function PrinterSelector({
   const loadCurrentPrinter = async () => {
     try {
       const response = await fetch('/api/config');
-      
+
       // Check if response exists and is valid
       if (!response) {
         console.error('No response received from /api/config');
         return;
       }
-      
+
       if (response.ok) {
         const config: PrinterConfigResponse = await response.json();
         if (config.active_printer) {
