@@ -93,7 +93,7 @@ By following these guidelines, Copilot Workspace can be a powerful assistant in 
 
 ## 8. Additional Guidelines
 
-- Any new code must pass existing checks (CI, Linting, etc.) -- validate this before committing any change. Always look for code formatting violations by running these linters on your changes and addressing any failures.
+- Any new code must pass existing checks (CI, Linting, etc.) -- validate this before committing any change. Always look for code formatting violations by running these linters on your changes and addressing any failures and run any auto formatters (e.g. black) before committing.
 - As much as feasible, do your work within the dev container for the project and keep the dev container definition up to date as requirements change.
 - When possible, include screenshots of any UI changes in the PR after implementing using playwright.
 - If you change UI, provide screenshots of the changes in the PR.
