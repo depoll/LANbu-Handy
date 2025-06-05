@@ -166,8 +166,8 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({
           // ThreeMFLoader returns a Group, we need to extract the geometry
           // and handle potential multiple objects/materials
           const geometries: THREE.BufferGeometry[] = [];
-          
-          object.traverse((child) => {
+
+          object.traverse(child => {
             if (child instanceof THREE.Mesh && child.geometry) {
               geometries.push(child.geometry);
             }

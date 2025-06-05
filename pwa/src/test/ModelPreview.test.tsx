@@ -5,7 +5,7 @@ import { FilamentRequirement, FilamentMapping } from '../types/api';
 
 // Mock Three.js
 vi.mock('three', () => {
-  const MockMesh = vi.fn(function(geometry) {
+  const MockMesh = vi.fn(function (geometry) {
     // Create the mock mesh instance with proper prototype for instanceof
     const mesh = {
       castShadow: false,
@@ -57,7 +57,7 @@ vi.mock('three', () => {
 
 vi.mock('three-stdlib', async () => {
   const THREE = await vi.importMock('three');
-  
+
   return {
     STLLoader: vi.fn(() => ({
       load: vi.fn((url, onLoad) => {
@@ -84,17 +84,17 @@ vi.mock('three-stdlib', async () => {
           },
           translate: vi.fn(),
         };
-        
+
         // Create a mock mesh using the mocked THREE.Mesh constructor
         const mockMesh = new THREE.Mesh(mockGeometry);
-        
+
         const mockGroup = {
-          traverse: vi.fn((callback) => {
+          traverse: vi.fn(callback => {
             // Call the callback with the mock mesh
             callback(mockMesh);
           }),
         };
-        
+
         setTimeout(() => onLoad(mockGroup), 100);
       }),
     })),
