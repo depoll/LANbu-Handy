@@ -123,14 +123,16 @@ LANbu-Handy/
 ## Documentation
 
 - **[Product Requirements Document](.docs/prd.md)**: Detailed project requirements and specifications
+- **[Developer Notes](DEVELOPER_NOTES.md)**: Architecture overview, development setup, and code organization
 - **[PWA Development Guide](pwa/README.md)**: Frontend development setup and structure
 - **[DevContainer Guide](.devcontainer/README.md)**: Development environment setup
 - **[Scripts Documentation](scripts/README.md)**: Build scripts and utilities
 
 ## Development
 
-For development setup and contribution guidelines, see:
+For comprehensive development information including architecture, setup instructions, and code organization, see the **[Developer Notes](DEVELOPER_NOTES.md)**.
 
+**Quick Links:**
 - **DevContainer**: Use the provided `.devcontainer` for a consistent development environment
 - **Backend Development**: See backend tests and FastAPI application structure
 - **Frontend Development**: See the [PWA README](pwa/README.md) for React development workflow
