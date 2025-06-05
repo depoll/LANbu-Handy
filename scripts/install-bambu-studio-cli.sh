@@ -68,7 +68,7 @@ install_minimal_dependencies() {
 
         echo "Installing $desc..."
         for package in "${packages[@]}"; do
-            if $APT_CMD install -y --allow-unauthenticated "$package" 2>/dev/null; then
+            if $APT_CMD install -y --no-install-recommends --allow-unauthenticated "$package" 2>/dev/null; then
                 echo "  ✓ $package"
             else
                 echo "  ✗ $package (not available or failed to install)"
@@ -77,6 +77,13 @@ install_minimal_dependencies() {
     }
 
     install_package_list "minimal CLI dependencies" "${MINIMAL_DEPS_LIST[@]}"
+
+    # Clean up package caches to reduce image size
+    if [ "$EUID" -eq 0 ]; then
+        apt-get clean && rm -rf /var/lib/apt/lists/*
+    elif command -v sudo >/dev/null 2>&1; then
+        sudo apt-get clean && sudo rm -rf /var/lib/apt/lists/*
+    fi
 
     echo "Minimal system dependencies installation completed"
     echo "Note: CLI may show warnings about missing GUI libraries, but core functionality should work"
@@ -219,7 +226,7 @@ install_full_dependencies() {
 
         echo "Installing $desc..."
         for package in "${packages[@]}"; do
-            if $APT_CMD install -y --allow-unauthenticated "$package" 2>/dev/null; then
+            if $APT_CMD install -y --no-install-recommends --allow-unauthenticated "$package" 2>/dev/null; then
                 echo "  ✓ $package"
             else
                 echo "  ✗ $package (not available or failed to install)"
@@ -235,6 +242,13 @@ install_full_dependencies() {
     install_package_list "network and security dependencies" "${NETWORK_DEPS[@]}"
     install_package_list "system dependencies" "${SYSTEM_DEPS[@]}"
     install_package_list "optional dependencies" "${OPTIONAL_DEPS[@]}"
+
+    # Clean up package caches to reduce image size
+    if [ "$EUID" -eq 0 ]; then
+        apt-get clean && rm -rf /var/lib/apt/lists/*
+    elif command -v sudo >/dev/null 2>&1; then
+        sudo apt-get clean && sudo rm -rf /var/lib/apt/lists/*
+    fi
 
     echo "Full system dependencies installation completed"
 }
