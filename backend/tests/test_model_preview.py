@@ -2,15 +2,15 @@
 Tests for model preview endpoint
 """
 
-import pytest
-from fastapi.testclient import TestClient
-from pathlib import Path
 import tempfile
 import zipfile
+from pathlib import Path
 from unittest.mock import patch
 
+import pytest
 from app.main import app
 from app.model_service import ModelService
+from fastapi.testclient import TestClient
 
 
 @pytest.fixture

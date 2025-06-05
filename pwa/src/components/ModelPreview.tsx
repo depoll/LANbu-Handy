@@ -77,7 +77,7 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({
       if (!container) return;
       const newWidth = container.clientWidth;
       const newHeight = container.clientHeight || 300;
-      
+
       camera.aspect = newWidth / newHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(newWidth, newHeight);
@@ -109,15 +109,15 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({
 
     loader.load(
       modelUrl,
-      (geometry) => {
+      geometry => {
         // Remove existing mesh
         if (meshRef.current) {
           sceneRef.current?.remove(meshRef.current);
         }
 
         // Create material with default color
-        const material = new THREE.MeshLambertMaterial({ 
-          color: getModelColor(0, filamentRequirements, filamentMappings)
+        const material = new THREE.MeshLambertMaterial({
+          color: getModelColor(0, filamentRequirements, filamentMappings),
         });
 
         // Create mesh
@@ -131,10 +131,10 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({
         const box = geometry.boundingBox!;
         const center = box.getCenter(new THREE.Vector3());
         const size = box.getSize(new THREE.Vector3());
-        
+
         // Center the geometry
         geometry.translate(-center.x, -center.y, -center.z);
-        
+
         // Scale to fit in view
         const maxDim = Math.max(size.x, size.y, size.z);
         const scale = 30 / maxDim;
@@ -143,11 +143,11 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({
         sceneRef.current!.add(mesh);
         setIsLoading(false);
       },
-      (progress) => {
+      progress => {
         // Loading progress
         console.log('Model loading progress:', progress);
       },
-      (error) => {
+      error => {
         console.error('Error loading model:', error);
         setError('Failed to load model for preview');
         setIsLoading(false);
@@ -160,7 +160,9 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({
     if (!meshRef.current || !filamentRequirements) return;
 
     const newColor = getModelColor(0, filamentRequirements, filamentMappings);
-    (meshRef.current.material as THREE.MeshLambertMaterial).color.setHex(newColor);
+    (meshRef.current.material as THREE.MeshLambertMaterial).color.setHex(
+      newColor
+    );
   }, [filamentMappings, filamentRequirements]);
 
   return (
@@ -170,22 +172,22 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({
         {isLoading && <span className="loading-text">Loading model...</span>}
         {error && <span className="error-text">{error}</span>}
       </div>
-      <div 
-        ref={mountRef} 
+      <div
+        ref={mountRef}
         className="model-preview-container"
-        style={{ 
-          width: '100%', 
-          height: '300px', 
+        style={{
+          width: '100%',
+          height: '300px',
           border: '1px solid #ddd',
           borderRadius: '8px',
-          overflow: 'hidden'
+          overflow: 'hidden',
         }}
       />
       {filamentRequirements && filamentRequirements.filament_count > 1 && (
         <div className="preview-note">
           <small>
-            ⚠️ Multi-material models show simplified color preview. 
-            Actual print will use mapped filament colors.
+            ⚠️ Multi-material models show simplified color preview. Actual print
+            will use mapped filament colors.
           </small>
         </div>
       )}
@@ -203,13 +205,15 @@ function getModelColor(
 ): number {
   // If we have filament requirements and mappings, try to use the mapped color
   if (filamentRequirements && filamentMappings.length > 0) {
-    const mapping = filamentMappings.find(m => m.filament_index === filamentIndex);
+    const mapping = filamentMappings.find(
+      m => m.filament_index === filamentIndex
+    );
     if (mapping) {
       // For now, use a simple color mapping based on AMS slot
       // This could be enhanced to query actual AMS colors
       const colors = [
         0xff6b6b, // Red
-        0x4ecdc4, // Teal  
+        0x4ecdc4, // Teal
         0x45b7d1, // Blue
         0x96ceb4, // Green
         0xffeaa7, // Yellow
@@ -222,7 +226,10 @@ function getModelColor(
   }
 
   // If we have filament requirements but no mapping, use the requirement color
-  if (filamentRequirements && filamentRequirements.filament_colors.length > filamentIndex) {
+  if (
+    filamentRequirements &&
+    filamentRequirements.filament_colors.length > filamentIndex
+  ) {
     const colorStr = filamentRequirements.filament_colors[filamentIndex];
     if (colorStr && colorStr.startsWith('#')) {
       return parseInt(colorStr.substring(1), 16);

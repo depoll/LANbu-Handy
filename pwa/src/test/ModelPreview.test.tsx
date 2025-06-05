@@ -64,7 +64,7 @@ vi.mock('three-stdlib', () => ({
 // Mock requestAnimationFrame and cancelAnimationFrame
 Object.defineProperty(window, 'requestAnimationFrame', {
   writable: true,
-  value: vi.fn((cb) => setTimeout(cb, 16)),
+  value: vi.fn(cb => setTimeout(cb, 16)),
 });
 
 Object.defineProperty(window, 'cancelAnimationFrame', {
@@ -96,24 +96,24 @@ describe('ModelPreview Component', () => {
 
   it('renders without crashing', () => {
     render(<ModelPreview fileId="test-file.stl" />);
-    
+
     expect(screen.getByText('Model Preview')).toBeInTheDocument();
   });
 
   it('shows loading state initially', () => {
     render(<ModelPreview fileId="test-file.stl" />);
-    
+
     expect(screen.getByText('Loading model...')).toBeInTheDocument();
   });
 
   it('renders preview container with correct dimensions', () => {
     render(<ModelPreview fileId="test-file.stl" />);
-    
+
     const container = document.querySelector('.model-preview-container');
     expect(container).toBeInTheDocument();
-    expect(container).toHaveStyle({ 
-      width: '100%', 
-      height: '300px' 
+    expect(container).toHaveStyle({
+      width: '100%',
+      height: '300px',
     });
   });
 
@@ -154,10 +154,7 @@ describe('ModelPreview Component', () => {
 
   it('applies custom className', () => {
     render(
-      <ModelPreview
-        fileId="test-file.stl"
-        className="custom-preview-class"
-      />
+      <ModelPreview fileId="test-file.stl" className="custom-preview-class" />
     );
 
     const previewDiv = document.querySelector('.model-preview');
@@ -166,11 +163,11 @@ describe('ModelPreview Component', () => {
 
   it('handles file ID changes', () => {
     const { rerender } = render(<ModelPreview fileId="file1.stl" />);
-    
+
     expect(screen.getByText('Loading model...')).toBeInTheDocument();
 
     rerender(<ModelPreview fileId="file2.stl" />);
-    
+
     // Should still show loading for the new file
     expect(screen.getByText('Loading model...')).toBeInTheDocument();
   });
