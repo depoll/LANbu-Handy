@@ -157,7 +157,7 @@ function PrinterSelector({
 
   const handleSetManualPrinter = async () => {
     if (!manualIp.trim()) {
-      setStatusMessage('Please enter a printer IP address');
+      setStatusMessage('Please enter a printer IP address or hostname');
       return;
     }
 
@@ -295,7 +295,7 @@ function PrinterSelector({
         <div className="printer-selection-panel">
           <div className="panel-header">
             <h3>Select Printer</h3>
-            <p>Choose a discovered printer or enter IP address manually</p>
+            <p>Choose a discovered printer or enter IP address or hostname manually</p>
           </div>
 
           {/* Discovery Section */}
@@ -353,7 +353,7 @@ function PrinterSelector({
             <div className="manual-form">
               <div className="form-row">
                 <label htmlFor="manual-ip">
-                  IP Address *
+                  IP Address or Hostname *
                   {hasSavedIP() && (
                     <span className="saved-ip-indicator"> (saved)</span>
                   )}
@@ -365,7 +365,7 @@ function PrinterSelector({
                     value={manualIp}
                     onChange={e => setManualIp(e.target.value)}
                     onKeyPress={handleKeyPress}
-                    placeholder="192.168.1.100"
+                    placeholder="192.168.1.100 or printer.local"
                     disabled={isSettingPrinter}
                     className="ip-input"
                   />
@@ -378,7 +378,7 @@ function PrinterSelector({
                       }}
                       disabled={isSettingPrinter}
                       className="clear-saved-ip-button"
-                      title="Clear saved IP address"
+                      title="Clear saved IP address or hostname"
                     >
                       ✕
                     </button>

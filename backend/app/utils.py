@@ -5,6 +5,7 @@ This module provides common utility functions used across the application
 for error handling, path management, and other shared operations.
 """
 
+import re
 import tempfile
 from pathlib import Path
 from typing import Dict, List
@@ -83,12 +84,124 @@ def handle_printer_errors(e: Exception) -> HTTPException:
         return HTTPException(status_code=500, detail=msg)
 
 
-def validate_ip_address(ip: str) -> str:
+def validate_ip_or_hostname(address: str) -> str:
     """
-    Validate and clean an IP address string.
+    Validate and clean an IP address or hostname string.
 
     Args:
-        ip: The IP address string to validate
+        address: The IP address or hostname string to validate
+
+    Returns:
+        str: The cleaned IP address or hostname
+
+    Raises:
+        HTTPException: If the address is invalid
+    """
+    address = address.strip()
+    if not address:
+        raise HTTPException(
+            status_code=400, detail="Printer address cannot be empty"
+        )
+
+    # First try IPv4 validation
+    if _is_valid_ipv4(address):
+        return address
+    
+    # Then try hostname validation
+    if _is_valid_hostname(address):
+        return address
+    
+    raise HTTPException(
+        status_code=400, 
+        detail="Invalid IP address or hostname format"
+    )
+
+
+def _is_valid_ipv4(ip: str) -> bool:
+    """
+    Check if a string is a valid IPv4 address.
+    
+    Args:
+        ip: The string to validate as IPv4
+        
+    Returns:
+        bool: True if valid IPv4, False otherwise
+    """
+    ip_parts = ip.split(".")
+    if len(ip_parts) != 4:
+        return False
+
+    try:
+        for part in ip_parts:
+            part_int = int(part)
+            if part_int < 0 or part_int > 255:
+                return False
+    except ValueError:
+        return False
+
+    return True
+
+
+def _is_valid_hostname(hostname: str) -> bool:
+    """
+    Check if a string is a valid hostname according to RFC standards.
+    
+    Args:
+        hostname: The string to validate as hostname
+        
+    Returns:
+        bool: True if valid hostname, False otherwise
+    """
+    # Basic length checks
+    if not hostname or len(hostname) > 253:
+        return False
+    
+    # Remove trailing dot if present (FQDN)
+    if hostname.endswith('.'):
+        hostname = hostname[:-1]
+    
+    # Check each label (part between dots)
+    labels = hostname.split('.')
+    
+    for label in labels:
+        # Empty label not allowed (would happen with consecutive dots)
+        if not label:
+            return False
+        
+        # Label too long (max 63 characters per RFC)
+        if len(label) > 63:
+            return False
+            
+        # Label cannot start or end with hyphen
+        if label.startswith('-') or label.endswith('-'):
+            return False
+            
+        # Label can only contain letters, numbers, hyphens
+        # Note: Some systems allow underscores but RFC 952/1123 doesn't
+        if not re.match(r'^[a-zA-Z0-9-]+$', label):
+            return False
+        
+        # For hostnames that look like IP addresses (all numeric labels),
+        # apply some additional restrictions to avoid confusion
+        if label.isdigit():
+            # If all labels are numeric and there are 4 of them,
+            # this might be an invalid IP address attempt
+            if len(labels) == 4 and all(l.isdigit() for l in labels):
+                # Let this be handled by IP validation instead
+                return False
+    
+    return True
+
+
+# Keep the old function name for backward compatibility
+def validate_ip_address(address: str) -> str:
+    """
+    Validate and clean an IP address string (legacy function - IP addresses only).
+    
+    For new code, use validate_ip_or_hostname() which supports both IPs and hostnames.
+
+    Args:
+        address: The IP address string to validate
 
     Returns:
         str: The cleaned IP address
@@ -96,26 +209,20 @@ def validate_ip_address(ip: str) -> str:
     Raises:
         HTTPException: If the IP address is invalid
     """
-    ip = ip.strip()
-    if not ip:
+    address = address.strip()
+    if not address:
         raise HTTPException(
-            status_code=400, detail="Printer IP address cannot be empty"
+            status_code=400, detail="Printer address cannot be empty"
         )
 
-    # Basic IP format validation
-    ip_parts = ip.split(".")
-    if len(ip_parts) != 4:
-        raise HTTPException(status_code=400, detail="Invalid IP address format")
-
-    try:
-        for part in ip_parts:
-            part_int = int(part)
-            if part_int < 0 or part_int > 255:
-                raise ValueError("IP part out of range")
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid IP address format")
-
-    return ip
+    # Strict IPv4 validation only
+    if _is_valid_ipv4(address):
+        return address
+    
+    raise HTTPException(
+        status_code=400, 
+        detail="Invalid IP address format"
+    )
 
 
 def find_gcode_file(output_dir: Path) -> Path:
