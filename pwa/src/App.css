@@ -2179,3 +2179,115 @@ footer p {
     font-size: 0.85rem;
   }
 }
+
+/* Model Preview Component Styles */
+.model-preview {
+  background: white;
+  border: 1px solid #e9ecef;
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin: 1rem 0;
+}
+
+.model-preview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.model-preview-header h3 {
+  margin: 0;
+  color: #343a40;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.model-preview .loading-text {
+  color: #6c757d;
+  font-size: 0.9rem;
+  font-style: italic;
+}
+
+.model-preview .error-text {
+  color: #dc3545;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.model-preview-container {
+  position: relative;
+  background: #f8f9fa;
+  border-radius: 6px;
+  overflow: hidden;
+  min-height: 300px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.model-preview-container canvas {
+  border-radius: 6px;
+}
+
+.preview-note {
+  margin-top: 1rem;
+  padding: 0.75rem;
+  background: #fff3cd;
+  border: 1px solid #ffeaa7;
+  border-radius: 4px;
+  color: #856404;
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.preview-note small {
+  display: block;
+  line-height: 1.4;
+}
+
+/* Loading state for model preview */
+.model-preview-container::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 40px;
+  height: 40px;
+  border: 3px solid #e9ecef;
+  border-top: 3px solid #2196f3;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  z-index: 1;
+}
+
+.model-preview-container:has(canvas)::before {
+  display: none;
+}
+
+/* Mobile responsiveness for model preview */
+@media (max-width: 768px) {
+  .model-preview {
+    margin: 1rem;
+    padding: 1rem;
+  }
+
+  .model-preview-container {
+    height: 250px;
+    min-height: 250px;
+  }
+
+  .model-preview-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+
+  .preview-note {
+    font-size: 0.8rem;
+    padding: 0.5rem;
+  }
+}
