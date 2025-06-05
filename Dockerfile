@@ -39,13 +39,13 @@ RUN chmod +x /tmp/install-bambu-studio-cli.sh && \
     MINIMAL_DEPS=true /tmp/install-bambu-studio-cli.sh && \
     rm -f /tmp/install-bambu-studio-cli.sh
 
-# Copy and install Python dependencies
-COPY backend/requirements.txt ./backend/
+# Copy and install Python dependencies (production only)
+COPY backend/requirements-prod.txt ./backend/
 RUN pip install --trusted-host pypi.org \
     --trusted-host pypi.python.org \
     --trusted-host files.pythonhosted.org \
     --no-cache-dir \
-    -r backend/requirements.txt && \
+    -r backend/requirements-prod.txt && \
     pip cache purge
 
 # Copy backend application and set proper ownership
