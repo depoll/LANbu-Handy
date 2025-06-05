@@ -67,12 +67,6 @@ BAMBU_PRINTERS='[
 ]'
 ```
 
-#### Legacy Format (Still Supported)
-```bash
-BAMBU_PRINTER_IP=192.168.1.100
-BAMBU_PRINTER_ACCESS_CODE=12345678
-```
-
 ## Storage Priority
 
 LANbu Handy loads printers in this order:
@@ -116,8 +110,6 @@ The following new API endpoints are available for managing persistent printers:
 |----------|-------------|---------|
 | `PRINTER_CONFIG_FILE` | Path to persistent printer config file | `/app/data/printers.json` |
 | `BAMBU_PRINTERS` | JSON array of printer configurations | `""` |
-| `BAMBU_PRINTER_IP` | Legacy single printer IP | `""` |
-| `BAMBU_PRINTER_ACCESS_CODE` | Legacy single printer access code | `""` |
 
 ### Docker Compose Configuration
 
@@ -138,8 +130,6 @@ services:
       
       # Optional: Environment-based printer configuration  
       - BAMBU_PRINTERS=${BAMBU_PRINTERS:-}
-      - BAMBU_PRINTER_IP=${BAMBU_PRINTER_IP:-}
-      - BAMBU_PRINTER_ACCESS_CODE=${BAMBU_PRINTER_ACCESS_CODE:-}
 ```
 
 ## Migration Guide

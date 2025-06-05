@@ -108,11 +108,7 @@ pre-commit install
 Create a `.env` file for local development:
 
 ```bash
-# Single printer (legacy format)
-BAMBU_PRINTER_IP=192.168.1.100
-BAMBU_PRINTER_ACCESS_CODE=12345678
-
-# Multiple printers (recommended)
+# Printer configuration (JSON format)
 BAMBU_PRINTERS=[{"name":"Living Room X1C","ip":"192.168.1.100","access_code":"12345678"}]
 ```
 
@@ -381,8 +377,7 @@ services:
     ports:
       - "8080:8000"
     environment:
-      - BAMBU_PRINTER_IP=${BAMBU_PRINTER_IP}
-      - BAMBU_PRINTER_ACCESS_CODE=${BAMBU_PRINTER_ACCESS_CODE}
+      - BAMBU_PRINTERS=${BAMBU_PRINTERS:-}
     tmpfs:
       - /tmp:noexec,nosuid,size=1g  # Temporary file storage
 ```

@@ -50,7 +50,7 @@ LANbu Handy is designed as an "all-in-one" Dockerized application:
 - **Comments**: Add clear comments for complex logic, non-obvious decisions, and public API functions/methods.
 - **Error Handling**: Implement robust error handling for all I/O operations, API calls, CLI interactions, and printer communications. Provide user-friendly error messages to the PWA.
 - **Configuration**:
-  - Printer IP address should initially be configurable via an environment variable for the Docker container (e.g., `BAMBU_PRINTER_IP`). The UI will later allow selection or manual input.
+  - Printer configurations should be manageable via environment variables (JSON format with `BAMBU_PRINTERS`) for Docker containers and via the UI for user-friendly management.
   - Avoid hardcoding configurable values.
 - **Security**: While primarily for LAN use, validate all inputs from the PWA and ensure that file operations are handled securely (e.g., temporary file storage, path traversal).
 - **Testing**:

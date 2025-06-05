@@ -9,7 +9,7 @@ import logging
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from app.config import config
+from app.config import config, PrinterConfig
 from app.job_orchestration import (
     download_model_step,
     slice_model_step,

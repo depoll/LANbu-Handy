@@ -33,7 +33,6 @@ class TestPrinterManagementIntegration:
         self.env_patch = patch.dict('os.environ', {
             'PRINTER_CONFIG_FILE': str(self.config_file),
             'BAMBU_PRINTERS': '',  # Ensure no environment printers
-            'BAMBU_PRINTER_IP': '',
         })
         self.env_patch.start()
 

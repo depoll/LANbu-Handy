@@ -78,21 +78,12 @@ LANbu Handy provides a streamlined workflow from model URL to print initiation, 
        restart: unless-stopped
        environment:
          - BAMBU_PRINTERS=${BAMBU_PRINTERS:-}
-         - BAMBU_PRINTER_IP=${BAMBU_PRINTER_IP:-}
-         - BAMBU_PRINTER_ACCESS_CODE=${BAMBU_PRINTER_ACCESS_CODE:-}
          - LOG_LEVEL=${LOG_LEVEL:-info}
    ```
 
 2. **Configure your printer(s)**:
 
    Create a `.env` file or set environment variables:
-
-   **For a single printer (legacy format)**:
-
-   ```bash
-   BAMBU_PRINTER_IP=192.168.1.100
-   BAMBU_PRINTER_ACCESS_CODE=12345678
-   ```
 
    **For multiple printers (recommended)**:
 
@@ -211,12 +202,6 @@ BAMBU_PRINTERS='[
   {"name":"Living Room X1C","ip":"192.168.1.100","access_code":"12345678"},
   {"name":"Garage A1 mini","ip":"192.168.1.101","access_code":"87654321"}
 ]'
-```
-
-**Single printer (legacy)**:
-```bash
-BAMBU_PRINTER_IP=192.168.1.100
-BAMBU_PRINTER_ACCESS_CODE=12345678
 ```
 
 ### Hybrid Configuration

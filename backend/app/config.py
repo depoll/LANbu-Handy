@@ -41,7 +41,8 @@ class Config:
     """Application configuration class."""
 
     def __init__(self):
-        """Initialize configuration by reading environment variables and persistent storage."""
+        """Initialize configuration by reading environment variables and
+        persistent storage."""
         self.printers: List[PrinterConfig] = self._load_printers()
         self.runtime_active_printer: Optional[PrinterConfig] = None
 
@@ -64,29 +65,37 @@ class Config:
             persistent_printers = printer_storage.load_printers()
             all_printers.extend(persistent_printers)
             if persistent_printers:
-                logger.info(f"Loaded {len(persistent_printers)} printers from persistent storage")
+                logger.info(
+                    f"Loaded {len(persistent_printers)} printers "
+                    f"from persistent storage"
+                )
         except Exception as e:
             logger.warning(f"Failed to load printers from persistent storage: {e}")
 
         # Then load from environment variables (for backward compatibility)
         env_printers = self._load_printers_from_env()
-        
+
         # Add environment printers that don't conflict with persistent ones
         # (same IP address = conflict)
         persistent_ips = {p.ip for p in all_printers}
         for env_printer in env_printers:
             if env_printer.ip not in persistent_ips:
                 all_printers.append(env_printer)
-                logger.info(f"Added environment printer: {env_printer.name} at {env_printer.ip}")
+                logger.info(
+                    f"Added environment printer: {env_printer.name} "
+                    f"at {env_printer.ip}"
+                )
             else:
-                logger.info(f"Skipping environment printer {env_printer.name} - IP {env_printer.ip} already exists in persistent storage")
+                logger.info(
+                    f"Skipping environment printer "
+                    f"{env_printer.name} - IP {env_printer.ip} "
+                    f"already exists in persistent storage"
+                )
 
         if not all_printers:
             logger.warning(
                 "No printer configuration found. Set BAMBU_PRINTERS "
-                "(JSON format) or BAMBU_PRINTER_IP + "
-                "BAMBU_PRINTER_ACCESS_CODE for legacy format, "
-                "or add printers via the UI. "
+                "(JSON format) or add printers via the UI. "
                 "Printer communication will not be available."
             )
 
@@ -95,16 +104,14 @@ class Config:
     def _load_printers_from_env(self) -> List[PrinterConfig]:
         """Load Bambu printer configurations from environment variables.
 
-        Supports two formats:
-        1. New format: BAMBU_PRINTERS JSON array
-        2. Legacy format: BAMBU_PRINTER_IP (for backward compatibility)
+        Supports BAMBU_PRINTERS JSON array format.
 
         Returns:
             List[PrinterConfig]: List of configured printers from environment
         """
         printers = []
 
-        # Try new format first: BAMBU_PRINTERS JSON
+        # Load from BAMBU_PRINTERS JSON
         bambu_printers_json = os.getenv("BAMBU_PRINTERS")
         if bambu_printers_json:
             try:
@@ -147,36 +154,6 @@ class Config:
 
             except json.JSONDecodeError as e:
                 logger.error(f"Invalid JSON in BAMBU_PRINTERS: {e}")
-
-        # Fall back to legacy format: BAMBU_PRINTER_IP
-        legacy_ip = os.getenv("BAMBU_PRINTER_IP")
-        if legacy_ip:
-            legacy_ip = legacy_ip.strip()
-            if legacy_ip:
-                # For legacy format, we need an access code too
-                legacy_access_code = os.getenv("BAMBU_PRINTER_ACCESS_CODE", "")
-                if not legacy_access_code.strip():
-                    logger.warning(
-                        "BAMBU_PRINTER_IP is set but "
-                        "BAMBU_PRINTER_ACCESS_CODE is missing. "
-                        "Please provide access code or use "
-                        "BAMBU_PRINTERS format."
-                    )
-                    return []
-
-                try:
-                    printer = PrinterConfig(
-                        name="Default Printer",
-                        ip=legacy_ip,
-                        access_code=legacy_access_code.strip(),
-                    )
-                    printers.append(printer)
-                    logger.info(
-                        f"Configured legacy printer: {printer.name} " f"at {printer.ip}"
-                    )
-                    return printers
-                except ValueError as e:
-                    logger.error(f"Invalid legacy printer configuration: {e}")
 
         # No printers configured via environment variables
         return []
@@ -272,10 +249,10 @@ class Config:
 
     def add_persistent_printer(self, printer: PrinterConfig) -> None:
         """Add a printer to persistent storage and update the current list.
-        
+
         Args:
             printer: Printer configuration to add
-            
+
         Raises:
             ValueError: If printer already exists or storage fails
         """
@@ -283,21 +260,21 @@ class Config:
             from app.printer_storage import get_printer_storage
             printer_storage = get_printer_storage()
             printer_storage.add_printer(printer)
-            
+
             # Reload printers to include the new one
             self.printers = self._load_printers()
             logger.info(f"Added persistent printer: {printer.name} at {printer.ip}")
-            
+
         except Exception as e:
             logger.error(f"Failed to add persistent printer: {e}")
             raise ValueError(f"Failed to add printer: {e}")
 
     def remove_persistent_printer(self, ip: str) -> bool:
         """Remove a printer from persistent storage and update the current list.
-        
+
         Args:
             ip: IP address of the printer to remove
-            
+
         Returns:
             bool: True if printer was removed, False if not found
         """
@@ -305,34 +282,34 @@ class Config:
             from app.printer_storage import get_printer_storage
             printer_storage = get_printer_storage()
             removed = printer_storage.remove_printer(ip)
-            
+
             if removed:
                 # Reload printers to reflect the removal
                 self.printers = self._load_printers()
-                
+
                 # Clear active printer if it was the removed one
-                if (self.runtime_active_printer and 
-                    self.runtime_active_printer.ip == ip):
+                if (self.runtime_active_printer and
+                        self.runtime_active_printer.ip == ip):
                     self.runtime_active_printer = None
                     logger.info("Cleared active printer as it was removed")
-                
+
                 logger.info(f"Removed persistent printer with IP: {ip}")
-            
+
             return removed
-            
+
         except Exception as e:
             logger.error(f"Failed to remove persistent printer: {e}")
             return False
 
-    def update_persistent_printer(self, ip: str, name: Optional[str] = None, 
-                                access_code: Optional[str] = None) -> bool:
+    def update_persistent_printer(self, ip: str, name: Optional[str] = None,
+                                  access_code: Optional[str] = None) -> bool:
         """Update a persistent printer configuration.
-        
+
         Args:
             ip: IP address of the printer to update
             name: New name for the printer (if provided)
             access_code: New access code for the printer (if provided)
-            
+
         Returns:
             bool: True if printer was updated, False if not found
         """
@@ -340,32 +317,33 @@ class Config:
             from app.printer_storage import get_printer_storage
             printer_storage = get_printer_storage()
             updated = printer_storage.update_printer(ip, name, access_code)
-            
+
             if updated:
                 # Reload printers to reflect the changes
                 self.printers = self._load_printers()
-                
+
                 # Update active printer if it was the modified one
-                if (self.runtime_active_printer and 
-                    self.runtime_active_printer.ip == ip):
+                if (self.runtime_active_printer and
+                        self.runtime_active_printer.ip == ip):
                     updated_printer = self.get_printer_by_ip(ip)
                     if updated_printer:
                         self.runtime_active_printer = updated_printer
                         logger.info("Updated active printer configuration")
-                
+
                 logger.info(f"Updated persistent printer with IP: {ip}")
-            
+
             return updated
-            
+
         except Exception as e:
             logger.error(f"Failed to update persistent printer: {e}")
             return False
 
     def get_persistent_printers(self) -> List[PrinterConfig]:
         """Get only the printers stored in persistent storage.
-        
+
         Returns:
-            List[PrinterConfig]: List of persistent printers (excludes environment-based ones)
+            List[PrinterConfig]: List of persistent printers
+                (excludes environment-based ones)
         """
         try:
             from app.printer_storage import get_printer_storage
@@ -377,10 +355,10 @@ class Config:
 
     def get_printer_by_ip(self, ip: str) -> Optional[PrinterConfig]:
         """Get a printer configuration by IP address.
-        
+
         Args:
             ip: The printer IP address to search for
-            
+
         Returns:
             PrinterConfig: The printer configuration if found, None otherwise
         """
