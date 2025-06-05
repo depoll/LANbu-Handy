@@ -68,7 +68,9 @@ describe('PrinterSelector IP Persistence', () => {
 
     // Wait for component to load and check if manual IP input is pre-filled
     await waitFor(() => {
-      const manualIpInput = screen.getByPlaceholderText('192.168.1.100 or printer.local');
+      const manualIpInput = screen.getByPlaceholderText(
+        '192.168.1.100 or printer.local'
+      );
       expect(manualIpInput).toHaveValue(savedIP);
     });
   });
@@ -115,7 +117,9 @@ describe('PrinterSelector IP Persistence', () => {
 
     // Check for clear button
     await waitFor(() => {
-      const clearButton = screen.getByTitle('Clear saved IP address or hostname');
+      const clearButton = screen.getByTitle(
+        'Clear saved IP address or hostname'
+      );
       expect(clearButton).toBeInTheDocument();
     });
   });
@@ -139,7 +143,9 @@ describe('PrinterSelector IP Persistence', () => {
 
     // Click clear button
     await waitFor(() => {
-      const clearButton = screen.getByTitle('Clear saved IP address or hostname');
+      const clearButton = screen.getByTitle(
+        'Clear saved IP address or hostname'
+      );
       fireEvent.click(clearButton);
     });
 
@@ -149,7 +155,9 @@ describe('PrinterSelector IP Persistence', () => {
     );
 
     // Check that manual IP input is cleared
-    const manualIpInput = screen.getByPlaceholderText('192.168.1.100 or printer.local');
+    const manualIpInput = screen.getByPlaceholderText(
+      '192.168.1.100 or printer.local'
+    );
     expect(manualIpInput).toHaveValue('');
   });
 
@@ -161,7 +169,9 @@ describe('PrinterSelector IP Persistence', () => {
     fireEvent.click(configureButton);
 
     // Fill in manual IP
-    const manualIpInput = screen.getByPlaceholderText('192.168.1.100 or printer.local');
+    const manualIpInput = screen.getByPlaceholderText(
+      '192.168.1.100 or printer.local'
+    );
     fireEvent.change(manualIpInput, { target: { value: '192.168.1.100' } });
 
     // Mock successful printer set response
@@ -203,7 +213,9 @@ describe('PrinterSelector IP Persistence', () => {
 
     // Wait for component to render
     await waitFor(() => {
-      expect(screen.getByPlaceholderText('192.168.1.100 or printer.local')).toBeInTheDocument();
+      expect(
+        screen.getByPlaceholderText('192.168.1.100 or printer.local')
+      ).toBeInTheDocument();
     });
 
     // Check that saved indicator and clear button are not present
