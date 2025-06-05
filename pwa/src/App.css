@@ -66,13 +66,14 @@ header p {
 }
 
 .header-printer-selector .expand-button {
-  background: rgba(255, 255, 255, 0.2);
-  color: white;
+  background: rgba(255, 255, 255, 0.25); /* Slightly darker/more opaque */
+  color: #0d47a1; /* Darker blue for text */
   border: 1px solid rgba(255, 255, 255, 0.3);
+  font-weight: 500; /* Increased font weight */
 }
 
 .header-printer-selector .expand-button:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.35);
 }
 
 /* Status bar */
@@ -301,6 +302,7 @@ footer p {
   padding: 0.5rem 1rem;
   border: 2px solid #e0e0e0;
   background: white;
+  color: #1976d2; /* Changed text color for non-active state */
   border-radius: 6px;
   cursor: pointer;
   font-size: 0.9rem;
@@ -420,7 +422,8 @@ footer p {
 }
 
 .slice-and-print-button:disabled {
-  background-color: #cccccc;
+  background-color: #b0b0b0; /* Darker grey for disabled background */
+  color: #757575; /* Darker text for disabled state */
   cursor: not-allowed;
 }
 
