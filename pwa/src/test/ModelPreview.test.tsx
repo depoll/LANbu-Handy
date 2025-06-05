@@ -4,62 +4,102 @@ import ModelPreview from '../components/ModelPreview';
 import { FilamentRequirement, FilamentMapping } from '../types/api';
 
 // Mock Three.js
-vi.mock('three', () => ({
-  Scene: vi.fn(() => ({
-    background: {},
-    add: vi.fn(),
-    remove: vi.fn(),
-  })),
-  PerspectiveCamera: vi.fn(() => ({
-    position: { set: vi.fn() },
-    aspect: 0,
-    updateProjectionMatrix: vi.fn(),
-  })),
-  WebGLRenderer: vi.fn(() => ({
-    setSize: vi.fn(),
-    shadowMap: { enabled: false, type: {} },
-    domElement: document.createElement('canvas'),
-    render: vi.fn(),
-    dispose: vi.fn(),
-  })),
-  AmbientLight: vi.fn(),
-  DirectionalLight: vi.fn(() => ({
-    position: { set: vi.fn() },
-    castShadow: false,
-  })),
-  MeshLambertMaterial: vi.fn(() => ({
-    color: { setHex: vi.fn() },
-  })),
-  Mesh: vi.fn(() => ({
-    castShadow: false,
-    receiveShadow: false,
-    scale: { setScalar: vi.fn() },
-    rotation: { y: 0 },
-    material: { color: { setHex: vi.fn() } },
-  })),
-  Color: vi.fn(),
-  Vector3: vi.fn(() => ({
-    set: vi.fn(),
-  })),
-  PCFSoftShadowMap: {},
-}));
+vi.mock('three', () => {
+  const MockMesh = vi.fn(function(geometry) {
+    // Create the mock mesh instance with proper prototype for instanceof
+    const mesh = {
+      castShadow: false,
+      receiveShadow: false,
+      scale: { setScalar: vi.fn() },
+      rotation: { y: 0 },
+      material: { color: { setHex: vi.fn() } },
+      geometry: geometry,
+    };
+    // Set up the prototype chain for instanceof checks
+    Object.setPrototypeOf(mesh, MockMesh.prototype);
+    return mesh;
+  });
 
-vi.mock('three-stdlib', () => ({
-  STLLoader: vi.fn(() => ({
-    load: vi.fn((url, onLoad) => {
-      // Mock successful loading
-      const mockGeometry = {
-        computeBoundingBox: vi.fn(),
-        boundingBox: {
-          getCenter: vi.fn(() => ({ x: 0, y: 0, z: 0 })),
-          getSize: vi.fn(() => ({ x: 10, y: 10, z: 10 })),
-        },
-        translate: vi.fn(),
-      };
-      setTimeout(() => onLoad(mockGeometry), 100);
-    }),
-  })),
-}));
+  return {
+    Scene: vi.fn(() => ({
+      background: {},
+      add: vi.fn(),
+      remove: vi.fn(),
+    })),
+    PerspectiveCamera: vi.fn(() => ({
+      position: { set: vi.fn() },
+      aspect: 0,
+      updateProjectionMatrix: vi.fn(),
+    })),
+    WebGLRenderer: vi.fn(() => ({
+      setSize: vi.fn(),
+      shadowMap: { enabled: false, type: {} },
+      domElement: document.createElement('canvas'),
+      render: vi.fn(),
+      dispose: vi.fn(),
+    })),
+    AmbientLight: vi.fn(),
+    DirectionalLight: vi.fn(() => ({
+      position: { set: vi.fn() },
+      castShadow: false,
+    })),
+    MeshLambertMaterial: vi.fn(() => ({
+      color: { setHex: vi.fn() },
+    })),
+    Mesh: MockMesh,
+    Color: vi.fn(),
+    Vector3: vi.fn(() => ({
+      set: vi.fn(),
+    })),
+    PCFSoftShadowMap: {},
+  };
+});
+
+vi.mock('three-stdlib', async () => {
+  const THREE = await vi.importMock('three');
+  
+  return {
+    STLLoader: vi.fn(() => ({
+      load: vi.fn((url, onLoad) => {
+        // Mock successful loading
+        const mockGeometry = {
+          computeBoundingBox: vi.fn(),
+          boundingBox: {
+            getCenter: vi.fn(() => ({ x: 0, y: 0, z: 0 })),
+            getSize: vi.fn(() => ({ x: 10, y: 10, z: 10 })),
+          },
+          translate: vi.fn(),
+        };
+        setTimeout(() => onLoad(mockGeometry), 100);
+      }),
+    })),
+    ThreeMFLoader: vi.fn(() => ({
+      load: vi.fn((url, onLoad) => {
+        // Mock successful 3MF loading - returns a Group with Mesh children
+        const mockGeometry = {
+          computeBoundingBox: vi.fn(),
+          boundingBox: {
+            getCenter: vi.fn(() => ({ x: 0, y: 0, z: 0 })),
+            getSize: vi.fn(() => ({ x: 10, y: 10, z: 10 })),
+          },
+          translate: vi.fn(),
+        };
+        
+        // Create a mock mesh using the mocked THREE.Mesh constructor
+        const mockMesh = new THREE.Mesh(mockGeometry);
+        
+        const mockGroup = {
+          traverse: vi.fn((callback) => {
+            // Call the callback with the mock mesh
+            callback(mockMesh);
+          }),
+        };
+        
+        setTimeout(() => onLoad(mockGroup), 100);
+      }),
+    })),
+  };
+});
 
 // Mock requestAnimationFrame and cancelAnimationFrame
 Object.defineProperty(window, 'requestAnimationFrame', {
@@ -183,6 +223,21 @@ describe('ModelPreview Component', () => {
 
     // Should render without errors even with empty mappings
     expect(screen.getByText('Model Preview')).toBeInTheDocument();
+  });
+
+  it('handles different file extensions correctly', () => {
+    // Test STL file
+    const { rerender } = render(<ModelPreview fileId="test-file.stl" />);
+    expect(screen.getByText('Loading model...')).toBeInTheDocument();
+
+    // Test 3MF file
+    rerender(<ModelPreview fileId="test-file.3mf" />);
+    expect(screen.getByText('Loading model...')).toBeInTheDocument();
+
+    // Test unsupported file
+    rerender(<ModelPreview fileId="test-file.unsupported" />);
+    // Should show error for unsupported type
+    expect(screen.getByText(/Unsupported file type/)).toBeInTheDocument();
   });
 
   it('handles missing filament requirements', () => {

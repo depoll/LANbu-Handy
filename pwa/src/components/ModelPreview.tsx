@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { STLLoader } from 'three-stdlib';
+import { STLLoader, ThreeMFLoader } from 'three-stdlib';
 import { FilamentRequirement, FilamentMapping } from '../types/api';
 
 interface ModelPreviewProps {
@@ -104,55 +104,90 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({
     setIsLoading(true);
     setError(null);
 
-    const loader = new STLLoader();
+    // Determine file type from file extension
+    const fileExtension = fileId.toLowerCase().split('.').pop();
     const modelUrl = `/api/model/preview/${fileId}`;
 
-    loader.load(
-      modelUrl,
-      geometry => {
-        // Remove existing mesh
-        if (meshRef.current) {
-          sceneRef.current?.remove(meshRef.current);
-        }
-
-        // Create material with default color
-        const material = new THREE.MeshLambertMaterial({
-          color: getModelColor(0, filamentRequirements, filamentMappings),
-        });
-
-        // Create mesh
-        const mesh = new THREE.Mesh(geometry, material);
-        mesh.castShadow = true;
-        mesh.receiveShadow = true;
-        meshRef.current = mesh;
-
-        // Center and scale the model
-        geometry.computeBoundingBox();
-        const box = geometry.boundingBox!;
-        const center = box.getCenter(new THREE.Vector3());
-        const size = box.getSize(new THREE.Vector3());
-
-        // Center the geometry
-        geometry.translate(-center.x, -center.y, -center.z);
-
-        // Scale to fit in view
-        const maxDim = Math.max(size.x, size.y, size.z);
-        const scale = 30 / maxDim;
-        mesh.scale.setScalar(scale);
-
-        sceneRef.current!.add(mesh);
-        setIsLoading(false);
-      },
-      progress => {
-        // Loading progress
-        console.log('Model loading progress:', progress);
-      },
-      error => {
-        console.error('Error loading model:', error);
-        setError('Failed to load model for preview');
-        setIsLoading(false);
+    const handleGeometry = (geometry: THREE.BufferGeometry) => {
+      // Remove existing mesh
+      if (meshRef.current) {
+        sceneRef.current?.remove(meshRef.current);
       }
-    );
+
+      // Create material with default color
+      const material = new THREE.MeshLambertMaterial({
+        color: getModelColor(0, filamentRequirements, filamentMappings),
+      });
+
+      // Create mesh
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      meshRef.current = mesh;
+
+      // Center and scale the model
+      geometry.computeBoundingBox();
+      const box = geometry.boundingBox!;
+      const center = box.getCenter(new THREE.Vector3());
+      const size = box.getSize(new THREE.Vector3());
+
+      // Center the geometry
+      geometry.translate(-center.x, -center.y, -center.z);
+
+      // Scale to fit in view
+      const maxDim = Math.max(size.x, size.y, size.z);
+      const scale = 30 / maxDim;
+      mesh.scale.setScalar(scale);
+
+      sceneRef.current!.add(mesh);
+      setIsLoading(false);
+    };
+
+    const handleProgress = (progress: ProgressEvent) => {
+      // Loading progress
+      console.log('Model loading progress:', progress);
+    };
+
+    const handleError = (error: Error | ErrorEvent | unknown) => {
+      console.error('Error loading model:', error);
+      setError('Failed to load model for preview');
+      setIsLoading(false);
+    };
+
+    // Choose appropriate loader based on file extension
+    if (fileExtension === 'stl') {
+      const loader = new STLLoader();
+      loader.load(modelUrl, handleGeometry, handleProgress, handleError);
+    } else if (fileExtension === '3mf') {
+      const loader = new ThreeMFLoader();
+      loader.load(
+        modelUrl,
+        (object: THREE.Group) => {
+          // ThreeMFLoader returns a Group, we need to extract the geometry
+          // and handle potential multiple objects/materials
+          const geometries: THREE.BufferGeometry[] = [];
+          
+          object.traverse((child) => {
+            if (child instanceof THREE.Mesh && child.geometry) {
+              geometries.push(child.geometry);
+            }
+          });
+
+          if (geometries.length > 0) {
+            // For now, just use the first geometry found
+            // In the future, this could be enhanced to handle multi-material models
+            handleGeometry(geometries[0]);
+          } else {
+            handleError(new Error('No valid geometry found in 3MF file'));
+          }
+        },
+        handleProgress,
+        handleError
+      );
+    } else {
+      setError(`Unsupported file type: ${fileExtension}`);
+      setIsLoading(false);
+    }
   }, [fileId, filamentRequirements, filamentMappings]);
 
   // Update colors when filament mappings change
