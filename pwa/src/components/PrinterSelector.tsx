@@ -57,6 +57,13 @@ function PrinterSelector({
   const loadCurrentPrinter = async () => {
     try {
       const response = await fetch('/api/config');
+
+      // Check if response exists and is valid
+      if (!response) {
+        console.error('No response received from /api/config');
+        return;
+      }
+
       if (response.ok) {
         const config: PrinterConfigResponse = await response.json();
         if (config.active_printer) {
@@ -89,6 +96,11 @@ function PrinterSelector({
 
     try {
       const response = await fetch('/api/printers/discover');
+
+      // Check if response exists and is valid
+      if (!response) {
+        throw new Error('No response received from server');
+      }
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -174,6 +186,11 @@ function PrinterSelector({
         },
         body: JSON.stringify(request),
       });
+
+      // Check if response exists and is valid
+      if (!response) {
+        throw new Error('No response received from server');
+      }
 
       if (!response.ok) {
         const errorText = await response.text();

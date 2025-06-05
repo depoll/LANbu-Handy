@@ -150,6 +150,13 @@ function SliceAndPrint() {
         body: JSON.stringify(requestBody),
       });
 
+      // Check if response exists and is valid
+      if (!response) {
+        const errorMsg = 'No response received from server';
+        updateOperationStep(0, 'error', 'Download failed', errorMsg);
+        throw new Error(errorMsg);
+      }
+
       if (!response.ok) {
         const errorText = await response.text();
         updateOperationStep(0, 'error', 'Download failed', errorText);
@@ -343,6 +350,13 @@ function SliceAndPrint() {
         body: JSON.stringify(request),
       });
 
+      // Check if response exists and is valid
+      if (!response) {
+        const errorMsg = 'No response received from server';
+        updateOperationStep(1, 'error', 'G-code generation failed', errorMsg);
+        throw new Error(errorMsg);
+      }
+
       if (!response.ok) {
         const errorText = await response.text();
         updateOperationStep(1, 'error', 'G-code generation failed', errorText);
@@ -442,6 +456,11 @@ function SliceAndPrint() {
         body: JSON.stringify(requestBody),
       });
 
+      // Check if response exists and is valid
+      if (!response) {
+        throw new Error('No response received from server');
+      }
+
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(`HTTP ${response.status}: ${errorText}`);
@@ -510,6 +529,11 @@ function SliceAndPrint() {
         },
         body: JSON.stringify(requestBody),
       });
+
+      // Check if response exists and is valid
+      if (!response) {
+        throw new Error('No response received from server');
+      }
 
       if (!response.ok) {
         const errorText = await response.text();

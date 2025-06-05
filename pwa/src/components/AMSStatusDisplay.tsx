@@ -23,6 +23,11 @@ function AMSStatusDisplay({
     try {
       const response = await fetch(`/api/printer/${printerId}/ams-status`);
 
+      // Check if response exists and is valid
+      if (!response) {
+        throw new Error('No response received from server');
+      }
+
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
