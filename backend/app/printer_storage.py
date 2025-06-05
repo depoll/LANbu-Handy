@@ -114,6 +114,9 @@ class PrinterStorage:
             # Create the data structure
             data = {"version": "1.0", "printers": printer_data}
 
+            # Ensure the parent directory exists before writing
+            self.config_file.parent.mkdir(parents=True, exist_ok=True)
+
             # Write to a temp file first, then rename for atomic operation
             temp_file = self.config_file.with_suffix(".tmp")
 
@@ -250,3 +253,9 @@ def get_printer_storage() -> PrinterStorage:
     if _printer_storage is None:
         _printer_storage = PrinterStorage()
     return _printer_storage
+
+
+def reset_printer_storage():
+    """Reset the global printer storage instance. For testing purposes only."""
+    global _printer_storage
+    _printer_storage = None

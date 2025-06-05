@@ -21,6 +21,15 @@ class TestPrinterSelection:
 
     def test_set_active_printer_valid_ip(self, client):
         """Test setting active printer with valid IP address."""
+        # Reset global config state for test isolation
+        from app import main
+        from app.config import reset_config
+        from app.printer_storage import reset_printer_storage
+
+        reset_config()
+        reset_printer_storage()
+        main.config = main.get_config()
+
         # Clear any existing runtime printer
         get_config().clear_active_printer()
 
@@ -83,6 +92,15 @@ class TestPrinterSelection:
 
     def test_config_endpoint_includes_active_printer(self, client):
         """Test that config endpoint includes active printer information."""
+        # Reset global config state for test isolation
+        from app import main
+        from app.config import reset_config
+        from app.printer_storage import reset_printer_storage
+
+        reset_config()
+        reset_printer_storage()
+        main.config = main.get_config()
+
         # Set an active printer first
         get_config().set_active_printer(
             "192.168.1.150", "testcode", "Config Test Printer"
@@ -102,6 +120,15 @@ class TestPrinterSelection:
 
     def test_config_endpoint_without_active_printer(self, client):
         """Test config endpoint when no active printer is set."""
+        # Reset global config state for test isolation
+        from app import main
+        from app.config import reset_config
+        from app.printer_storage import reset_printer_storage
+
+        reset_config()
+        reset_printer_storage()
+        main.config = main.get_config()
+
         # Clear any active printer
         get_config().clear_active_printer()
 

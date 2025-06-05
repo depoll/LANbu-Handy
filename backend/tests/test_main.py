@@ -49,13 +49,15 @@ class TestConfigEndpoint:
         """Test config endpoint when printer IP is configured."""
         from app.config import PrinterConfig
 
-        with patch("app.config.config") as mock_config:
+        with patch("app.main.config") as mock_config:
             mock_printer = PrinterConfig(
                 name="Test Printer", ip="192.168.1.100", access_code="test123"
             )
             mock_config.is_printer_configured.return_value = True
             mock_config.get_printer_ip.return_value = "192.168.1.100"
             mock_config.get_printers.return_value = [mock_printer]
+            mock_config.get_persistent_printers.return_value = []
+            mock_config.get_active_printer.return_value = None
 
             response = client.get("/api/config")
             assert response.status_code == 200
@@ -70,10 +72,12 @@ class TestConfigEndpoint:
 
     def test_config_endpoint_without_printer_ip(self):
         """Test config endpoint when printer IP is not configured."""
-        with patch("app.config.config") as mock_config:
+        with patch("app.main.config") as mock_config:
             mock_config.is_printer_configured.return_value = False
             mock_config.get_printer_ip.return_value = None
             mock_config.get_printers.return_value = []
+            mock_config.get_persistent_printers.return_value = []
+            mock_config.get_active_printer.return_value = None
 
             response = client.get("/api/config")
             assert response.status_code == 200
@@ -87,7 +91,7 @@ class TestConfigEndpoint:
         """Test config endpoint when multiple printers are configured."""
         from app.config import PrinterConfig
 
-        with patch("app.config.config") as mock_config:
+        with patch("app.main.config") as mock_config:
             mock_printers = [
                 PrinterConfig(
                     name="Living Room", ip="192.168.1.100", access_code="test123"
@@ -97,6 +101,8 @@ class TestConfigEndpoint:
             mock_config.is_printer_configured.return_value = True
             mock_config.get_printer_ip.return_value = "192.168.1.100"
             mock_config.get_printers.return_value = mock_printers
+            mock_config.get_persistent_printers.return_value = []
+            mock_config.get_active_printer.return_value = None
 
             response = client.get("/api/config")
             assert response.status_code == 200

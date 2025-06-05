@@ -55,6 +55,9 @@ model_service = ModelService()
 # Initialize printer service
 printer_service = PrinterService()
 
+# Initialize configuration (for testing compatibility)
+config = get_config()
+
 # Path to the PWA static files directory
 # In Docker, this will be /app/static_pwa, but for local testing we use a
 # relative path. Try Docker path first, then fall back to relative path for
@@ -113,10 +116,6 @@ async def get_app_config():
 
     Returns information about printer configuration and other settings.
     """
-    # Import config inside the function so it can be mocked
-    from app.config import get_config as get_config_instance
-
-    config = get_config_instance()
     printers = config.get_printers()
     persistent_printers = config.get_persistent_printers()
     persistent_ips = {p.ip for p in persistent_printers}
@@ -150,16 +149,14 @@ async def get_app_config():
         }
 
     return {
-        "printer_configured": get_config().is_printer_configured(),
+        "printer_configured": config.is_printer_configured(),
         "printers": printers_info,
         "printer_count": len(printers),
         "persistent_printer_count": len(persistent_printers),
         "active_printer": active_printer_info,
         # Legacy fields for backward compatibility
         "printer_ip": (
-            get_config().get_printer_ip()
-            if get_config().is_printer_configured()
-            else None
+            config.get_printer_ip() if config.is_printer_configured() else None
         ),
     }
 
@@ -600,14 +597,14 @@ async def start_basic_job(request: JobStartRequest):
 
     try:
         # Check if printer is configured
-        if not get_config().is_printer_configured():
+        if not config.is_printer_configured():
             raise HTTPException(
                 status_code=400,
                 detail="No printer configured. Please configure a printer " "first.",
             )
 
         # Get the first configured printer
-        printers = get_config().get_printers()
+        printers = config.get_printers()
         printer_config = printers[0]
 
         # Step 1: Download model
@@ -721,7 +718,7 @@ async def get_ams_status(printer_id: str):
     """
     try:
         # Check if any printers are configured
-        if not get_config().is_printer_configured():
+        if not config.is_printer_configured():
             raise HTTPException(
                 status_code=400,
                 detail="No printers configured. " "Please configure a printer first.",
@@ -731,14 +728,14 @@ async def get_ams_status(printer_id: str):
         printer_config = None
         if printer_id.lower() == "default":
             # Use the first/default printer
-            printer_config = get_config().get_default_printer()
+            printer_config = config.get_default_printer()
         else:
             # Look for printer by name
-            printer_config = get_config().get_printer_by_name(printer_id)
+            printer_config = config.get_printer_by_name(printer_id)
 
         if not printer_config:
             # List available printers for helpful error message
-            available_printers = [p.name for p in get_config().get_printers()]
+            available_printers = [p.name for p in config.get_printers()]
             raise HTTPException(
                 status_code=404,
                 detail=f"Printer '{printer_id}' not found. "
@@ -879,7 +876,7 @@ async def set_active_printer(request: SetActivePrinterRequest):
 
         # Set the active printer
         try:
-            printer_config = get_config().set_active_printer(
+            printer_config = config.set_active_printer(
                 ip=ip,
                 access_code=request.access_code,
                 name=request.name or f"Printer at {ip}",
@@ -945,13 +942,13 @@ async def add_printer(request: AddPrinterRequest):
         if request.save_permanently:
             # Add to persistent storage
             try:
-                get_config().add_persistent_printer(printer_config)
+                config.add_persistent_printer(printer_config)
                 storage_message = "permanently saved"
             except ValueError as e:
                 raise HTTPException(status_code=400, detail=str(e))
         else:
             # Add as runtime active printer only
-            get_config().set_active_printer(
+            config.set_active_printer(
                 ip=printer_config.ip,
                 access_code=printer_config.access_code,
                 name=printer_config.name,
@@ -1000,7 +997,7 @@ async def remove_printer(request: RemovePrinterRequest):
         ip = validate_ip_address(request.ip)
 
         # Remove from persistent storage
-        removed = get_config().remove_persistent_printer(ip)
+        removed = config.remove_persistent_printer(ip)
 
         if removed:
             return RemovePrinterResponse(
@@ -1038,7 +1035,7 @@ async def get_persistent_printers():
         HTTPException: If retrieval fails due to internal server error
     """
     try:
-        persistent_printers = get_config().get_persistent_printers()
+        persistent_printers = config.get_persistent_printers()
 
         printers_info = []
         for printer in persistent_printers:

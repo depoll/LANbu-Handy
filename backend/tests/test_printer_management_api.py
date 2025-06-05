@@ -32,12 +32,28 @@ class TestPrinterManagementAPI:
         )
         self.env_patch.start()
 
+        # Reset and reinitialize config with new environment
+        from app import main
+        from app.config import reset_config
+        from app.printer_storage import reset_printer_storage
+
+        reset_config()
+        reset_printer_storage()
+        main.config = main.get_config()  # Reinitialize with new env vars
+
         # Create test client
         self.client = TestClient(app)
 
     def teardown_method(self):
         """Clean up test fixtures."""
         self.env_patch.stop()
+
+        # Reset config after test
+        from app.config import reset_config
+        from app.printer_storage import reset_printer_storage
+
+        reset_config()
+        reset_printer_storage()
 
         # Clean up temp files
         if self.config_file.exists():
@@ -151,7 +167,7 @@ class TestPrinterManagementAPI:
 
     def test_remove_printer_not_found(self):
         """Test removing a printer that doesn't exist."""
-        remove_data = {"ip": "192.168.1.999"}
+        remove_data = {"ip": "192.168.1.200"}  # Valid IP that doesn't exist
         response = self.client.post("/api/printers/remove", json=remove_data)
 
         assert response.status_code == 200

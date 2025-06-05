@@ -395,6 +395,12 @@ def get_config() -> Config:
     return _config
 
 
+def reset_config():
+    """Reset the global configuration instance. For testing purposes only."""
+    global _config
+    _config = None
+
+
 # For backward compatibility, provide the config instance when accessed
 # Use get_config() for new code
 config = None
