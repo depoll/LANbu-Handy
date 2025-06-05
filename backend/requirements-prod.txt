@@ -1,6 +1,8 @@
 # Production dependencies only
+# This file is used by Docker and production deployments
 fastapi>=0.104.0
 uvicorn[standard]>=0.24.0
+python-multipart>=0.0.6
 httpx>=0.25.0
 paho-mqtt>=1.6.0
 zeroconf>=0.131.0
