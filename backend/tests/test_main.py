@@ -343,8 +343,9 @@ class TestSliceEndpoint:
         assert response.status_code == 404
         assert "Model file not found" in response.json()["detail"]
 
+    @patch("app.main.find_gcode_file")
     @patch("app.main.slice_model")
-    def test_slice_success(self, mock_slice_model, temp_model_file):
+    def test_slice_success(self, mock_slice_model, mock_find_gcode_file, temp_model_file):
         """Test successful slicing with mocked CLI."""
         from app.slicer_service import CLIResult
 
@@ -352,6 +353,10 @@ class TestSliceEndpoint:
         mock_slice_model.return_value = CLIResult(
             exit_code=0, stdout="G-code generated successfully", stderr="", success=True
         )
+        
+        # Mock finding the G-code file
+        mock_gcode_path = Path("/tmp/test_output.gcode")
+        mock_find_gcode_file.return_value = mock_gcode_path
 
         # Create a temporary file in the model service directory
         import shutil
@@ -466,8 +471,9 @@ class TestConfiguredSliceEndpoint:
         assert response.status_code == 404
         assert "Model file not found" in response.json()["detail"]
 
+    @patch("app.main.find_gcode_file") 
     @patch("app.main.slice_model")
-    def test_configured_slice_success(self, mock_slice_model, temp_model_file):
+    def test_configured_slice_success(self, mock_slice_model, mock_find_gcode_file, temp_model_file):
         """Test successful configured slicing with mocked CLI."""
         from app.slicer_service import CLIResult
 
@@ -475,6 +481,10 @@ class TestConfiguredSliceEndpoint:
         mock_slice_model.return_value = CLIResult(
             exit_code=0, stdout="G-code generated successfully", stderr="", success=True
         )
+        
+        # Mock finding the G-code file
+        mock_gcode_path = Path("/tmp/test_configured_output.gcode")
+        mock_find_gcode_file.return_value = mock_gcode_path
 
         # Create a temporary file in the model service directory
         import shutil
@@ -564,7 +574,8 @@ class TestConfiguredSliceEndpoint:
 
     def test_build_slicing_options_from_config(self):
         """Test the helper function that builds CLI options from configuration."""
-        from app.main import FilamentMapping, _build_slicing_options_from_config
+        from app.main import FilamentMapping
+        from app.utils import build_slicing_options_from_config
 
         filament_mappings = [
             FilamentMapping(filament_index=0, ams_unit_id=0, ams_slot_id=1),
@@ -572,7 +583,7 @@ class TestConfiguredSliceEndpoint:
         ]
         build_plate_type = "Cool Plate"
 
-        options = _build_slicing_options_from_config(
+        options = build_slicing_options_from_config(
             filament_mappings, build_plate_type
         )
 
@@ -582,9 +593,9 @@ class TestConfiguredSliceEndpoint:
 
     def test_build_slicing_options_empty_mappings(self):
         """Test the helper function with empty filament mappings."""
-        from app.main import _build_slicing_options_from_config
+        from app.utils import build_slicing_options_from_config
 
-        options = _build_slicing_options_from_config([], "Smooth PEI Plate")
+        options = build_slicing_options_from_config([], "Smooth PEI Plate")
 
         assert options["build-plate"] == "Smooth PEI Plate"
         assert len(options) == 1  # Only build plate option
@@ -670,55 +681,60 @@ class TestJobStartEndpoint:
 
     @patch("app.main.config.is_printer_configured")
     @patch("app.main.config.get_printers")
-    @patch("app.main.model_service.download_model")
-    @patch("app.main.slice_model")
-    @patch("app.main.printer_service.upload_gcode")
-    @patch("app.main.printer_service.start_print")
+    @patch("app.main.download_model_step")
+    @patch("app.main.slice_model_step")
+    @patch("app.main.upload_gcode_step")
+    @patch("app.main.start_print_step")
     def test_job_start_complete_success(
         self,
-        mock_start_print,
-        mock_upload,
-        mock_slice,
-        mock_download,
+        mock_start_print_step,
+        mock_upload_step,
+        mock_slice_step,
+        mock_download_step,
         mock_get_printers,
         mock_is_configured,
         temp_model_file,
     ):
         """Test job start endpoint with complete success."""
         from app.config import PrinterConfig
-        from app.printer_service import FTPUploadResult, MQTTResult
-        from app.slicer_service import CLIResult
 
         mock_is_configured.return_value = True
         mock_get_printers.return_value = [
             PrinterConfig("Test Printer", "192.168.1.100", "test123")
         ]
-        mock_download.return_value = Path(temp_model_file)
-        mock_slice.return_value = CLIResult(
-            exit_code=0, stdout="Slicing successful", stderr="", success=True
-        )
-        mock_upload.return_value = FTPUploadResult(
-            success=True, message="Upload successful", remote_path="/upload/test.gcode"
-        )
-        mock_start_print.return_value = MQTTResult(
-            success=True, message="Print command sent successfully", error_details=None
-        )
+        
+        # Mock each step to return success
+        mock_download_step.return_value = {
+            "success": True,
+            "file_path": Path(temp_model_file),
+            "message": "Model downloaded successfully",
+            "details": f"File: {Path(temp_model_file).name}"
+        }
+        
+        mock_slice_step.return_value = {
+            "success": True,
+            "gcode_path": Path("/tmp/test.gcode"),
+            "message": "Model sliced successfully",
+            "details": "G-code: test.gcode"
+        }
+        
+        mock_upload_step.return_value = {
+            "success": True,
+            "message": "Upload successful",
+            "details": "Remote path: /upload/test.gcode",
+            "gcode_filename": "test.gcode"
+        }
+        
+        mock_start_print_step.return_value = {
+            "success": True,
+            "message": "Print command sent successfully",
+            "details": "Print started for: test.gcode"
+        }
 
-        # Create a temporary gcode file for the test
-        with tempfile.TemporaryDirectory() as tmpdir:
-            gcode_dir = Path(tmpdir) / "gcode"
-            gcode_dir.mkdir()
-            gcode_file = gcode_dir / "test.gcode"
-            gcode_file.write_text("test gcode content")
-
-            # Mock Path.glob to return our test gcode file
-            with patch("pathlib.Path.glob") as mock_glob:
-                mock_glob.return_value = [gcode_file]
-
-                response = client.post(
-                    "/api/job/start-basic",
-                    json={"model_url": "http://example.com/model.stl"},
-                )
+        response = client.post(
+            "/api/job/start-basic",
+            json={"model_url": "http://example.com/model.stl"},
+        )
 
         assert response.status_code == 200
         data = response.json()
