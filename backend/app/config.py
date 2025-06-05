@@ -61,6 +61,7 @@ class Config:
         # First, try to load from persistent storage
         try:
             from app.printer_storage import get_printer_storage
+
             printer_storage = get_printer_storage()
             persistent_printers = printer_storage.load_printers()
             all_printers.extend(persistent_printers)
@@ -258,6 +259,7 @@ class Config:
         """
         try:
             from app.printer_storage import get_printer_storage
+
             printer_storage = get_printer_storage()
             printer_storage.add_printer(printer)
 
@@ -280,6 +282,7 @@ class Config:
         """
         try:
             from app.printer_storage import get_printer_storage
+
             printer_storage = get_printer_storage()
             removed = printer_storage.remove_printer(ip)
 
@@ -288,8 +291,7 @@ class Config:
                 self.printers = self._load_printers()
 
                 # Clear active printer if it was the removed one
-                if (self.runtime_active_printer and
-                        self.runtime_active_printer.ip == ip):
+                if self.runtime_active_printer and self.runtime_active_printer.ip == ip:
                     self.runtime_active_printer = None
                     logger.info("Cleared active printer as it was removed")
 
@@ -301,8 +303,9 @@ class Config:
             logger.error(f"Failed to remove persistent printer: {e}")
             return False
 
-    def update_persistent_printer(self, ip: str, name: Optional[str] = None,
-                                  access_code: Optional[str] = None) -> bool:
+    def update_persistent_printer(
+        self, ip: str, name: Optional[str] = None, access_code: Optional[str] = None
+    ) -> bool:
         """Update a persistent printer configuration.
 
         Args:
@@ -315,6 +318,7 @@ class Config:
         """
         try:
             from app.printer_storage import get_printer_storage
+
             printer_storage = get_printer_storage()
             updated = printer_storage.update_printer(ip, name, access_code)
 
@@ -323,8 +327,7 @@ class Config:
                 self.printers = self._load_printers()
 
                 # Update active printer if it was the modified one
-                if (self.runtime_active_printer and
-                        self.runtime_active_printer.ip == ip):
+                if self.runtime_active_printer and self.runtime_active_printer.ip == ip:
                     updated_printer = self.get_printer_by_ip(ip)
                     if updated_printer:
                         self.runtime_active_printer = updated_printer
@@ -347,6 +350,7 @@ class Config:
         """
         try:
             from app.printer_storage import get_printer_storage
+
             printer_storage = get_printer_storage()
             return printer_storage.load_printers()
         except Exception as e:
@@ -379,5 +383,18 @@ class Config:
         return default_printer.ip if default_printer else None
 
 
-# Global configuration instance
-config = Config()
+# Global configuration instance - initialized lazily
+_config = None
+
+
+def get_config() -> Config:
+    """Get the global configuration instance, creating it if necessary."""
+    global _config
+    if _config is None:
+        _config = Config()
+    return _config
+
+
+# For backward compatibility, provide the config instance when accessed
+# Use get_config() for new code
+config = None

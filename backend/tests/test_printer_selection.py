@@ -5,7 +5,7 @@ Test for new printer selection API endpoints.
 from unittest.mock import patch
 
 import pytest
-from app.config import config
+from app.config import get_config
 from app.main import app
 from fastapi.testclient import TestClient
 
@@ -22,7 +22,7 @@ class TestPrinterSelection:
     def test_set_active_printer_valid_ip(self, client):
         """Test setting active printer with valid IP address."""
         # Clear any existing runtime printer
-        config.clear_active_printer()
+        get_config().clear_active_printer()
 
         request_data = {
             "ip": "192.168.1.100",
@@ -42,7 +42,7 @@ class TestPrinterSelection:
         assert data["printer_info"]["has_access_code"] is True
 
         # Verify the printer was set in config
-        active_printer = config.get_active_printer()
+        active_printer = get_config().get_active_printer()
         assert active_printer is not None
         assert active_printer.ip == "192.168.1.100"
         assert active_printer.name == "Test Printer"
@@ -84,7 +84,9 @@ class TestPrinterSelection:
     def test_config_endpoint_includes_active_printer(self, client):
         """Test that config endpoint includes active printer information."""
         # Set an active printer first
-        config.set_active_printer("192.168.1.150", "testcode", "Config Test Printer")
+        get_config().set_active_printer(
+            "192.168.1.150", "testcode", "Config Test Printer"
+        )
 
         response = client.get("/api/config")
 
@@ -101,7 +103,7 @@ class TestPrinterSelection:
     def test_config_endpoint_without_active_printer(self, client):
         """Test config endpoint when no active printer is set."""
         # Clear any active printer
-        config.clear_active_printer()
+        get_config().clear_active_printer()
 
         response = client.get("/api/config")
 
@@ -167,4 +169,4 @@ class TestPrinterSelection:
     def teardown_method(self):
         """Clean up after each test."""
         # Clear any runtime printer that was set during tests
-        config.clear_active_printer()
+        get_config().clear_active_printer()

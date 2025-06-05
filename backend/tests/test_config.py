@@ -128,8 +128,6 @@ class TestConfig:
             assert config.is_printer_configured() is False
             assert len(config.get_printers()) == 0
 
-
-
     @patch.dict(os.environ, {"BAMBU_PRINTER_IP": ""})
     def test_config_with_empty_printer_ip(self):
         """Test config when BAMBU_PRINTER_IP is empty string."""
@@ -191,8 +189,6 @@ class TestConfig:
                 Config()
 
         assert "Configured printer: Test Printer at 192.168.1.50" in caplog.text
-
-
 
     @patch.dict(os.environ, {}, clear=True)
     def test_config_logging_when_no_printers_configured(self, caplog):

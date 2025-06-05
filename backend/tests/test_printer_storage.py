@@ -6,10 +6,10 @@ Tests the persistent storage service for printer configurations.
 
 import json
 import tempfile
-import pytest
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
 from app.config import PrinterConfig
 from app.printer_storage import PrinterStorage, PrinterStorageError
 
@@ -20,10 +20,10 @@ class TestPrinterStorage:
     def setup_method(self):
         """Set up test fixtures."""
         # Create a temporary file for testing
-        self.temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.json')
+        self.temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".json")
         self.temp_file.close()
         self.temp_path = Path(self.temp_file.name)
-        
+
         # Create storage instance
         self.storage = PrinterStorage(str(self.temp_path))
 
@@ -42,14 +42,14 @@ class TestPrinterStorage:
     def test_load_printers_invalid_json(self):
         """Test loading from file with invalid JSON raises error."""
         self.temp_path.write_text("invalid json content")
-        
+
         with pytest.raises(PrinterStorageError, match="Invalid JSON"):
             self.storage.load_printers()
 
     def test_load_printers_invalid_format(self):
         """Test loading from file with invalid format returns empty list."""
         self.temp_path.write_text('{"invalid": "format"}')
-        
+
         result = self.storage.load_printers()
         assert result == []
 
@@ -59,10 +59,10 @@ class TestPrinterStorage:
             PrinterConfig(name="Printer 1", ip="192.168.1.100", access_code="123"),
             PrinterConfig(name="Printer 2", ip="192.168.1.101", access_code="456"),
         ]
-        
+
         # Save printers
         self.storage.save_printers(printers)
-        
+
         # Load and verify
         loaded = self.storage.load_printers()
         assert len(loaded) == 2
@@ -78,10 +78,10 @@ class TestPrinterStorage:
         printers = [
             PrinterConfig(name="Printer", ip="192.168.1.100", access_code=""),
         ]
-        
+
         self.storage.save_printers(printers)
         loaded = self.storage.load_printers()
-        
+
         assert len(loaded) == 1
         assert loaded[0].access_code == ""
 
@@ -90,12 +90,14 @@ class TestPrinterStorage:
         # Make sure file doesn't exist to start fresh
         if self.temp_path.exists():
             self.temp_path.unlink()
-            
-        printer = PrinterConfig(name="New Printer", ip="192.168.1.100", access_code="123")
-        
+
+        printer = PrinterConfig(
+            name="New Printer", ip="192.168.1.100", access_code="123"
+        )
+
         self.storage.add_printer(printer)
         loaded = self.storage.load_printers()
-        
+
         assert len(loaded) == 1
         assert loaded[0].name == "New Printer"
         assert loaded[0].ip == "192.168.1.100"
@@ -105,12 +107,16 @@ class TestPrinterStorage:
         # Start fresh
         if self.temp_path.exists():
             self.temp_path.unlink()
-            
-        printer1 = PrinterConfig(name="Printer 1", ip="192.168.1.100", access_code="123")
-        printer2 = PrinterConfig(name="Printer 2", ip="192.168.1.100", access_code="456")
-        
+
+        printer1 = PrinterConfig(
+            name="Printer 1", ip="192.168.1.100", access_code="123"
+        )
+        printer2 = PrinterConfig(
+            name="Printer 2", ip="192.168.1.100", access_code="456"
+        )
+
         self.storage.add_printer(printer1)
-        
+
         with pytest.raises(PrinterStorageError, match="already exists"):
             self.storage.add_printer(printer2)
 
@@ -121,10 +127,10 @@ class TestPrinterStorage:
             PrinterConfig(name="Printer 2", ip="192.168.1.101", access_code="456"),
         ]
         self.storage.save_printers(printers)
-        
+
         result = self.storage.remove_printer("192.168.1.100")
         assert result is True
-        
+
         loaded = self.storage.load_printers()
         assert len(loaded) == 1
         assert loaded[0].ip == "192.168.1.101"
@@ -142,13 +148,15 @@ class TestPrinterStorage:
         # Start fresh
         if self.temp_path.exists():
             self.temp_path.unlink()
-            
+
         printer = PrinterConfig(name="Old Name", ip="192.168.1.100", access_code="123")
         self.storage.add_printer(printer)
-        
-        result = self.storage.update_printer("192.168.1.100", name="New Name", access_code="456")
+
+        result = self.storage.update_printer(
+            "192.168.1.100", name="New Name", access_code="456"
+        )
         assert result is True
-        
+
         loaded = self.storage.load_printers()
         assert len(loaded) == 1
         assert loaded[0].name == "New Name"
@@ -159,14 +167,14 @@ class TestPrinterStorage:
         # Start fresh
         if self.temp_path.exists():
             self.temp_path.unlink()
-            
+
         printer = PrinterConfig(name="Old Name", ip="192.168.1.100", access_code="123")
         self.storage.add_printer(printer)
-        
+
         # Update only name
         result = self.storage.update_printer("192.168.1.100", name="New Name")
         assert result is True
-        
+
         loaded = self.storage.load_printers()
         assert loaded[0].name == "New Name"
         assert loaded[0].access_code == "123"  # Should remain unchanged
@@ -184,10 +192,12 @@ class TestPrinterStorage:
         # Start fresh
         if self.temp_path.exists():
             self.temp_path.unlink()
-            
-        printer = PrinterConfig(name="Test Printer", ip="192.168.1.100", access_code="123")
+
+        printer = PrinterConfig(
+            name="Test Printer", ip="192.168.1.100", access_code="123"
+        )
         self.storage.add_printer(printer)
-        
+
         result = self.storage.get_printer_by_ip("192.168.1.100")
         assert result is not None
         assert result.name == "Test Printer"
@@ -207,7 +217,7 @@ class TestPrinterStorage:
             PrinterConfig(name="Printer 2", ip="192.168.1.101", access_code="456"),
         ]
         self.storage.save_printers(printers)
-        
+
         self.storage.clear_all_printers()
         loaded = self.storage.load_printers()
         assert loaded == []
@@ -217,11 +227,13 @@ class TestPrinterStorage:
         # Start fresh
         if self.temp_path.exists():
             self.temp_path.unlink()
-            
+
         # Save initial data
-        printer = PrinterConfig(name="Test Printer", ip="192.168.1.100", access_code="123")
+        printer = PrinterConfig(
+            name="Test Printer", ip="192.168.1.100", access_code="123"
+        )
         self.storage.add_printer(printer)
-        
+
         # Verify temp file was cleaned up
         temp_files = list(self.temp_path.parent.glob(f"{self.temp_path.name}.tmp"))
         assert len(temp_files) == 0
@@ -232,15 +244,23 @@ class TestPrinterStorage:
             "version": "1.0",
             "printers": [
                 {"name": "Valid Printer", "ip": "192.168.1.100", "access_code": "123"},
-                {"name": "", "ip": "192.168.1.101", "access_code": "456"},  # Invalid: empty name
+                {
+                    "name": "",
+                    "ip": "192.168.1.101",
+                    "access_code": "456",
+                },  # Invalid: empty name
                 {"ip": "192.168.1.102", "access_code": "789"},  # Invalid: missing name
-                {"name": "Valid Printer 2", "ip": "192.168.1.103", "access_code": "000"},
-            ]
+                {
+                    "name": "Valid Printer 2",
+                    "ip": "192.168.1.103",
+                    "access_code": "000",
+                },
+            ],
         }
-        
+
         self.temp_path.write_text(json.dumps(data))
         loaded = self.storage.load_printers()
-        
+
         # Should load only the valid printers
         assert len(loaded) == 2
         assert loaded[0].name == "Valid Printer"
@@ -253,21 +273,23 @@ class TestPrinterStorageEnvironmentConfig:
     def test_default_config_file_path(self):
         """Test default configuration file path."""
         with tempfile.TemporaryDirectory() as temp_dir:
-            with patch.dict('os.environ', {'PRINTER_CONFIG_FILE': f'{temp_dir}/printers.json'}):
+            with patch.dict(
+                "os.environ", {"PRINTER_CONFIG_FILE": f"{temp_dir}/printers.json"}
+            ):
                 storage = PrinterStorage()
                 assert str(storage.config_file) == f"{temp_dir}/printers.json"
 
     def test_custom_config_file_path_from_env(self):
         """Test custom configuration file path from environment."""
         with tempfile.TemporaryDirectory() as temp_dir:
-            custom_path = f'{temp_dir}/custom/printers.json'
-            with patch.dict('os.environ', {'PRINTER_CONFIG_FILE': custom_path}):
+            custom_path = f"{temp_dir}/custom/printers.json"
+            with patch.dict("os.environ", {"PRINTER_CONFIG_FILE": custom_path}):
                 storage = PrinterStorage()
                 assert str(storage.config_file) == custom_path
 
     def test_explicit_config_file_path(self):
         """Test explicit configuration file path."""
         with tempfile.TemporaryDirectory() as temp_dir:
-            explicit_path = f'{temp_dir}/explicit/printers.json'
+            explicit_path = f"{temp_dir}/explicit/printers.json"
             storage = PrinterStorage(explicit_path)
             assert str(storage.config_file) == explicit_path

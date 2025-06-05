@@ -2,8 +2,6 @@ import { useState, useEffect } from 'react';
 import {
   DiscoveredPrinter,
   PrinterDiscoveryResponse,
-  SetActivePrinterRequest,
-  SetActivePrinterResponse,
   PrinterConfigResponse,
   AddPrinterRequest,
   AddPrinterResponse,
@@ -210,11 +208,11 @@ function PrinterSelector({
       const result: AddPrinterResponse = await response.json();
 
       if (result.success) {
-        const permanencyMessage = request.save_permanently 
-          ? 'permanently saved' 
+        const permanencyMessage = request.save_permanently
+          ? 'permanently saved'
           : 'set for current session';
         setStatusMessage(`✅ Printer ${permanencyMessage}`);
-        
+
         if (result.printer_info) {
           setCurrentPrinter({
             ...result.printer_info,
@@ -245,63 +243,6 @@ function PrinterSelector({
         error instanceof Error ? error.message : 'Unknown error';
       setStatusMessage(`❌ Failed to add printer: ${errorMessage}`);
       console.error('Add printer error:', error);
-    }
-  };
-
-  const setPrinter = async (request: SetActivePrinterRequest) => {
-    try {
-      const response = await fetch('/api/printer/set-active', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(request),
-      });
-
-      // Check if response exists and is valid
-      if (!response) {
-        throw new Error('No response received from server');
-      }
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`HTTP ${response.status}: ${errorText}`);
-      }
-
-      const result: SetActivePrinterResponse = await response.json();
-
-      if (result.success) {
-        setStatusMessage(`✅ ${result.message}`);
-        if (result.printer_info) {
-          setCurrentPrinter({
-            ...result.printer_info,
-            is_runtime_set: true,
-          });
-
-          // Save IP to Local Storage for future use
-          saveIP(result.printer_info.ip);
-
-          // Notify parent component
-          if (onPrinterChange) {
-            onPrinterChange(result.printer_info);
-          }
-        }
-
-        // Collapse the selector after successful selection
-        setTimeout(() => {
-          setIsExpanded(false);
-        }, 1500);
-      } else {
-        setStatusMessage(`❌ ${result.message}`);
-        if (result.error_details) {
-          console.error('Set printer error details:', result.error_details);
-        }
-      }
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
-      setStatusMessage(`❌ Failed to set printer: ${errorMessage}`);
-      console.error('Set printer error:', error);
     }
   };
 
@@ -487,10 +428,9 @@ function PrinterSelector({
                   </span>
                 </label>
                 <small className="checkbox-help">
-                  {savePermanently 
+                  {savePermanently
                     ? 'Printer will be saved to persistent storage'
-                    : 'Printer will only be active for this session'
-                  }
+                    : 'Printer will only be active for this session'}
                 </small>
               </div>
 
@@ -499,10 +439,13 @@ function PrinterSelector({
                 disabled={isSettingPrinter || !manualIp.trim()}
                 className="set-manual-button"
               >
-                {isSettingPrinter 
-                  ? (savePermanently ? 'Saving...' : 'Setting...') 
-                  : (savePermanently ? 'Save Printer Permanently' : 'Set Active Printer')
-                }
+                {isSettingPrinter
+                  ? savePermanently
+                    ? 'Saving...'
+                    : 'Setting...'
+                  : savePermanently
+                    ? 'Save Printer Permanently'
+                    : 'Set Active Printer'}
               </button>
             </div>
           </div>

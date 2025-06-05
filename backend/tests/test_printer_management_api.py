@@ -9,10 +9,8 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
-from fastapi.testclient import TestClient
-
 from app.main import app
+from fastapi.testclient import TestClient
 
 
 class TestPrinterManagementAPI:
@@ -23,21 +21,24 @@ class TestPrinterManagementAPI:
         # Create a temporary directory for config storage
         self.temp_dir = tempfile.mkdtemp()
         self.config_file = Path(self.temp_dir) / "printers.json"
-        
+
         # Patch the environment to use our temp config file
-        self.env_patch = patch.dict('os.environ', {
-            'PRINTER_CONFIG_FILE': str(self.config_file),
-            'BAMBU_PRINTERS': '',  # Ensure no environment printers
-        })
+        self.env_patch = patch.dict(
+            "os.environ",
+            {
+                "PRINTER_CONFIG_FILE": str(self.config_file),
+                "BAMBU_PRINTERS": "",  # Ensure no environment printers
+            },
+        )
         self.env_patch.start()
-        
+
         # Create test client
         self.client = TestClient(app)
 
     def teardown_method(self):
         """Clean up test fixtures."""
         self.env_patch.stop()
-        
+
         # Clean up temp files
         if self.config_file.exists():
             self.config_file.unlink()
@@ -49,11 +50,11 @@ class TestPrinterManagementAPI:
             "ip": "192.168.1.100",
             "access_code": "12345678",
             "name": "Test Printer",
-            "save_permanently": False
+            "save_permanently": False,
         }
-        
+
         response = self.client.post("/api/printers/add", json=request_data)
-        
+
         assert response.status_code == 200
         data = response.json()
         assert data["success"] is True
@@ -69,11 +70,11 @@ class TestPrinterManagementAPI:
             "ip": "192.168.1.100",
             "access_code": "12345678",
             "name": "Persistent Printer",
-            "save_permanently": True
+            "save_permanently": True,
         }
-        
+
         response = self.client.post("/api/printers/add", json=request_data)
-        
+
         assert response.status_code == 200
         data = response.json()
         assert data["success"] is True
@@ -81,10 +82,10 @@ class TestPrinterManagementAPI:
         assert "permanently saved" in data["message"]
         assert data["printer_info"]["name"] == "Persistent Printer"
         assert data["printer_info"]["is_persistent"] is True
-        
+
         # Verify it was actually saved to storage
         assert self.config_file.exists()
-        with open(self.config_file, 'r') as f:
+        with open(self.config_file, "r") as f:
             config_data = json.load(f)
         assert len(config_data["printers"]) == 1
         assert config_data["printers"][0]["name"] == "Persistent Printer"
@@ -95,11 +96,11 @@ class TestPrinterManagementAPI:
             "ip": "invalid.ip.address",
             "access_code": "12345678",
             "name": "Invalid Printer",
-            "save_permanently": False
+            "save_permanently": False,
         }
-        
+
         response = self.client.post("/api/printers/add", json=request_data)
-        
+
         assert response.status_code == 400
         assert "Invalid IP address" in response.text
 
@@ -110,20 +111,20 @@ class TestPrinterManagementAPI:
             "ip": "192.168.1.100",
             "access_code": "12345678",
             "name": "First Printer",
-            "save_permanently": True
+            "save_permanently": True,
         }
         response = self.client.post("/api/printers/add", json=request_data)
         assert response.status_code == 200
-        
+
         # Try to add another printer with the same IP
         request_data2 = {
             "ip": "192.168.1.100",
             "access_code": "87654321",
             "name": "Second Printer",
-            "save_permanently": True
+            "save_permanently": True,
         }
         response = self.client.post("/api/printers/add", json=request_data2)
-        
+
         assert response.status_code == 400
         assert "already exists" in response.text
 
@@ -134,15 +135,15 @@ class TestPrinterManagementAPI:
             "ip": "192.168.1.100",
             "access_code": "12345678",
             "name": "Test Printer",
-            "save_permanently": True
+            "save_permanently": True,
         }
         response = self.client.post("/api/printers/add", json=request_data)
         assert response.status_code == 200
-        
+
         # Now remove it
         remove_data = {"ip": "192.168.1.100"}
         response = self.client.post("/api/printers/remove", json=remove_data)
-        
+
         assert response.status_code == 200
         data = response.json()
         assert data["success"] is True
@@ -152,7 +153,7 @@ class TestPrinterManagementAPI:
         """Test removing a printer that doesn't exist."""
         remove_data = {"ip": "192.168.1.999"}
         response = self.client.post("/api/printers/remove", json=remove_data)
-        
+
         assert response.status_code == 200
         data = response.json()
         assert data["success"] is False
@@ -161,7 +162,7 @@ class TestPrinterManagementAPI:
     def test_get_persistent_printers_empty(self):
         """Test getting persistent printers when none exist."""
         response = self.client.get("/api/printers/persistent")
-        
+
         assert response.status_code == 200
         data = response.json()
         assert data["success"] is True
@@ -172,23 +173,33 @@ class TestPrinterManagementAPI:
         """Test getting persistent printers when some exist."""
         # Add a couple of persistent printers
         printers = [
-            {"ip": "192.168.1.100", "name": "Printer 1", "access_code": "123", "save_permanently": True},
-            {"ip": "192.168.1.101", "name": "Printer 2", "access_code": "456", "save_permanently": True}
+            {
+                "ip": "192.168.1.100",
+                "name": "Printer 1",
+                "access_code": "123",
+                "save_permanently": True,
+            },
+            {
+                "ip": "192.168.1.101",
+                "name": "Printer 2",
+                "access_code": "456",
+                "save_permanently": True,
+            },
         ]
-        
+
         for printer_data in printers:
             response = self.client.post("/api/printers/add", json=printer_data)
             assert response.status_code == 200
-        
+
         # Get the persistent printers
         response = self.client.get("/api/printers/persistent")
-        
+
         assert response.status_code == 200
         data = response.json()
         assert data["success"] is True
         assert len(data["printers"]) == 2
         assert "2 persistent printers" in data["message"]
-        
+
         # Check the printer details
         printer_ips = {p["ip"] for p in data["printers"]}
         assert "192.168.1.100" in printer_ips
@@ -201,20 +212,20 @@ class TestPrinterManagementAPI:
             "ip": "192.168.1.100",
             "access_code": "12345678",
             "name": "Persistent Printer",
-            "save_permanently": True
+            "save_permanently": True,
         }
         response = self.client.post("/api/printers/add", json=request_data)
         assert response.status_code == 200
-        
+
         # Check the config endpoint
         response = self.client.get("/api/config")
-        
+
         assert response.status_code == 200
         data = response.json()
         assert data["printer_count"] == 1
         assert data["persistent_printer_count"] == 1
         assert len(data["printers"]) == 1
-        
+
         printer = data["printers"][0]
         assert printer["ip"] == "192.168.1.100"
         assert printer["is_persistent"] is True
@@ -225,11 +236,11 @@ class TestPrinterManagementAPI:
         request_data = {
             "ip": "192.168.1.100",
             "access_code": "12345678",
-            "name": "Active Printer"
+            "name": "Active Printer",
         }
-        
+
         response = self.client.post("/api/printer/set-active", json=request_data)
-        
+
         assert response.status_code == 200
         data = response.json()
         assert data["success"] is True
