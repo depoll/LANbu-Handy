@@ -1,0 +1,8 @@
+# Development-only dependencies for formatting, linting, and testing
+pytest>=7.4.0
+pytest-cov>=4.1.0
+pytest-asyncio>=0.21.0
+black>=25.1.0
+isort>=5.14.0
+flake8>=7.2.0
+pre-commit>=4.0.1
