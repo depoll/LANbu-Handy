@@ -65,7 +65,7 @@ describe('PrinterSelector Badge Visibility', () => {
 
     // Check that runtime badge is displayed
     expect(screen.getByText('Session')).toBeInTheDocument();
-    
+
     // Check that runtime badge has the correct CSS class
     const runtimeBadge = screen.getByText('Session');
     expect(runtimeBadge).toHaveClass('runtime-badge');
@@ -102,7 +102,7 @@ describe('PrinterSelector Badge Visibility', () => {
 
     // Check that persistent badge is displayed
     expect(screen.getByText('Saved')).toBeInTheDocument();
-    
+
     // Check that persistent badge has the correct CSS class
     const persistentBadge = screen.getByText('Saved');
     expect(persistentBadge).toHaveClass('persistent-badge');
@@ -140,7 +140,7 @@ describe('PrinterSelector Badge Visibility', () => {
     // Check that both badges are displayed
     expect(screen.getByText('Session')).toBeInTheDocument();
     expect(screen.getByText('Saved')).toBeInTheDocument();
-    
+
     // Check that badges have the correct CSS classes
     const runtimeBadge = screen.getByText('Session');
     const persistentBadge = screen.getByText('Saved');
