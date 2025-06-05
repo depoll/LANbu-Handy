@@ -5,6 +5,10 @@ services:
     ports:
       - '8080:8000'
     restart: unless-stopped
+    volumes:
+      # Optional: Mount a directory for persistent printer configurations
+      # Uncomment the line below to enable persistent storage across container upgrades
+      # - ./config:/app/data
     environment:
       # Configure Bambu printers for LAN-only mode communication
 
@@ -23,6 +27,11 @@ services:
       # - BAMBU_PRINTER_ACCESS_CODE=12345678
       - BAMBU_PRINTER_IP=${BAMBU_PRINTER_IP:-}
       - BAMBU_PRINTER_ACCESS_CODE=${BAMBU_PRINTER_ACCESS_CODE:-}
+
+      # Persistent storage configuration
+      # Path to the printer configuration file (inside the container)
+      # This should correspond to the mounted volume above
+      - PRINTER_CONFIG_FILE=${PRINTER_CONFIG_FILE:-/app/data/printers.json}
 
       # Other settings
       - LOG_LEVEL=${LOG_LEVEL:-info}

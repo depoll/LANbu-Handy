@@ -97,13 +97,59 @@ export interface PrinterConfigResponse {
     name: string;
     ip: string;
     has_access_code: boolean;
+    is_persistent?: boolean;
+    source?: 'persistent' | 'environment';
   }[];
   printer_count: number;
+  persistent_printer_count?: number;
   active_printer?: {
     name: string;
     ip: string;
     has_access_code: boolean;
     is_runtime_set: boolean;
+    is_persistent?: boolean;
   };
   printer_ip?: string; // Legacy field
+}
+
+// New Persistent Printer Management Types
+export interface AddPrinterRequest {
+  ip: string;
+  access_code?: string;
+  name?: string;
+  save_permanently: boolean;
+}
+
+export interface AddPrinterResponse {
+  success: boolean;
+  message: string;
+  printer_info?: {
+    name: string;
+    ip: string;
+    has_access_code: boolean;
+    is_persistent: boolean;
+  };
+  error_details?: string;
+}
+
+export interface RemovePrinterRequest {
+  ip: string;
+}
+
+export interface RemovePrinterResponse {
+  success: boolean;
+  message: string;
+  error_details?: string;
+}
+
+export interface PersistentPrintersResponse {
+  success: boolean;
+  message: string;
+  printers?: {
+    name: string;
+    ip: string;
+    has_access_code: boolean;
+    is_persistent: boolean;
+  }[];
+  error_details?: string;
 }
