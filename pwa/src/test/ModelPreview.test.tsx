@@ -46,7 +46,7 @@ vi.mock('three', () => ({
 
 vi.mock('three-stdlib', () => ({
   STLLoader: vi.fn(() => ({
-    load: vi.fn((url, onLoad, onProgress, onError) => {
+    load: vi.fn((url, onLoad) => {
       // Mock successful loading
       const mockGeometry = {
         computeBoundingBox: vi.fn(),

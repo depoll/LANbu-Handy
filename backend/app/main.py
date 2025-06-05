@@ -455,9 +455,7 @@ async def get_model_preview(file_id: str):
 
         # Validate file extension for security
         if not model_service.validate_file_extension(model_file_path.name):
-            raise HTTPException(
-                status_code=400, detail="Invalid file type for preview"
-            )
+            raise HTTPException(status_code=400, detail="Invalid file type for preview")
 
         # Determine media type based on file extension
         media_type = "application/octet-stream"
@@ -467,9 +465,7 @@ async def get_model_preview(file_id: str):
             media_type = "model/3mf"
 
         return FileResponse(
-            path=model_file_path,
-            media_type=media_type,
-            filename=model_file_path.name
+            path=model_file_path, media_type=media_type, filename=model_file_path.name
         )
 
     except HTTPException:
