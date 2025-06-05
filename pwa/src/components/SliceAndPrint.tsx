@@ -43,6 +43,11 @@ function SliceAndPrint() {
   const [amsStatus, setAmsStatus] = useState<AMSStatusResponse | null>(null);
   const [currentFileId, setCurrentFileId] = useState<string>('');
 
+  // File upload state
+  const [inputMode, setInputMode] = useState<'url' | 'file'>('url');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
+
   // New state for configuration
   const [filamentMappings, setFilamentMappings] = useState<FilamentMapping[]>(
     []
@@ -114,6 +119,9 @@ function SliceAndPrint() {
     setCurrentWorkflowStep('');
     setOperationSteps([]);
     setShowOperationProgress(false);
+    // Reset file upload state
+    setSelectedFile(null);
+    setUploadProgress(0);
   };
 
   const handleModelSubmit = async () => {
@@ -242,6 +250,207 @@ function SliceAndPrint() {
     } finally {
       setIsProcessing(false);
       setCurrentWorkflowStep('');
+    }
+  };
+
+  const handleFileUpload = async () => {
+    if (!selectedFile) {
+      showError('Please select a file to upload');
+      return;
+    }
+
+    setIsProcessing(true);
+    setCurrentWorkflowStep('Uploading model');
+    setStatusMessages([]);
+    setUploadProgress(0);
+
+    // Initialize operation progress
+    initializeOperationSteps([
+      'Upload File',
+      'Analyze Structure',
+      'Extract Requirements',
+    ]);
+
+    addStatusMessage('📂 Uploading model file...');
+    showInfo('Starting file upload...', 'File Upload');
+
+    try {
+      // Step 1: Upload File
+      updateOperationStep(
+        0,
+        'running',
+        'Uploading file to server...',
+        undefined,
+        0
+      );
+
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+
+      const response = await fetch('/api/model/upload-file', {
+        method: 'POST',
+        body: formData,
+      });
+
+      // Check if response exists and is valid
+      if (!response) {
+        const errorMsg = 'No response received from server';
+        updateOperationStep(0, 'error', 'Upload failed', errorMsg);
+        throw new Error(errorMsg);
+      }
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        updateOperationStep(0, 'error', 'Upload failed', errorText);
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      }
+
+      updateOperationStep(
+        0,
+        'completed',
+        'File uploaded successfully',
+        undefined,
+        100
+      );
+      setUploadProgress(100);
+
+      // Step 2: Analyze Structure
+      updateOperationStep(1, 'running', 'Analyzing file structure...');
+
+      const result: ModelSubmissionResponse = await response.json();
+
+      updateOperationStep(1, 'completed', 'Structure analysis complete');
+
+      // Step 3: Extract Requirements
+      updateOperationStep(2, 'running', 'Extracting filament requirements...');
+
+      if (result.success) {
+        addStatusMessage(`✅ File upload completed: ${result.message}`);
+        setCurrentFileId(result.file_id || '');
+
+        if (result.filament_requirements) {
+          setFilamentRequirements(result.filament_requirements);
+          updateOperationStep(
+            2,
+            'completed',
+            `Found ${result.filament_requirements.filament_count} filament requirement(s)`,
+            `Filament types detected and analyzed`
+          );
+          addStatusMessage('✅ Filament requirements detected and analyzed');
+          addStatusMessage(
+            `🎨 Model requires ${result.filament_requirements.filament_count} filament(s)`
+          );
+          showSuccess(
+            `Model requires ${result.filament_requirements.filament_count} filament(s)`,
+            'Analysis Complete'
+          );
+        } else {
+          updateOperationStep(
+            2,
+            'completed',
+            'No specific requirements detected'
+          );
+          addStatusMessage('ℹ No specific filament requirements detected');
+          showInfo(
+            'No specific filament requirements detected',
+            'Analysis Complete'
+          );
+        }
+
+        setModelSubmitted(true);
+        setCurrentWorkflowStep('');
+        addStatusMessage('📡 Ready to query AMS status...');
+      } else {
+        updateOperationStep(2, 'error', 'Analysis failed', result.message);
+        addStatusMessage(`❌ File analysis failed: ${result.message}`);
+        showError(`File analysis failed: ${result.message}`, 'Analysis Failed');
+      }
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error occurred';
+
+      // Update the current running step to error
+      const runningStepIndex = operationSteps.findIndex(
+        step => step.status === 'running'
+      );
+      if (runningStepIndex >= 0) {
+        updateOperationStep(
+          runningStepIndex,
+          'error',
+          'Operation failed',
+          errorMessage
+        );
+      }
+
+      addStatusMessage(`❌ File upload error: ${errorMessage}`);
+      showError(`File upload failed: ${errorMessage}`, 'Error');
+      console.error('File upload error:', error);
+    } finally {
+      setIsProcessing(false);
+      setCurrentWorkflowStep('');
+    }
+  };
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      // Validate file extension
+      const validExtensions = ['.stl', '.3mf'];
+      const fileExtension = file.name
+        .toLowerCase()
+        .substring(file.name.lastIndexOf('.'));
+
+      if (!validExtensions.includes(fileExtension)) {
+        showError(
+          `Unsupported file type. Please select a ${validExtensions.join(' or ')} file.`
+        );
+        event.target.value = ''; // Clear the input
+        return;
+      }
+
+      // Validate file size (100MB limit)
+      const maxSize = 100 * 1024 * 1024; // 100MB in bytes
+      if (file.size > maxSize) {
+        showError(
+          'File size exceeds 100MB limit. Please select a smaller file.'
+        );
+        event.target.value = ''; // Clear the input
+        return;
+      }
+
+      setSelectedFile(file);
+      setUploadProgress(0);
+      showInfo(
+        `Selected file: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`,
+        'File Selected'
+      );
+    }
+  };
+
+  const handleModeSwitch = (mode: 'url' | 'file') => {
+    setInputMode(mode);
+    // Clear current input when switching modes
+    if (mode === 'url') {
+      setSelectedFile(null);
+      setUploadProgress(0);
+    } else {
+      setModelUrl('');
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (inputMode === 'url') {
+      await handleModelSubmit();
+    } else {
+      await handleFileUpload();
+    }
+  };
+
+  const canSubmit = () => {
+    if (inputMode === 'url') {
+      return modelUrl.trim() !== '';
+    } else {
+      return selectedFile !== null;
     }
   };
 
@@ -582,7 +791,7 @@ function SliceAndPrint() {
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !isProcessing) {
       if (!modelSubmitted) {
-        handleModelSubmit();
+        handleSubmit();
       } else if (!isSliced) {
         handleConfiguredSlice();
       } else {
@@ -597,26 +806,87 @@ function SliceAndPrint() {
         <h2>Slice and Print</h2>
         <p>
           {!modelSubmitted
-            ? 'Enter a URL to your 3D model file (.stl or .3mf) to analyze filament requirements'
+            ? 'Enter a URL or upload your 3D model file (.stl or .3mf) to analyze filament requirements'
             : 'Review your model requirements and AMS status, then configure and print'}
         </p>
       </div>
 
-      {/* Model URL Input Section */}
+      {/* Model Input Section */}
       <div className="slice-and-print-form">
-        <div className="input-group">
-          <label htmlFor="model-url">Model URL:</label>
-          <input
-            id="model-url"
-            type="url"
-            value={modelUrl}
-            onChange={e => setModelUrl(e.target.value)}
-            onKeyPress={handleKeyPress}
-            placeholder="https://example.com/model.stl"
-            disabled={isProcessing || modelSubmitted}
-            className="model-url-input"
-          />
-        </div>
+        {/* Input Mode Toggle */}
+        {!modelSubmitted && (
+          <div className="input-mode-toggle">
+            <button
+              type="button"
+              className={`mode-toggle-button ${inputMode === 'url' ? 'active' : ''}`}
+              onClick={() => handleModeSwitch('url')}
+              disabled={isProcessing}
+            >
+              🔗 URL
+            </button>
+            <button
+              type="button"
+              className={`mode-toggle-button ${inputMode === 'file' ? 'active' : ''}`}
+              onClick={() => handleModeSwitch('file')}
+              disabled={isProcessing}
+            >
+              📁 File Upload
+            </button>
+          </div>
+        )}
+
+        {/* URL Input */}
+        {inputMode === 'url' && (
+          <div className="input-group">
+            <label htmlFor="model-url">Model URL:</label>
+            <input
+              id="model-url"
+              type="url"
+              value={modelUrl}
+              onChange={e => setModelUrl(e.target.value)}
+              onKeyPress={handleKeyPress}
+              placeholder="https://example.com/model.stl"
+              disabled={isProcessing || modelSubmitted}
+              className="model-url-input"
+            />
+          </div>
+        )}
+
+        {/* File Upload Input */}
+        {inputMode === 'file' && (
+          <div className="input-group">
+            <label htmlFor="model-file">Model File:</label>
+            <div className="file-input-container">
+              <input
+                id="model-file"
+                type="file"
+                accept=".stl,.3mf"
+                onChange={handleFileSelect}
+                disabled={isProcessing || modelSubmitted}
+                className="model-file-input"
+              />
+              {selectedFile && (
+                <div className="selected-file-info">
+                  <span className="file-name">📄 {selectedFile.name}</span>
+                  <span className="file-size">
+                    {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+                  </span>
+                  {uploadProgress > 0 && uploadProgress < 100 && (
+                    <div className="upload-progress">
+                      <div
+                        className="upload-progress-bar"
+                        style={{ width: `${uploadProgress}%` }}
+                      ></div>
+                      <span className="upload-progress-text">
+                        {uploadProgress}%
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         <div className="button-group">
           {/* Loading Indicator */}
@@ -629,11 +899,17 @@ function SliceAndPrint() {
 
           {!modelSubmitted ? (
             <button
-              onClick={handleModelSubmit}
-              disabled={isProcessing || !modelUrl.trim()}
+              onClick={handleSubmit}
+              disabled={isProcessing || !canSubmit()}
               className="slice-and-print-button"
             >
-              {isProcessing ? 'Analyzing...' : 'Analyze Model'}
+              {isProcessing
+                ? inputMode === 'url'
+                  ? 'Analyzing...'
+                  : 'Uploading...'
+                : inputMode === 'url'
+                  ? 'Analyze Model'
+                  : 'Upload & Analyze'}
             </button>
           ) : (
             <>

@@ -318,6 +318,107 @@ class TestModelSubmissionEndpoint:
         assert response.status_code in [400, 422]  # Validation or format error
 
 
+class TestModelFileUploadEndpoint:
+    """Test cases for the model file upload endpoint."""
+
+    def test_upload_model_file_success(self):
+        """Test successful file upload."""
+        # Create test file content
+        test_content = b"mock stl file content for testing"
+        files = {"file": ("test_model.stl", test_content, "application/octet-stream")}
+
+        response = client.post("/api/model/upload-file", files=files)
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        assert data["message"] == "Model uploaded and validated successfully"
+        assert data["file_id"] is not None
+        assert data["file_info"] is not None
+        assert data["file_info"]["extension"] == ".stl"
+
+    def test_upload_model_file_with_3mf_requirements(self):
+        """Test file upload with .3mf file that has filament requirements."""
+        # Create a mock 3mf file (zip file with project settings)
+        import json
+        import os
+        import tempfile
+        import zipfile
+
+        with tempfile.NamedTemporaryFile(suffix=".3mf", delete=False) as temp_file:
+            try:
+                # Create a zip file with mock project settings
+                with zipfile.ZipFile(temp_file.name, "w") as zip_file:
+                    config_data = {
+                        "filament_type": ["PLA", "PETG"],
+                        "filament_colour": ["#FF0000", "#00FF00"],
+                    }
+                    zip_file.writestr(
+                        "Metadata/project_settings.config", json.dumps(config_data)
+                    )
+
+                # Read the file content
+                with open(temp_file.name, "rb") as f:
+                    test_content = f.read()
+
+                files = {
+                    "file": ("test_model.3mf", test_content, "application/octet-stream")
+                }
+                response = client.post("/api/model/upload-file", files=files)
+
+                assert response.status_code == 200
+                data = response.json()
+                assert data["success"] is True
+                assert data["filament_requirements"] is not None
+                assert data["filament_requirements"]["filament_count"] == 2
+                assert data["filament_requirements"]["filament_types"] == [
+                    "PLA",
+                    "PETG",
+                ]
+
+            finally:
+                os.unlink(temp_file.name)
+
+    def test_upload_model_file_empty_filename(self):
+        """Test file upload with empty filename."""
+        test_content = b"mock file content"
+        files = {"file": ("", test_content, "application/octet-stream")}
+
+        response = client.post("/api/model/upload-file", files=files)
+
+        # FastAPI TestClient has different behavior for empty filename
+        assert response.status_code == 422  # Validation error
+
+    def test_upload_model_file_unsupported_extension(self):
+        """Test file upload with unsupported file extension."""
+        test_content = b"mock file content"
+        files = {"file": ("test_model.obj", test_content, "application/octet-stream")}
+
+        response = client.post("/api/model/upload-file", files=files)
+
+        assert response.status_code == 400  # Client error
+        data = response.json()
+        assert "Unsupported file extension" in str(data)
+
+    def test_upload_model_file_too_large(self):
+        """Test file upload with file too large."""
+        # Create a file larger than the limit (100MB default)
+        large_content = b"x" * (101 * 1024 * 1024)  # 101MB
+        files = {"file": ("large_model.stl", large_content, "application/octet-stream")}
+
+        response = client.post("/api/model/upload-file", files=files)
+
+        assert response.status_code == 400  # Client error
+        data = response.json()
+        assert "exceeds maximum allowed size" in str(data)
+
+    def test_upload_model_file_no_file(self):
+        """Test file upload endpoint without providing file."""
+        response = client.post("/api/model/upload-file", files={})
+
+        assert response.status_code == 422  # Validation error
+
+
 class TestSliceEndpoint:
     """Test cases for the slice endpoint."""
 
