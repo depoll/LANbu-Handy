@@ -10,6 +10,12 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from app.config import config
+from app.job_orchestration import (
+    download_model_step,
+    slice_model_step,
+    start_print_step,
+    upload_gcode_step,
+)
 from app.model_service import (
     ModelDownloadError,
     ModelService,
@@ -21,12 +27,6 @@ from app.printer_service import (
     PrinterService,
 )
 from app.slicer_service import slice_model
-from app.job_orchestration import (
-    download_model_step,
-    slice_model_step,
-    start_print_step,
-    upload_gcode_step,
-)
 from app.utils import (
     build_slicing_options_from_config,
     find_gcode_file,

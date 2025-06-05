@@ -9,10 +9,9 @@ import tempfile
 from pathlib import Path
 from typing import Dict, List
 
-from fastapi import HTTPException
-
 from app.model_service import ModelDownloadError, ModelValidationError
 from app.printer_service import PrinterCommunicationError, PrinterMQTTError
+from fastapi import HTTPException
 
 
 def get_gcode_output_dir() -> Path:

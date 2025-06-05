@@ -345,7 +345,9 @@ class TestSliceEndpoint:
 
     @patch("app.main.find_gcode_file")
     @patch("app.main.slice_model")
-    def test_slice_success(self, mock_slice_model, mock_find_gcode_file, temp_model_file):
+    def test_slice_success(
+        self, mock_slice_model, mock_find_gcode_file, temp_model_file
+    ):
         """Test successful slicing with mocked CLI."""
         from app.slicer_service import CLIResult
 
@@ -353,7 +355,7 @@ class TestSliceEndpoint:
         mock_slice_model.return_value = CLIResult(
             exit_code=0, stdout="G-code generated successfully", stderr="", success=True
         )
-        
+
         # Mock finding the G-code file
         mock_gcode_path = Path("/tmp/test_output.gcode")
         mock_find_gcode_file.return_value = mock_gcode_path
@@ -471,9 +473,11 @@ class TestConfiguredSliceEndpoint:
         assert response.status_code == 404
         assert "Model file not found" in response.json()["detail"]
 
-    @patch("app.main.find_gcode_file") 
+    @patch("app.main.find_gcode_file")
     @patch("app.main.slice_model")
-    def test_configured_slice_success(self, mock_slice_model, mock_find_gcode_file, temp_model_file):
+    def test_configured_slice_success(
+        self, mock_slice_model, mock_find_gcode_file, temp_model_file
+    ):
         """Test successful configured slicing with mocked CLI."""
         from app.slicer_service import CLIResult
 
@@ -481,7 +485,7 @@ class TestConfiguredSliceEndpoint:
         mock_slice_model.return_value = CLIResult(
             exit_code=0, stdout="G-code generated successfully", stderr="", success=True
         )
-        
+
         # Mock finding the G-code file
         mock_gcode_path = Path("/tmp/test_configured_output.gcode")
         mock_find_gcode_file.return_value = mock_gcode_path
@@ -583,9 +587,7 @@ class TestConfiguredSliceEndpoint:
         ]
         build_plate_type = "Cool Plate"
 
-        options = build_slicing_options_from_config(
-            filament_mappings, build_plate_type
-        )
+        options = build_slicing_options_from_config(filament_mappings, build_plate_type)
 
         assert options["build-plate"] == "Cool Plate"
         assert options["filament-slot-0"] == "0-1"
@@ -702,33 +704,33 @@ class TestJobStartEndpoint:
         mock_get_printers.return_value = [
             PrinterConfig("Test Printer", "192.168.1.100", "test123")
         ]
-        
+
         # Mock each step to return success
         mock_download_step.return_value = {
             "success": True,
             "file_path": Path(temp_model_file),
             "message": "Model downloaded successfully",
-            "details": f"File: {Path(temp_model_file).name}"
+            "details": f"File: {Path(temp_model_file).name}",
         }
-        
+
         mock_slice_step.return_value = {
             "success": True,
             "gcode_path": Path("/tmp/test.gcode"),
             "message": "Model sliced successfully",
-            "details": "G-code: test.gcode"
+            "details": "G-code: test.gcode",
         }
-        
+
         mock_upload_step.return_value = {
             "success": True,
             "message": "Upload successful",
             "details": "Remote path: /upload/test.gcode",
-            "gcode_filename": "test.gcode"
+            "gcode_filename": "test.gcode",
         }
-        
+
         mock_start_print_step.return_value = {
             "success": True,
             "message": "Print command sent successfully",
-            "details": "Print started for: test.gcode"
+            "details": "Print started for: test.gcode",
         }
 
         response = client.post(

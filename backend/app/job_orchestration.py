@@ -6,12 +6,12 @@ that involve multiple steps like downloading, slicing, and printing.
 """
 
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any, Dict
 
-from app.model_service import ModelService, ModelValidationError, ModelDownloadError
+from app.model_service import ModelDownloadError, ModelService, ModelValidationError
 from app.printer_service import PrinterService
 from app.slicer_service import slice_model
-from app.utils import get_default_slicing_options, get_gcode_output_dir, find_gcode_file
+from app.utils import find_gcode_file, get_default_slicing_options, get_gcode_output_dir
 
 
 async def download_model_step(
