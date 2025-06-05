@@ -99,31 +99,26 @@ def validate_ip_or_hostname(address: str) -> str:
     """
     address = address.strip()
     if not address:
-        raise HTTPException(
-            status_code=400, detail="Printer address cannot be empty"
-        )
+        raise HTTPException(status_code=400, detail="Printer address cannot be empty")
 
     # First try IPv4 validation
     if _is_valid_ipv4(address):
         return address
-    
+
     # Then try hostname validation
     if _is_valid_hostname(address):
         return address
-    
-    raise HTTPException(
-        status_code=400, 
-        detail="Invalid IP address or hostname format"
-    )
+
+    raise HTTPException(status_code=400, detail="Invalid IP address or hostname format")
 
 
 def _is_valid_ipv4(ip: str) -> bool:
     """
     Check if a string is a valid IPv4 address.
-    
+
     Args:
         ip: The string to validate as IPv4
-        
+
     Returns:
         bool: True if valid IPv4, False otherwise
     """
@@ -145,51 +140,51 @@ def _is_valid_ipv4(ip: str) -> bool:
 def _is_valid_hostname(hostname: str) -> bool:
     """
     Check if a string is a valid hostname according to RFC standards.
-    
+
     Args:
         hostname: The string to validate as hostname
-        
+
     Returns:
         bool: True if valid hostname, False otherwise
     """
     # Basic length checks
     if not hostname or len(hostname) > 253:
         return False
-    
+
     # Remove trailing dot if present (FQDN)
-    if hostname.endswith('.'):
+    if hostname.endswith("."):
         hostname = hostname[:-1]
-    
+
     # Check each label (part between dots)
-    labels = hostname.split('.')
-    
+    labels = hostname.split(".")
+
     for label in labels:
         # Empty label not allowed (would happen with consecutive dots)
         if not label:
             return False
-        
+
         # Label too long (max 63 characters per RFC)
         if len(label) > 63:
             return False
-            
+
         # Label cannot start or end with hyphen
-        if label.startswith('-') or label.endswith('-'):
+        if label.startswith("-") or label.endswith("-"):
             return False
-            
+
         # Label can only contain letters, numbers, hyphens
         # Note: Some systems allow underscores but RFC 952/1123 doesn't
-        if not re.match(r'^[a-zA-Z0-9-]+$', label):
+        if not re.match(r"^[a-zA-Z0-9-]+$", label):
             return False
-        
+
         # For hostnames that look like IP addresses (all numeric labels),
         # apply some additional restrictions to avoid confusion
         if label.isdigit():
             # If all labels are numeric and there are 4 of them,
             # this might be an invalid IP address attempt
-            if len(labels) == 4 and all(l.isdigit() for l in labels):
+            if len(labels) == 4 and all(label.isdigit() for label in labels):
                 # Let this be handled by IP validation instead
                 return False
-    
+
     return True
 
 
@@ -197,7 +192,7 @@ def _is_valid_hostname(hostname: str) -> bool:
 def validate_ip_address(address: str) -> str:
     """
     Validate and clean an IP address string (legacy function - IP addresses only).
-    
+
     For new code, use validate_ip_or_hostname() which supports both IPs and hostnames.
 
     Args:
@@ -211,18 +206,13 @@ def validate_ip_address(address: str) -> str:
     """
     address = address.strip()
     if not address:
-        raise HTTPException(
-            status_code=400, detail="Printer address cannot be empty"
-        )
+        raise HTTPException(status_code=400, detail="Printer address cannot be empty")
 
     # Strict IPv4 validation only
     if _is_valid_ipv4(address):
         return address
-    
-    raise HTTPException(
-        status_code=400, 
-        detail="Invalid IP address format"
-    )
+
+    raise HTTPException(status_code=400, detail="Invalid IP address format")
 
 
 def find_gcode_file(output_dir: Path) -> Path:

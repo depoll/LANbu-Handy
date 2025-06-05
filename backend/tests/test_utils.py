@@ -17,8 +17,8 @@ from app.utils import (
     get_gcode_output_dir,
     handle_model_errors,
     handle_printer_errors,
-    validate_ip_or_hostname,
     validate_ip_address,
+    validate_ip_or_hostname,
 )
 from fastapi import HTTPException
 
@@ -397,7 +397,7 @@ class TestIPOrHostnameValidation:
         """Test validation of hostname that is too long."""
         # Create a hostname longer than 253 characters
         long_hostname = "a" * 250 + ".com"
-        
+
         with pytest.raises(HTTPException) as exc_info:
             validate_ip_or_hostname(long_hostname)
 
@@ -409,7 +409,7 @@ class TestIPOrHostnameValidation:
         # Create a label longer than 63 characters
         long_label = "a" * 64
         long_hostname = f"{long_label}.local"
-        
+
         with pytest.raises(HTTPException) as exc_info:
             validate_ip_or_hostname(long_hostname)
 

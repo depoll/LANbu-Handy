@@ -295,7 +295,10 @@ function PrinterSelector({
         <div className="printer-selection-panel">
           <div className="panel-header">
             <h3>Select Printer</h3>
-            <p>Choose a discovered printer or enter IP address or hostname manually</p>
+            <p>
+              Choose a discovered printer or enter IP address or hostname
+              manually
+            </p>
           </div>
 
           {/* Discovery Section */}

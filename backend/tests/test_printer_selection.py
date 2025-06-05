@@ -67,7 +67,7 @@ class TestPrinterSelection:
         response = client.post("/api/printer/set-active", json=request_data)
 
         assert response.status_code == 400
-        assert "Invalid IP address format" in response.text
+        assert "Invalid IP address or hostname format" in response.text
 
     def test_set_active_printer_empty_ip(self, client):
         """Test setting active printer with empty IP address."""
@@ -76,7 +76,7 @@ class TestPrinterSelection:
         response = client.post("/api/printer/set-active", json=request_data)
 
         assert response.status_code == 400
-        assert "Printer IP address cannot be empty" in response.text
+        assert "Printer address cannot be empty" in response.text
 
     def test_set_active_printer_without_access_code(self, client):
         """Test setting active printer without access code."""
