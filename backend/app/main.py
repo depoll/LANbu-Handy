@@ -9,7 +9,7 @@ import logging
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from app.config import config
+from app.config import PrinterConfig, get_config
 from app.job_orchestration import (
     download_model_step,
     slice_model_step,
@@ -54,6 +54,9 @@ model_service = ModelService()
 
 # Initialize printer service
 printer_service = PrinterService()
+
+# Initialize configuration (for testing compatibility)
+config = get_config()
 
 # Path to the PWA static files directory
 # In Docker, this will be /app/static_pwa, but for local testing we use a
@@ -107,25 +110,28 @@ async def status():
 
 
 @app.get("/api/config")
-async def get_config():
+async def get_app_config():
     """
     Get application configuration status.
 
     Returns information about printer configuration and other settings.
     """
-    # Import config inside the function so it can be mocked
-    from app.config import config
-
     printers = config.get_printers()
+    persistent_printers = config.get_persistent_printers()
+    persistent_ips = {p.ip for p in persistent_printers}
+
     printers_info = []
 
     for printer in printers:
+        is_persistent = printer.ip in persistent_ips
         printers_info.append(
             {
                 "name": printer.name,
                 "ip": printer.ip,
                 # Don't expose access codes in API for security
                 "has_access_code": bool(printer.access_code),
+                "is_persistent": is_persistent,
+                "source": "persistent" if is_persistent else "environment",
             }
         )
 
@@ -133,17 +139,20 @@ async def get_config():
     active_printer = config.get_active_printer()
     active_printer_info = None
     if active_printer:
+        is_persistent = active_printer.ip in persistent_ips
         active_printer_info = {
             "name": active_printer.name,
             "ip": active_printer.ip,
             "has_access_code": bool(active_printer.access_code),
             "is_runtime_set": True,  # Indicates this was set via API, not env vars
+            "is_persistent": is_persistent,
         }
 
     return {
         "printer_configured": config.is_printer_configured(),
         "printers": printers_info,
         "printer_count": len(printers),
+        "persistent_printer_count": len(persistent_printers),
         "active_printer": active_printer_info,
         # Legacy fields for backward compatibility
         "printer_ip": (
@@ -250,6 +259,37 @@ class SetActivePrinterResponse(BaseModel):
     success: bool
     message: str
     printer_info: Optional[Dict] = None
+    error_details: Optional[str] = None
+
+
+class AddPrinterRequest(BaseModel):
+    ip: str
+    access_code: str = ""
+    name: Optional[str] = None
+    save_permanently: bool = False
+
+
+class AddPrinterResponse(BaseModel):
+    success: bool
+    message: str
+    printer_info: Optional[Dict] = None
+    error_details: Optional[str] = None
+
+
+class RemovePrinterRequest(BaseModel):
+    ip: str
+
+
+class RemovePrinterResponse(BaseModel):
+    success: bool
+    message: str
+    error_details: Optional[str] = None
+
+
+class PersistentPrintersResponse(BaseModel):
+    success: bool
+    message: str
+    printers: List[Dict] = None
     error_details: Optional[str] = None
 
 
@@ -866,5 +906,155 @@ async def set_active_printer(request: SetActivePrinterRequest):
         raise
     except Exception as e:
         msg = f"Internal server error while setting active printer: {str(e)}"
+        logger.error(msg)
+        raise HTTPException(status_code=500, detail=msg)
+
+
+@app.post("/api/printers/add", response_model=AddPrinterResponse)
+async def add_printer(request: AddPrinterRequest):
+    """
+    Add a new printer configuration.
+
+    Allows adding a printer either temporarily (for the current session) or
+    permanently (saved to persistent storage). Permanent printers survive
+    container restarts.
+
+    Args:
+        request: AddPrinterRequest containing printer details and persistence option
+
+    Returns:
+        AddPrinterResponse: Success status and printer information
+
+    Raises:
+        HTTPException: If the printer configuration is invalid or already exists
+    """
+    try:
+        # Validate IP address format
+        ip = validate_ip_address(request.ip)
+
+        # Create printer configuration
+        printer_config = PrinterConfig(
+            name=request.name or f"Printer at {ip}",
+            ip=ip,
+            access_code=request.access_code,
+        )
+
+        if request.save_permanently:
+            # Add to persistent storage
+            try:
+                config.add_persistent_printer(printer_config)
+                storage_message = "permanently saved"
+            except ValueError as e:
+                raise HTTPException(status_code=400, detail=str(e))
+        else:
+            # Add as runtime active printer only
+            config.set_active_printer(
+                ip=printer_config.ip,
+                access_code=printer_config.access_code,
+                name=printer_config.name,
+            )
+            storage_message = "set as active for current session"
+
+        return AddPrinterResponse(
+            success=True,
+            message=f"Printer {printer_config.name} {storage_message}",
+            printer_info={
+                "name": printer_config.name,
+                "ip": printer_config.ip,
+                "has_access_code": bool(printer_config.access_code),
+                "is_persistent": request.save_permanently,
+            },
+        )
+
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
+    except Exception as e:
+        msg = f"Internal server error while adding printer: {str(e)}"
+        logger.error(msg)
+        raise HTTPException(status_code=500, detail=msg)
+
+
+@app.post("/api/printers/remove", response_model=RemovePrinterResponse)
+async def remove_printer(request: RemovePrinterRequest):
+    """
+    Remove a printer from persistent storage.
+
+    Removes a printer configuration from persistent storage. This does not affect
+    runtime active printers unless the removed printer is currently active.
+
+    Args:
+        request: RemovePrinterRequest containing the IP of the printer to remove
+
+    Returns:
+        RemovePrinterResponse: Success status and operation result
+
+    Raises:
+        HTTPException: If removal fails due to internal server error
+    """
+    try:
+        # Validate IP address format
+        ip = validate_ip_address(request.ip)
+
+        # Remove from persistent storage
+        removed = config.remove_persistent_printer(ip)
+
+        if removed:
+            return RemovePrinterResponse(
+                success=True,
+                message=f"Printer with IP {ip} removed from persistent storage",
+            )
+        else:
+            return RemovePrinterResponse(
+                success=False,
+                message=f"No printer found with IP {ip} in persistent storage",
+            )
+
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
+    except Exception as e:
+        msg = f"Internal server error while removing printer: {str(e)}"
+        logger.error(msg)
+        raise HTTPException(status_code=500, detail=msg)
+
+
+@app.get("/api/printers/persistent", response_model=PersistentPrintersResponse)
+async def get_persistent_printers():
+    """
+    Get all printers stored in persistent storage.
+
+    Returns a list of all printer configurations that are permanently saved
+    and will survive container restarts. This excludes environment-configured
+    printers and runtime active printers.
+
+    Returns:
+        PersistentPrintersResponse: List of persistent printer configurations
+
+    Raises:
+        HTTPException: If retrieval fails due to internal server error
+    """
+    try:
+        persistent_printers = config.get_persistent_printers()
+
+        printers_info = []
+        for printer in persistent_printers:
+            printers_info.append(
+                {
+                    "name": printer.name,
+                    "ip": printer.ip,
+                    "has_access_code": bool(printer.access_code),
+                    "is_persistent": True,
+                }
+            )
+
+        return PersistentPrintersResponse(
+            success=True,
+            message=f"Retrieved {len(persistent_printers)} persistent printers",
+            printers=printers_info,
+        )
+
+    except Exception as e:
+        msg = f"Internal server error while retrieving persistent printers: {str(e)}"
         logger.error(msg)
         raise HTTPException(status_code=500, detail=msg)

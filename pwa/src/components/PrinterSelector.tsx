@@ -2,9 +2,9 @@ import { useState, useEffect } from 'react';
 import {
   DiscoveredPrinter,
   PrinterDiscoveryResponse,
-  SetActivePrinterRequest,
-  SetActivePrinterResponse,
   PrinterConfigResponse,
+  AddPrinterRequest,
+  AddPrinterResponse,
 } from '../types/api';
 import { usePrinterIPPersistence } from '../hooks/usePrinterIPPersistence';
 
@@ -13,6 +13,7 @@ interface PrinterInfo {
   ip: string;
   has_access_code: boolean;
   is_runtime_set?: boolean;
+  is_persistent?: boolean;
 }
 
 interface PrinterSelectorProps {
@@ -33,6 +34,7 @@ function PrinterSelector({
   const [manualIp, setManualIp] = useState('');
   const [manualAccessCode, setManualAccessCode] = useState('');
   const [manualName, setManualName] = useState('');
+  const [savePermanently, setSavePermanently] = useState(false);
   const [isSettingPrinter, setIsSettingPrinter] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
   const [currentPrinter, setCurrentPrinter] = useState<PrinterInfo | null>(
@@ -72,6 +74,7 @@ function PrinterSelector({
             ip: config.active_printer.ip,
             has_access_code: config.active_printer.has_access_code,
             is_runtime_set: config.active_printer.is_runtime_set,
+            is_persistent: config.active_printer.is_persistent,
           });
         } else if (config.printers.length > 0) {
           // Use first configured printer as fallback
@@ -81,6 +84,7 @@ function PrinterSelector({
             ip: firstPrinter.ip,
             has_access_code: firstPrinter.has_access_code,
             is_runtime_set: false,
+            is_persistent: firstPrinter.is_persistent,
           });
         }
       }
@@ -137,14 +141,15 @@ function PrinterSelector({
     setStatusMessage(`Setting printer: ${printer.ip}...`);
 
     try {
-      const request: SetActivePrinterRequest = {
+      const request: AddPrinterRequest = {
         ip: printer.ip,
         access_code: '', // Discovered printers don't have access codes initially
         name:
           printer.hostname || `${printer.model || 'Printer'} at ${printer.ip}`,
+        save_permanently: false, // Default to temporary for discovered printers
       };
 
-      await setPrinter(request);
+      await addPrinter(request);
     } finally {
       setIsSettingPrinter(false);
     }
@@ -157,29 +162,32 @@ function PrinterSelector({
     }
 
     setIsSettingPrinter(true);
-    setStatusMessage(`Setting printer: ${manualIp}...`);
+    const actionType = savePermanently ? 'Saving' : 'Setting';
+    setStatusMessage(`${actionType} printer: ${manualIp}...`);
 
     try {
-      const request: SetActivePrinterRequest = {
+      const request: AddPrinterRequest = {
         ip: manualIp.trim(),
         access_code: manualAccessCode.trim(),
         name: manualName.trim() || `Printer at ${manualIp.trim()}`,
+        save_permanently: savePermanently,
       };
 
-      await setPrinter(request);
+      await addPrinter(request);
 
       // Clear manual input fields on success
       setManualIp('');
       setManualAccessCode('');
       setManualName('');
+      setSavePermanently(false);
     } finally {
       setIsSettingPrinter(false);
     }
   };
 
-  const setPrinter = async (request: SetActivePrinterRequest) => {
+  const addPrinter = async (request: AddPrinterRequest) => {
     try {
-      const response = await fetch('/api/printer/set-active', {
+      const response = await fetch('/api/printers/add', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -197,17 +205,21 @@ function PrinterSelector({
         throw new Error(`HTTP ${response.status}: ${errorText}`);
       }
 
-      const result: SetActivePrinterResponse = await response.json();
+      const result: AddPrinterResponse = await response.json();
 
       if (result.success) {
-        setStatusMessage(`✅ ${result.message}`);
+        const permanencyMessage = request.save_permanently
+          ? 'permanently saved'
+          : 'set for current session';
+        setStatusMessage(`✅ Printer ${permanencyMessage}`);
+
         if (result.printer_info) {
           setCurrentPrinter({
             ...result.printer_info,
             is_runtime_set: true,
           });
 
-          // Save IP to Local Storage for future use
+          // Save IP to Local Storage for future use (regardless of permanency)
           saveIP(result.printer_info.ip);
 
           // Notify parent component
@@ -223,14 +235,14 @@ function PrinterSelector({
       } else {
         setStatusMessage(`❌ ${result.message}`);
         if (result.error_details) {
-          console.error('Set printer error details:', result.error_details);
+          console.error('Add printer error details:', result.error_details);
         }
       }
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
-      setStatusMessage(`❌ Failed to set printer: ${errorMessage}`);
-      console.error('Set printer error:', error);
+      setStatusMessage(`❌ Failed to add printer: ${errorMessage}`);
+      console.error('Add printer error:', error);
     }
   };
 
@@ -251,9 +263,14 @@ function PrinterSelector({
               <div className="printer-info">
                 <span className="printer-name">{currentPrinter.name}</span>
                 <span className="printer-ip">{currentPrinter.ip}</span>
-                {currentPrinter.is_runtime_set && (
-                  <span className="runtime-badge">Session</span>
-                )}
+                <div className="printer-badges">
+                  {currentPrinter.is_runtime_set && (
+                    <span className="runtime-badge">Session</span>
+                  )}
+                  {currentPrinter.is_persistent && (
+                    <span className="persistent-badge">Saved</span>
+                  )}
+                </div>
               </div>
             </div>
           ) : (
@@ -397,12 +414,38 @@ function PrinterSelector({
                 />
               </div>
 
+              <div className="form-row">
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={savePermanently}
+                    onChange={e => setSavePermanently(e.target.checked)}
+                    disabled={isSettingPrinter}
+                    className="save-permanently-checkbox"
+                  />
+                  <span className="checkbox-text">
+                    Save permanently (survives container restarts)
+                  </span>
+                </label>
+                <small className="checkbox-help">
+                  {savePermanently
+                    ? 'Printer will be saved to persistent storage'
+                    : 'Printer will only be active for this session'}
+                </small>
+              </div>
+
               <button
                 onClick={handleSetManualPrinter}
                 disabled={isSettingPrinter || !manualIp.trim()}
                 className="set-manual-button"
               >
-                {isSettingPrinter ? 'Setting...' : 'Set Active Printer'}
+                {isSettingPrinter
+                  ? savePermanently
+                    ? 'Saving...'
+                    : 'Setting...'
+                  : savePermanently
+                    ? 'Save Printer Permanently'
+                    : 'Set Active Printer'}
               </button>
             </div>
           </div>

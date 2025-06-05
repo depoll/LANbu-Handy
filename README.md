@@ -21,6 +21,8 @@ LANbu Handy provides a streamlined workflow from model URL to print initiation, 
 - 🎨 **AMS Integration**: Query AMS status and map filaments to model requirements
 - 🏗️ **Build Plate Selection**: Choose the correct build plate for optimal adhesion
 - 🔧 **Settings Preservation**: Respects embedded `.3mf` settings with selective overrides
+- 🖨️ **Printer Management**: Auto-discover and manage multiple printers with persistent storage
+- 💾 **Persistent Config**: Save printer configurations that survive container upgrades
 - 🚀 **Self-Hosted**: Deploy as a single Docker container in your home lab
 
 ## Technology Stack
@@ -76,21 +78,12 @@ LANbu Handy provides a streamlined workflow from model URL to print initiation, 
        restart: unless-stopped
        environment:
          - BAMBU_PRINTERS=${BAMBU_PRINTERS:-}
-         - BAMBU_PRINTER_IP=${BAMBU_PRINTER_IP:-}
-         - BAMBU_PRINTER_ACCESS_CODE=${BAMBU_PRINTER_ACCESS_CODE:-}
          - LOG_LEVEL=${LOG_LEVEL:-info}
    ```
 
 2. **Configure your printer(s)**:
 
    Create a `.env` file or set environment variables:
-
-   **For a single printer (legacy format)**:
-
-   ```bash
-   BAMBU_PRINTER_IP=192.168.1.100
-   BAMBU_PRINTER_ACCESS_CODE=12345678
-   ```
 
    **For multiple printers (recommended)**:
 
@@ -168,6 +161,58 @@ services:
    - G-code is transferred via FTP to your printer
    - Print job starts automatically once transfer completes
    - Monitor initial print status in the interface
+
+## Printer Management
+
+LANbu Handy supports multiple ways to configure and manage your Bambu Lab printers:
+
+### Persistent Storage (Recommended)
+
+Enable persistent storage to save printer configurations that survive container restarts:
+
+1. **Enable volume mount** in your `docker-compose.yml`:
+
+   ```yaml
+   services:
+     lanbuhandy:
+       # ... other configuration
+       volumes:
+         # Uncomment the line below to enable persistent storage
+         - ./config:/app/data
+   ```
+
+2. **Add printers via the UI**:
+   - Use the printer selector in the web interface
+   - Click "Scan Network" to auto-discover printers
+   - Or enter printer details manually
+   - **Check "Save permanently"** to persist across restarts
+
+3. **Manage printers**:
+   - View all configured printers with persistence indicators
+   - Remove or update saved printers as needed
+   - Configurations stored in `./config/printers.json`
+
+### Environment Variables
+
+You can also configure printers via environment variables:
+
+**Multiple printers (JSON format)**:
+```bash
+BAMBU_PRINTERS='[
+  {"name":"Living Room X1C","ip":"192.168.1.100","access_code":"12345678"},
+  {"name":"Garage A1 mini","ip":"192.168.1.101","access_code":"87654321"}
+]'
+```
+
+### Hybrid Configuration
+
+LANbu Handy can use both persistent storage and environment variables:
+
+- **Persistent storage** takes precedence for the same IP address
+- **Environment printers** are loaded if they don't conflict
+- **Best practice**: Use persistent storage for flexibility
+
+For detailed configuration options and troubleshooting, see [PRINTER_MANAGEMENT.md](./PRINTER_MANAGEMENT.md).
 
 ## Troubleshooting
 
