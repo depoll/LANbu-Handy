@@ -323,12 +323,15 @@ CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 
 ### Building and Testing Locally
 
-```bash
-# Build the complete application
-docker compose build
+For development and testing the application:
 
-# Run locally for testing
+```bash
+# Option 1: Use pre-built image (quick start)
 docker compose up -d
+
+# Option 2: Build from source (for development)
+docker compose -f docker-compose.dev.yml build
+docker compose -f docker-compose.dev.yml up -d
 
 # View logs
 docker compose logs -f
@@ -345,17 +348,19 @@ The embedded Bambu Studio CLI version is managed through:
 2. **Install Script**: `scripts/install-bambu-studio-cli.sh` handles download and setup
 3. **Docker Build**: CLI is installed during the Docker build process
 
-**To update the CLI version:**
+**To update the CLI version (for development builds):**
 ```bash
 # Edit the version file
 echo "01.10.01.05" > scripts/bambu-studio-version.txt
 
-# Rebuild the Docker image
-docker compose build --no-cache
+# Rebuild the Docker image from source
+docker compose -f docker-compose.dev.yml build --no-cache
 
 # Test the new version
-docker compose up -d
+docker compose -f docker-compose.dev.yml up -d
 ```
+
+**Note**: Pre-built images from GitHub Container Registry include the CLI version that was current at build time. For the latest CLI version, use development builds or wait for the next release.
 
 ### Production Deployment Considerations
 

@@ -1,6 +1,10 @@
+# Docker Compose configuration for building from source (development)
 services:
   lanbuhandy:
-    image: ghcr.io/depoll/lanbu-handy:latest
+    build:
+      context: .
+      platforms:
+        - linux/amd64
     platform: linux/amd64
     ports:
       - '8080:8000'
