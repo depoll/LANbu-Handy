@@ -127,32 +127,37 @@ To use a specific release version instead of the latest:
 ```yaml
 services:
   lanbuhandy:
-    image: ghcr.io/depoll/lanbu-handy:v1.0.0  # Replace with desired version
+    image: ghcr.io/depoll/lanbu-handy:v1.0.0 # Replace with desired version
     # ... rest of configuration
 ```
 
 ### Usage
 
 1. **Enter Model URL**: Provide a direct URL to your 3D model file (`.3mf` or `.stl` format)
+
    - Supported sources: GitHub releases, file sharing services, direct HTTP/HTTPS links
    - Model files should be publicly accessible without authentication
 
 2. **Select Printer**: Choose your target printer from the dropdown (if multiple configured)
+
    - The interface will show printer status and availability
    - Printer must be powered on and connected to your network
 
 3. **Configure AMS Filaments**: Review and map AMS filaments to model requirements
+
    - The system queries your printer's current AMS status
    - Map each model color/material requirement to available AMS slots
    - Override material types if needed (PLA, PETG, ABS, etc.)
 
 4. **Choose Build Plate**: Select the appropriate build plate for your material
+
    - Cool Plate: PLA, PETG
    - Engineering Plate: ABS, ASA, PC
    - High Temp Plate: PA, PEI
    - Textured PEI Plate: PETG, TPU
 
 5. **Slice Model**: Click "Slice" to process the model with Bambu Studio CLI
+
    - Monitor slicing progress in the interface
    - Review estimated print time and material usage
    - Slicing respects embedded `.3mf` settings with selective overrides
@@ -182,6 +187,7 @@ Enable persistent storage to save printer configurations that survive container 
    ```
 
 2. **Add printers via the UI**:
+
    - Use the printer selector in the web interface
    - Click "Scan Network" to auto-discover printers
    - Or enter printer details manually
@@ -197,6 +203,7 @@ Enable persistent storage to save printer configurations that survive container 
 You can also configure printers via environment variables:
 
 **Multiple printers (JSON format)**:
+
 ```bash
 BAMBU_PRINTERS='[
   {"name":"Living Room X1C","ip":"192.168.1.100","access_code":"12345678"},
@@ -219,6 +226,7 @@ For detailed configuration options and troubleshooting, see [PRINTER_MANAGEMENT.
 ### Container and Installation Issues
 
 **Container won't start:**
+
 ```bash
 # Check container logs
 docker compose logs lanbuhandy
@@ -234,6 +242,7 @@ lsof -i :8080
 ```
 
 **Permission issues with Docker:**
+
 ```bash
 # Add user to docker group (Linux)
 sudo usermod -aG docker $USER
@@ -245,6 +254,7 @@ sudo docker compose up -d
 ```
 
 **Build failures:**
+
 ```bash
 # If using the pre-built image (recommended), build issues should not occur
 # If building from source, try:
@@ -263,31 +273,35 @@ df -h
 **Printer not detected or "Connection failed":**
 
 1. **Verify LAN-only mode is enabled:**
+
    - Go to printer Settings → Network → LAN-Only Mode
    - Enable LAN-Only Mode and note the Access Code
 
 2. **Check network connectivity:**
+
    ```bash
    # Test if printer IP is reachable
    ping 192.168.1.100  # Replace with your printer IP
-   
+
    # Test MQTT port (8883 for secure, 1883 for non-secure)
    telnet 192.168.1.100 8883
-   
-   # Test FTP port  
+
+   # Test FTP port
    telnet 192.168.1.100 990
    ```
 
 3. **Verify configuration:**
+
    - Double-check printer IP address in your `.env` file
    - Verify Access Code is exactly as shown on printer screen (8 digits)
    - Ensure no extra spaces or characters in configuration
 
 4. **Multiple printers configuration:**
+
    ```bash
    # Correct JSON format for multiple printers:
    BAMBU_PRINTERS=[{"name":"Printer 1","ip":"192.168.1.100","access_code":"12345678"},{"name":"Printer 2","ip":"192.168.1.101","access_code":"87654321"}]
-   
+
    # Common mistakes:
    # - Missing quotes around strings
    # - Extra commas at the end
@@ -295,6 +309,7 @@ df -h
    ```
 
 **MQTT connection timeouts:**
+
 - Some routers block MQTT traffic - check firewall settings
 - Try power cycling the printer
 - Verify printer firmware is up to date
@@ -304,32 +319,36 @@ df -h
 **"Failed to download model" errors:**
 
 1. **URL format issues:**
+
    ```bash
    # ✅ Correct: Direct file URLs
    https://github.com/user/repo/releases/download/v1.0/model.3mf
    https://example.com/files/model.stl
-   
-   # ❌ Incorrect: Repository or webpage URLs  
+
+   # ❌ Incorrect: Repository or webpage URLs
    https://github.com/user/repo/blob/main/model.3mf
    https://thingiverse.com/thing/123456
    ```
 
 2. **Authentication required:**
+
    - Ensure URLs are publicly accessible
    - For GitHub, use "releases" URLs, not repository file URLs
    - Test URL in browser's private/incognito mode
 
 3. **File format issues:**
+
    ```bash
    # Supported formats:
    .3mf  # Preferred - includes print settings
    .stl  # Supported - requires manual configuration
-   
+
    # Unsupported formats:
    .obj, .ply, .amf, .zip archives
    ```
 
 **Large file downloads:**
+
 - Files over 100MB may timeout - check your network connection
 - Consider hosting files on faster CDN if possible
 
@@ -338,6 +357,7 @@ df -h
 **Bambu Studio CLI errors:**
 
 1. **"Command not found" or CLI missing:**
+
    ```bash
    # If using pre-built image, try pulling the latest version
    docker compose pull
@@ -350,16 +370,18 @@ df -h
    ```
 
 2. **Slicing fails with memory errors:**
+
    - Increase Docker memory allocation to at least 4GB
    - For complex models, allocate 8GB+ RAM to Docker
 
 3. **Invalid model errors:**
+
    ```bash
    # Common model issues:
    # - Non-manifold geometry
-   # - Corrupt STL files  
+   # - Corrupt STL files
    # - Models with zero volume
-   
+
    # Try repairing model in:
    # - Meshmixer (free)
    # - Netfabb (Windows built-in)
@@ -367,6 +389,7 @@ df -h
    ```
 
 **Slicing configuration problems:**
+
 - `.3mf` files contain embedded settings - these are preserved during slicing
 - Manual overrides (filament, plate type) take precedence over embedded settings
 - Check material compatibility with selected build plate
@@ -376,15 +399,17 @@ df -h
 **Can't access web interface:**
 
 1. **Check container status:**
+
    ```bash
    docker compose ps
    # Should show lanbuhandy as "Up"
-   
+
    docker compose logs lanbuhandy
    # Look for "Uvicorn running on http://0.0.0.0:8000"
    ```
 
 2. **Network access:**
+
    ```bash
    # Try different URLs:
    http://localhost:8080        # If running on same machine
@@ -393,20 +418,23 @@ df -h
    ```
 
 3. **Firewall issues:**
+
    ```bash
    # Linux: Allow port 8080
    sudo ufw allow 8080
-   
+
    # Check if firewall is blocking:
    sudo iptables -L | grep 8080
    ```
 
 **Mobile browser compatibility:**
+
 - Use modern browsers: Chrome 80+, Safari 13+, Firefox 75+
 - Enable JavaScript and cookies
 - Try refreshing with Ctrl+F5 (or Cmd+Shift+R on Mac)
 
 **PWA installation issues:**
+
 - Look for "Add to Home Screen" in browser menu
 - Ensure HTTPS is not required (should work on local network with HTTP)
 - Clear browser cache if PWA features aren't working
@@ -414,22 +442,26 @@ df -h
 ### Performance Issues
 
 **Slow slicing:**
+
 - Increase Docker CPU allocation
 - Close other resource-intensive applications
 - Consider using simpler print profiles for testing
 
 **Interface lag:**
+
 - Clear browser cache and cookies
 - Disable browser extensions
 - Check network latency to server
 
 **High memory usage:**
+
 - Restart container periodically: `docker compose restart lanbuhandy`
 - Monitor with: `docker stats lanbuhandy`
 
 ### Getting Help
 
 **Enable debug logging:**
+
 ```bash
 # Add to your .env file or docker-compose.yml:
 LOG_LEVEL=debug
@@ -442,6 +474,7 @@ docker compose logs -f lanbuhandy
 ```
 
 **Collect diagnostic information:**
+
 ```bash
 # System info
 docker --version
@@ -458,6 +491,7 @@ traceroute <printer_ip>
 ```
 
 **Common solutions checklist:**
+
 - [ ] Printer is powered on and connected to network
 - [ ] LAN-only mode is enabled with correct access code
 - [ ] Docker container is running (`docker compose ps`)
@@ -501,6 +535,7 @@ LANbu-Handy/
 For comprehensive development information including architecture, setup instructions, and code organization, see the **[Developer Notes](DEVELOPER_NOTES.md)**.
 
 **Quick Links:**
+
 - **DevContainer**: Use the provided `.devcontainer` for a consistent development environment
 - **Backend Development**: See backend tests and FastAPI application structure
 - **Frontend Development**: See the [PWA README](pwa/README.md) for React development workflow

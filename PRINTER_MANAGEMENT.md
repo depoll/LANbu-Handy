@@ -52,11 +52,12 @@ This creates a `config` directory in your LANbu Handy installation folder where 
 You can still configure printers via environment variables. These take precedence if they have the same IP as a persistent printer.
 
 #### New JSON Format (Recommended)
+
 ```bash
 BAMBU_PRINTERS='[
   {
     "name": "Living Room X1C",
-    "ip": "192.168.1.100", 
+    "ip": "192.168.1.100",
     "access_code": "12345678"
   },
   {
@@ -106,10 +107,10 @@ The following new API endpoints are available for managing persistent printers:
 
 ### Environment Variables
 
-| Variable | Description | Default |
-|----------|-------------|---------|
+| Variable              | Description                            | Default                   |
+| --------------------- | -------------------------------------- | ------------------------- |
 | `PRINTER_CONFIG_FILE` | Path to persistent printer config file | `/app/data/printers.json` |
-| `BAMBU_PRINTERS` | JSON array of printer configurations | `""` |
+| `BAMBU_PRINTERS`      | JSON array of printer configurations   | `""`                      |
 
 ### Docker Compose Configuration
 
@@ -127,8 +128,8 @@ services:
     environment:
       # Optional: Persistent storage config file path
       - PRINTER_CONFIG_FILE=/app/data/printers.json
-      
-      # Optional: Environment-based printer configuration  
+
+      # Optional: Environment-based printer configuration
       - BAMBU_PRINTERS=${BAMBU_PRINTERS:-}
 ```
 
