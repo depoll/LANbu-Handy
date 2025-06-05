@@ -267,7 +267,7 @@ function SliceAndPrint() {
     // Initialize operation progress
     initializeOperationSteps([
       'Upload File',
-      'Analyze Structure', 
+      'Analyze Structure',
       'Extract Requirements',
     ]);
 
@@ -276,7 +276,13 @@ function SliceAndPrint() {
 
     try {
       // Step 1: Upload File
-      updateOperationStep(0, 'running', 'Uploading file to server...', undefined, 0);
+      updateOperationStep(
+        0,
+        'running',
+        'Uploading file to server...',
+        undefined,
+        0
+      );
 
       const formData = new FormData();
       formData.append('file', selectedFile);
@@ -299,7 +305,13 @@ function SliceAndPrint() {
         throw new Error(`HTTP ${response.status}: ${errorText}`);
       }
 
-      updateOperationStep(0, 'completed', 'File uploaded successfully', undefined, 100);
+      updateOperationStep(
+        0,
+        'completed',
+        'File uploaded successfully',
+        undefined,
+        100
+      );
       setUploadProgress(100);
 
       // Step 2: Analyze Structure
@@ -351,10 +363,7 @@ function SliceAndPrint() {
       } else {
         updateOperationStep(2, 'error', 'Analysis failed', result.message);
         addStatusMessage(`❌ File analysis failed: ${result.message}`);
-        showError(
-          `File analysis failed: ${result.message}`,
-          'Analysis Failed'
-        );
+        showError(`File analysis failed: ${result.message}`, 'Analysis Failed');
       }
     } catch (error) {
       const errorMessage =
@@ -387,10 +396,14 @@ function SliceAndPrint() {
     if (file) {
       // Validate file extension
       const validExtensions = ['.stl', '.3mf'];
-      const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
-      
+      const fileExtension = file.name
+        .toLowerCase()
+        .substring(file.name.lastIndexOf('.'));
+
       if (!validExtensions.includes(fileExtension)) {
-        showError(`Unsupported file type. Please select a ${validExtensions.join(' or ')} file.`);
+        showError(
+          `Unsupported file type. Please select a ${validExtensions.join(' or ')} file.`
+        );
         event.target.value = ''; // Clear the input
         return;
       }
@@ -398,14 +411,19 @@ function SliceAndPrint() {
       // Validate file size (100MB limit)
       const maxSize = 100 * 1024 * 1024; // 100MB in bytes
       if (file.size > maxSize) {
-        showError('File size exceeds 100MB limit. Please select a smaller file.');
+        showError(
+          'File size exceeds 100MB limit. Please select a smaller file.'
+        );
         event.target.value = ''; // Clear the input
         return;
       }
 
       setSelectedFile(file);
       setUploadProgress(0);
-      showInfo(`Selected file: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`, 'File Selected');
+      showInfo(
+        `Selected file: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`,
+        'File Selected'
+      );
     }
   };
 
@@ -855,11 +873,13 @@ function SliceAndPrint() {
                   </span>
                   {uploadProgress > 0 && uploadProgress < 100 && (
                     <div className="upload-progress">
-                      <div 
-                        className="upload-progress-bar" 
+                      <div
+                        className="upload-progress-bar"
                         style={{ width: `${uploadProgress}%` }}
                       ></div>
-                      <span className="upload-progress-text">{uploadProgress}%</span>
+                      <span className="upload-progress-text">
+                        {uploadProgress}%
+                      </span>
                     </div>
                   )}
                 </div>
@@ -883,9 +903,13 @@ function SliceAndPrint() {
               disabled={isProcessing || !canSubmit()}
               className="slice-and-print-button"
             >
-              {isProcessing 
-                ? (inputMode === 'url' ? 'Analyzing...' : 'Uploading...') 
-                : (inputMode === 'url' ? 'Analyze Model' : 'Upload & Analyze')}
+              {isProcessing
+                ? inputMode === 'url'
+                  ? 'Analyzing...'
+                  : 'Uploading...'
+                : inputMode === 'url'
+                  ? 'Analyze Model'
+                  : 'Upload & Analyze'}
             </button>
           ) : (
             <>

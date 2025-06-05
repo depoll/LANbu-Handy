@@ -21,25 +21,29 @@ describe('SliceAndPrint File Upload Tests', () => {
 
   it('shows URL input by default', () => {
     renderWithToast(<SliceAndPrint />);
-    expect(screen.getByPlaceholderText('https://example.com/model.stl')).toBeInTheDocument();
+    expect(
+      screen.getByPlaceholderText('https://example.com/model.stl')
+    ).toBeInTheDocument();
     expect(screen.queryByLabelText('Model File:')).not.toBeInTheDocument();
   });
 
   it('switches to file input when file upload button is clicked', async () => {
     renderWithToast(<SliceAndPrint />);
-    
+
     const fileUploadButton = screen.getByText('📁 File Upload');
     fireEvent.click(fileUploadButton);
 
     await waitFor(() => {
       expect(screen.getByLabelText('Model File:')).toBeInTheDocument();
-      expect(screen.queryByPlaceholderText('https://example.com/model.stl')).not.toBeInTheDocument();
+      expect(
+        screen.queryByPlaceholderText('https://example.com/model.stl')
+      ).not.toBeInTheDocument();
     });
   });
 
   it('updates button text for file upload mode', async () => {
     renderWithToast(<SliceAndPrint />);
-    
+
     const fileUploadButton = screen.getByText('📁 File Upload');
     fireEvent.click(fileUploadButton);
 
@@ -50,7 +54,7 @@ describe('SliceAndPrint File Upload Tests', () => {
 
   it('shows file upload button as active when in file mode', async () => {
     renderWithToast(<SliceAndPrint />);
-    
+
     const fileUploadButton = screen.getByText('📁 File Upload');
     fireEvent.click(fileUploadButton);
 
@@ -61,25 +65,29 @@ describe('SliceAndPrint File Upload Tests', () => {
 
   it('accepts valid file types', async () => {
     renderWithToast(<SliceAndPrint />);
-    
+
     const fileUploadButton = screen.getByText('📁 File Upload');
     fireEvent.click(fileUploadButton);
 
     await waitFor(() => {
-      const fileInput = screen.getByLabelText('Model File:') as HTMLInputElement;
+      const fileInput = screen.getByLabelText(
+        'Model File:'
+      ) as HTMLInputElement;
       expect(fileInput.accept).toBe('.stl,.3mf');
     });
   });
 
   it('handles file selection and shows file info', async () => {
     renderWithToast(<SliceAndPrint />);
-    
+
     const fileUploadButton = screen.getByText('📁 File Upload');
     fireEvent.click(fileUploadButton);
 
     await waitFor(() => {
-      const fileInput = screen.getByLabelText('Model File:') as HTMLInputElement;
-      
+      const fileInput = screen.getByLabelText(
+        'Model File:'
+      ) as HTMLInputElement;
+
       // Create a mock file
       const mockFile = new File(['mock content'], 'test-model.stl', {
         type: 'application/octet-stream',
@@ -100,7 +108,7 @@ describe('SliceAndPrint File Upload Tests', () => {
 
   it('enables submit button when file is selected', async () => {
     renderWithToast(<SliceAndPrint />);
-    
+
     const fileUploadButton = screen.getByText('📁 File Upload');
     fireEvent.click(fileUploadButton);
 
@@ -108,8 +116,10 @@ describe('SliceAndPrint File Upload Tests', () => {
       const submitButton = screen.getByText('Upload & Analyze');
       expect(submitButton).toBeDisabled();
 
-      const fileInput = screen.getByLabelText('Model File:') as HTMLInputElement;
-      
+      const fileInput = screen.getByLabelText(
+        'Model File:'
+      ) as HTMLInputElement;
+
       // Create a mock file
       const mockFile = new File(['mock content'], 'test-model.stl', {
         type: 'application/octet-stream',
@@ -130,14 +140,16 @@ describe('SliceAndPrint File Upload Tests', () => {
 
   it('clears file when switching back to URL mode', async () => {
     renderWithToast(<SliceAndPrint />);
-    
+
     // Switch to file mode
     const fileUploadButton = screen.getByText('📁 File Upload');
     fireEvent.click(fileUploadButton);
 
     await waitFor(() => {
-      const fileInput = screen.getByLabelText('Model File:') as HTMLInputElement;
-      
+      const fileInput = screen.getByLabelText(
+        'Model File:'
+      ) as HTMLInputElement;
+
       // Select a file
       const mockFile = new File(['mock content'], 'test-model.stl', {
         type: 'application/octet-stream',
@@ -157,7 +169,9 @@ describe('SliceAndPrint File Upload Tests', () => {
     fireEvent.click(urlButton);
 
     await waitFor(() => {
-      expect(screen.getByPlaceholderText('https://example.com/model.stl')).toBeInTheDocument();
+      expect(
+        screen.getByPlaceholderText('https://example.com/model.stl')
+      ).toBeInTheDocument();
       expect(screen.queryByText('📄 test-model.stl')).not.toBeInTheDocument();
     });
   });

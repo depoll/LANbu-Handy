@@ -35,7 +35,7 @@ from app.utils import (
     handle_model_errors,
     validate_ip_address,
 )
-from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -334,9 +334,10 @@ async def upload_model_file(file: UploadFile = File(...)):
                 f"Unsupported file extension. File must be one of: {extensions}"
             )
 
-        # Check file size (FastAPI doesn't provide direct size, so we'll check during read)
+        # Check file size (FastAPI doesn't provide direct size, so we'll
+        # check during read)
         content = await file.read()
-        
+
         if len(content) > model_service.max_file_size_bytes:
             max_mb = model_service.max_file_size_bytes // (1024 * 1024)
             raise ModelValidationError(
@@ -345,6 +346,7 @@ async def upload_model_file(file: UploadFile = File(...)):
 
         # Generate unique filename and save to temp directory
         import uuid
+
         unique_filename = f"{uuid.uuid4().hex}_{file.filename}"
         temp_file_path = model_service.temp_dir / unique_filename
 
@@ -356,7 +358,9 @@ async def upload_model_file(file: UploadFile = File(...)):
         file_info = model_service.get_file_info(temp_file_path)
 
         # Parse filament requirements if it's a .3mf file
-        filament_requirements = model_service.parse_3mf_filament_requirements(temp_file_path)
+        filament_requirements = model_service.parse_3mf_filament_requirements(
+            temp_file_path
+        )
 
         # Convert to response model if requirements were found
         filament_requirements_response = None

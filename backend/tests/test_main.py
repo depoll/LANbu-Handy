@@ -340,26 +340,30 @@ class TestModelFileUploadEndpoint:
     def test_upload_model_file_with_3mf_requirements(self):
         """Test file upload with .3mf file that has filament requirements."""
         # Create a mock 3mf file (zip file with project settings)
-        import zipfile
         import json
-        import tempfile
         import os
+        import tempfile
+        import zipfile
 
         with tempfile.NamedTemporaryFile(suffix=".3mf", delete=False) as temp_file:
             try:
                 # Create a zip file with mock project settings
-                with zipfile.ZipFile(temp_file.name, 'w') as zip_file:
+                with zipfile.ZipFile(temp_file.name, "w") as zip_file:
                     config_data = {
                         "filament_type": ["PLA", "PETG"],
-                        "filament_colour": ["#FF0000", "#00FF00"]
+                        "filament_colour": ["#FF0000", "#00FF00"],
                     }
-                    zip_file.writestr("Metadata/project_settings.config", json.dumps(config_data))
+                    zip_file.writestr(
+                        "Metadata/project_settings.config", json.dumps(config_data)
+                    )
 
                 # Read the file content
                 with open(temp_file.name, "rb") as f:
                     test_content = f.read()
 
-                files = {"file": ("test_model.3mf", test_content, "application/octet-stream")}
+                files = {
+                    "file": ("test_model.3mf", test_content, "application/octet-stream")
+                }
                 response = client.post("/api/model/upload-file", files=files)
 
                 assert response.status_code == 200
@@ -367,7 +371,10 @@ class TestModelFileUploadEndpoint:
                 assert data["success"] is True
                 assert data["filament_requirements"] is not None
                 assert data["filament_requirements"]["filament_count"] == 2
-                assert data["filament_requirements"]["filament_types"] == ["PLA", "PETG"]
+                assert data["filament_requirements"]["filament_types"] == [
+                    "PLA",
+                    "PETG",
+                ]
 
             finally:
                 os.unlink(temp_file.name)
