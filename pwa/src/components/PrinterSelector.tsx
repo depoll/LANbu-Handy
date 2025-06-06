@@ -340,7 +340,8 @@ function PrinterSelector({
               <div className="persistence-info">
                 <p className="info-text">
                   <span className="info-icon">💾</span>
-                  All printers are automatically saved and will persist across container restarts.
+                  All printers are automatically saved and will persist across
+                  container restarts.
                 </p>
               </div>
 
@@ -349,9 +350,7 @@ function PrinterSelector({
                 disabled={isSettingPrinter || !manualIp.trim()}
                 className="set-manual-button"
               >
-                {isSettingPrinter
-                  ? 'Saving...'
-                  : 'Save Printer'}
+                {isSettingPrinter ? 'Saving...' : 'Save Printer'}
               </button>
             </div>
           </div>
