@@ -58,22 +58,7 @@ export interface SliceResponse {
   error_details?: string;
 }
 
-// Printer Discovery and Selection Types
-export interface DiscoveredPrinter {
-  ip: string;
-  hostname: string;
-  model?: string;
-  service_name?: string;
-  port?: number;
-}
-
-export interface PrinterDiscoveryResponse {
-  success: boolean;
-  message: string;
-  printers?: DiscoveredPrinter[];
-  error_details?: string;
-}
-
+// Printer Configuration Types
 export interface SetActivePrinterRequest {
   ip: string;
   access_code?: string;

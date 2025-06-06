@@ -2,8 +2,6 @@
 Test for new printer selection API endpoints.
 """
 
-from unittest.mock import patch
-
 import pytest
 from app.config import get_config
 from app.main import app
@@ -139,59 +137,6 @@ class TestPrinterSelection:
 
         # Should have no active printer
         assert data.get("active_printer") is None
-
-    @patch("app.main.printer_service.discover_printers")
-    def test_discover_printers_endpoint(self, mock_discover, client):
-        """Test printer discovery endpoint."""
-        from app.printer_service import DiscoveredPrinter, PrinterDiscoveryResult
-
-        # Mock discovery result
-        mock_printer = DiscoveredPrinter(
-            ip="192.168.1.250",
-            hostname="bambu-x1",
-            model="X1 Carbon",
-            service_name="bambu-x1._bambu-connect._tcp.local.",
-            port=21,
-        )
-
-        mock_result = PrinterDiscoveryResult(
-            success=True, message="Found 1 Bambu printer(s)", printers=[mock_printer]
-        )
-
-        mock_discover.return_value = mock_result
-
-        response = client.get("/api/printers/discover")
-
-        assert response.status_code == 200
-        data = response.json()
-
-        assert data["success"] is True
-        assert len(data["printers"]) == 1
-
-        discovered_printer = data["printers"][0]
-        assert discovered_printer["ip"] == "192.168.1.250"
-        assert discovered_printer["hostname"] == "bambu-x1"
-        assert discovered_printer["model"] == "X1 Carbon"
-
-    @patch("app.main.printer_service.discover_printers")
-    def test_discover_printers_no_results(self, mock_discover, client):
-        """Test printer discovery when no printers are found."""
-        from app.printer_service import PrinterDiscoveryResult
-
-        mock_result = PrinterDiscoveryResult(
-            success=True, message="No Bambu printers found on the network", printers=[]
-        )
-
-        mock_discover.return_value = mock_result
-
-        response = client.get("/api/printers/discover")
-
-        assert response.status_code == 200
-        data = response.json()
-
-        assert data["success"] is True
-        assert data["printers"] == []
-        assert "No Bambu printers found" in data["message"]
 
     def teardown_method(self):
         """Clean up after each test."""

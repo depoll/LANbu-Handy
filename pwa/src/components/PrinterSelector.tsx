@@ -1,7 +1,5 @@
 import { useState, useEffect } from 'react';
 import {
-  DiscoveredPrinter,
-  PrinterDiscoveryResponse,
   PrinterConfigResponse,
   AddPrinterRequest,
   AddPrinterResponse,
@@ -27,11 +25,6 @@ function PrinterSelector({
   className = '',
 }: PrinterSelectorProps) {
   const [isExpanded, setIsExpanded] = useState(false);
-  const [isDiscovering, setIsDiscovering] = useState(false);
-  const [discoveredPrinters, setDiscoveredPrinters] = useState<
-    DiscoveredPrinter[]
-  >([]);
-  const [discoveryError, setDiscoveryError] = useState<string>('');
   const [manualIp, setManualIp] = useState('');
   const [manualAccessCode, setManualAccessCode] = useState('');
   const [manualName, setManualName] = useState('');
@@ -94,69 +87,6 @@ function PrinterSelector({
       }
     } catch (error) {
       console.error('Failed to load current printer configuration:', error);
-    }
-  };
-
-  const handleDiscoverPrinters = async () => {
-    setIsDiscovering(true);
-    setDiscoveryError('');
-    setStatusMessage('Scanning network for Bambu Lab printers...');
-
-    try {
-      const response = await fetch('/api/printers/discover');
-
-      // Check if response exists and is valid
-      if (!response) {
-        throw new Error('No response received from server');
-      }
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const result: PrinterDiscoveryResponse = await response.json();
-
-      if (result.success) {
-        setDiscoveredPrinters(result.printers || []);
-        setStatusMessage(
-          result.printers && result.printers.length > 0
-            ? `Found ${result.printers.length} printer(s)`
-            : 'No printers found on the network'
-        );
-      } else {
-        setDiscoveryError(result.message || 'Discovery failed');
-        setStatusMessage('Discovery failed');
-        setDiscoveredPrinters([]);
-      }
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
-      setDiscoveryError(`Discovery error: ${errorMessage}`);
-      setStatusMessage('Discovery failed');
-      setDiscoveredPrinters([]);
-      console.error('Printer discovery error:', error);
-    } finally {
-      setIsDiscovering(false);
-    }
-  };
-
-  const handleSelectDiscoveredPrinter = async (printer: DiscoveredPrinter) => {
-    setIsSettingPrinter(true);
-    setStatusMessage(`Setting printer: ${printer.ip}...`);
-
-    try {
-      const request: AddPrinterRequest = {
-        ip: printer.ip,
-        access_code: '', // Discovered printers don't have access codes initially
-        name:
-          printer.hostname || `${printer.model || 'Printer'} at ${printer.ip}`,
-        save_permanently: false, // Default to temporary for discovered printers
-        serial_number: '', // Discovered printers don't have serial numbers initially
-      };
-
-      await addPrinter(request);
-    } finally {
-      setIsSettingPrinter(false);
     }
   };
 
@@ -315,61 +245,15 @@ function PrinterSelector({
           <div className="panel-header">
             <h3>Select Printer</h3>
             <p>
-              Choose a discovered printer or enter IP address or hostname
-              manually
+              Enter your printer's IP address or hostname and serial number
             </p>
-          </div>
-
-          {/* Discovery Section */}
-          <div className="discovery-section">
-            <div className="section-header">
-              <h4>Network Discovery</h4>
-              <button
-                onClick={handleDiscoverPrinters}
-                disabled={isDiscovering || isSettingPrinter}
-                className="discover-button"
-              >
-                {isDiscovering ? 'Scanning...' : 'Scan Network'}
-              </button>
-            </div>
-
-            {discoveredPrinters.length > 0 && (
-              <div className="discovered-printers">
-                {discoveredPrinters.map((printer, index) => (
-                  <div key={index} className="discovered-printer">
-                    <div className="printer-details">
-                      <div className="printer-primary">
-                        <span className="printer-ip">{printer.ip}</span>
-                        <span className="printer-hostname">
-                          {printer.hostname}
-                        </span>
-                      </div>
-                      {printer.model && (
-                        <div className="printer-model">{printer.model}</div>
-                      )}
-                    </div>
-                    <button
-                      onClick={() => handleSelectDiscoveredPrinter(printer)}
-                      disabled={isSettingPrinter}
-                      className="select-printer-button"
-                    >
-                      Select
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {discoveryError && (
-              <div className="discovery-error">❌ {discoveryError}</div>
-            )}
           </div>
 
           {/* Manual Entry Section */}
           <div className="manual-entry-section">
             <div className="section-header">
-              <h4>Manual Configuration</h4>
-              <p>Enter printer details manually</p>
+              <h4>Printer Configuration</h4>
+              <p>Enter printer details</p>
             </div>
 
             <div className="manual-form">
