@@ -4,6 +4,8 @@ Tests for the configuration module.
 
 import json
 import os
+import tempfile
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -54,6 +56,45 @@ class TestPrinterConfig:
 class TestConfig:
     """Test cases for the Config class."""
 
+    def setup_method(self):
+        """Set up test fixtures."""
+        # Create a temporary config file for each test
+        self.temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".json")
+        self.temp_file.close()
+        self.temp_config_file = Path(self.temp_file.name)
+
+        # Patch environment to use our temp config file and clear any existing printers
+        self.env_patch = patch.dict(
+            os.environ,
+            {
+                "PRINTER_CONFIG_FILE": str(self.temp_config_file),
+                "BAMBU_PRINTERS": "",  # Clear any existing environment printers
+            },
+        )
+        self.env_patch.start()
+
+        # Reset global instances to ensure clean state
+        from app.config import reset_config
+        from app.printer_storage import reset_printer_storage
+
+        reset_config()
+        reset_printer_storage()
+
+    def teardown_method(self):
+        """Clean up test fixtures."""
+        self.env_patch.stop()
+
+        # Clean up temp file
+        if self.temp_config_file.exists():
+            self.temp_config_file.unlink()
+
+        # Reset global instances after test
+        from app.config import reset_config
+        from app.printer_storage import reset_printer_storage
+
+        reset_config()
+        reset_printer_storage()
+
     # Test new JSON format
     def test_config_with_bambu_printers_json_single(self):
         """Test config with single printer in BAMBU_PRINTERS JSON format."""
@@ -61,7 +102,7 @@ class TestConfig:
             [{"name": "Test Printer", "ip": "192.168.1.100", "access_code": "12345678"}]
         )
 
-        with patch.dict(os.environ, {"BAMBU_PRINTERS": printers_json}):
+        with patch.dict(os.environ, {"BAMBU_PRINTERS": printers_json}, clear=False):
             config = Config()
 
             assert config.is_printer_configured() is True
@@ -88,7 +129,7 @@ class TestConfig:
             ]
         )
 
-        with patch.dict(os.environ, {"BAMBU_PRINTERS": printers_json}):
+        with patch.dict(os.environ, {"BAMBU_PRINTERS": printers_json}, clear=False):
             config = Config()
 
             assert config.is_printer_configured() is True
@@ -104,7 +145,7 @@ class TestConfig:
         """Test config with printer missing name uses default."""
         printers_json = json.dumps([{"ip": "192.168.1.100", "access_code": "12345678"}])
 
-        with patch.dict(os.environ, {"BAMBU_PRINTERS": printers_json}):
+        with patch.dict(os.environ, {"BAMBU_PRINTERS": printers_json}, clear=False):
             config = Config()
 
             printer = config.get_default_printer()
@@ -112,7 +153,7 @@ class TestConfig:
 
     def test_config_with_bambu_printers_invalid_json(self):
         """Test config with invalid JSON in BAMBU_PRINTERS."""
-        with patch.dict(os.environ, {"BAMBU_PRINTERS": "invalid json"}):
+        with patch.dict(os.environ, {"BAMBU_PRINTERS": "invalid json"}, clear=False):
             config = Config()
 
             assert config.is_printer_configured() is False
@@ -122,7 +163,7 @@ class TestConfig:
         """Test config with BAMBU_PRINTERS that is not an array."""
         printers_json = json.dumps({"name": "Test", "ip": "192.168.1.100"})
 
-        with patch.dict(os.environ, {"BAMBU_PRINTERS": printers_json}):
+        with patch.dict(os.environ, {"BAMBU_PRINTERS": printers_json}, clear=False):
             config = Config()
 
             assert config.is_printer_configured() is False
@@ -144,13 +185,25 @@ class TestConfig:
         assert config.is_printer_configured() is False
         assert config.get_printer_ip() is None
 
-    @patch.dict(os.environ, {}, clear=True)
     def test_config_without_printer_ip(self):
         """Test config when no printer environment variables are set."""
-        config = Config()
+        # Reset to ensure clean state for this test
+        from app.config import reset_config
+        from app.printer_storage import reset_printer_storage
 
-        assert config.is_printer_configured() is False
-        assert config.get_printer_ip() is None
+        reset_config()
+        reset_printer_storage()
+
+        # Clear environment variables that would provide printer configs
+        with patch.dict(
+            os.environ,
+            {"BAMBU_PRINTERS": "", "PRINTER_CONFIG_FILE": str(self.temp_config_file)},
+            clear=False,
+        ):
+            config = Config()
+
+            assert config.is_printer_configured() is False
+            assert config.get_printer_ip() is None
 
     # Test utility methods
     def test_get_printer_by_name(self):
@@ -166,7 +219,7 @@ class TestConfig:
             ]
         )
 
-        with patch.dict(os.environ, {"BAMBU_PRINTERS": printers_json}):
+        with patch.dict(os.environ, {"BAMBU_PRINTERS": printers_json}, clear=False):
             config = Config()
 
             printer = config.get_printer_by_name("Garage")
@@ -184,18 +237,30 @@ class TestConfig:
             [{"name": "Test Printer", "ip": "192.168.1.50", "access_code": "12345678"}]
         )
 
-        with patch.dict(os.environ, {"BAMBU_PRINTERS": printers_json}):
+        with patch.dict(os.environ, {"BAMBU_PRINTERS": printers_json}, clear=False):
             with caplog.at_level("INFO"):
                 Config()
 
         assert "Configured printer: Test Printer at 192.168.1.50" in caplog.text
 
-    @patch.dict(os.environ, {}, clear=True)
     def test_config_logging_when_no_printers_configured(self, caplog):
         """Test that warning message is logged when no printers are
         configured."""
-        with caplog.at_level("WARNING"):
-            Config()
+        # Reset to ensure clean state for this test
+        from app.config import reset_config
+        from app.printer_storage import reset_printer_storage
+
+        reset_config()
+        reset_printer_storage()
+
+        # Clear environment variables that would provide printer configs
+        with patch.dict(
+            os.environ,
+            {"BAMBU_PRINTERS": "", "PRINTER_CONFIG_FILE": str(self.temp_config_file)},
+            clear=False,
+        ):
+            with caplog.at_level("WARNING"):
+                Config()
 
         assert "No printer configuration found" in caplog.text
         assert "Set BAMBU_PRINTERS (JSON format)" in caplog.text

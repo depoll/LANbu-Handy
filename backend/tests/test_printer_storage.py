@@ -293,3 +293,48 @@ class TestPrinterStorageEnvironmentConfig:
             explicit_path = f"{temp_dir}/explicit/printers.json"
             storage = PrinterStorage(explicit_path)
             assert str(storage.config_file) == explicit_path
+
+
+class TestPrinterStorageGracefulDegradation:
+    """Test graceful degradation when storage is unavailable."""
+
+    def test_storage_graceful_degradation_on_permission_error(self):
+        """Test graceful handling when directory creation fails."""
+        from unittest.mock import patch
+
+        def mock_mkdir_permission_denied(*args, **kwargs):
+            raise PermissionError("Permission denied")
+
+        with patch.object(Path, "mkdir", side_effect=mock_mkdir_permission_denied):
+            # Should not raise exception but mark storage as unavailable
+            storage = PrinterStorage("/fake/inaccessible/path/printers.json")
+
+            # Storage should be marked as unavailable
+            assert not storage.is_storage_available()
+
+            # Should return empty list gracefully
+            assert storage.load_printers() == []
+
+            # Should raise informative error for write operations
+            with pytest.raises(PrinterStorageError, match="not available"):
+                storage.save_printers([])
+
+            with pytest.raises(PrinterStorageError, match="not available"):
+                test_printer = PrinterConfig(
+                    name="Test", ip="192.168.1.1", access_code="test"
+                )
+                storage.add_printer(test_printer)
+
+    def test_default_path_selection_fallback(self):
+        """Test that default path selection works in development environments."""
+        # This test runs in development where /app doesn't exist
+        storage = PrinterStorage()
+
+        # Should not use the Docker path
+        assert "/app/data/printers.json" != str(storage.config_file)
+
+        # Should select a reasonable fallback path
+        assert storage.config_file.name == "printers.json"
+
+        # The parent directory should exist (or be creatable)
+        assert storage.config_file.parent.exists() or storage.is_storage_available()

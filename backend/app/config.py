@@ -271,6 +271,15 @@ class Config:
             from app.printer_storage import get_printer_storage
 
             printer_storage = get_printer_storage()
+
+            # Check if storage is available
+            if not printer_storage.is_storage_available():
+                raise ValueError(
+                    "Persistent storage is not available. This may be due to "
+                    "permission issues or the storage directory being inaccessible. "
+                    "You can still add printers for the current session only."
+                )
+
             printer_storage.add_printer(printer)
 
             # Reload printers to include the new one

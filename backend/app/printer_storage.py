@@ -35,14 +35,84 @@ class PrinterStorage:
         if config_file_path:
             self.config_file = Path(config_file_path)
         else:
-            # Check for environment variable first
-            config_path = os.getenv("PRINTER_CONFIG_FILE", "/app/data/printers.json")
-            self.config_file = Path(config_path)
+            # Check for environment variable first, then determine appropriate default
+            config_path = os.getenv("PRINTER_CONFIG_FILE")
+            if config_path:
+                self.config_file = Path(config_path)
+            else:
+                # Auto-detect appropriate default path based on environment
+                self.config_file = self._get_default_config_path()
 
-        # Ensure the parent directory exists
-        self.config_file.parent.mkdir(parents=True, exist_ok=True)
+        # Initialize storage availability flag
+        self._storage_available = True
 
-        logger.info(f"Printer storage initialized with config file: {self.config_file}")
+        # Try to ensure the parent directory exists
+        try:
+            self.config_file.parent.mkdir(parents=True, exist_ok=True)
+            logger.info(
+                f"Printer storage initialized with config file: {self.config_file}"
+            )
+        except (PermissionError, OSError) as e:
+            self._storage_available = False
+            logger.warning(
+                f"Failed to create printer storage directory "
+                f"{self.config_file.parent}: {e}. "
+                "Persistent printer storage will be disabled."
+            )
+            logger.info(
+                f"Printer storage initialized with config file: "
+                f"{self.config_file} (unavailable)"
+            )
+
+    def _get_default_config_path(self) -> Path:
+        """Determine the appropriate default config file path based on environment.
+
+        Returns:
+            Path: Appropriate path for the current environment
+        """
+        # Check if we're running in a Docker container (common indicator: /app exists)
+        docker_path = Path("/app/data/printers.json")
+        if Path("/app").exists() and os.access("/app", os.W_OK):
+            return docker_path
+
+        # For development/local environments, use a local data directory
+        # Try current working directory first
+        local_data_dir = Path.cwd() / "data"
+        try:
+            local_data_dir.mkdir(exist_ok=True)
+            if os.access(local_data_dir, os.W_OK):
+                return local_data_dir / "printers.json"
+        except (PermissionError, OSError):
+            pass
+
+        # Fall back to user's home directory
+        try:
+            home_data_dir = Path.home() / ".lanbu-handy"
+            home_data_dir.mkdir(exist_ok=True)
+            if os.access(home_data_dir, os.W_OK):
+                return home_data_dir / "printers.json"
+        except (PermissionError, OSError):
+            pass
+
+        # Last resort: use temp directory (non-persistent)
+        import tempfile
+
+        temp_dir = Path(tempfile.gettempdir()) / "lanbu-handy"
+        try:
+            temp_dir.mkdir(exist_ok=True)
+            return temp_dir / "printers.json"
+        except (PermissionError, OSError):
+            # If all else fails, use the original docker path
+            # (will likely fail but preserves original behavior)
+            return docker_path
+
+    def is_storage_available(self) -> bool:
+        """Check if persistent storage is available.
+
+        Returns:
+            bool: True if storage is available, False otherwise
+        """
+        return self._storage_available
 
     def load_printers(self) -> List[PrinterConfig]:
         """Load printer configurations from the persistent storage file.
@@ -53,6 +123,10 @@ class PrinterStorage:
         Raises:
             PrinterStorageError: If loading fails
         """
+        if not self._storage_available:
+            logger.debug("Printer storage unavailable - returning empty list")
+            return []
+
         if not self.config_file.exists():
             logger.info(
                 "No persistent printer config file found - returning empty list"
@@ -100,6 +174,12 @@ class PrinterStorage:
         Raises:
             PrinterStorageError: If saving fails
         """
+        if not self._storage_available:
+            logger.warning("Printer storage unavailable - cannot save printers")
+            raise PrinterStorageError(
+                "Persistent storage is not available. Check directory permissions."
+            )
+
         try:
             # Convert printers to serializable format
             printer_data = []
@@ -117,7 +197,10 @@ class PrinterStorage:
             data = {"version": "1.0", "printers": printer_data}
 
             # Ensure the parent directory exists before writing
-            self.config_file.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                self.config_file.parent.mkdir(parents=True, exist_ok=True)
+            except (PermissionError, OSError) as e:
+                raise PrinterStorageError(f"Cannot create storage directory: {e}")
 
             # Write to a temp file first, then rename for atomic operation
             temp_file = self.config_file.with_suffix(".tmp")
@@ -144,6 +227,14 @@ class PrinterStorage:
         Raises:
             PrinterStorageError: If the printer already exists or saving fails
         """
+        if not self._storage_available:
+            logger.warning(
+                "Printer storage unavailable - cannot add printer persistently"
+            )
+            raise PrinterStorageError(
+                "Persistent storage is not available. Check directory permissions."
+            )
+
         printers = self.load_printers()
 
         # Check if printer already exists (by IP)
