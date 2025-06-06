@@ -130,6 +130,7 @@ async def get_app_config():
                 "ip": printer.ip,
                 # Don't expose access codes in API for security
                 "has_access_code": bool(printer.access_code),
+                "has_serial_number": bool(printer.serial_number),
                 "is_persistent": is_persistent,
                 "source": "persistent" if is_persistent else "environment",
             }
@@ -144,6 +145,7 @@ async def get_app_config():
             "name": active_printer.name,
             "ip": active_printer.ip,
             "has_access_code": bool(active_printer.access_code),
+            "has_serial_number": bool(active_printer.serial_number),
             "is_runtime_set": True,  # Indicates this was set via API, not env vars
             "is_persistent": is_persistent,
         }
@@ -253,6 +255,7 @@ class SetActivePrinterRequest(BaseModel):
     ip: str
     access_code: str = ""
     name: Optional[str] = None
+    serial_number: str = ""
 
 
 class SetActivePrinterResponse(BaseModel):
@@ -267,6 +270,7 @@ class AddPrinterRequest(BaseModel):
     access_code: str = ""
     name: Optional[str] = None
     save_permanently: bool = False
+    serial_number: str = ""
 
 
 class AddPrinterResponse(BaseModel):
@@ -929,6 +933,7 @@ async def set_active_printer(request: SetActivePrinterRequest):
                 ip=ip,
                 access_code=request.access_code,
                 name=request.name or f"Printer at {ip}",
+                serial_number=request.serial_number,
             )
 
             # Optional: Test connection to validate the printer
@@ -944,6 +949,7 @@ async def set_active_printer(request: SetActivePrinterRequest):
                     "name": printer_config.name,
                     "ip": printer_config.ip,
                     "has_access_code": bool(printer_config.access_code),
+                    "has_serial_number": bool(printer_config.serial_number),
                 },
             )
 
@@ -986,6 +992,7 @@ async def add_printer(request: AddPrinterRequest):
             name=request.name or f"Printer at {ip}",
             ip=ip,
             access_code=request.access_code,
+            serial_number=request.serial_number,
         )
 
         if request.save_permanently:
@@ -1001,6 +1008,7 @@ async def add_printer(request: AddPrinterRequest):
                 ip=printer_config.ip,
                 access_code=printer_config.access_code,
                 name=printer_config.name,
+                serial_number=printer_config.serial_number,
             )
             storage_message = "set as active for current session"
 
@@ -1011,6 +1019,7 @@ async def add_printer(request: AddPrinterRequest):
                 "name": printer_config.name,
                 "ip": printer_config.ip,
                 "has_access_code": bool(printer_config.access_code),
+                "has_serial_number": bool(printer_config.serial_number),
                 "is_persistent": request.save_permanently,
             },
         )
@@ -1093,6 +1102,7 @@ async def get_persistent_printers():
                     "name": printer.name,
                     "ip": printer.ip,
                     "has_access_code": bool(printer.access_code),
+                    "has_serial_number": bool(printer.serial_number),
                     "is_persistent": True,
                 }
             )

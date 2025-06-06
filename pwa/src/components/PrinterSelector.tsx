@@ -12,6 +12,7 @@ interface PrinterInfo {
   name: string;
   ip: string;
   has_access_code: boolean;
+  has_serial_number: boolean;
   is_runtime_set?: boolean;
   is_persistent?: boolean;
 }
@@ -34,6 +35,7 @@ function PrinterSelector({
   const [manualIp, setManualIp] = useState('');
   const [manualAccessCode, setManualAccessCode] = useState('');
   const [manualName, setManualName] = useState('');
+  const [manualSerialNumber, setManualSerialNumber] = useState('');
   const [savePermanently, setSavePermanently] = useState(false);
   const [isSettingPrinter, setIsSettingPrinter] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
@@ -73,6 +75,7 @@ function PrinterSelector({
             name: config.active_printer.name,
             ip: config.active_printer.ip,
             has_access_code: config.active_printer.has_access_code,
+            has_serial_number: config.active_printer.has_serial_number,
             is_runtime_set: config.active_printer.is_runtime_set,
             is_persistent: config.active_printer.is_persistent,
           });
@@ -83,6 +86,7 @@ function PrinterSelector({
             name: firstPrinter.name,
             ip: firstPrinter.ip,
             has_access_code: firstPrinter.has_access_code,
+            has_serial_number: firstPrinter.has_serial_number,
             is_runtime_set: false,
             is_persistent: firstPrinter.is_persistent,
           });
@@ -147,6 +151,7 @@ function PrinterSelector({
         name:
           printer.hostname || `${printer.model || 'Printer'} at ${printer.ip}`,
         save_permanently: false, // Default to temporary for discovered printers
+        serial_number: '', // Discovered printers don't have serial numbers initially
       };
 
       await addPrinter(request);
@@ -171,6 +176,7 @@ function PrinterSelector({
         access_code: manualAccessCode.trim(),
         name: manualName.trim() || `Printer at ${manualIp.trim()}`,
         save_permanently: savePermanently,
+        serial_number: manualSerialNumber.trim(),
       };
 
       await addPrinter(request);
@@ -179,6 +185,7 @@ function PrinterSelector({
       setManualIp('');
       setManualAccessCode('');
       setManualName('');
+      setManualSerialNumber('');
       setSavePermanently(false);
     } finally {
       setIsSettingPrinter(false);
@@ -269,6 +276,9 @@ function PrinterSelector({
                   )}
                   {currentPrinter.is_persistent && (
                     <span className="persistent-badge">Saved</span>
+                  )}
+                  {currentPrinter.has_serial_number && (
+                    <span className="serial-badge">Serial</span>
                   )}
                 </div>
               </div>
@@ -415,6 +425,27 @@ function PrinterSelector({
                   disabled={isSettingPrinter}
                   className="name-input"
                 />
+              </div>
+
+              <div className="form-row">
+                <label htmlFor="manual-serial-number">
+                  Serial Number
+                  <span className="field-hint"> (for MQTT communication)</span>
+                </label>
+                <input
+                  id="manual-serial-number"
+                  type="text"
+                  value={manualSerialNumber}
+                  onChange={e => setManualSerialNumber(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  placeholder="01S00C123456789 (recommended)"
+                  disabled={isSettingPrinter}
+                  className="serial-number-input"
+                />
+                <small className="field-help">
+                  Serial number enables proper MQTT communication with your printer.
+                  You can find it on the printer's info screen or settings.
+                </small>
               </div>
 
               <div className="form-row">

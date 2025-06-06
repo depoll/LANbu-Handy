@@ -78,6 +78,7 @@ export interface SetActivePrinterRequest {
   ip: string;
   access_code?: string;
   name?: string;
+  serial_number?: string;
 }
 
 export interface SetActivePrinterResponse {
@@ -87,6 +88,7 @@ export interface SetActivePrinterResponse {
     name: string;
     ip: string;
     has_access_code: boolean;
+    has_serial_number: boolean;
   };
   error_details?: string;
 }
@@ -97,6 +99,7 @@ export interface PrinterConfigResponse {
     name: string;
     ip: string;
     has_access_code: boolean;
+    has_serial_number: boolean;
     is_persistent?: boolean;
     source?: 'persistent' | 'environment';
   }[];
@@ -106,6 +109,7 @@ export interface PrinterConfigResponse {
     name: string;
     ip: string;
     has_access_code: boolean;
+    has_serial_number: boolean;
     is_runtime_set: boolean;
     is_persistent?: boolean;
   };
@@ -118,6 +122,7 @@ export interface AddPrinterRequest {
   access_code?: string;
   name?: string;
   save_permanently: boolean;
+  serial_number?: string;
 }
 
 export interface AddPrinterResponse {
@@ -127,6 +132,7 @@ export interface AddPrinterResponse {
     name: string;
     ip: string;
     has_access_code: boolean;
+    has_serial_number: boolean;
     is_persistent: boolean;
   };
   error_details?: string;
@@ -149,6 +155,7 @@ export interface PersistentPrintersResponse {
     name: string;
     ip: string;
     has_access_code: boolean;
+    has_serial_number: boolean;
     is_persistent: boolean;
   }[];
   error_details?: string;

@@ -391,8 +391,13 @@ class PrinterService:
 
             # Prepare the print command message
             # Bambu Lab MQTT topic format: device/{serial}/request
-            # For LAN mode, we can use a generic device ID or the printer IP
-            device_topic = f"device/{printer_config.ip.replace('.', '_')}/request"
+            # Use serial number if available, otherwise fallback to IP-based topic
+            if printer_config.serial_number:
+                device_topic = f"device/{printer_config.serial_number}/request"
+            else:
+                # Fallback to IP-based topic (for backward compatibility)
+                device_topic = f"device/{printer_config.ip.replace('.', '_')}/request"
+                logger.warning(f"No serial number configured for printer {printer_config.name}, using IP-based MQTT topic. MQTT communication may fail.")
 
             # Bambu Lab print command JSON structure
             print_command = {
@@ -497,9 +502,12 @@ class PrinterService:
                     logger.debug(f"MQTT connected to printer {printer_config.ip}")
 
                     # Subscribe to response topic immediately after connection
-                    response_topic = (
-                        f"device/{printer_config.ip.replace('.', '_')}/report"
-                    )
+                    if printer_config.serial_number:
+                        response_topic = f"device/{printer_config.serial_number}/report"
+                    else:
+                        # Fallback to IP-based topic (for backward compatibility)
+                        response_topic = f"device/{printer_config.ip.replace('.', '_')}/report"
+                        logger.warning(f"No serial number configured for printer {printer_config.name}, using IP-based MQTT topic. MQTT communication may fail.")
                     client.subscribe(response_topic, qos=1)
                     logger.debug(f"Subscribed to topic: {response_topic}")
                 else:
@@ -580,7 +588,11 @@ class PrinterService:
 
             # Bambu Lab AMS status query command
             # This requests the current printer status, which includes AMS info
-            device_topic = f"device/{printer_config.ip.replace('.', '_')}/request"
+            if printer_config.serial_number:
+                device_topic = f"device/{printer_config.serial_number}/request"
+            else:
+                # Fallback to IP-based topic (for backward compatibility)
+                device_topic = f"device/{printer_config.ip.replace('.', '_')}/request"
 
             # Query command to get printer status including AMS
             status_query = {"pushing": {"sequence_id": "1", "command": "pushall"}}
