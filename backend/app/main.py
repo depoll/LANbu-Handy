@@ -254,7 +254,6 @@ class AddPrinterRequest(BaseModel):
     ip: str
     access_code: str = ""
     name: Optional[str] = None
-    save_permanently: bool = False  # Ignored - kept for backward compatibility
     serial_number: str = ""
 
 
@@ -878,7 +877,8 @@ async def set_active_printer(request: SetActivePrinterRequest):
             try:
                 config.add_persistent_printer(printer_config)
                 logger.info(
-                    f"Automatically saved new printer {printer_config.name} to persistent storage"
+                    f"Automatically saved new printer {printer_config.name} "
+                    f"to persistent storage"
                 )
             except ValueError as e:
                 # If it fails to add to persistent storage (e.g., due to duplicate),
@@ -933,9 +933,8 @@ async def add_printer(request: AddPrinterRequest):
     """
     Add a new printer configuration.
 
-    All printer configurations are now automatically saved to persistent storage
-    to survive container restarts. The save_permanently flag is ignored for
-    backward compatibility.
+    All printer configurations are automatically saved to persistent storage
+    to survive container restarts.
 
     Args:
         request: AddPrinterRequest containing printer details
@@ -958,7 +957,7 @@ async def add_printer(request: AddPrinterRequest):
             serial_number=request.serial_number,
         )
 
-        # Always add to persistent storage (save_permanently flag is ignored)
+        # Add to persistent storage
         try:
             config.add_persistent_printer(printer_config)
             storage_message = "permanently saved"

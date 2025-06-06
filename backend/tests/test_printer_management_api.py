@@ -61,12 +61,11 @@ class TestPrinterManagementAPI:
         Path(self.temp_dir).rmdir()
 
     def test_add_printer_temporary(self):
-        """Test adding a printer with save_permanently=False (now ignored)."""
+        """Test adding a printer (all printers are now permanently saved)."""
         request_data = {
             "ip": "192.168.1.100",
             "access_code": "12345678",
             "name": "Test Printer",
-            "save_permanently": False,
         }
 
         response = self.client.post("/api/printers/add", json=request_data)
@@ -82,12 +81,11 @@ class TestPrinterManagementAPI:
         assert data["printer_info"]["is_persistent"] is True  # Always true now
 
     def test_add_printer_permanent(self):
-        """Test adding a printer permanently (persistent)."""
+        """Test adding a printer (all printers are permanently saved)."""
         request_data = {
             "ip": "192.168.1.100",
             "access_code": "12345678",
             "name": "Persistent Printer",
-            "save_permanently": True,
         }
 
         response = self.client.post("/api/printers/add", json=request_data)
@@ -113,7 +111,6 @@ class TestPrinterManagementAPI:
             "ip": "300.400.500.600",  # Invalid IP address
             "access_code": "12345678",
             "name": "Invalid Printer",
-            "save_permanently": False,
         }
 
         response = self.client.post("/api/printers/add", json=request_data)
@@ -127,7 +124,6 @@ class TestPrinterManagementAPI:
             "ip": "printer.local",
             "access_code": "12345678",
             "name": "Hostname Printer",
-            "save_permanently": False,
         }
 
         response = self.client.post("/api/printers/add", json=request_data)
@@ -145,7 +141,6 @@ class TestPrinterManagementAPI:
             "ip": "192.168.1.100",
             "access_code": "12345678",
             "name": "First Printer",
-            "save_permanently": True,
         }
         response = self.client.post("/api/printers/add", json=request_data)
         assert response.status_code == 200
@@ -155,7 +150,6 @@ class TestPrinterManagementAPI:
             "ip": "192.168.1.100",
             "access_code": "87654321",
             "name": "Second Printer",
-            "save_permanently": True,
         }
         response = self.client.post("/api/printers/add", json=request_data2)
 
@@ -169,7 +163,6 @@ class TestPrinterManagementAPI:
             "ip": "192.168.1.100",
             "access_code": "12345678",
             "name": "Test Printer",
-            "save_permanently": True,
         }
         response = self.client.post("/api/printers/add", json=request_data)
         assert response.status_code == 200
@@ -211,13 +204,11 @@ class TestPrinterManagementAPI:
                 "ip": "192.168.1.100",
                 "name": "Printer 1",
                 "access_code": "123",
-                "save_permanently": True,
             },
             {
                 "ip": "192.168.1.101",
                 "name": "Printer 2",
                 "access_code": "456",
-                "save_permanently": True,
             },
         ]
 
@@ -246,7 +237,6 @@ class TestPrinterManagementAPI:
             "ip": "192.168.1.100",
             "access_code": "12345678",
             "name": "Persistent Printer",
-            "save_permanently": True,
         }
         response = self.client.post("/api/printers/add", json=request_data)
         assert response.status_code == 200
@@ -309,13 +299,12 @@ class TestPrinterManagementAPI:
         assert printer["name"] == "Auto-Persistent Printer"
 
     def test_set_active_printer_existing_no_duplicate(self):
-        """Test that setting an active printer that already exists doesn't create duplicates."""
+        """Test setting active printer that exists doesn't create duplicates."""
         # First add a printer to persistent storage
         request_data = {
             "ip": "192.168.1.150",
             "access_code": "11111111",
             "name": "Existing Printer",
-            "save_permanently": True,
         }
         response = self.client.post("/api/printers/add", json=request_data)
         assert response.status_code == 200

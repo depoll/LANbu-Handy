@@ -113,7 +113,6 @@ function PrinterSelector({
         ip: manualIp.trim(),
         access_code: manualAccessCode.trim(),
         name: manualName.trim() || `Printer at ${manualIp.trim()}`,
-        // save_permanently no longer needed - all printers are automatically persistent
         serial_number: manualSerialNumber.trim(),
       };
 
