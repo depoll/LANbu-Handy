@@ -58,7 +58,7 @@ describe('PrinterSelector Multiple Printers Management', () => {
                   source: 'persistent',
                 },
                 {
-                  name: 'Test Printer 2', 
+                  name: 'Test Printer 2',
                   ip: '192.168.1.101',
                   has_access_code: false,
                   has_serial_number: true,
@@ -258,12 +258,9 @@ describe('PrinterSelector Multiple Printers Management', () => {
   });
 
   it('should allow switching to a different printer', async () => {
-    let configCallCount = 0;
-    
     // Mock API responses
-    mockFetch.mockImplementation((url: string, options?: any) => {
+    mockFetch.mockImplementation((url: string, options?: RequestInit) => {
       if (url === '/api/config') {
-        configCallCount++;
         return Promise.resolve({
           ok: true,
           json: () =>
@@ -331,7 +328,7 @@ describe('PrinterSelector Multiple Printers Management', () => {
     // Find and click the switch button for the second printer
     const switchButtons = screen.getAllByText(/🔄 Switch/);
     expect(switchButtons).toHaveLength(1); // Only non-active printers should have switch button
-    
+
     fireEvent.click(switchButtons[0]);
 
     // Should call the add printer API to switch
@@ -346,7 +343,7 @@ describe('PrinterSelector Multiple Printers Management', () => {
 
   it('should allow deleting persistent printers', async () => {
     // Mock API responses
-    mockFetch.mockImplementation((url: string, options?: any) => {
+    mockFetch.mockImplementation((url: string, options?: RequestInit) => {
       if (url === '/api/config') {
         return Promise.resolve({
           ok: true,
@@ -408,7 +405,7 @@ describe('PrinterSelector Multiple Printers Management', () => {
     // Find and click the delete button (only persistent printers should have it)
     const deleteButtons = screen.getAllByText(/🗑️ Delete/);
     expect(deleteButtons).toHaveLength(1); // Only persistent printers should have delete button
-    
+
     fireEvent.click(deleteButtons[0]);
 
     // Should show confirmation dialog and call delete API

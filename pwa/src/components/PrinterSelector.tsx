@@ -107,15 +107,17 @@ function PrinterSelector({
       if (response.ok) {
         const config: PrinterConfigResponse = await response.json();
         if (config.printers && config.printers.length > 0) {
-          setAllPrinters(config.printers.map(printer => ({
-            name: printer.name,
-            ip: printer.ip,
-            has_access_code: printer.has_access_code,
-            has_serial_number: printer.has_serial_number,
-            is_runtime_set: false,
-            is_persistent: printer.is_persistent,
-            source: printer.source,
-          })));
+          setAllPrinters(
+            config.printers.map(printer => ({
+              name: printer.name,
+              ip: printer.ip,
+              has_access_code: printer.has_access_code,
+              has_serial_number: printer.has_serial_number,
+              is_runtime_set: false,
+              is_persistent: printer.is_persistent,
+              source: printer.source,
+            }))
+          );
         }
       }
     } catch (error) {
@@ -192,7 +194,7 @@ function PrinterSelector({
       setManualSerialNumber('');
       setSavePermanently(false);
       setIsEditingMode(false);
-      
+
       // Reload all printers to update the list
       await loadAllPrinters();
     } finally {
@@ -215,10 +217,10 @@ function PrinterSelector({
 
       await addPrinter(request);
       setStatusMessage(`✅ Switched to ${printer.name}`);
-      
+
       // Reload current printer configuration
       await loadCurrentPrinter();
-      
+
       // Collapse the panel after switch
       setTimeout(() => {
         setIsExpanded(false);
@@ -262,10 +264,10 @@ function PrinterSelector({
 
       if (result.success) {
         setStatusMessage(`✅ Deleted printer: ${printer.name}`);
-        
+
         // Reload all printers to update the list
         await loadAllPrinters();
-        
+
         // If the deleted printer was the current active printer, reload current printer
         if (currentPrinter && currentPrinter.ip === printer.ip) {
           await loadCurrentPrinter();
@@ -328,7 +330,7 @@ function PrinterSelector({
         setTimeout(() => {
           setIsExpanded(false);
         }, 1500);
-        
+
         // Reload all printers to update the list
         await loadAllPrinters();
       } else {
@@ -419,12 +421,14 @@ function PrinterSelector({
         <div className="printer-list-panel">
           <div className="panel-header">
             <h3>All Printers ({allPrinters.length})</h3>
-            <p>Click to switch between printers or delete persistent printers</p>
+            <p>
+              Click to switch between printers or delete persistent printers
+            </p>
           </div>
 
           <div className="printer-list">
             {allPrinters.map((printer, index) => (
-              <div 
+              <div
                 key={`${printer.ip}-${index}`}
                 className={`printer-item ${currentPrinter?.ip === printer.ip ? 'active' : ''}`}
               >
@@ -463,7 +467,7 @@ function PrinterSelector({
                       🔄 Switch
                     </button>
                   )}
-                  
+
                   {printer.is_persistent && (
                     <button
                       onClick={() => handleDeletePrinter(printer)}
@@ -481,7 +485,10 @@ function PrinterSelector({
 
           {allPrinters.length === 0 && (
             <div className="no-printers-message">
-              <p>No printers configured. Add a printer using the Configure panel above.</p>
+              <p>
+                No printers configured. Add a printer using the Configure panel
+                above.
+              </p>
             </div>
           )}
         </div>
