@@ -144,15 +144,9 @@ describe('PrinterSelector Edit Functionality', () => {
       expect(screen.getByText('Edit Printer')).toBeInTheDocument();
       expect(screen.getByDisplayValue('192.168.1.100')).toBeInTheDocument();
       expect(screen.getByDisplayValue('Test Printer')).toBeInTheDocument();
-      expect(
-        screen.getByText('Update Printer Permanently')
-      ).toBeInTheDocument();
+      expect(screen.getByText('Update Printer')).toBeInTheDocument();
       expect(screen.getByText('Cancel')).toBeInTheDocument();
     });
-
-    // Check that save permanently checkbox is checked (since is_persistent was true)
-    const saveCheckbox = screen.getByRole('checkbox');
-    expect(saveCheckbox).toBeChecked();
   });
 
   it('should show editing notice when in edit mode', async () => {
@@ -251,7 +245,7 @@ describe('PrinterSelector Edit Functionality', () => {
       expect(screen.getByText('Select Printer')).toBeInTheDocument();
       expect(screen.queryByText('Edit Printer')).not.toBeInTheDocument();
       expect(screen.queryByText('Cancel')).not.toBeInTheDocument();
-      expect(screen.getByText('Set Active Printer')).toBeInTheDocument();
+      expect(screen.getByText('Save Printer')).toBeInTheDocument();
     });
   });
 });

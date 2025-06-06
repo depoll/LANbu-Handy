@@ -106,7 +106,6 @@ export interface AddPrinterRequest {
   ip: string;
   access_code?: string;
   name?: string;
-  save_permanently: boolean;
   serial_number?: string;
 }
 

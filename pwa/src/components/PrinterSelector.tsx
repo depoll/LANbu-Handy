@@ -30,7 +30,7 @@ function PrinterSelector({
   const [manualAccessCode, setManualAccessCode] = useState('');
   const [manualName, setManualName] = useState('');
   const [manualSerialNumber, setManualSerialNumber] = useState('');
-  const [savePermanently, setSavePermanently] = useState(false);
+  // savePermanently removed - all printers are now automatically persistent
   const [isSettingPrinter, setIsSettingPrinter] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
   const [currentPrinter, setCurrentPrinter] = useState<PrinterInfo | null>(
@@ -133,7 +133,6 @@ function PrinterSelector({
       // Note: We can't populate access_code and serial_number as they're not returned by the API for security
       setManualAccessCode('');
       setManualSerialNumber('');
-      setSavePermanently(currentPrinter.is_persistent || false);
       setIsEditingMode(true);
       setIsExpanded(true);
       setStatusMessage('');
@@ -146,7 +145,6 @@ function PrinterSelector({
     setManualAccessCode('');
     setManualName('');
     setManualSerialNumber('');
-    setSavePermanently(false);
     setIsEditingMode(false);
     setStatusMessage('');
 
@@ -173,15 +171,13 @@ function PrinterSelector({
     }
 
     setIsSettingPrinter(true);
-    const actionType = savePermanently ? 'Saving' : 'Setting';
-    setStatusMessage(`${actionType} printer: ${manualIp}...`);
+    setStatusMessage(`Saving printer: ${manualIp}...`);
 
     try {
       const request: AddPrinterRequest = {
         ip: manualIp.trim(),
         access_code: manualAccessCode.trim(),
         name: manualName.trim() || `Printer at ${manualIp.trim()}`,
-        save_permanently: savePermanently,
         serial_number: manualSerialNumber.trim(),
       };
 
@@ -192,7 +188,6 @@ function PrinterSelector({
       setManualAccessCode('');
       setManualName('');
       setManualSerialNumber('');
-      setSavePermanently(false);
       setIsEditingMode(false);
 
       // Reload all printers to update the list
@@ -306,10 +301,7 @@ function PrinterSelector({
       const result: AddPrinterResponse = await response.json();
 
       if (result.success) {
-        const permanencyMessage = request.save_permanently
-          ? 'permanently saved'
-          : 'set for current session';
-        setStatusMessage(`✅ Printer ${permanencyMessage}`);
+        setStatusMessage(`✅ Printer saved permanently`);
 
         if (result.printer_info) {
           setCurrentPrinter({
@@ -317,7 +309,7 @@ function PrinterSelector({
             is_runtime_set: true,
           });
 
-          // Save IP to Local Storage for future use (regardless of permanency)
+          // Save IP to Local Storage for future use
           saveIP(result.printer_info.ip);
 
           // Notify parent component
@@ -611,24 +603,12 @@ function PrinterSelector({
                 </small>
               </div>
 
-              <div className="form-row">
-                <label className="checkbox-label">
-                  <input
-                    type="checkbox"
-                    checked={savePermanently}
-                    onChange={e => setSavePermanently(e.target.checked)}
-                    disabled={isSettingPrinter}
-                    className="save-permanently-checkbox"
-                  />
-                  <span className="checkbox-text">
-                    Save permanently (survives container restarts)
-                  </span>
-                </label>
-                <small className="checkbox-help">
-                  {savePermanently
-                    ? 'Printer will be saved to persistent storage'
-                    : 'Printer will only be active for this session'}
-                </small>
+              <div className="persistence-info">
+                <p className="info-text">
+                  <span className="info-icon">💾</span>
+                  All printers are automatically saved and will persist across
+                  container restarts.
+                </p>
               </div>
 
               <div className="form-buttons">
@@ -638,16 +618,10 @@ function PrinterSelector({
                   className="set-manual-button"
                 >
                   {isSettingPrinter
-                    ? savePermanently
-                      ? 'Saving...'
-                      : 'Setting...'
+                    ? 'Saving...'
                     : isEditingMode
-                      ? savePermanently
-                        ? 'Update Printer Permanently'
-                        : 'Update Active Printer'
-                      : savePermanently
-                        ? 'Save Printer Permanently'
-                        : 'Set Active Printer'}
+                      ? 'Update Printer'
+                      : 'Save Printer'}
                 </button>
 
                 {isEditingMode && (
