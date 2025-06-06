@@ -3,6 +3,7 @@ import {
   PrinterConfigResponse,
   AddPrinterRequest,
   AddPrinterResponse,
+  SetActivePrinterRequest,
 } from '../types/api';
 import { usePrinterIPPersistence } from '../hooks/usePrinterIPPersistence';
 
@@ -202,15 +203,14 @@ function PrinterSelector({
     setStatusMessage(`Switching to printer: ${printer.name}...`);
 
     try {
-      const request: AddPrinterRequest = {
+      const request: SetActivePrinterRequest = {
         ip: printer.ip,
         access_code: '', // Access code is not available from the list
         name: printer.name,
-        save_permanently: false, // Just set as active, don't save again
         serial_number: '', // Serial number is not available from the list
       };
 
-      await addPrinter(request);
+      await setActivePrinter(request);
       setStatusMessage(`✅ Switched to ${printer.name}`);
 
       // Reload current printer configuration
@@ -336,6 +336,53 @@ function PrinterSelector({
         error instanceof Error ? error.message : 'Unknown error';
       setStatusMessage(`❌ Failed to add printer: ${errorMessage}`);
       console.error('Add printer error:', error);
+    }
+  };
+
+  const setActivePrinter = async (request: SetActivePrinterRequest) => {
+    try {
+      const response = await fetch('/api/printer/configure', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(request),
+      });
+
+      // Check if response exists and is valid
+      if (!response) {
+        throw new Error('No response received from server');
+      }
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      }
+
+      const result = await response.json();
+
+      if (result.success) {
+        if (result.printer_info) {
+          setCurrentPrinter({
+            ...result.printer_info,
+            is_runtime_set: true,
+          });
+
+          // Notify parent component
+          if (onPrinterChange) {
+            onPrinterChange(result.printer_info);
+          }
+        }
+
+        // Reload all printers to update the list
+        await loadAllPrinters();
+      } else {
+        throw new Error(result.message || 'Failed to set active printer');
+      }
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(`Failed to set active printer: ${errorMessage}`);
     }
   };
 
