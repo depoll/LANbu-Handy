@@ -439,7 +439,10 @@ function PrinterSelector({
               <div className="form-row">
                 <label htmlFor="manual-serial-number">
                   Serial Number *
-                  <span className="field-hint"> (required for MQTT/print features)</span>
+                  <span className="field-hint">
+                    {' '}
+                    (required for MQTT/print features)
+                  </span>
                 </label>
                 <input
                   id="manual-serial-number"
@@ -452,8 +455,9 @@ function PrinterSelector({
                   className="serial-number-input"
                 />
                 <small className="field-help">
-                  Serial number is required for MQTT communication (print commands, AMS status).
-                  Find it on your printer's display: Settings → Device → Serial Number.
+                  Serial number is required for MQTT communication (print
+                  commands, AMS status). Find it on your printer's display:
+                  Settings → Device → Serial Number.
                 </small>
               </div>
 

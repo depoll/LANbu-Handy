@@ -392,8 +392,12 @@ class PrinterService:
             # Prepare the print command message
             # Bambu Lab MQTT topic format: device/{serial}/request
             if not printer_config.serial_number:
-                raise PrinterMQTTError(f"No serial number configured for printer {printer_config.name}. Serial number is required for MQTT communication.")
-            
+                raise PrinterMQTTError(
+                    f"No serial number configured for printer "
+                    f"{printer_config.name}. Serial number is required for "
+                    f"MQTT communication."
+                )
+
             device_topic = f"device/{printer_config.serial_number}/request"
 
             # Bambu Lab print command JSON structure
@@ -500,10 +504,14 @@ class PrinterService:
 
                     # Subscribe to response topic immediately after connection
                     if not printer_config.serial_number:
-                        connection_error = f"No serial number configured for printer {printer_config.name}. Serial number is required for MQTT communication."
+                        connection_error = (
+                            f"No serial number configured for printer "
+                            f"{printer_config.name}. Serial number is required "
+                            f"for MQTT communication."
+                        )
                         logger.error(connection_error)
                         return
-                    
+
                     response_topic = f"device/{printer_config.serial_number}/report"
                     client.subscribe(response_topic, qos=1)
                     logger.debug(f"Subscribed to topic: {response_topic}")
@@ -586,8 +594,12 @@ class PrinterService:
             # Bambu Lab AMS status query command
             # This requests the current printer status, which includes AMS info
             if not printer_config.serial_number:
-                raise PrinterMQTTError(f"No serial number configured for printer {printer_config.name}. Serial number is required for MQTT communication.")
-            
+                raise PrinterMQTTError(
+                    f"No serial number configured for printer "
+                    f"{printer_config.name}. Serial number is required for "
+                    f"MQTT communication."
+                )
+
             device_topic = f"device/{printer_config.serial_number}/request"
 
             # Query command to get printer status including AMS

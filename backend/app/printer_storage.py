@@ -183,7 +183,11 @@ class PrinterStorage:
             return False
 
     def update_printer(
-        self, ip: str, name: Optional[str] = None, access_code: Optional[str] = None, serial_number: Optional[str] = None
+        self,
+        ip: str,
+        name: Optional[str] = None,
+        access_code: Optional[str] = None,
+        serial_number: Optional[str] = None,
     ) -> bool:
         """Update an existing printer configuration.
 

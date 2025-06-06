@@ -137,7 +137,10 @@ class Config:
                             serial_number = printer_data.get("serial_number", "")
 
                             printer = PrinterConfig(
-                                name=name, ip=ip, access_code=access_code, serial_number=serial_number
+                                name=name,
+                                ip=ip,
+                                access_code=access_code,
+                                serial_number=serial_number,
                             )
                             printers.append(printer)
                             logger.info(
@@ -231,7 +234,10 @@ class Config:
             name = "Active Printer"
 
         printer_config = PrinterConfig(
-            name=name, ip=ip.strip(), access_code=access_code.strip(), serial_number=serial_number.strip()
+            name=name,
+            ip=ip.strip(),
+            access_code=access_code.strip(),
+            serial_number=serial_number.strip(),
         )
 
         self.runtime_active_printer = printer_config
@@ -308,7 +314,11 @@ class Config:
             return False
 
     def update_persistent_printer(
-        self, ip: str, name: Optional[str] = None, access_code: Optional[str] = None, serial_number: Optional[str] = None
+        self,
+        ip: str,
+        name: Optional[str] = None,
+        access_code: Optional[str] = None,
+        serial_number: Optional[str] = None,
     ) -> bool:
         """Update a persistent printer configuration.
 
@@ -325,7 +335,9 @@ class Config:
             from app.printer_storage import get_printer_storage
 
             printer_storage = get_printer_storage()
-            updated = printer_storage.update_printer(ip, name, access_code, serial_number)
+            updated = printer_storage.update_printer(
+                ip, name, access_code, serial_number
+            )
 
             if updated:
                 # Reload printers to reflect the changes
