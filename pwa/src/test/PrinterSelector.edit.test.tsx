@@ -144,9 +144,7 @@ describe('PrinterSelector Edit Functionality', () => {
       expect(screen.getByText('Edit Printer')).toBeInTheDocument();
       expect(screen.getByDisplayValue('192.168.1.100')).toBeInTheDocument();
       expect(screen.getByDisplayValue('Test Printer')).toBeInTheDocument();
-      expect(
-        screen.getByText('Update Printer')
-      ).toBeInTheDocument();
+      expect(screen.getByText('Update Printer')).toBeInTheDocument();
       expect(screen.getByText('Cancel')).toBeInTheDocument();
     });
   });

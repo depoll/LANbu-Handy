@@ -178,7 +178,9 @@ describe('PrinterSelector IP Persistence', () => {
     const serialNumberInput = screen.getByPlaceholderText(
       '01S00C123456789 (required)'
     );
-    fireEvent.change(serialNumberInput, { target: { value: '01S00C123456789' } });
+    fireEvent.change(serialNumberInput, {
+      target: { value: '01S00C123456789' },
+    });
 
     // Mock successful printer set response
     mockFetch.mockImplementationOnce(() =>

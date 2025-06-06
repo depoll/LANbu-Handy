@@ -407,7 +407,11 @@ function PrinterSelector({
                   disabled={isSettingPrinter || !manualIp.trim()}
                   className="set-manual-button"
                 >
-                  {isSettingPrinter ? 'Saving...' : isEditingMode ? 'Update Printer' : 'Save Printer'}
+                  {isSettingPrinter
+                    ? 'Saving...'
+                    : isEditingMode
+                      ? 'Update Printer'
+                      : 'Save Printer'}
                 </button>
 
                 {isEditingMode && (
