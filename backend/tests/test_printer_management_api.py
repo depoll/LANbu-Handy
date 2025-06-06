@@ -61,7 +61,7 @@ class TestPrinterManagementAPI:
         Path(self.temp_dir).rmdir()
 
     def test_add_printer_temporary(self):
-        """Test adding a printer temporarily (not persistent)."""
+        """Test adding a printer with save_permanently=False (now ignored)."""
         request_data = {
             "ip": "192.168.1.100",
             "access_code": "12345678",
@@ -75,10 +75,11 @@ class TestPrinterManagementAPI:
         data = response.json()
         assert data["success"] is True
         assert "Test Printer" in data["message"]
-        assert "current session" in data["message"]
+        # With new behavior, all printers are permanently saved
+        assert "permanently saved" in data["message"]
         assert data["printer_info"]["name"] == "Test Printer"
         assert data["printer_info"]["ip"] == "192.168.1.100"
-        assert data["printer_info"]["is_persistent"] is False
+        assert data["printer_info"]["is_persistent"] is True  # Always true now
 
     def test_add_printer_permanent(self):
         """Test adding a printer permanently (persistent)."""
@@ -133,7 +134,8 @@ class TestPrinterManagementAPI:
 
         assert response.status_code == 200
         data = response.json()
-        assert "Hostname Printer set as active for current session" in data["message"]
+        # With new behavior, all printers are permanently saved
+        assert "Hostname Printer permanently saved" in data["message"]
         assert data["printer_info"]["ip"] == "printer.local"
 
     def test_add_printer_duplicate_ip_persistent(self):
@@ -278,3 +280,58 @@ class TestPrinterManagementAPI:
         assert data["success"] is True
         assert data["printer_info"]["ip"] == "192.168.1.100"
         assert data["printer_info"]["name"] == "Active Printer"
+
+    def test_set_active_printer_auto_persists(self):
+        """Test that setting an active printer automatically persists it."""
+        request_data = {
+            "ip": "192.168.1.200",
+            "access_code": "87654321",
+            "name": "Auto-Persistent Printer",
+        }
+
+        response = self.client.post("/api/printer/set-active", json=request_data)
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        assert data["printer_info"]["ip"] == "192.168.1.200"
+        assert data["printer_info"]["name"] == "Auto-Persistent Printer"
+
+        # Verify it was automatically saved to persistent storage
+        response = self.client.get("/api/printers/persistent")
+        assert response.status_code == 200
+        persistent_data = response.json()
+        assert persistent_data["success"] is True
+        assert len(persistent_data["printers"]) == 1
+
+        printer = persistent_data["printers"][0]
+        assert printer["ip"] == "192.168.1.200"
+        assert printer["name"] == "Auto-Persistent Printer"
+
+    def test_set_active_printer_existing_no_duplicate(self):
+        """Test that setting an active printer that already exists doesn't create duplicates."""
+        # First add a printer to persistent storage
+        request_data = {
+            "ip": "192.168.1.150",
+            "access_code": "11111111",
+            "name": "Existing Printer",
+            "save_permanently": True,
+        }
+        response = self.client.post("/api/printers/add", json=request_data)
+        assert response.status_code == 200
+
+        # Now set the same printer as active (might have different access code)
+        set_active_data = {
+            "ip": "192.168.1.150",
+            "access_code": "22222222",
+            "name": "Updated Name",
+        }
+        response = self.client.post("/api/printer/set-active", json=set_active_data)
+        assert response.status_code == 200
+
+        # Verify there's still only one printer in persistent storage
+        response = self.client.get("/api/printers/persistent")
+        assert response.status_code == 200
+        persistent_data = response.json()
+        assert persistent_data["success"] is True
+        assert len(persistent_data["printers"]) == 1

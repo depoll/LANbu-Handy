@@ -254,7 +254,7 @@ class AddPrinterRequest(BaseModel):
     ip: str
     access_code: str = ""
     name: Optional[str] = None
-    save_permanently: bool = False
+    save_permanently: bool = False  # Ignored - kept for backward compatibility
     serial_number: str = ""
 
 
@@ -841,9 +841,9 @@ async def set_active_printer(request: SetActivePrinterRequest):
     """
     Set the active printer for the current session.
 
-    Allows setting a printer IP address (and optional access code) as the active
-    printer for the current session. This printer will be used for subsequent
-    printing operations until changed or the session ends.
+    Sets a printer IP address (and optional access code) as the active printer
+    for the current session. If the printer doesn't already exist in persistent
+    storage, it will be automatically saved there.
 
     Args:
         request: SetActivePrinterRequest containing IP, access code, and optional name
@@ -858,34 +858,66 @@ async def set_active_printer(request: SetActivePrinterRequest):
         # Validate IP address or hostname format
         ip = validate_ip_or_hostname(request.ip)
 
-        # Set the active printer
+        # Create printer configuration
+        printer_config = PrinterConfig(
+            name=request.name or f"Printer at {ip}",
+            ip=ip,
+            access_code=request.access_code,
+            serial_number=request.serial_number,
+        )
+
+        # Check if this printer already exists in persistent storage
         try:
-            printer_config = config.set_active_printer(
+            existing_printer = config.get_printer_by_ip(ip)
+        except Exception as e:
+            logger.warning(f"Error checking existing printer: {e}")
+            existing_printer = None
+
+        if not existing_printer:
+            # Printer doesn't exist in storage, add it automatically
+            try:
+                config.add_persistent_printer(printer_config)
+                logger.info(
+                    f"Automatically saved new printer {printer_config.name} to persistent storage"
+                )
+            except ValueError as e:
+                # If it fails to add to persistent storage (e.g., due to duplicate),
+                # just continue with setting as active printer
+                logger.warning(
+                    f"Failed to auto-save printer to persistent storage: {e}"
+                )
+            except Exception as e:
+                # For other errors, log but continue
+                logger.warning(f"Unexpected error auto-saving printer: {e}")
+
+        # Set the active printer (this will use the persistent version if it exists)
+        try:
+            active_printer = config.set_active_printer(
                 ip=ip,
                 access_code=request.access_code,
                 name=request.name or f"Printer at {ip}",
                 serial_number=request.serial_number,
             )
-
-            # Optional: Test connection to validate the printer
-            # This is commented out for now as it might be slow
-            # connection_test = printer_service.test_connection(printer_config)
-            # if not connection_test:
-            #     logger.warning(f"Could not connect to printer at {ip}")
-
-            return SetActivePrinterResponse(
-                success=True,
-                message=f"Active printer set to {printer_config.ip}",
-                printer_info={
-                    "name": printer_config.name,
-                    "ip": printer_config.ip,
-                    "has_access_code": bool(printer_config.access_code),
-                    "has_serial_number": bool(printer_config.serial_number),
-                },
-            )
-
         except ValueError as e:
+            # Handle configuration errors
             raise HTTPException(status_code=400, detail=str(e))
+
+        # Optional: Test connection to validate the printer
+        # This is commented out for now as it might be slow
+        # connection_test = printer_service.test_connection(printer_config)
+        # if not connection_test:
+        #     logger.warning(f"Could not connect to printer at {ip}")
+
+        return SetActivePrinterResponse(
+            success=True,
+            message=f"Active printer set to {active_printer.ip}",
+            printer_info={
+                "name": active_printer.name,
+                "ip": active_printer.ip,
+                "has_access_code": bool(active_printer.access_code),
+                "has_serial_number": bool(active_printer.serial_number),
+            },
+        )
 
     except HTTPException:
         # Re-raise HTTP exceptions as-is
@@ -901,12 +933,12 @@ async def add_printer(request: AddPrinterRequest):
     """
     Add a new printer configuration.
 
-    Allows adding a printer either temporarily (for the current session) or
-    permanently (saved to persistent storage). Permanent printers survive
-    container restarts.
+    All printer configurations are now automatically saved to persistent storage
+    to survive container restarts. The save_permanently flag is ignored for
+    backward compatibility.
 
     Args:
-        request: AddPrinterRequest containing printer details and persistence option
+        request: AddPrinterRequest containing printer details
 
     Returns:
         AddPrinterResponse: Success status and printer information
@@ -926,22 +958,12 @@ async def add_printer(request: AddPrinterRequest):
             serial_number=request.serial_number,
         )
 
-        if request.save_permanently:
-            # Add to persistent storage
-            try:
-                config.add_persistent_printer(printer_config)
-                storage_message = "permanently saved"
-            except ValueError as e:
-                raise HTTPException(status_code=400, detail=str(e))
-        else:
-            # Add as runtime active printer only
-            config.set_active_printer(
-                ip=printer_config.ip,
-                access_code=printer_config.access_code,
-                name=printer_config.name,
-                serial_number=printer_config.serial_number,
-            )
-            storage_message = "set as active for current session"
+        # Always add to persistent storage (save_permanently flag is ignored)
+        try:
+            config.add_persistent_printer(printer_config)
+            storage_message = "permanently saved"
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
 
         return AddPrinterResponse(
             success=True,
@@ -951,7 +973,7 @@ async def add_printer(request: AddPrinterRequest):
                 "ip": printer_config.ip,
                 "has_access_code": bool(printer_config.access_code),
                 "has_serial_number": bool(printer_config.serial_number),
-                "is_persistent": request.save_permanently,
+                "is_persistent": True,  # Always true now
             },
         )
 
