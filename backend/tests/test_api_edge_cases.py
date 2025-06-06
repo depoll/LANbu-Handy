@@ -215,11 +215,13 @@ class TestJobStartEdgeCases:
         """Test job start with malformed URL."""
         response = client.post("/api/job/start-basic", json={"model_url": "not-a-url"})
 
-        # Malformed URL might cause a 500 during processing
-        assert response.status_code in [422, 500]
-        if response.status_code == 422:
-            data = response.json()
-            assert data["success"] is False
+        # API returns 200 with structured error response for malformed URLs
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is False
+        assert "job_steps" in data
+        assert data["job_steps"]["download"]["success"] is False
+        assert "Invalid URL format" in data["error_details"]
 
 
 class TestInputValidationEdgeCases:
