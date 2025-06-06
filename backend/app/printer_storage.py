@@ -55,11 +55,13 @@ class PrinterStorage:
         except (PermissionError, OSError) as e:
             self._storage_available = False
             logger.warning(
-                f"Failed to create printer storage directory {self.config_file.parent}: {e}. "
+                f"Failed to create printer storage directory "
+                f"{self.config_file.parent}: {e}. "
                 "Persistent printer storage will be disabled."
             )
             logger.info(
-                f"Printer storage initialized with config file: {self.config_file} (unavailable)"
+                f"Printer storage initialized with config file: "
+                f"{self.config_file} (unavailable)"
             )
 
     def _get_default_config_path(self) -> Path:
@@ -100,7 +102,8 @@ class PrinterStorage:
             temp_dir.mkdir(exist_ok=True)
             return temp_dir / "printers.json"
         except (PermissionError, OSError):
-            # If all else fails, use the original docker path (will likely fail but preserves original behavior)
+            # If all else fails, use the original docker path
+            # (will likely fail but preserves original behavior)
             return docker_path
 
     def is_storage_available(self) -> bool:
