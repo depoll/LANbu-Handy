@@ -3,6 +3,7 @@ import {
   PrinterConfigResponse,
   AddPrinterRequest,
   AddPrinterResponse,
+  SetActivePrinterRequest,
 } from '../types/api';
 import { usePrinterIPPersistence } from '../hooks/usePrinterIPPersistence';
 
@@ -13,6 +14,7 @@ interface PrinterInfo {
   has_serial_number: boolean;
   is_runtime_set?: boolean;
   is_persistent?: boolean;
+  source?: string;
 }
 
 interface PrinterSelectorProps {
@@ -35,7 +37,9 @@ function PrinterSelector({
   const [currentPrinter, setCurrentPrinter] = useState<PrinterInfo | null>(
     null
   );
+  const [allPrinters, setAllPrinters] = useState<PrinterInfo[]>([]);
   const [isEditingMode, setIsEditingMode] = useState(false);
+  const [showPrinterList, setShowPrinterList] = useState(false);
 
   // Initialize printer IP persistence hook
   const { getSavedIP, saveIP, clearSavedIP, hasSavedIP } =
@@ -44,6 +48,7 @@ function PrinterSelector({
   // Load current printer configuration and saved IP on component mount
   useEffect(() => {
     loadCurrentPrinter();
+    loadAllPrinters();
 
     // Load saved IP and pre-fill manual input if no current printer is set
     const savedIP = getSavedIP();
@@ -88,6 +93,36 @@ function PrinterSelector({
       }
     } catch (error) {
       console.error('Failed to load current printer configuration:', error);
+    }
+  };
+
+  const loadAllPrinters = async () => {
+    try {
+      const response = await fetch('/api/config');
+
+      if (!response) {
+        console.error('No response received from /api/config');
+        return;
+      }
+
+      if (response.ok) {
+        const config: PrinterConfigResponse = await response.json();
+        if (config.printers && config.printers.length > 0) {
+          setAllPrinters(
+            config.printers.map(printer => ({
+              name: printer.name,
+              ip: printer.ip,
+              has_access_code: printer.has_access_code,
+              has_serial_number: printer.has_serial_number,
+              is_runtime_set: false,
+              is_persistent: printer.is_persistent,
+              source: printer.source,
+            }))
+          );
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load all printers:', error);
     }
   };
 
@@ -155,8 +190,91 @@ function PrinterSelector({
       setManualName('');
       setManualSerialNumber('');
       setIsEditingMode(false);
+
+      // Reload all printers to update the list
+      await loadAllPrinters();
     } finally {
       setIsSettingPrinter(false);
+    }
+  };
+
+  const handleSwitchToPrinter = async (printer: PrinterInfo) => {
+    setIsSettingPrinter(true);
+    setStatusMessage(`Switching to printer: ${printer.name}...`);
+
+    try {
+      const request: SetActivePrinterRequest = {
+        ip: printer.ip,
+        access_code: '', // Access code is not available from the list
+        name: printer.name,
+        serial_number: '', // Serial number is not available from the list
+      };
+
+      await setActivePrinter(request);
+      setStatusMessage(`✅ Switched to ${printer.name}`);
+
+      // Reload current printer configuration
+      await loadCurrentPrinter();
+
+      // Collapse the panel after switch
+      setTimeout(() => {
+        setIsExpanded(false);
+        setShowPrinterList(false);
+      }, 1500);
+    } catch (error) {
+      setStatusMessage(`❌ Failed to switch to printer: ${error}`);
+    } finally {
+      setIsSettingPrinter(false);
+    }
+  };
+
+  const handleDeletePrinter = async (printer: PrinterInfo) => {
+    if (!printer.is_persistent) {
+      setStatusMessage('❌ Cannot delete non-persistent printers');
+      return;
+    }
+
+    const confirmDelete = confirm(
+      `Are you sure you want to delete the printer "${printer.name}" from persistent storage?`
+    );
+    if (!confirmDelete) {
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/printers/remove', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ ip: printer.ip }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      }
+
+      const result = await response.json();
+
+      if (result.success) {
+        setStatusMessage(`✅ Deleted printer: ${printer.name}`);
+
+        // Reload all printers to update the list
+        await loadAllPrinters();
+
+        // If the deleted printer was the current active printer, reload current printer
+        if (currentPrinter && currentPrinter.ip === printer.ip) {
+          await loadCurrentPrinter();
+        }
+      } else {
+        setStatusMessage(`❌ ${result.message}`);
+      }
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      setStatusMessage(`❌ Failed to delete printer: ${errorMessage}`);
+      console.error('Delete printer error:', error);
     }
   };
 
@@ -204,6 +322,9 @@ function PrinterSelector({
         setTimeout(() => {
           setIsExpanded(false);
         }, 1500);
+
+        // Reload all printers to update the list
+        await loadAllPrinters();
       } else {
         setStatusMessage(`❌ ${result.message}`);
         if (result.error_details) {
@@ -215,6 +336,53 @@ function PrinterSelector({
         error instanceof Error ? error.message : 'Unknown error';
       setStatusMessage(`❌ Failed to add printer: ${errorMessage}`);
       console.error('Add printer error:', error);
+    }
+  };
+
+  const setActivePrinter = async (request: SetActivePrinterRequest) => {
+    try {
+      const response = await fetch('/api/printer/configure', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(request),
+      });
+
+      // Check if response exists and is valid
+      if (!response) {
+        throw new Error('No response received from server');
+      }
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      }
+
+      const result = await response.json();
+
+      if (result.success) {
+        if (result.printer_info) {
+          setCurrentPrinter({
+            ...result.printer_info,
+            is_runtime_set: true,
+          });
+
+          // Notify parent component
+          if (onPrinterChange) {
+            onPrinterChange(result.printer_info);
+          }
+        }
+
+        // Reload all printers to update the list
+        await loadAllPrinters();
+      } else {
+        throw new Error(result.message || 'Failed to set active printer');
+      }
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(`Failed to set active printer: ${errorMessage}`);
     }
   };
 
@@ -263,6 +431,17 @@ function PrinterSelector({
             {isExpanded ? '▼' : '▶'} Configure
           </button>
 
+          {allPrinters.length > 1 && (
+            <button
+              onClick={() => setShowPrinterList(!showPrinterList)}
+              className="list-button"
+              disabled={isSettingPrinter}
+              title="View all saved printers"
+            >
+              📋 List ({allPrinters.length})
+            </button>
+          )}
+
           {currentPrinter && (
             <button
               onClick={handleEditPrinter}
@@ -275,6 +454,84 @@ function PrinterSelector({
           )}
         </div>
       </div>
+
+      {/* Printer List Panel */}
+      {showPrinterList && allPrinters.length > 0 && (
+        <div className="printer-list-panel">
+          <div className="panel-header">
+            <h3>All Printers ({allPrinters.length})</h3>
+            <p>
+              Click to switch between printers or delete persistent printers
+            </p>
+          </div>
+
+          <div className="printer-list">
+            {allPrinters.map((printer, index) => (
+              <div
+                key={`${printer.ip}-${index}`}
+                className={`printer-item ${currentPrinter?.ip === printer.ip ? 'active' : ''}`}
+              >
+                <div className="printer-info-section">
+                  <span className="printer-indicator">
+                    {currentPrinter?.ip === printer.ip ? '🟢' : '🖨️'}
+                  </span>
+                  <div className="printer-details">
+                    <span className="printer-name">{printer.name}</span>
+                    <span className="printer-ip">{printer.ip}</span>
+                    <div className="printer-badges">
+                      {currentPrinter?.ip === printer.ip && (
+                        <span className="active-badge">Active</span>
+                      )}
+                      {printer.is_persistent && (
+                        <span className="persistent-badge">Saved</span>
+                      )}
+                      {printer.source === 'environment' && (
+                        <span className="env-badge">Environment</span>
+                      )}
+                      {printer.has_serial_number && (
+                        <span className="serial-badge">Serial</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="printer-actions">
+                  {currentPrinter?.ip !== printer.ip && (
+                    <button
+                      onClick={() => handleSwitchToPrinter(printer)}
+                      disabled={isSettingPrinter}
+                      className="switch-button"
+                      title="Switch to this printer"
+                    >
+                      🔄 Switch
+                    </button>
+                  )}
+
+                  {printer.is_persistent && (
+                    <button
+                      onClick={() => handleDeletePrinter(printer)}
+                      disabled={isSettingPrinter}
+                      className="delete-button"
+                      title="Delete this printer from persistent storage"
+                    >
+                      🗑️ Delete
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {allPrinters.length === 0 && (
+            <div className="no-printers-message">
+              <p>
+                No printers configured. Add a printer using the Configure panel
+                above.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Printer Selection Panel */}
       {isExpanded && (

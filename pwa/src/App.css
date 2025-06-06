@@ -1445,6 +1445,154 @@ footer p {
   cursor: not-allowed;
 }
 
+.list-button {
+  background: #17a2b8;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: background-color 0.3s ease;
+}
+
+.list-button:hover:not(:disabled) {
+  background: #138496;
+}
+
+.list-button:disabled {
+  background: #cccccc;
+  color: #3e3e3e;
+  cursor: not-allowed;
+}
+
+.printer-list-panel {
+  padding: 1.5rem;
+  background: white;
+  border-top: 1px solid #e9ecef;
+}
+
+.printer-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.printer-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 6px;
+  transition: all 0.3s ease;
+}
+
+.printer-item.active {
+  background: #e8f5e8;
+  border-color: #28a745;
+}
+
+.printer-item:hover {
+  background: #e9ecef;
+}
+
+.printer-item.active:hover {
+  background: #d4edda;
+}
+
+.printer-info-section {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex: 1;
+}
+
+.printer-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.printer-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.switch-button {
+  background: #007bff;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition: background-color 0.3s ease;
+}
+
+.switch-button:hover:not(:disabled) {
+  background: #0056b3;
+}
+
+.switch-button:disabled {
+  background: #cccccc;
+  color: #3e3e3e;
+  cursor: not-allowed;
+}
+
+.delete-button {
+  background: #dc3545;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition: background-color 0.3s ease;
+}
+
+.delete-button:hover:not(:disabled) {
+  background: #c82333;
+}
+
+.delete-button:disabled {
+  background: #cccccc;
+  color: #3e3e3e;
+  cursor: not-allowed;
+}
+
+.active-badge {
+  background: #28a745;
+  color: white;
+  padding: 0.2rem 0.5rem;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.env-badge {
+  background: #6f42c1;
+  color: white;
+  padding: 0.2rem 0.5rem;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.no-printers-message {
+  text-align: center;
+  padding: 2rem;
+  color: #6c757d;
+  background: #f8f9fa;
+  border-radius: 6px;
+  border: 1px solid #e9ecef;
+}
+
 .printer-selection-panel {
   padding: 1.5rem;
   background: white;
@@ -1769,6 +1917,32 @@ footer p {
 
   .manual-form {
     gap: 1.25rem;
+  }
+
+  .list-button {
+    justify-content: center;
+  }
+
+  .printer-item {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+  }
+
+  .printer-info-section {
+    justify-content: center;
+    text-align: center;
+  }
+
+  .printer-actions {
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .switch-button,
+  .delete-button {
+    flex: 1;
+    min-width: 120px;
   }
 
   .form-row {
