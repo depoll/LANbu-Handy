@@ -72,7 +72,7 @@ class TestSerialNumberMQTT:
         mock_printer_class.return_value = mock_printer
 
         # Mock successful connection and print start
-        mock_printer.connect = Mock()
+        mock_printer.mqtt_start = Mock()
         mock_printer.mqtt_client_ready.return_value = True
         mock_printer.start_print.return_value = True
         mock_printer.disconnect = Mock()
@@ -88,7 +88,7 @@ class TestSerialNumberMQTT:
         )
 
         # Verify connection and start_print were called
-        mock_printer.connect.assert_called_once()
+        mock_printer.mqtt_start.assert_called_once()
         mock_printer.start_print.assert_called_once_with(
             filename="test.gcode", plate_number=1, use_ams=False
         )
@@ -160,7 +160,7 @@ class TestSerialNumberMQTT:
         mock_printer_class.return_value = mock_printer
 
         # Mock successful connection
-        mock_printer.connect = Mock()
+        mock_printer.mqtt_start = Mock()
         mock_printer.mqtt_client_ready.return_value = True
         mock_printer.disconnect = Mock()
 
@@ -185,7 +185,7 @@ class TestSerialNumberMQTT:
         )
 
         # Verify connection and methods were called
-        mock_printer.connect.assert_called_once()
+        mock_printer.mqtt_start.assert_called_once()
         mock_mqtt_client.pushall.assert_called_once()
         mock_printer.ams_hub.assert_called_once()
         mock_printer.disconnect.assert_called_once()

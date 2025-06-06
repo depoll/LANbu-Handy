@@ -324,8 +324,8 @@ class PrinterService:
                 serial=printer_config.serial_number,
             )
 
-            # Connect to the printer
-            printer.connect()
+            # Connect using only MQTT (avoid camera to prevent SSL issues)
+            printer.mqtt_start()
 
             # Wait for connection to be ready with timeout
             start_time = time.time()
@@ -432,8 +432,8 @@ class PrinterService:
                 serial=printer_config.serial_number,
             )
 
-            # Connect to the printer
-            printer.connect()
+            # Connect using only MQTT (avoid camera to prevent SSL issues)
+            printer.mqtt_start()
 
             # Wait for connection to be ready with timeout
             start_time = time.time()

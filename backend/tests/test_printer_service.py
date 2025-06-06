@@ -768,7 +768,7 @@ class TestStartPrint:
         mock_printer_class.return_value = mock_printer
 
         # Mock successful connection and print start
-        mock_printer.connect = Mock()
+        mock_printer.mqtt_start = Mock()
         mock_printer.mqtt_client_ready.return_value = True
         mock_printer.start_print.return_value = True
         mock_printer.disconnect = Mock()
@@ -785,7 +785,7 @@ class TestStartPrint:
             access_code=test_printer_config.access_code,
             serial=test_printer_config.serial_number,
         )
-        mock_printer.connect.assert_called_once()
+        mock_printer.mqtt_start.assert_called_once()
         mock_printer.start_print.assert_called_once_with(
             filename="test_model.gcode",
             plate_number=1,
@@ -803,7 +803,7 @@ class TestStartPrint:
         mock_printer_class.return_value = mock_printer
 
         # Mock connection and never ready state (simulates connection timeout)
-        mock_printer.connect = Mock()
+        mock_printer.mqtt_start = Mock()
         mock_printer.mqtt_client_ready.return_value = False
         mock_printer.disconnect = Mock()
 
@@ -823,7 +823,7 @@ class TestStartPrint:
         mock_printer_class.return_value = mock_printer
 
         # Mock successful connection but start_print failure
-        mock_printer.connect = Mock()
+        mock_printer.mqtt_start = Mock()
         mock_printer.mqtt_client_ready.return_value = True
         mock_printer.start_print.return_value = False  # Simulate print start failure
         mock_printer.disconnect = Mock()
@@ -846,7 +846,7 @@ class TestStartPrint:
         mock_printer_class.return_value = mock_printer
 
         # Mock successful connection but never ready (simulates timeout)
-        mock_printer.connect = Mock()
+        mock_printer.mqtt_start = Mock()
         mock_printer.mqtt_client_ready.return_value = False
         mock_printer.disconnect = Mock()
 
@@ -881,7 +881,7 @@ class TestStartPrint:
         mock_printer_class.return_value = mock_printer
 
         # Mock connection that raises an exception
-        mock_printer.connect.side_effect = Exception("Connection error")
+        mock_printer.mqtt_start.side_effect = Exception("Connection error")
         mock_printer.disconnect = Mock()
 
         with pytest.raises(PrinterMQTTError):
@@ -919,7 +919,7 @@ class TestAMSQuery:
         mock_printer_class.return_value = mock_printer
 
         # Mock successful connection
-        mock_printer.connect = Mock()
+        mock_printer.mqtt_start = Mock()
         mock_printer.mqtt_client_ready.return_value = True
         mock_printer.disconnect = Mock()
 
@@ -986,7 +986,7 @@ class TestAMSQuery:
             access_code=test_printer_config.access_code,
             serial=test_printer_config.serial_number,
         )
-        mock_printer.connect.assert_called_once()
+        mock_printer.mqtt_start.assert_called_once()
         mock_mqtt_client.pushall.assert_called_once()
         mock_printer.ams_hub.assert_called_once()
         mock_printer.disconnect.assert_called_once()
@@ -1001,7 +1001,7 @@ class TestAMSQuery:
         mock_printer_class.return_value = mock_printer
 
         # Mock connection but never ready state (simulates connection timeout)
-        mock_printer.connect = Mock()
+        mock_printer.mqtt_start = Mock()
         mock_printer.mqtt_client_ready.return_value = False
         mock_printer.disconnect = Mock()
 
@@ -1021,7 +1021,7 @@ class TestAMSQuery:
         mock_printer_class.return_value = mock_printer
 
         # Mock connection but never ready state (simulates connection timeout)
-        mock_printer.connect = Mock()
+        mock_printer.mqtt_start = Mock()
         mock_printer.mqtt_client_ready.return_value = False
         mock_printer.disconnect = Mock()
 
@@ -1168,7 +1168,7 @@ class TestMQTTIntegration:
         mock_printer_class.return_value = mock_printer
 
         # Mock successful connection and print start
-        mock_printer.connect = Mock()
+        mock_printer.mqtt_start = Mock()
         mock_printer.mqtt_client_ready.return_value = True
         mock_printer.start_print.return_value = True
         mock_printer.disconnect = Mock()
@@ -1181,7 +1181,7 @@ class TestMQTTIntegration:
         assert "Print command sent successfully" in result.message
 
         # Verify key operations were called
-        mock_printer.connect.assert_called_once()
+        mock_printer.mqtt_start.assert_called_once()
         mock_printer.mqtt_client_ready.assert_called()
         mock_printer.start_print.assert_called_once()
         mock_printer.disconnect.assert_called_once()
