@@ -174,6 +174,14 @@ describe('PrinterSelector IP Persistence', () => {
     );
     fireEvent.change(manualIpInput, { target: { value: '192.168.1.100' } });
 
+    // Fill in serial number to avoid confirm dialog
+    const serialNumberInput = screen.getByPlaceholderText(
+      '01S00C123456789 (required)'
+    );
+    fireEvent.change(serialNumberInput, {
+      target: { value: '01S00C123456789' },
+    });
+
     // Mock successful printer set response
     mockFetch.mockImplementationOnce(() =>
       Promise.resolve({
@@ -192,7 +200,7 @@ describe('PrinterSelector IP Persistence', () => {
     );
 
     // Click set printer button
-    const setButton = screen.getByText('Set Active Printer');
+    const setButton = screen.getByText('Save Printer');
     fireEvent.click(setButton);
 
     // Wait for API call and check if IP was saved
