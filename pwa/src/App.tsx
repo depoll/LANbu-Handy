@@ -74,7 +74,10 @@ function App() {
 
   return (
     <ToastProvider>
-      <div className={`app ${appStatus.status === 'ready' ? 'app-ready' : ''}`}>
+      <div 
+        className={`app ${appStatus.status === 'ready' ? 'app-ready' : ''}`}
+        data-testid={appStatus.status === 'ready' ? 'app-initialized' : 'app-loading'}
+      >
         <Header />
 
         {/* Backend Status Display */}
