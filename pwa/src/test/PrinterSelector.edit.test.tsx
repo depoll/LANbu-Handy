@@ -98,7 +98,9 @@ describe('PrinterSelector Edit Functionality', () => {
     });
 
     // Check that edit button is not present
-    expect(screen.queryByTitle('Edit current printer configuration')).not.toBeInTheDocument();
+    expect(
+      screen.queryByTitle('Edit current printer configuration')
+    ).not.toBeInTheDocument();
   });
 
   it('should populate form fields when edit button is clicked', async () => {
@@ -142,7 +144,9 @@ describe('PrinterSelector Edit Functionality', () => {
       expect(screen.getByText('Edit Printer')).toBeInTheDocument();
       expect(screen.getByDisplayValue('192.168.1.100')).toBeInTheDocument();
       expect(screen.getByDisplayValue('Test Printer')).toBeInTheDocument();
-      expect(screen.getByText('Update Printer Permanently')).toBeInTheDocument();
+      expect(
+        screen.getByText('Update Printer Permanently')
+      ).toBeInTheDocument();
       expect(screen.getByText('Cancel')).toBeInTheDocument();
     });
 
@@ -189,7 +193,11 @@ describe('PrinterSelector Edit Functionality', () => {
 
     // Check that editing notice is shown
     await waitFor(() => {
-      expect(screen.getByText(/For security reasons, access code and serial number fields are not pre-filled/)).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          /For security reasons, access code and serial number fields are not pre-filled/
+        )
+      ).toBeInTheDocument();
     });
   });
 

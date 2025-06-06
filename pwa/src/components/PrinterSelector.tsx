@@ -115,7 +115,7 @@ function PrinterSelector({
     setSavePermanently(false);
     setIsEditingMode(false);
     setStatusMessage('');
-    
+
     // Load saved IP if available
     const savedIP = getSavedIP();
     if (savedIP && savedIP.trim()) {
@@ -270,7 +270,7 @@ function PrinterSelector({
           >
             {isExpanded ? '▼' : '▶'} Configure
           </button>
-          
+
           {currentPrinter && (
             <button
               onClick={handleEditPrinter}
@@ -289,10 +289,18 @@ function PrinterSelector({
         <div className="printer-selection-panel">
           <div className="panel-header">
             <h3>{isEditingMode ? 'Edit Printer' : 'Select Printer'}</h3>
-            <p>{isEditingMode ? 'Modify your printer configuration' : 'Enter your printer\'s IP address or hostname and serial number'}</p>
+            <p>
+              {isEditingMode
+                ? 'Modify your printer configuration'
+                : "Enter your printer's IP address or hostname and serial number"}
+            </p>
             {isEditingMode && (
               <div className="editing-notice">
-                <p><strong>Note:</strong> For security reasons, access code and serial number fields are not pre-filled. Please re-enter them if needed.</p>
+                <p>
+                  <strong>Note:</strong> For security reasons, access code and
+                  serial number fields are not pre-filled. Please re-enter them
+                  if needed.
+                </p>
               </div>
             )}
           </div>
@@ -431,7 +439,7 @@ function PrinterSelector({
                         ? 'Save Printer Permanently'
                         : 'Set Active Printer'}
                 </button>
-                
+
                 {isEditingMode && (
                   <button
                     onClick={handleCancelEdit}
