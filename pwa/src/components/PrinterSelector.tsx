@@ -244,9 +244,7 @@ function PrinterSelector({
         <div className="printer-selection-panel">
           <div className="panel-header">
             <h3>Select Printer</h3>
-            <p>
-              Enter your printer's IP address or hostname and serial number
-            </p>
+            <p>Enter your printer's IP address or hostname and serial number</p>
           </div>
 
           {/* Manual Entry Section */}
