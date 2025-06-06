@@ -35,6 +35,7 @@ function PrinterSelector({
   const [currentPrinter, setCurrentPrinter] = useState<PrinterInfo | null>(
     null
   );
+  const [isEditingMode, setIsEditingMode] = useState(false);
 
   // Initialize printer IP persistence hook
   const { getSavedIP, saveIP, clearSavedIP, hasSavedIP } =
@@ -72,7 +73,7 @@ function PrinterSelector({
             is_runtime_set: config.active_printer.is_runtime_set,
             is_persistent: config.active_printer.is_persistent,
           });
-        } else if (config.printers.length > 0) {
+        } else if (config.printers && config.printers.length > 0) {
           // Use first configured printer as fallback
           const firstPrinter = config.printers[0];
           setCurrentPrinter({
@@ -87,6 +88,38 @@ function PrinterSelector({
       }
     } catch (error) {
       console.error('Failed to load current printer configuration:', error);
+    }
+  };
+
+  const handleEditPrinter = () => {
+    if (currentPrinter) {
+      // Populate form fields with current printer data
+      setManualIp(currentPrinter.ip);
+      setManualName(currentPrinter.name);
+      // Note: We can't populate access_code and serial_number as they're not returned by the API for security
+      setManualAccessCode('');
+      setManualSerialNumber('');
+      setSavePermanently(currentPrinter.is_persistent || false);
+      setIsEditingMode(true);
+      setIsExpanded(true);
+      setStatusMessage('');
+    }
+  };
+
+  const handleCancelEdit = () => {
+    // Clear form fields
+    setManualIp('');
+    setManualAccessCode('');
+    setManualName('');
+    setManualSerialNumber('');
+    setSavePermanently(false);
+    setIsEditingMode(false);
+    setStatusMessage('');
+    
+    // Load saved IP if available
+    const savedIP = getSavedIP();
+    if (savedIP && savedIP.trim()) {
+      setManualIp(savedIP);
     }
   };
 
@@ -126,6 +159,7 @@ function PrinterSelector({
       setManualName('');
       setManualSerialNumber('');
       setSavePermanently(false);
+      setIsEditingMode(false);
     } finally {
       setIsSettingPrinter(false);
     }
@@ -236,6 +270,17 @@ function PrinterSelector({
           >
             {isExpanded ? '▼' : '▶'} Configure
           </button>
+          
+          {currentPrinter && (
+            <button
+              onClick={handleEditPrinter}
+              className="edit-button"
+              disabled={isSettingPrinter}
+              title="Edit current printer configuration"
+            >
+              ✏️ Edit
+            </button>
+          )}
         </div>
       </div>
 
@@ -243,8 +288,13 @@ function PrinterSelector({
       {isExpanded && (
         <div className="printer-selection-panel">
           <div className="panel-header">
-            <h3>Select Printer</h3>
-            <p>Enter your printer's IP address or hostname and serial number</p>
+            <h3>{isEditingMode ? 'Edit Printer' : 'Select Printer'}</h3>
+            <p>{isEditingMode ? 'Modify your printer configuration' : 'Enter your printer\'s IP address or hostname and serial number'}</p>
+            {isEditingMode && (
+              <div className="editing-notice">
+                <p><strong>Note:</strong> For security reasons, access code and serial number fields are not pre-filled. Please re-enter them if needed.</p>
+              </div>
+            )}
           </div>
 
           {/* Manual Entry Section */}
@@ -363,19 +413,35 @@ function PrinterSelector({
                 </small>
               </div>
 
-              <button
-                onClick={handleSetManualPrinter}
-                disabled={isSettingPrinter || !manualIp.trim()}
-                className="set-manual-button"
-              >
-                {isSettingPrinter
-                  ? savePermanently
-                    ? 'Saving...'
-                    : 'Setting...'
-                  : savePermanently
-                    ? 'Save Printer Permanently'
-                    : 'Set Active Printer'}
-              </button>
+              <div className="form-buttons">
+                <button
+                  onClick={handleSetManualPrinter}
+                  disabled={isSettingPrinter || !manualIp.trim()}
+                  className="set-manual-button"
+                >
+                  {isSettingPrinter
+                    ? savePermanently
+                      ? 'Saving...'
+                      : 'Setting...'
+                    : isEditingMode
+                      ? savePermanently
+                        ? 'Update Printer Permanently'
+                        : 'Update Active Printer'
+                      : savePermanently
+                        ? 'Save Printer Permanently'
+                        : 'Set Active Printer'}
+                </button>
+                
+                {isEditingMode && (
+                  <button
+                    onClick={handleCancelEdit}
+                    disabled={isSettingPrinter}
+                    className="cancel-edit-button"
+                  >
+                    Cancel
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
