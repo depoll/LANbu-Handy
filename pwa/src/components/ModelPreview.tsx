@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { STLLoader } from 'three-stdlib';
+import { ThreeMFLoader } from 'three-stdlib';
 import { FilamentRequirement, FilamentMapping } from '../types/api';
 
 interface ModelPreviewProps {
@@ -240,10 +241,53 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({
         setIsLoading(false);
       }
     } else if (fileExtension === '3mf') {
-      // Temporarily disable 3MF support while debugging
-      console.log('ModelPreview: 3MF files temporarily not supported');
-      setError('3MF files are temporarily not supported. Please use STL files.');
-      setIsLoading(false);
+      try {
+        console.log('ModelPreview: Creating 3MF loader');
+        const loader = new ThreeMFLoader();
+        
+        // Set up loading manager for better error handling
+        const loadingManager = new THREE.LoadingManager();
+        loadingManager.onLoad = () => {
+          console.log('ModelPreview: 3MF loading completed');
+        };
+        loadingManager.onError = (url) => {
+          console.error('ModelPreview: Loading manager error for URL:', url);
+          handleError(new Error(`Failed to load resource: ${url}`));
+        };
+        
+        loader.manager = loadingManager;
+        loader.load(
+          modelUrl,
+          (object: THREE.Group) => {
+            console.log('ModelPreview: Processing 3MF object');
+            // ThreeMFLoader returns a Group, we need to extract the geometry
+            // and handle potential multiple objects/materials
+            const geometries: THREE.BufferGeometry[] = [];
+
+            object.traverse(child => {
+              if (child instanceof THREE.Mesh && child.geometry) {
+                geometries.push(child.geometry);
+              }
+            });
+
+            if (geometries.length > 0) {
+              console.log(`ModelPreview: Found ${geometries.length} geometries in 3MF`);
+              // For now, just use the first geometry found
+              // In the future, this could be enhanced to handle multi-material models
+              handleGeometry(geometries[0]);
+            } else {
+              handleError(new Error('No valid geometry found in 3MF file'));
+            }
+          },
+          handleProgress,
+          handleError
+        );
+        console.log('ModelPreview: 3MF load initiated');
+      } catch (loaderError) {
+        console.error('ModelPreview: Error creating 3MF loader:', loaderError);
+        setError('Failed to initialize 3MF loader');
+        setIsLoading(false);
+      }
     } else {
       console.log('ModelPreview: Unsupported file extension:', fileExtension);
       setError(`Unsupported file type: ${fileExtension}`);
