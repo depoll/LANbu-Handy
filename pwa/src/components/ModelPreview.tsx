@@ -43,7 +43,8 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({
     try {
       // Check if WebGL is available by trying to create a context
       const canvas = document.createElement('canvas');
-      const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+      const gl =
+        canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
       if (!gl) {
         throw new Error('WebGL is not supported by this browser');
       }
@@ -61,10 +62,10 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({
       console.log('ModelPreview: Camera created successfully');
 
       // Renderer
-      const renderer = new THREE.WebGLRenderer({ 
+      const renderer = new THREE.WebGLRenderer({
         antialias: true,
         alpha: true,
-        preserveDrawingBuffer: true
+        preserveDrawingBuffer: true,
       });
       renderer.setSize(width, height);
       renderer.shadowMap.enabled = true;
@@ -114,13 +115,18 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({
         if (animationRef.current) {
           cancelAnimationFrame(animationRef.current);
         }
-        if (container && renderer.domElement && container.contains(renderer.domElement)) {
+        if (
+          container &&
+          renderer.domElement &&
+          container.contains(renderer.domElement)
+        ) {
           container.removeChild(renderer.domElement);
         }
         renderer.dispose();
       };
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown initialization error';
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown initialization error';
       console.error('ModelPreview: Error initializing Three.js scene:', error);
       setInitError(errorMessage);
     }
@@ -145,14 +151,14 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({
     // Determine file type from file extension
     const fileExtension = fileId.toLowerCase().split('.').pop();
     const modelUrl = `/api/model/preview/${fileId}`;
-    
+
     console.log('ModelPreview: File extension:', fileExtension);
     console.log('ModelPreview: Model URL:', modelUrl);
 
     const handleGeometry = (geometry: THREE.BufferGeometry) => {
       try {
         console.log('ModelPreview: Processing geometry');
-        
+
         // Remove existing mesh
         if (meshRef.current) {
           sceneRef.current?.remove(meshRef.current);
@@ -199,19 +205,24 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({
     };
 
     const handleProgress = (progress: ProgressEvent) => {
-      console.log('ModelPreview: Loading progress:', progress.loaded, '/', progress.total);
+      console.log(
+        'ModelPreview: Loading progress:',
+        progress.loaded,
+        '/',
+        progress.total
+      );
     };
 
     const handleError = (error: Error | ErrorEvent | unknown) => {
       console.error('ModelPreview: Error loading model:', error);
-      
+
       let errorMessage = 'Failed to load model for preview';
       if (error instanceof Error) {
         errorMessage = `Failed to load model: ${error.message}`;
       } else if (typeof error === 'string') {
         errorMessage = `Failed to load model: ${error}`;
       }
-      
+
       setError(errorMessage);
       setIsLoading(false);
     };
@@ -221,17 +232,17 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({
       try {
         console.log('ModelPreview: Creating STL loader');
         const loader = new STLLoader();
-        
+
         // Set up loading manager for better error handling
         const loadingManager = new THREE.LoadingManager();
         loadingManager.onLoad = () => {
           console.log('ModelPreview: STL loading completed');
         };
-        loadingManager.onError = (url) => {
+        loadingManager.onError = url => {
           console.error('ModelPreview: Loading manager error for URL:', url);
           handleError(new Error(`Failed to load resource: ${url}`));
         };
-        
+
         loader.manager = loadingManager;
         loader.load(modelUrl, handleGeometry, handleProgress, handleError);
         console.log('ModelPreview: STL load initiated');
@@ -244,17 +255,17 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({
       try {
         console.log('ModelPreview: Creating 3MF loader');
         const loader = new ThreeMFLoader();
-        
+
         // Set up loading manager for better error handling
         const loadingManager = new THREE.LoadingManager();
         loadingManager.onLoad = () => {
           console.log('ModelPreview: 3MF loading completed');
         };
-        loadingManager.onError = (url) => {
+        loadingManager.onError = url => {
           console.error('ModelPreview: Loading manager error for URL:', url);
           handleError(new Error(`Failed to load resource: ${url}`));
         };
-        
+
         loader.manager = loadingManager;
         loader.load(
           modelUrl,
@@ -271,7 +282,9 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({
             });
 
             if (geometries.length > 0) {
-              console.log(`ModelPreview: Found ${geometries.length} geometries in 3MF`);
+              console.log(
+                `ModelPreview: Found ${geometries.length} geometries in 3MF`
+              );
               // For now, just use the first geometry found
               // In the future, this could be enhanced to handle multi-material models
               handleGeometry(geometries[0]);
@@ -314,8 +327,12 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({
     <div className={`model-preview ${className}`}>
       <div className="model-preview-header">
         <h3>Model Preview</h3>
-        {initError && <span className="error-text">Initialization Error: {initError}</span>}
-        {!initError && isLoading && <span className="loading-text">Loading model...</span>}
+        {initError && (
+          <span className="error-text">Initialization Error: {initError}</span>
+        )}
+        {!initError && isLoading && (
+          <span className="loading-text">Loading model...</span>
+        )}
         {!initError && error && <span className="error-text">{error}</span>}
       </div>
       <div
@@ -331,16 +348,18 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({
         }}
       >
         {initError && (
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            height: '100%',
-            color: '#666',
-            fontSize: '14px',
-            textAlign: 'center',
-            padding: '20px',
-          }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              height: '100%',
+              color: '#666',
+              fontSize: '14px',
+              textAlign: 'center',
+              padding: '20px',
+            }}
+          >
             <div>
               <div>⚠️ 3D Preview Unavailable</div>
               <div style={{ marginTop: '8px' }}>{initError}</div>
