@@ -6,7 +6,6 @@ including G-code file uploads and basic error handling.
 """
 
 import ftplib
-import json
 import logging
 import time
 from dataclasses import dataclass
@@ -352,7 +351,7 @@ class PrinterService:
 
             if not success:
                 raise PrinterMQTTError(
-                    f"Failed to start print: bambulabs_api returned False"
+                    "Failed to start print: bambulabs_api returned False"
                 )
 
             logger.info(
@@ -530,7 +529,6 @@ class PrinterService:
             # For now, create a simplified parsing based on what we can access
             # This may need adjustment based on the actual API structure
             unit_id = 0
-            filaments = []
 
             # Try to extract filament trays if available
             if hasattr(ams_hub, "ams_list") and ams_hub.ams_list:
@@ -563,7 +561,8 @@ class PrinterService:
             else:
                 # Fallback - if we can't parse properly, return empty but don't error
                 logger.warning(
-                    "Could not parse AMS data from bambulabs_api - structure may have changed"
+                    "Could not parse AMS data from bambulabs_api - "
+                    "structure may have changed"
                 )
 
         except Exception as e:

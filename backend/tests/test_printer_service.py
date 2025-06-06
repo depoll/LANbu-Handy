@@ -6,7 +6,6 @@ including connection, authentication, and file upload operations.
 """
 
 import ftplib
-import json
 import os
 import tempfile
 from pathlib import Path
