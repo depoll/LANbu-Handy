@@ -130,6 +130,7 @@ async def get_app_config():
                 "ip": printer.ip,
                 # Don't expose access codes in API for security
                 "has_access_code": bool(printer.access_code),
+                "has_serial_number": bool(printer.serial_number),
                 "is_persistent": is_persistent,
                 "source": "persistent" if is_persistent else "environment",
             }
@@ -144,6 +145,7 @@ async def get_app_config():
             "name": active_printer.name,
             "ip": active_printer.ip,
             "has_access_code": bool(active_printer.access_code),
+            "has_serial_number": bool(active_printer.serial_number),
             "is_runtime_set": True,  # Indicates this was set via API, not env vars
             "is_persistent": is_persistent,
         }
@@ -234,25 +236,11 @@ class ConfiguredSliceRequest(BaseModel):
     build_plate_type: str
 
 
-class DiscoveredPrinterResponse(BaseModel):
-    ip: str
-    hostname: str
-    model: Optional[str] = None
-    service_name: Optional[str] = None
-    port: Optional[int] = None
-
-
-class PrinterDiscoveryResponse(BaseModel):
-    success: bool
-    message: str
-    printers: Optional[List[DiscoveredPrinterResponse]] = None
-    error_details: Optional[str] = None
-
-
 class SetActivePrinterRequest(BaseModel):
     ip: str
     access_code: str = ""
     name: Optional[str] = None
+    serial_number: str = ""
 
 
 class SetActivePrinterResponse(BaseModel):
@@ -267,6 +255,7 @@ class AddPrinterRequest(BaseModel):
     access_code: str = ""
     name: Optional[str] = None
     save_permanently: bool = False
+    serial_number: str = ""
 
 
 class AddPrinterResponse(BaseModel):
@@ -847,60 +836,6 @@ async def get_ams_status(printer_id: str):
         raise HTTPException(status_code=500, detail=msg)
 
 
-@app.get("/api/printers/discover", response_model=PrinterDiscoveryResponse)
-async def discover_printers():
-    """
-    Discover Bambu Lab printers on the local network using mDNS.
-
-    Attempts to find printers advertising Bambu Lab services on the LAN using
-    mDNS/Bonjour discovery. Returns a list of discovered printers with their
-    IP addresses, hostnames, and model information if available.
-
-    Returns:
-        PrinterDiscoveryResponse: Discovery results with list of found printers
-
-    Raises:
-        HTTPException: If discovery fails due to internal server error
-    """
-    try:
-        logger.info("Starting printer discovery via mDNS")
-
-        # Perform mDNS discovery with a reasonable timeout
-        discovery_result = printer_service.discover_printers(timeout=10)
-
-        if discovery_result.success:
-            # Convert internal data structures to API response format
-            printers_response = []
-            if discovery_result.printers:
-                for printer in discovery_result.printers:
-                    printer_response = DiscoveredPrinterResponse(
-                        ip=printer.ip,
-                        hostname=printer.hostname,
-                        model=printer.model,
-                        service_name=printer.service_name,
-                        port=printer.port,
-                    )
-                    printers_response.append(printer_response)
-
-            return PrinterDiscoveryResponse(
-                success=True,
-                message=discovery_result.message,
-                printers=printers_response,
-            )
-        else:
-            # Discovery failed
-            return PrinterDiscoveryResponse(
-                success=False,
-                message=discovery_result.message,
-                error_details=discovery_result.error_details,
-            )
-
-    except Exception as e:
-        msg = f"Internal server error during printer discovery: {str(e)}"
-        logger.error(msg)
-        raise HTTPException(status_code=500, detail=msg)
-
-
 @app.post("/api/printer/set-active", response_model=SetActivePrinterResponse)
 async def set_active_printer(request: SetActivePrinterRequest):
     """
@@ -929,6 +864,7 @@ async def set_active_printer(request: SetActivePrinterRequest):
                 ip=ip,
                 access_code=request.access_code,
                 name=request.name or f"Printer at {ip}",
+                serial_number=request.serial_number,
             )
 
             # Optional: Test connection to validate the printer
@@ -944,6 +880,7 @@ async def set_active_printer(request: SetActivePrinterRequest):
                     "name": printer_config.name,
                     "ip": printer_config.ip,
                     "has_access_code": bool(printer_config.access_code),
+                    "has_serial_number": bool(printer_config.serial_number),
                 },
             )
 
@@ -986,6 +923,7 @@ async def add_printer(request: AddPrinterRequest):
             name=request.name or f"Printer at {ip}",
             ip=ip,
             access_code=request.access_code,
+            serial_number=request.serial_number,
         )
 
         if request.save_permanently:
@@ -1001,6 +939,7 @@ async def add_printer(request: AddPrinterRequest):
                 ip=printer_config.ip,
                 access_code=printer_config.access_code,
                 name=printer_config.name,
+                serial_number=printer_config.serial_number,
             )
             storage_message = "set as active for current session"
 
@@ -1011,6 +950,7 @@ async def add_printer(request: AddPrinterRequest):
                 "name": printer_config.name,
                 "ip": printer_config.ip,
                 "has_access_code": bool(printer_config.access_code),
+                "has_serial_number": bool(printer_config.serial_number),
                 "is_persistent": request.save_permanently,
             },
         )
@@ -1093,6 +1033,7 @@ async def get_persistent_printers():
                     "name": printer.name,
                     "ip": printer.ip,
                     "has_access_code": bool(printer.access_code),
+                    "has_serial_number": bool(printer.serial_number),
                     "is_persistent": True,
                 }
             )

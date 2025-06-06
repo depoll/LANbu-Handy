@@ -72,6 +72,12 @@ header p {
   border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
+.header-printer-selector .serial-badge {
+  background: rgba(255, 152, 0, 0.9);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
 .header-printer-selector .expand-button {
   background: rgba(255, 255, 255, 0.9); /* More opaque for better contrast */
   color: #0d47a1; /* Darker blue for full WCAG AA compliance */
@@ -1400,6 +1406,16 @@ footer p {
   text-transform: uppercase;
 }
 
+.serial-badge {
+  background: #ff9800;
+  color: white;
+  padding: 0.125rem 0.5rem;
+  border-radius: 12px;
+  font-size: 0.7rem;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
 .no-printer-text {
   color: #dc3545;
   font-weight: 500;
@@ -1598,9 +1614,23 @@ footer p {
   font-size: 0.9rem;
 }
 
+.field-hint {
+  font-weight: 300;
+  color: #6c757d;
+  font-size: 0.8rem;
+}
+
+.field-help {
+  color: #6c757d;
+  font-size: 0.8rem;
+  margin-top: 0.25rem;
+  line-height: 1.4;
+}
+
 .ip-input,
 .access-code-input,
-.name-input {
+.name-input,
+.serial-number-input {
   padding: 0.75rem;
   border: 1px solid #ced4da;
   border-radius: 4px;
@@ -1610,7 +1640,8 @@ footer p {
 
 .ip-input:focus,
 .access-code-input:focus,
-.name-input:focus {
+.name-input:focus,
+.serial-number-input:focus {
   outline: none;
   border-color: #2196f3;
   box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
@@ -1618,7 +1649,8 @@ footer p {
 
 .ip-input:disabled,
 .access-code-input:disabled,
-.name-input:disabled {
+.name-input:disabled,
+.serial-number-input:disabled {
   background: #f8f9fa;
   cursor: not-allowed;
 }

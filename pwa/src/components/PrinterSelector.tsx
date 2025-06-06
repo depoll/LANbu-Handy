@@ -1,7 +1,5 @@
 import { useState, useEffect } from 'react';
 import {
-  DiscoveredPrinter,
-  PrinterDiscoveryResponse,
   PrinterConfigResponse,
   AddPrinterRequest,
   AddPrinterResponse,
@@ -12,6 +10,7 @@ interface PrinterInfo {
   name: string;
   ip: string;
   has_access_code: boolean;
+  has_serial_number: boolean;
   is_runtime_set?: boolean;
   is_persistent?: boolean;
 }
@@ -26,14 +25,10 @@ function PrinterSelector({
   className = '',
 }: PrinterSelectorProps) {
   const [isExpanded, setIsExpanded] = useState(false);
-  const [isDiscovering, setIsDiscovering] = useState(false);
-  const [discoveredPrinters, setDiscoveredPrinters] = useState<
-    DiscoveredPrinter[]
-  >([]);
-  const [discoveryError, setDiscoveryError] = useState<string>('');
   const [manualIp, setManualIp] = useState('');
   const [manualAccessCode, setManualAccessCode] = useState('');
   const [manualName, setManualName] = useState('');
+  const [manualSerialNumber, setManualSerialNumber] = useState('');
   const [savePermanently, setSavePermanently] = useState(false);
   const [isSettingPrinter, setIsSettingPrinter] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
@@ -73,6 +68,7 @@ function PrinterSelector({
             name: config.active_printer.name,
             ip: config.active_printer.ip,
             has_access_code: config.active_printer.has_access_code,
+            has_serial_number: config.active_printer.has_serial_number,
             is_runtime_set: config.active_printer.is_runtime_set,
             is_persistent: config.active_printer.is_persistent,
           });
@@ -83,6 +79,7 @@ function PrinterSelector({
             name: firstPrinter.name,
             ip: firstPrinter.ip,
             has_access_code: firstPrinter.has_access_code,
+            has_serial_number: firstPrinter.has_serial_number,
             is_runtime_set: false,
             is_persistent: firstPrinter.is_persistent,
           });
@@ -93,72 +90,19 @@ function PrinterSelector({
     }
   };
 
-  const handleDiscoverPrinters = async () => {
-    setIsDiscovering(true);
-    setDiscoveryError('');
-    setStatusMessage('Scanning network for Bambu Lab printers...');
-
-    try {
-      const response = await fetch('/api/printers/discover');
-
-      // Check if response exists and is valid
-      if (!response) {
-        throw new Error('No response received from server');
-      }
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const result: PrinterDiscoveryResponse = await response.json();
-
-      if (result.success) {
-        setDiscoveredPrinters(result.printers || []);
-        setStatusMessage(
-          result.printers && result.printers.length > 0
-            ? `Found ${result.printers.length} printer(s)`
-            : 'No printers found on the network'
-        );
-      } else {
-        setDiscoveryError(result.message || 'Discovery failed');
-        setStatusMessage('Discovery failed');
-        setDiscoveredPrinters([]);
-      }
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
-      setDiscoveryError(`Discovery error: ${errorMessage}`);
-      setStatusMessage('Discovery failed');
-      setDiscoveredPrinters([]);
-      console.error('Printer discovery error:', error);
-    } finally {
-      setIsDiscovering(false);
-    }
-  };
-
-  const handleSelectDiscoveredPrinter = async (printer: DiscoveredPrinter) => {
-    setIsSettingPrinter(true);
-    setStatusMessage(`Setting printer: ${printer.ip}...`);
-
-    try {
-      const request: AddPrinterRequest = {
-        ip: printer.ip,
-        access_code: '', // Discovered printers don't have access codes initially
-        name:
-          printer.hostname || `${printer.model || 'Printer'} at ${printer.ip}`,
-        save_permanently: false, // Default to temporary for discovered printers
-      };
-
-      await addPrinter(request);
-    } finally {
-      setIsSettingPrinter(false);
-    }
-  };
-
   const handleSetManualPrinter = async () => {
     if (!manualIp.trim()) {
       setStatusMessage('Please enter a printer IP address or hostname');
       return;
+    }
+
+    if (!manualSerialNumber.trim()) {
+      const confirmWithoutSerial = confirm(
+        'No serial number provided. MQTT features (print commands, AMS status) will not work. Continue anyway?'
+      );
+      if (!confirmWithoutSerial) {
+        return;
+      }
     }
 
     setIsSettingPrinter(true);
@@ -171,6 +115,7 @@ function PrinterSelector({
         access_code: manualAccessCode.trim(),
         name: manualName.trim() || `Printer at ${manualIp.trim()}`,
         save_permanently: savePermanently,
+        serial_number: manualSerialNumber.trim(),
       };
 
       await addPrinter(request);
@@ -179,6 +124,7 @@ function PrinterSelector({
       setManualIp('');
       setManualAccessCode('');
       setManualName('');
+      setManualSerialNumber('');
       setSavePermanently(false);
     } finally {
       setIsSettingPrinter(false);
@@ -270,6 +216,9 @@ function PrinterSelector({
                   {currentPrinter.is_persistent && (
                     <span className="persistent-badge">Saved</span>
                   )}
+                  {currentPrinter.has_serial_number && (
+                    <span className="serial-badge">Serial</span>
+                  )}
                 </div>
               </div>
             </div>
@@ -295,62 +244,14 @@ function PrinterSelector({
         <div className="printer-selection-panel">
           <div className="panel-header">
             <h3>Select Printer</h3>
-            <p>
-              Choose a discovered printer or enter IP address or hostname
-              manually
-            </p>
-          </div>
-
-          {/* Discovery Section */}
-          <div className="discovery-section">
-            <div className="section-header">
-              <h4>Network Discovery</h4>
-              <button
-                onClick={handleDiscoverPrinters}
-                disabled={isDiscovering || isSettingPrinter}
-                className="discover-button"
-              >
-                {isDiscovering ? 'Scanning...' : 'Scan Network'}
-              </button>
-            </div>
-
-            {discoveredPrinters.length > 0 && (
-              <div className="discovered-printers">
-                {discoveredPrinters.map((printer, index) => (
-                  <div key={index} className="discovered-printer">
-                    <div className="printer-details">
-                      <div className="printer-primary">
-                        <span className="printer-ip">{printer.ip}</span>
-                        <span className="printer-hostname">
-                          {printer.hostname}
-                        </span>
-                      </div>
-                      {printer.model && (
-                        <div className="printer-model">{printer.model}</div>
-                      )}
-                    </div>
-                    <button
-                      onClick={() => handleSelectDiscoveredPrinter(printer)}
-                      disabled={isSettingPrinter}
-                      className="select-printer-button"
-                    >
-                      Select
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {discoveryError && (
-              <div className="discovery-error">❌ {discoveryError}</div>
-            )}
+            <p>Enter your printer's IP address or hostname and serial number</p>
           </div>
 
           {/* Manual Entry Section */}
           <div className="manual-entry-section">
             <div className="section-header">
-              <h4>Manual Configuration</h4>
-              <p>Enter printer details manually</p>
+              <h4>Printer Configuration</h4>
+              <p>Enter printer details</p>
             </div>
 
             <div className="manual-form">
@@ -415,6 +316,31 @@ function PrinterSelector({
                   disabled={isSettingPrinter}
                   className="name-input"
                 />
+              </div>
+
+              <div className="form-row">
+                <label htmlFor="manual-serial-number">
+                  Serial Number *
+                  <span className="field-hint">
+                    {' '}
+                    (required for MQTT/print features)
+                  </span>
+                </label>
+                <input
+                  id="manual-serial-number"
+                  type="text"
+                  value={manualSerialNumber}
+                  onChange={e => setManualSerialNumber(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  placeholder="01S00C123456789 (required)"
+                  disabled={isSettingPrinter}
+                  className="serial-number-input"
+                />
+                <small className="field-help">
+                  Serial number is required for MQTT communication (print
+                  commands, AMS status). Find it on your printer's display:
+                  Settings → Device → Serial Number.
+                </small>
               </div>
 
               <div className="form-row">

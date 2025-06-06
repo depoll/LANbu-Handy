@@ -20,6 +20,7 @@ class PrinterConfig:
     name: str
     ip: str
     access_code: str
+    serial_number: str = ""
 
     def __post_init__(self):
         """Validate printer configuration after initialization."""
@@ -35,6 +36,7 @@ class PrinterConfig:
         self.name = self.name.strip()
         self.ip = self.ip.strip()
         self.access_code = self.access_code.strip() if self.access_code else ""
+        self.serial_number = self.serial_number.strip() if self.serial_number else ""
 
 
 class Config:
@@ -132,9 +134,13 @@ class Config:
                             name = printer_data.get("name", f"Printer {i+1}")
                             ip = printer_data.get("ip", "")
                             access_code = printer_data.get("access_code", "")
+                            serial_number = printer_data.get("serial_number", "")
 
                             printer = PrinterConfig(
-                                name=name, ip=ip, access_code=access_code
+                                name=name,
+                                ip=ip,
+                                access_code=access_code,
+                                serial_number=serial_number,
                             )
                             printers.append(printer)
                             logger.info(
@@ -205,7 +211,7 @@ class Config:
         return self.printers[0] if self.printers else None
 
     def set_active_printer(
-        self, ip: str, access_code: str = "", name: str = None
+        self, ip: str, access_code: str = "", name: str = None, serial_number: str = ""
     ) -> PrinterConfig:
         """Set the active printer for the current session.
 
@@ -213,6 +219,7 @@ class Config:
             ip: Printer IP address
             access_code: Optional printer access code
             name: Optional printer name (defaults to "Active Printer")
+            serial_number: Optional printer serial number
 
         Returns:
             PrinterConfig: The newly set active printer configuration
@@ -227,7 +234,10 @@ class Config:
             name = "Active Printer"
 
         printer_config = PrinterConfig(
-            name=name, ip=ip.strip(), access_code=access_code.strip()
+            name=name,
+            ip=ip.strip(),
+            access_code=access_code.strip(),
+            serial_number=serial_number.strip(),
         )
 
         self.runtime_active_printer = printer_config
@@ -304,7 +314,11 @@ class Config:
             return False
 
     def update_persistent_printer(
-        self, ip: str, name: Optional[str] = None, access_code: Optional[str] = None
+        self,
+        ip: str,
+        name: Optional[str] = None,
+        access_code: Optional[str] = None,
+        serial_number: Optional[str] = None,
     ) -> bool:
         """Update a persistent printer configuration.
 
@@ -312,6 +326,7 @@ class Config:
             ip: IP address of the printer to update
             name: New name for the printer (if provided)
             access_code: New access code for the printer (if provided)
+            serial_number: New serial number for the printer (if provided)
 
         Returns:
             bool: True if printer was updated, False if not found
@@ -320,7 +335,9 @@ class Config:
             from app.printer_storage import get_printer_storage
 
             printer_storage = get_printer_storage()
-            updated = printer_storage.update_printer(ip, name, access_code)
+            updated = printer_storage.update_printer(
+                ip, name, access_code, serial_number
+            )
 
             if updated:
                 # Reload printers to reflect the changes

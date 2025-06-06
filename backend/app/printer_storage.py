@@ -74,6 +74,7 @@ class PrinterStorage:
                         name=printer_data["name"],
                         ip=printer_data["ip"],
                         access_code=printer_data.get("access_code", ""),
+                        serial_number=printer_data.get("serial_number", ""),
                     )
                     printers.append(printer)
                 except (KeyError, ValueError) as e:
@@ -108,6 +109,7 @@ class PrinterStorage:
                         "name": printer.name,
                         "ip": printer.ip,
                         "access_code": printer.access_code,
+                        "serial_number": printer.serial_number,
                     }
                 )
 
@@ -181,7 +183,11 @@ class PrinterStorage:
             return False
 
     def update_printer(
-        self, ip: str, name: Optional[str] = None, access_code: Optional[str] = None
+        self,
+        ip: str,
+        name: Optional[str] = None,
+        access_code: Optional[str] = None,
+        serial_number: Optional[str] = None,
     ) -> bool:
         """Update an existing printer configuration.
 
@@ -189,6 +195,7 @@ class PrinterStorage:
             ip: IP address of the printer to update
             name: New name for the printer (if provided)
             access_code: New access code for the printer (if provided)
+            serial_number: New serial number for the printer (if provided)
 
         Returns:
             bool: True if printer was found and updated, False if not found
@@ -205,6 +212,8 @@ class PrinterStorage:
                     printer.name = name
                 if access_code is not None:
                     printer.access_code = access_code
+                if serial_number is not None:
+                    printer.serial_number = serial_number
                 found = True
                 break
 
