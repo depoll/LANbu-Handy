@@ -14,7 +14,9 @@ test.describe('Printer Description Visibility Fix', () => {
     await page.waitForLoadState('networkidle');
   });
 
-  test('should show visible printer description text in header', async ({ page }) => {
+  test('should show visible printer description text in header', async ({
+    page,
+  }) => {
     // Take a screenshot of the header area
     await page.locator('header').screenshot({
       path: 'header-printer-selector-visibility-fix.png',
@@ -35,17 +37,21 @@ test.describe('Printer Description Visibility Fix', () => {
     }
   });
 
-  test('should have improved background contrast for printer selector', async ({ page }) => {
+  test('should have improved background contrast for printer selector', async ({
+    page,
+  }) => {
     // Check the current printer display has the updated background
-    const currentPrinterDisplay = page.locator('.header-printer-selector .current-printer-display');
+    const currentPrinterDisplay = page.locator(
+      '.header-printer-selector .current-printer-display'
+    );
     await expect(currentPrinterDisplay).toBeVisible();
-    
+
     // The background should now be rgba(255, 255, 255, 0.15) instead of rgba(255, 255, 255, 0.05)
     // This provides better contrast for white text
-    const backgroundStyle = await currentPrinterDisplay.evaluate(el => 
-      window.getComputedStyle(el).backgroundColor
+    const backgroundStyle = await currentPrinterDisplay.evaluate(
+      el => window.getComputedStyle(el).backgroundColor
     );
-    
+
     // We expect a more opaque white background
     expect(backgroundStyle).toMatch(/rgba?\(255,\s*255,\s*255,\s*0\.1[5-9]/);
   });
