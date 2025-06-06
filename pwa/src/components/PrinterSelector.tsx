@@ -166,6 +166,15 @@ function PrinterSelector({
       return;
     }
 
+    if (!manualSerialNumber.trim()) {
+      const confirmWithoutSerial = confirm(
+        'No serial number provided. MQTT features (print commands, AMS status) will not work. Continue anyway?'
+      );
+      if (!confirmWithoutSerial) {
+        return;
+      }
+    }
+
     setIsSettingPrinter(true);
     const actionType = savePermanently ? 'Saving' : 'Setting';
     setStatusMessage(`${actionType} printer: ${manualIp}...`);
@@ -429,8 +438,8 @@ function PrinterSelector({
 
               <div className="form-row">
                 <label htmlFor="manual-serial-number">
-                  Serial Number
-                  <span className="field-hint"> (for MQTT communication)</span>
+                  Serial Number *
+                  <span className="field-hint"> (required for MQTT/print features)</span>
                 </label>
                 <input
                   id="manual-serial-number"
@@ -438,13 +447,13 @@ function PrinterSelector({
                   value={manualSerialNumber}
                   onChange={e => setManualSerialNumber(e.target.value)}
                   onKeyPress={handleKeyPress}
-                  placeholder="01S00C123456789 (recommended)"
+                  placeholder="01S00C123456789 (required)"
                   disabled={isSettingPrinter}
                   className="serial-number-input"
                 />
                 <small className="field-help">
-                  Serial number enables proper MQTT communication with your printer.
-                  You can find it on the printer's info screen or settings.
+                  Serial number is required for MQTT communication (print commands, AMS status).
+                  Find it on your printer's display: Settings → Device → Serial Number.
                 </small>
               </div>
 

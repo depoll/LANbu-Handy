@@ -1,14 +1,14 @@
 # Serial Number Configuration Guide
 
-LANbu Handy now supports printer serial numbers for proper MQTT communication with Bambu Lab printers. This guide explains how to find and configure your printer's serial number.
+LANbu Handy requires printer serial numbers for MQTT communication with Bambu Lab printers. This guide explains how to find and configure your printer's serial number.
 
-## Why Serial Numbers Matter
+## Why Serial Numbers Are Required
 
 Bambu Lab printers use their serial number for MQTT communication topics in the format:
 - `device/{serial_number}/request` for sending commands
 - `device/{serial_number}/report` for receiving status
 
-Without the correct serial number, MQTT communication may fail, affecting:
+**Serial numbers are required** for MQTT communication to work properly. Without a configured serial number, the following features will not function:
 - Print start commands
 - AMS status queries
 - Real-time printer status updates
@@ -38,7 +38,7 @@ Without the correct serial number, MQTT communication may fail, affecting:
 3. In the **Manual Configuration** section:
    - Enter your printer's **IP Address**
    - Enter the **Access Code** (if required)
-   - **Enter the Serial Number** in the dedicated field
+   - **Enter the Serial Number** in the dedicated field (required for MQTT features)
    - Optionally save permanently for persistence across container restarts
 4. Click **Set Active Printer** or **Save Printer Permanently**
 
@@ -80,13 +80,6 @@ Bambu Lab printers typically use these serial number patterns:
 - **P1 Series**: `01P00A` + 9 digits (e.g., `01P00A123456789`)
 - **A1 Series**: `01A00B` + 9 digits (e.g., `01A00B123456789`)
 
-## Backward Compatibility
-
-LANbu Handy maintains full backward compatibility:
-- **With Serial Number**: Uses `device/{serial}/request` for optimal compatibility
-- **Without Serial Number**: Falls back to `device/{ip_with_underscores}/request`
-- **Warning**: A warning will be logged when using IP-based fallback
-
 ## Troubleshooting
 
 ### MQTT Communication Issues
@@ -100,11 +93,11 @@ If you're experiencing MQTT communication problems:
 ### Serial Number Not Working
 - Ensure there are no extra spaces or characters in the serial number
 - Try copying the serial number directly from your printer's display
-- If issues persist, you can still use the IP-based fallback by leaving the serial number field empty
+- Verify the serial number format matches your printer model (see patterns above)
 
 ### Logs and Debugging
 - Check LANbu Handy logs for MQTT connection errors
-- Look for warnings about missing serial numbers
+- Look for errors about missing serial numbers
 - Verify the MQTT topic format in debug logs
 
 ## Example Configuration
@@ -131,4 +124,4 @@ If you're still having issues with serial number configuration:
 1. Check your printer's documentation for the exact serial number location
 2. Verify network connectivity between LANbu Handy and your printer
 3. Review the application logs for specific error messages
-4. Consider using the IP-based fallback temporarily while troubleshooting
+4. Ensure the serial number is correctly entered (15 characters, matching your printer model)

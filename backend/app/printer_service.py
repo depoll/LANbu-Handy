@@ -391,13 +391,10 @@ class PrinterService:
 
             # Prepare the print command message
             # Bambu Lab MQTT topic format: device/{serial}/request
-            # Use serial number if available, otherwise fallback to IP-based topic
-            if printer_config.serial_number:
-                device_topic = f"device/{printer_config.serial_number}/request"
-            else:
-                # Fallback to IP-based topic (for backward compatibility)
-                device_topic = f"device/{printer_config.ip.replace('.', '_')}/request"
-                logger.warning(f"No serial number configured for printer {printer_config.name}, using IP-based MQTT topic. MQTT communication may fail.")
+            if not printer_config.serial_number:
+                raise PrinterMQTTError(f"No serial number configured for printer {printer_config.name}. Serial number is required for MQTT communication.")
+            
+            device_topic = f"device/{printer_config.serial_number}/request"
 
             # Bambu Lab print command JSON structure
             print_command = {
@@ -502,12 +499,12 @@ class PrinterService:
                     logger.debug(f"MQTT connected to printer {printer_config.ip}")
 
                     # Subscribe to response topic immediately after connection
-                    if printer_config.serial_number:
-                        response_topic = f"device/{printer_config.serial_number}/report"
-                    else:
-                        # Fallback to IP-based topic (for backward compatibility)
-                        response_topic = f"device/{printer_config.ip.replace('.', '_')}/report"
-                        logger.warning(f"No serial number configured for printer {printer_config.name}, using IP-based MQTT topic. MQTT communication may fail.")
+                    if not printer_config.serial_number:
+                        connection_error = f"No serial number configured for printer {printer_config.name}. Serial number is required for MQTT communication."
+                        logger.error(connection_error)
+                        return
+                    
+                    response_topic = f"device/{printer_config.serial_number}/report"
                     client.subscribe(response_topic, qos=1)
                     logger.debug(f"Subscribed to topic: {response_topic}")
                 else:
@@ -588,11 +585,10 @@ class PrinterService:
 
             # Bambu Lab AMS status query command
             # This requests the current printer status, which includes AMS info
-            if printer_config.serial_number:
-                device_topic = f"device/{printer_config.serial_number}/request"
-            else:
-                # Fallback to IP-based topic (for backward compatibility)
-                device_topic = f"device/{printer_config.ip.replace('.', '_')}/request"
+            if not printer_config.serial_number:
+                raise PrinterMQTTError(f"No serial number configured for printer {printer_config.name}. Serial number is required for MQTT communication.")
+            
+            device_topic = f"device/{printer_config.serial_number}/request"
 
             # Query command to get printer status including AMS
             status_query = {"pushing": {"sequence_id": "1", "command": "pushall"}}

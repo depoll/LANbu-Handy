@@ -171,7 +171,7 @@ class TestPrinterService:
     def test_printer_config(self):
         """Create a test printer configuration."""
         return PrinterConfig(
-            name="Test Printer", ip="192.168.1.100", access_code="test123"
+            name="Test Printer", ip="192.168.1.100", access_code="test123", serial_number="01S00C123456789"
         )
 
     @pytest.fixture
@@ -213,7 +213,7 @@ class TestUploadGcode:
     def test_printer_config(self):
         """Create a test printer configuration."""
         return PrinterConfig(
-            name="Test Printer", ip="192.168.1.100", access_code="test123"
+            name="Test Printer", ip="192.168.1.100", access_code="test123", serial_number="01S00C123456789"
         )
 
     @pytest.fixture
@@ -458,7 +458,7 @@ class TestConnectionTesting:
     def test_printer_config(self):
         """Create a test printer configuration."""
         return PrinterConfig(
-            name="Test Printer", ip="192.168.1.100", access_code="test123"
+            name="Test Printer", ip="192.168.1.100", access_code="test123", serial_number="01S00C123456789"
         )
 
     @patch("ftplib.FTP")
@@ -536,6 +536,7 @@ class TestIntegration:
             name="Integration Test Printer",
             ip="192.168.1.100",
             access_code="integration123",
+            serial_number="01S00C123456789"
         )
 
     def test_service_constants(self, printer_service):
@@ -574,7 +575,7 @@ class TestEndToEndWithMockFTP:
     def test_printer_config(self):
         """Create a test printer configuration."""
         return PrinterConfig(
-            name="Mock FTP Printer", ip="192.168.1.200", access_code="mocktest456"
+            name="Mock FTP Printer", ip="192.168.1.200", access_code="mocktest456", serial_number="01S00C123456789"
         )
 
     @pytest.fixture
@@ -740,7 +741,7 @@ class TestStartPrint:
     def test_printer_config(self):
         """Create a test printer configuration."""
         return PrinterConfig(
-            name="Test Printer", ip="192.168.1.100", access_code="test123"
+            name="Test Printer", ip="192.168.1.100", access_code="test123", serial_number="01S00C123456789"
         )
 
     @patch("paho.mqtt.client.Client")
@@ -789,7 +790,7 @@ class TestStartPrint:
         topic = publish_call[0][0]
         message = publish_call[0][1]
 
-        assert topic == (f"device/{test_printer_config.ip.replace('.', '_')}/request")
+        assert topic == f"device/{test_printer_config.serial_number}/request"
         assert "test_model.gcode" in message
         assert "project_file" in message
 
@@ -910,7 +911,7 @@ class TestAMSQuery:
     def test_printer_config(self):
         """Create a test printer configuration."""
         return PrinterConfig(
-            name="Test Printer", ip="192.168.1.100", access_code="12345678"
+            name="Test Printer", ip="192.168.1.100", access_code="12345678", serial_number="01S00C123456789"
         )
 
     @patch("paho.mqtt.client.Client")
@@ -1188,7 +1189,7 @@ class TestMQTTIntegration:
     def test_printer_config(self):
         """Create a test printer configuration."""
         return PrinterConfig(
-            name="Test Printer", ip="192.168.1.100", access_code="test123"
+            name="Test Printer", ip="192.168.1.100", access_code="test123", serial_number="01S00C123456789"
         )
 
     @patch("paho.mqtt.client.Client")
@@ -1253,7 +1254,7 @@ class TestMQTTIntegration:
         qos = kwargs.get("qos", 0)
 
         # Check topic format
-        expected_topic = f"device/{test_printer_config.ip.replace('.', '_')}/request"
+        expected_topic = f"device/{test_printer_config.serial_number}/request"
         assert topic == expected_topic
 
         # Check message content
