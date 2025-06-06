@@ -1295,6 +1295,6 @@ class TestMQTTIntegration:
         assert hasattr(printer_service, "DEFAULT_MQTT_TIMEOUT")
         assert hasattr(printer_service, "DEFAULT_MQTT_KEEPALIVE")
 
-        assert printer_service.DEFAULT_MQTT_PORT == 1883
+        assert printer_service.DEFAULT_MQTT_PORT == 8883
         assert printer_service.DEFAULT_MQTT_TIMEOUT == 30
         assert printer_service.DEFAULT_MQTT_KEEPALIVE == 60

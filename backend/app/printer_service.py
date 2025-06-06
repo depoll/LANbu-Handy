@@ -8,6 +8,7 @@ including G-code file uploads and basic error handling.
 import ftplib
 import json
 import logging
+import ssl
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -105,7 +106,7 @@ class PrinterService:
     DEFAULT_UPLOAD_PATH = "/upload"  # Common path for Bambu printers
 
     # Default MQTT settings for Bambu Lab printers
-    DEFAULT_MQTT_PORT = 1883
+    DEFAULT_MQTT_PORT = 8883  # Bambu Lab uses secure MQTT on port 8883
     DEFAULT_MQTT_TIMEOUT = 30
     DEFAULT_MQTT_KEEPALIVE = 60
 
@@ -344,6 +345,13 @@ class PrinterService:
                 # access code as password
                 client.username_pw_set("bblp", printer_config.access_code)
 
+            # Configure TLS for secure MQTT (port 8883)
+            # Create SSL context that allows self-signed certificates
+            ssl_context = ssl.create_default_context()
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
+            client.tls_set_context(ssl_context)
+
             # Connect to MQTT broker
             logger.debug(
                 f"Connecting to MQTT broker at "
@@ -544,6 +552,13 @@ class PrinterService:
                 # Bambu Lab printers typically use "bblp" as username and
                 # access code as password
                 client.username_pw_set("bblp", printer_config.access_code)
+
+            # Configure TLS for secure MQTT (port 8883)
+            # Create SSL context that allows self-signed certificates
+            ssl_context = ssl.create_default_context()
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
+            client.tls_set_context(ssl_context)
 
             # Connect to MQTT broker
             logger.debug(
