@@ -195,7 +195,11 @@ class TestConfig:
         reset_printer_storage()
 
         # Clear environment variables that would provide printer configs
-        with patch.dict(os.environ, {"BAMBU_PRINTERS": "", "PRINTER_CONFIG_FILE": str(self.temp_config_file)}, clear=False):
+        with patch.dict(
+            os.environ,
+            {"BAMBU_PRINTERS": "", "PRINTER_CONFIG_FILE": str(self.temp_config_file)},
+            clear=False,
+        ):
             config = Config()
 
             assert config.is_printer_configured() is False
@@ -250,7 +254,11 @@ class TestConfig:
         reset_printer_storage()
 
         # Clear environment variables that would provide printer configs
-        with patch.dict(os.environ, {"BAMBU_PRINTERS": "", "PRINTER_CONFIG_FILE": str(self.temp_config_file)}, clear=False):
+        with patch.dict(
+            os.environ,
+            {"BAMBU_PRINTERS": "", "PRINTER_CONFIG_FILE": str(self.temp_config_file)},
+            clear=False,
+        ):
             with caplog.at_level("WARNING"):
                 Config()
 
