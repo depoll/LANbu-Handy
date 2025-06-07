@@ -107,7 +107,7 @@ describe('PWA UI Workflow Tests', () => {
       expect(
         screen.queryByText(/Configuration Summary/)
       ).not.toBeInTheDocument();
-      
+
       // AMS Status should be visible from the start (before model upload)
       expect(screen.getByText('AMS Status')).toBeInTheDocument();
     });
