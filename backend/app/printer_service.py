@@ -515,6 +515,7 @@ class PrinterService:
                     logger.debug(f"Received MQTT message: {payload}")
 
                     response_json = json.loads(payload)
+                    response_json = response_json.get("print", {})
 
                     # Check if this message contains AMS data
                     # Bambu Lab printers typically send AMS data in "ams" field
@@ -695,30 +696,17 @@ class PrinterService:
                     slot_id = tray.get("id", 0)
 
                     # Extract filament information
-                    filament_type = tray.get("type", "Unknown")
-                    color = tray.get("color", "Unknown")
-
-                    # Some fields might be named differently in responses
-                    # Fallback to common alternatives
-                    if filament_type == "Unknown":
-                        filament_type = tray.get("material", "Unknown")
-
-                    if color == "Unknown":
-                        # Try to get color from hex code
-                        hex_color = tray.get("color_hex", "")
-                        if hex_color:
-                            color = hex_color
-
-                    # Only add filaments that are actually loaded
-                    # Check for common indicators that a slot is empty
-                    if tray.get("exist", True) and filament_type != "Unknown":
-                        filament = AMSFilament(
+                    filament_type = tray.get("tray_type", "Unknown")
+                    material_id = tray.get("tray_sub_brands", "Unknown")
+                    color = tray.get("tray_color", "Unknown")
+                    filaments.append(
+                        AMSFilament(
                             slot_id=slot_id,
                             filament_type=filament_type,
-                            color=color,
-                            material_id=tray.get("material_id"),
+                            color="#" + color,
+                            material_id=material_id,
                         )
-                        filaments.append(filament)
+                    )
 
                 # Create AMS unit with its filaments
                 ams_unit = AMSUnit(unit_id=unit_id, filaments=filaments)
