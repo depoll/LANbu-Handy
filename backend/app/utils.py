@@ -238,7 +238,7 @@ def build_slicing_options_from_config(
     filament_mappings: List, build_plate_type: str, selected_plate_index: int = None
 ) -> Dict[str, str]:
     """
-    Build CLI options dictionary from filament mappings, build plate configuration, 
+    Build CLI options dictionary from filament mappings, build plate configuration,
     and plate selection.
 
     Args:

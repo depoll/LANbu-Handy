@@ -34,14 +34,14 @@ class ModelDownloadError(Exception):
 @dataclass
 class PlateInfo:
     """Information about a single plate in a 3MF file."""
-    
+
     index: int
     prediction_seconds: Optional[int] = None
     weight_grams: Optional[float] = None
     has_support: bool = False
     object_count: int = 0
-    
-    
+
+
 @dataclass
 class FilamentRequirement:
     """Information about filament requirements for a 3D model."""
@@ -59,11 +59,11 @@ class FilamentRequirement:
 @dataclass
 class ModelInfo:
     """Comprehensive information about a 3D model."""
-    
+
     filament_requirements: Optional[FilamentRequirement] = None
     plates: List[PlateInfo] = None
     has_multiple_plates: bool = False
-    
+
     def __post_init__(self):
         """Ensure consistency in the data."""
         if self.plates is None:
@@ -400,7 +400,7 @@ class ModelService:
 
         try:
             import xml.etree.ElementTree as ET
-            
+
             with zipfile.ZipFile(file_path, "r") as zip_file:
                 # Check if slice_info.config exists (contains plate information)
                 slice_info_path = "Metadata/slice_info.config"
@@ -410,37 +410,37 @@ class ModelService:
 
                 # Read and parse the slice info XML
                 with zip_file.open(slice_info_path) as slice_file:
-                    content = slice_file.read().decode('utf-8')
+                    content = slice_file.read().decode("utf-8")
                     root = ET.fromstring(content)
 
                 plates = []
-                
+
                 # Find all plate elements
-                plate_elements = root.findall('.//plate')
-                
+                plate_elements = root.findall(".//plate")
+
                 for plate_elem in plate_elements:
                     plate_info = PlateInfo(index=0)
-                    
+
                     # Extract metadata
-                    for metadata in plate_elem.findall('metadata'):
-                        key = metadata.get('key')
-                        value = metadata.get('value')
-                        
-                        if key == 'index':
+                    for metadata in plate_elem.findall("metadata"):
+                        key = metadata.get("key")
+                        value = metadata.get("value")
+
+                        if key == "index":
                             plate_info.index = int(value)
-                        elif key == 'prediction':
+                        elif key == "prediction":
                             plate_info.prediction_seconds = int(value)
-                        elif key == 'weight':
+                        elif key == "weight":
                             plate_info.weight_grams = float(value)
-                        elif key == 'support_used':
-                            plate_info.has_support = value.lower() == 'true'
-                    
+                        elif key == "support_used":
+                            plate_info.has_support = value.lower() == "true"
+
                     # Count objects in this plate
-                    objects = plate_elem.findall('.//object')
+                    objects = plate_elem.findall(".//object")
                     plate_info.object_count = len(objects)
-                    
+
                     plates.append(plate_info)
-                
+
                 # Sort by plate index
                 plates.sort(key=lambda p: p.index)
                 return plates
@@ -463,14 +463,16 @@ class ModelService:
             ModelInfo object with filament requirements and plate information
         """
         model_info = ModelInfo()
-        
+
         # Parse filament requirements
-        model_info.filament_requirements = self.parse_3mf_filament_requirements(file_path)
-        
+        model_info.filament_requirements = self.parse_3mf_filament_requirements(
+            file_path
+        )
+
         # Parse plate information
         model_info.plates = self.parse_3mf_plate_info(file_path)
-        
+
         # Manually update has_multiple_plates
         model_info.has_multiple_plates = len(model_info.plates) > 1
-        
+
         return model_info

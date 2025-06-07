@@ -53,7 +53,10 @@ function PlateSelector({
           <option value="all">All Plates ({plates.length} plates)</option>
           {plates.map(plate => (
             <option key={plate.index} value={plate.index}>
-              Plate {plate.index} ({plate.object_count} object{plate.object_count !== 1 ? 's' : ''}, {formatTime(plate.prediction_seconds)}, {formatWeight(plate.weight_grams)})
+              Plate {plate.index} ({plate.object_count} object
+              {plate.object_count !== 1 ? 's' : ''},{' '}
+              {formatTime(plate.prediction_seconds)},{' '}
+              {formatWeight(plate.weight_grams)})
             </option>
           ))}
         </select>
@@ -62,7 +65,9 @@ function PlateSelector({
       {selectedPlateIndex !== null && (
         <div className="selected-plate-details">
           {(() => {
-            const selectedPlate = plates.find(p => p.index === selectedPlateIndex);
+            const selectedPlate = plates.find(
+              p => p.index === selectedPlateIndex
+            );
             if (!selectedPlate) return null;
 
             return (
@@ -71,19 +76,27 @@ function PlateSelector({
                 <div className="detail-grid">
                   <div className="detail-item">
                     <span className="detail-label">Objects:</span>
-                    <span className="detail-value">{selectedPlate.object_count}</span>
+                    <span className="detail-value">
+                      {selectedPlate.object_count}
+                    </span>
                   </div>
                   <div className="detail-item">
                     <span className="detail-label">Est. Time:</span>
-                    <span className="detail-value">{formatTime(selectedPlate.prediction_seconds)}</span>
+                    <span className="detail-value">
+                      {formatTime(selectedPlate.prediction_seconds)}
+                    </span>
                   </div>
                   <div className="detail-item">
                     <span className="detail-label">Est. Weight:</span>
-                    <span className="detail-value">{formatWeight(selectedPlate.weight_grams)}</span>
+                    <span className="detail-value">
+                      {formatWeight(selectedPlate.weight_grams)}
+                    </span>
                   </div>
                   <div className="detail-item">
                     <span className="detail-label">Support:</span>
-                    <span className="detail-value">{selectedPlate.has_support ? '✓ Yes' : '✗ No'}</span>
+                    <span className="detail-value">
+                      {selectedPlate.has_support ? '✓ Yes' : '✗ No'}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -107,7 +120,10 @@ function PlateSelector({
                 <span className="detail-label">Total Est. Time:</span>
                 <span className="detail-value">
                   {formatTime(
-                    plates.reduce((sum, plate) => sum + (plate.prediction_seconds || 0), 0)
+                    plates.reduce(
+                      (sum, plate) => sum + (plate.prediction_seconds || 0),
+                      0
+                    )
                   )}
                 </span>
               </div>
@@ -115,14 +131,18 @@ function PlateSelector({
                 <span className="detail-label">Total Est. Weight:</span>
                 <span className="detail-value">
                   {formatWeight(
-                    plates.reduce((sum, plate) => sum + (plate.weight_grams || 0), 0)
+                    plates.reduce(
+                      (sum, plate) => sum + (plate.weight_grams || 0),
+                      0
+                    )
                   )}
                 </span>
               </div>
               <div className="detail-item">
                 <span className="detail-label">Plates with Support:</span>
                 <span className="detail-value">
-                  {plates.filter(plate => plate.has_support).length} of {plates.length}
+                  {plates.filter(plate => plate.has_support).length} of{' '}
+                  {plates.length}
                 </span>
               </div>
             </div>

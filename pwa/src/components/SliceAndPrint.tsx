@@ -49,7 +49,9 @@ function SliceAndPrint() {
   // Plate selection state
   const [plates, setPlates] = useState<PlateInfo[]>([]);
   const [hasMultiplePlates, setHasMultiplePlates] = useState<boolean>(false);
-  const [selectedPlateIndex, setSelectedPlateIndex] = useState<number | null>(null);
+  const [selectedPlateIndex, setSelectedPlateIndex] = useState<number | null>(
+    null
+  );
 
   // File upload state
   const [inputMode, setInputMode] = useState<'url' | 'file'>('url');
@@ -203,12 +205,16 @@ function SliceAndPrint() {
         if (result.plates && result.plates.length > 0) {
           setPlates(result.plates);
           setHasMultiplePlates(result.has_multiple_plates);
-          addStatusMessage(`📋 Found ${result.plates.length} plate(s) in model`);
-          
+          addStatusMessage(
+            `📋 Found ${result.plates.length} plate(s) in model`
+          );
+
           // Auto-select first plate if multiple plates, or all plates if only one
           if (result.has_multiple_plates) {
             setSelectedPlateIndex(result.plates[0].index);
-            addStatusMessage(`🎯 Auto-selected Plate ${result.plates[0].index} (click to change)`);
+            addStatusMessage(
+              `🎯 Auto-selected Plate ${result.plates[0].index} (click to change)`
+            );
           } else {
             setSelectedPlateIndex(null); // Use all plates for single plate models
           }
@@ -363,12 +369,16 @@ function SliceAndPrint() {
         if (result.plates && result.plates.length > 0) {
           setPlates(result.plates);
           setHasMultiplePlates(result.has_multiple_plates);
-          addStatusMessage(`📋 Found ${result.plates.length} plate(s) in model`);
-          
+          addStatusMessage(
+            `📋 Found ${result.plates.length} plate(s) in model`
+          );
+
           // Auto-select first plate if multiple plates, or all plates if only one
           if (result.has_multiple_plates) {
             setSelectedPlateIndex(result.plates[0].index);
-            addStatusMessage(`🎯 Auto-selected Plate ${result.plates[0].index} (click to change)`);
+            addStatusMessage(
+              `🎯 Auto-selected Plate ${result.plates[0].index} (click to change)`
+            );
           } else {
             setSelectedPlateIndex(null); // Use all plates for single plate models
           }
@@ -578,7 +588,9 @@ function SliceAndPrint() {
     if (selectedPlateIndex !== null) {
       const selectedPlate = plates.find(p => p.index === selectedPlateIndex);
       if (selectedPlate) {
-        addStatusMessage(`🎯 Slicing Plate ${selectedPlate.index} only (${selectedPlate.object_count} objects)`);
+        addStatusMessage(
+          `🎯 Slicing Plate ${selectedPlate.index} only (${selectedPlate.object_count} objects)`
+        );
       }
     } else if (hasMultiplePlates) {
       addStatusMessage(`🎯 Slicing all ${plates.length} plates`);
@@ -1041,7 +1053,8 @@ function SliceAndPrint() {
           <div className="configuration-header">
             <h3>Print Configuration</h3>
             <p>
-              Configure your plate selection, filament mappings, and build plate before slicing
+              Configure your plate selection, filament mappings, and build plate
+              before slicing
             </p>
           </div>
 

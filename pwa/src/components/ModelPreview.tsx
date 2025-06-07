@@ -355,7 +355,13 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({
     return () => {
       clearLoadingTimeout();
     };
-  }, [fileId, filamentRequirements, filamentMappings, initError, selectedPlateIndex]);
+  }, [
+    fileId,
+    filamentRequirements,
+    filamentMappings,
+    initError,
+    selectedPlateIndex,
+  ]);
 
   // Update colors when filament mappings change
   useEffect(() => {
@@ -378,7 +384,10 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({
         <h3>
           Model Preview
           {plates.length > 1 && selectedPlateIndex !== null && (
-            <span className="plate-indicator"> - Plate {selectedPlateIndex}</span>
+            <span className="plate-indicator">
+              {' '}
+              - Plate {selectedPlateIndex}
+            </span>
           )}
           {plates.length > 1 && selectedPlateIndex === null && (
             <span className="plate-indicator"> - All Plates</span>
@@ -436,9 +445,15 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({
         <div className="preview-note">
           <small>
             📋 Multi-plate model detected. Preview shows{' '}
-            {selectedPlateIndex !== null ? `Plate ${selectedPlateIndex} only` : 'combined view of all plates'}.
+            {selectedPlateIndex !== null
+              ? `Plate ${selectedPlateIndex} only`
+              : 'combined view of all plates'}
+            .
             {selectedPlateIndex !== null && (
-              <span> Use plate selector above to change the target plate for slicing.</span>
+              <span>
+                {' '}
+                Use plate selector above to change the target plate for slicing.
+              </span>
             )}
           </small>
         </div>

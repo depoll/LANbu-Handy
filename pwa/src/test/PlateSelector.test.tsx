@@ -22,7 +22,7 @@ describe('PlateSelector Component', () => {
     {
       index: 3,
       prediction_seconds: 5460,
-      weight_grams: 25.10,
+      weight_grams: 25.1,
       has_support: false,
       object_count: 3,
     },
@@ -85,9 +85,15 @@ describe('PlateSelector Component', () => {
     );
 
     // Check that plate options include details
-    expect(screen.getByText(/Plate 1 \(2 objects, 1h 27m, 24\.6g\)/)).toBeInTheDocument();
-    expect(screen.getByText(/Plate 2 \(1 object, 1h 27m, 24\.4g\)/)).toBeInTheDocument();
-    expect(screen.getByText(/Plate 3 \(3 objects, 1h 31m, 25\.1g\)/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Plate 1 \(2 objects, 1h 27m, 24\.6g\)/)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Plate 2 \(1 object, 1h 27m, 24\.4g\)/)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Plate 3 \(3 objects, 1h 31m, 25\.1g\)/)
+    ).toBeInTheDocument();
   });
 
   it('displays selected plate details correctly', () => {
@@ -204,7 +210,11 @@ describe('PlateSelector Component', () => {
     );
 
     // Should show "Unknown" for missing data
-    expect(screen.getByText(/Plate 1 \(1 object, Unknown, Unknown\)/)).toBeInTheDocument();
-    expect(screen.getByText(/Plate 2 \(0 objects, 0h 16m, 10\.5g\)/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Plate 1 \(1 object, Unknown, Unknown\)/)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Plate 2 \(0 objects, 0h 16m, 10\.5g\)/)
+    ).toBeInTheDocument();
   });
 });

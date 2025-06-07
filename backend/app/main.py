@@ -333,13 +333,15 @@ async def submit_model_url(request: ModelURLRequest):
         plates_response = []
         if model_info.plates:
             for plate in model_info.plates:
-                plates_response.append(PlateInfoResponse(
-                    index=plate.index,
-                    prediction_seconds=plate.prediction_seconds,
-                    weight_grams=plate.weight_grams,
-                    has_support=plate.has_support,
-                    object_count=plate.object_count,
-                ))
+                plates_response.append(
+                    PlateInfoResponse(
+                        index=plate.index,
+                        prediction_seconds=plate.prediction_seconds,
+                        weight_grams=plate.weight_grams,
+                        has_support=plate.has_support,
+                        object_count=plate.object_count,
+                    )
+                )
 
         # Generate file ID (using the filename without UUID prefix
         # for user display)
@@ -427,13 +429,15 @@ async def upload_model_file(file: UploadFile = File(...)):
         plates_response = []
         if model_info.plates:
             for plate in model_info.plates:
-                plates_response.append(PlateInfoResponse(
-                    index=plate.index,
-                    prediction_seconds=plate.prediction_seconds,
-                    weight_grams=plate.weight_grams,
-                    has_support=plate.has_support,
-                    object_count=plate.object_count,
-                ))
+                plates_response.append(
+                    PlateInfoResponse(
+                        index=plate.index,
+                        prediction_seconds=plate.prediction_seconds,
+                        weight_grams=plate.weight_grams,
+                        has_support=plate.has_support,
+                        object_count=plate.object_count,
+                    )
+                )
 
         # Generate file ID (using the filename with UUID prefix for storage)
         file_id = temp_file_path.name
@@ -603,7 +607,9 @@ async def slice_model_with_configuration(request: ConfiguredSliceRequest):
 
         # Build slicing options from the configuration
         slicing_options = build_slicing_options_from_config(
-            request.filament_mappings, request.build_plate_type, request.selected_plate_index
+            request.filament_mappings,
+            request.build_plate_type,
+            request.selected_plate_index,
         )
 
         # Slice the model
