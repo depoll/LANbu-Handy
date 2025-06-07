@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import { useLocalStorage } from './useLocalStorage';
 
 const PRINTER_IP_STORAGE_KEY = 'lanbu-handy-printer-ip';
@@ -15,28 +16,31 @@ export function usePrinterIPPersistence() {
   const [printerData, setPrinterData, clearPrinterData] =
     useLocalStorage<PrinterIPData | null>(PRINTER_IP_STORAGE_KEY, null);
 
-  const getSavedIP = (): string | null => {
+  const getSavedIP = useCallback((): string | null => {
     return printerData?.ip ?? null;
-  };
+  }, [printerData]);
 
-  const saveIP = (ip: string) => {
-    setPrinterData({
-      ip,
-      lastUsed: Date.now(),
-    });
-  };
+  const saveIP = useCallback(
+    (ip: string) => {
+      setPrinterData({
+        ip,
+        lastUsed: Date.now(),
+      });
+    },
+    [setPrinterData]
+  );
 
-  const clearSavedIP = () => {
+  const clearSavedIP = useCallback(() => {
     clearPrinterData();
-  };
+  }, [clearPrinterData]);
 
-  const hasSavedIP = (): boolean => {
+  const hasSavedIP = useCallback((): boolean => {
     return printerData !== null && printerData.ip.trim() !== '';
-  };
+  }, [printerData]);
 
-  const getLastUsedDate = (): Date | null => {
+  const getLastUsedDate = useCallback((): Date | null => {
     return printerData?.lastUsed ? new Date(printerData.lastUsed) : null;
-  };
+  }, [printerData]);
 
   return {
     getSavedIP,

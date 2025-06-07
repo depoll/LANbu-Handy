@@ -19,6 +19,8 @@ wheels/
 .installed.cfg
 *.egg
 MANIFEST
+config/
+data/
 
 # Testing and coverage
 .coverage
