@@ -236,7 +236,9 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({
       } else if (typeof error === 'string') {
         errorMessage = `Failed to load model: ${error}`;
       } else if (error && typeof error === 'object' && 'message' in error) {
-        errorMessage = `Failed to load model: ${(error as any).message}`;
+        errorMessage = `Failed to load model: ${
+          (error as { message: string }).message
+        }`;
       }
 
       // Log additional context for debugging
@@ -246,7 +248,7 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({
         modelUrl,
         initError,
         errorType: typeof error,
-        errorName: error instanceof Error ? error.name : 'Unknown'
+        errorName: error instanceof Error ? error.name : 'Unknown',
       });
 
       setError(errorMessage);
@@ -311,14 +313,18 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({
               console.log(
                 `ModelPreview: Found ${geometries.length} geometries in 3MF`
               );
-              
+
               // Handle multiple geometries - for now just use the first one
               // TODO: In future, could merge geometries for complete model display
               if (geometries.length === 1) {
                 handleGeometry(geometries[0]);
               } else {
-                console.log(`ModelPreview: Found ${geometries.length} geometries, using first one`);
-                console.log(`ModelPreview: Note - Multi-part 3MF models may not display completely`);
+                console.log(
+                  `ModelPreview: Found ${geometries.length} geometries, using first one`
+                );
+                console.log(
+                  `ModelPreview: Note - Multi-part 3MF models may not display completely`
+                );
                 handleGeometry(geometries[0]);
               }
             } else {
