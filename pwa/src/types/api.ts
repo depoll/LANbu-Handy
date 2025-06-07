@@ -22,7 +22,15 @@ export interface AMSStatusResponse {
   error_details?: string;
 }
 
-// Model Filament Requirements Types
+// Model Filament Requirements and Plate Types
+export interface PlateInfo {
+  index: number;
+  prediction_seconds?: number;
+  weight_grams?: number;
+  has_support: boolean;
+  object_count: number;
+}
+
 export interface FilamentRequirement {
   filament_count: number;
   filament_types: string[];
@@ -36,6 +44,8 @@ export interface ModelSubmissionResponse {
   file_id?: string;
   file_info?: Record<string, unknown>;
   filament_requirements?: FilamentRequirement;
+  plates?: PlateInfo[];
+  has_multiple_plates: boolean;
 }
 
 // Filament Mapping and Configuration Types
@@ -49,6 +59,7 @@ export interface ConfiguredSliceRequest {
   file_id: string;
   filament_mappings: FilamentMapping[];
   build_plate_type: string;
+  selected_plate_index?: number | null; // null means all plates
 }
 
 export interface SliceResponse {

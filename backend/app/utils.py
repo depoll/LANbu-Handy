@@ -235,14 +235,16 @@ def find_gcode_file(output_dir: Path) -> Path:
 
 
 def build_slicing_options_from_config(
-    filament_mappings: List, build_plate_type: str
+    filament_mappings: List, build_plate_type: str, selected_plate_index: int = None
 ) -> Dict[str, str]:
     """
-    Build CLI options dictionary from filament mappings and build plate configuration.
+    Build CLI options dictionary from filament mappings, build plate configuration,
+    and plate selection.
 
     Args:
         filament_mappings: List of filament mappings from model indices to AMS slots
         build_plate_type: Selected build plate type
+        selected_plate_index: Index of the specific plate to slice (None for all plates)
 
     Returns:
         Dictionary of CLI options for the slicer
@@ -252,6 +254,10 @@ def build_slicing_options_from_config(
     # Add build plate type
     if build_plate_type:
         options["build-plate"] = build_plate_type
+
+    # Add plate selection if specified
+    if selected_plate_index is not None:
+        options["plate-index"] = str(selected_plate_index)
 
     # Add filament mappings
     for mapping in filament_mappings:
