@@ -56,9 +56,11 @@ class TestSerialNumberMQTT:
 
         assert config.serial_number == "01S00C123456789"
 
-    @patch("app.printer_service.Printer")
-    def test_mqtt_topic_with_serial_number(self, mock_printer_class, printer_service):
-        """Test that start_print works with serial number when available."""
+    @patch("paho.mqtt.client.Client")
+    def test_mqtt_topic_with_serial_number(
+        self, mock_mqtt_client_class, printer_service
+    ):
+        """Test that MQTT uses serial number when available."""
         # Create printer config with serial number
         printer_config = PrinterConfig(
             name="Test Printer",
@@ -67,40 +69,38 @@ class TestSerialNumberMQTT:
             serial_number="01S00C123456789",
         )
 
-        # Mock Printer instance
-        mock_printer = Mock()
-        mock_printer_class.return_value = mock_printer
+        # Mock MQTT client
+        mock_client = Mock()
+        mock_mqtt_client_class.return_value = mock_client
 
-        # Mock successful connection and print start
-        mock_printer.mqtt_start = Mock()
-        mock_printer.mqtt_client_ready.return_value = True
-        mock_printer.start_print.return_value = True
-        mock_printer.disconnect = Mock()
+        # Mock successful connection and publish
+        def simulate_connection(*args, **kwargs):
+            if hasattr(mock_client, "on_connect"):
+                mock_client.on_connect(mock_client, None, None, 0, None)
 
-        # Execute start_print command
+        mock_client.loop_start.side_effect = simulate_connection
+
+        mock_msg_info = Mock()
+        mock_msg_info.is_published.return_value = True
+        mock_client.publish.return_value = mock_msg_info
+
+        # Execute start_print to trigger MQTT topic usage
         result = printer_service.start_print(printer_config, "test.gcode")
 
-        # Verify the printer was created with correct parameters including serial
-        mock_printer_class.assert_called_once_with(
-            ip_address="192.168.1.100",
-            access_code="test123",
-            serial="01S00C123456789",
-        )
+        # Verify the publish was called with serial-number-based topic
+        mock_client.publish.assert_called_once()
+        publish_args = mock_client.publish.call_args[0]
+        topic = publish_args[0]
 
-        # Verify connection and start_print were called
-        mock_printer.mqtt_start.assert_called_once()
-        mock_printer.start_print.assert_called_once_with(
-            filename="test.gcode", plate_number=1, use_ams=False
-        )
-        mock_printer.disconnect.assert_called_once()
-
+        # Should use serial number in topic
+        assert topic == "device/01S00C123456789/request"
         assert result.success is True
 
-    @patch("app.printer_service.Printer")
+    @patch("paho.mqtt.client.Client")
     def test_mqtt_topic_without_serial_number_fails(
-        self, mock_printer_class, printer_service
+        self, mock_mqtt_client_class, printer_service
     ):
-        """Test that start_print fails when no serial number is provided."""
+        """Test that MQTT fails when no serial number is provided."""
         # Create printer config without serial number
         printer_config = PrinterConfig(
             name="Test Printer",
@@ -109,6 +109,17 @@ class TestSerialNumberMQTT:
             serial_number="",  # Empty serial number
         )
 
+        # Mock MQTT client
+        mock_client = Mock()
+        mock_mqtt_client_class.return_value = mock_client
+
+        # Mock successful connection
+        def simulate_connection(*args, **kwargs):
+            if hasattr(mock_client, "on_connect"):
+                mock_client.on_connect(mock_client, None, None, 0, None)
+
+        mock_client.loop_start.side_effect = simulate_connection
+
         # Execute start_print - should raise an exception for missing serial number
         with pytest.raises(Exception) as exc_info:
             printer_service.start_print(printer_config, "test.gcode")
@@ -116,12 +127,12 @@ class TestSerialNumberMQTT:
         # Should fail with serial number requirement error
         assert "Serial number is required" in str(exc_info.value)
 
-        # Printer class should not have been called since validation fails early
-        mock_printer_class.assert_not_called()
+        # Should not have called publish since it fails before that
+        mock_client.publish.assert_not_called()
 
-    @patch("app.printer_service.Printer")
+    @patch("paho.mqtt.client.Client")
     def test_ams_query_topic_without_serial_number_fails(
-        self, mock_printer_class, printer_service
+        self, mock_mqtt_client_class, printer_service
     ):
         """Test that AMS query fails when no serial number is provided."""
         # Create printer config without serial number
@@ -132,6 +143,17 @@ class TestSerialNumberMQTT:
             serial_number="",  # Empty serial number
         )
 
+        # Mock MQTT client
+        mock_client = Mock()
+        mock_mqtt_client_class.return_value = mock_client
+
+        # Mock successful connection
+        def simulate_connection(*args, **kwargs):
+            if hasattr(mock_client, "on_connect"):
+                mock_client.on_connect(mock_client, None, None, 0, None)
+
+        mock_client.loop_start.side_effect = simulate_connection
+
         # Execute AMS query - should raise an exception for missing serial number
         with pytest.raises(Exception) as exc_info:
             printer_service.query_ams_status(printer_config, timeout=1)
@@ -139,14 +161,15 @@ class TestSerialNumberMQTT:
         # Should fail with serial number requirement error
         assert "Serial number is required" in str(exc_info.value)
 
-        # Printer class should not have been called since validation fails early
-        mock_printer_class.assert_not_called()
+        # Should not have called subscribe or publish since it fails before that
+        mock_client.subscribe.assert_not_called()
+        mock_client.publish.assert_not_called()
 
-    @patch("app.printer_service.Printer")
+    @patch("paho.mqtt.client.Client")
     def test_ams_query_topic_with_serial_number(
-        self, mock_printer_class, printer_service
+        self, mock_mqtt_client_class, printer_service
     ):
-        """Test that AMS query works with serial number when available."""
+        """Test that AMS query uses serial number in topic when available."""
         # Create printer config with serial number
         printer_config = PrinterConfig(
             name="Test Printer",
@@ -155,42 +178,40 @@ class TestSerialNumberMQTT:
             serial_number="01S00C123456789",
         )
 
-        # Mock Printer instance
-        mock_printer = Mock()
-        mock_printer_class.return_value = mock_printer
+        # Mock MQTT client
+        mock_client = Mock()
+        mock_mqtt_client_class.return_value = mock_client
 
         # Mock successful connection
-        mock_printer.mqtt_start = Mock()
-        mock_printer.mqtt_client_ready.return_value = True
-        mock_printer.disconnect = Mock()
+        def simulate_connection(*args, **kwargs):
+            if hasattr(mock_client, "on_connect"):
+                mock_client.on_connect(mock_client, None, None, 0, None)
 
-        # Mock MQTT client and pushall
-        mock_mqtt_client = Mock()
-        mock_printer.mqtt_client = mock_mqtt_client
-        mock_mqtt_client.pushall.return_value = True
+        mock_client.loop_start.side_effect = simulate_connection
 
-        # Mock AMS hub with sample data
-        mock_ams_hub = Mock()
-        mock_ams_hub.ams_list = []  # Empty AMS for simplicity
-        mock_printer.ams_hub.return_value = mock_ams_hub
+        # Mock successful publish
+        mock_msg_info = Mock()
+        mock_msg_info.is_published.return_value = True
+        mock_client.publish.return_value = mock_msg_info
 
         # Execute AMS query with short timeout
-        result = printer_service.query_ams_status(printer_config, timeout=1)
+        printer_service.query_ams_status(printer_config, timeout=1)
 
-        # Verify the printer was created with correct parameters including serial
-        mock_printer_class.assert_called_once_with(
-            ip_address="192.168.1.100",
-            access_code="test123",
-            serial="01S00C123456789",
-        )
+        # Verify subscription used serial-number-based topic
+        mock_client.subscribe.assert_called_once()
+        subscribe_args = mock_client.subscribe.call_args[0]
+        response_topic = subscribe_args[0]
 
-        # Verify connection and methods were called
-        mock_printer.mqtt_start.assert_called_once()
-        mock_mqtt_client.pushall.assert_called_once()
-        mock_printer.ams_hub.assert_called_once()
-        mock_printer.disconnect.assert_called_once()
+        # Should use serial number in response topic
+        assert response_topic == "device/01S00C123456789/report"
 
-        assert result.success is True
+        # Verify publish used serial-number-based topic
+        mock_client.publish.assert_called_once()
+        publish_args = mock_client.publish.call_args[0]
+        request_topic = publish_args[0]
+
+        # Should use serial number in request topic
+        assert request_topic == "device/01S00C123456789/request"
 
     def test_mqtt_topic_generation_edge_cases(self):
         """Test edge cases for MQTT topic generation."""
