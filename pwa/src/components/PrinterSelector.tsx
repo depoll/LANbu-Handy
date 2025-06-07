@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { usePrinterIPPersistence } from '../hooks/usePrinterIPPersistence';
 import {
-  PrinterConfigResponse,
   AddPrinterRequest,
   AddPrinterResponse,
+  PrinterConfigResponse,
   SetActivePrinterRequest,
 } from '../types/api';
-import { usePrinterIPPersistence } from '../hooks/usePrinterIPPersistence';
 
 interface PrinterInfo {
   name: string;
@@ -55,7 +55,7 @@ function PrinterSelector({
     if (savedIP && savedIP.trim()) {
       setManualIp(savedIP);
     }
-  }, [getSavedIP]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadCurrentPrinter = async () => {
     try {
