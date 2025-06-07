@@ -481,6 +481,75 @@ async def upload_model_file(file: UploadFile = File(...)):
         raise handle_model_errors(e)
 
 
+@app.get("/api/model/{file_id}/plate/{plate_index}/filament-requirements")
+async def get_plate_filament_requirements(file_id: str, plate_index: int):
+    """
+    Get filament requirements for a specific plate.
+
+    Returns simplified filament requirements for the specified plate rather than
+    the full model requirements. This helps users focus on only the filaments
+    needed for their selected plate in multi-plate models.
+
+    Args:
+        file_id: The file ID from model submission
+        plate_index: The index of the plate to get requirements for
+
+    Returns:
+        FilamentRequirementResponse with plate-specific requirements
+
+    Raises:
+        HTTPException: If file is not found or plate index is invalid
+    """
+    try:
+        # Find the model file in the temp directory
+        model_file_path = model_service.temp_dir / file_id
+
+        if not model_file_path.exists():
+            raise HTTPException(
+                status_code=404, detail=f"Model file not found: {file_id}"
+            )
+
+        # Validate file extension for security
+        if not model_service.validate_file_extension(model_file_path.name):
+            raise HTTPException(
+                status_code=400, detail="Invalid file type for plate requirements"
+            )
+
+        # Get plate-specific filament requirements
+        plate_requirements = model_service.get_plate_specific_filament_requirements(
+            model_file_path, plate_index
+        )
+
+        if not plate_requirements:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No filament requirements found for plate {plate_index}",
+            )
+
+        # Convert to response format
+        requirements_response = FilamentRequirementResponse(
+            filament_count=plate_requirements.filament_count,
+            filament_types=plate_requirements.filament_types,
+            filament_colors=plate_requirements.filament_colors,
+            has_multicolor=plate_requirements.has_multicolor,
+        )
+
+        return {
+            "success": True,
+            "message": f"Filament requirements for plate {plate_index}",
+            "plate_index": plate_index,
+            "filament_requirements": requirements_response,
+            "is_filtered": True,  # Indicates this is a filtered/estimated set
+        }
+
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
+    except Exception as e:
+        msg = f"Internal server error getting plate filament requirements: {str(e)}"
+        raise HTTPException(status_code=500, detail=msg)
+
+
 @app.get("/api/model/preview/{file_id}")
 async def get_model_preview(file_id: str):
     """

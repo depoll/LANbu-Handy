@@ -476,3 +476,95 @@ class ModelService:
         model_info.has_multiple_plates = len(model_info.plates) > 1
 
         return model_info
+
+    def get_plate_specific_filament_requirements(
+        self, file_path: Path, plate_index: int
+    ) -> Optional[FilamentRequirement]:
+        """
+        Get estimated filament requirements for a specific plate.
+
+        This provides a simplified/estimated filament requirement for a single plate
+        rather than the full model requirements. For multi-plate models, this helps
+        users see only the filaments likely needed for their selected plate.
+
+        Args:
+            file_path: Path to the .3mf file
+            plate_index: Index of the plate to get requirements for
+
+        Returns:
+            FilamentRequirement object with estimated requirements for the plate,
+            or None if estimation fails or file is not .3mf
+        """
+        # Only process .3mf files
+        if file_path.suffix.lower() != ".3mf":
+            return None
+
+        # Get the full model filament requirements first
+        full_requirements = self.parse_3mf_filament_requirements(file_path)
+        if not full_requirements:
+            return None
+
+        # Get plate information to validate the plate_index
+        plates = self.parse_3mf_plate_info(file_path)
+        target_plate = None
+        for plate in plates:
+            if plate.index == plate_index:
+                target_plate = plate
+                break
+
+        if not target_plate:
+            # Invalid plate index, return None
+            return None
+
+        # For now, implement a simple heuristic:
+        # - If there's only 1 filament type overall, use that
+        # - If there are multiple filaments, estimate based on plate complexity
+        # - For single object plates, assume 1-2 filaments max
+        # - For multi-object plates, allow more filaments but still reduced
+
+        if full_requirements.filament_count == 1:
+            # Single filament model, just return the same requirement
+            return full_requirements
+
+        # Multi-filament model - estimate based on plate characteristics
+        estimated_count = self._estimate_filament_count_for_plate(
+            target_plate, full_requirements
+        )
+
+        # Take the first N filaments from the full requirements
+        # In a more sophisticated implementation, we could analyze which
+        # filaments are actually used by objects on this specific plate
+        estimated_types = full_requirements.filament_types[:estimated_count]
+        estimated_colors = full_requirements.filament_colors[:estimated_count]
+
+        return FilamentRequirement(
+            filament_count=estimated_count,
+            filament_types=estimated_types,
+            filament_colors=estimated_colors,
+        )
+
+    def _estimate_filament_count_for_plate(
+        self, plate: PlateInfo, full_requirements: FilamentRequirement
+    ) -> int:
+        """
+        Estimate how many filaments a specific plate likely needs.
+
+        Args:
+            plate: PlateInfo for the plate
+            full_requirements: Full model filament requirements
+
+        Returns:
+            Estimated number of filaments for this plate (at least 1)
+        """
+        # Simple heuristic based on object count and total filaments
+        if plate.object_count <= 1:
+            # Single object plates likely use 1-2 filaments
+            return min(2, full_requirements.filament_count)
+        elif plate.object_count <= 3:
+            # Small multi-object plates likely use 2-3 filaments
+            return min(3, full_requirements.filament_count)
+        else:
+            # Larger plates might use more filaments but still likely not all
+            # Use at most 75% of total filaments, minimum 1
+            estimated = max(1, int(full_requirements.filament_count * 0.75))
+            return min(estimated, full_requirements.filament_count)

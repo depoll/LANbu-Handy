@@ -2962,3 +2962,34 @@ footer p {
     border-radius: 4px;
   }
 }
+
+/* Filament requirements filter notice */
+.requirements-filter-notice {
+  background: #e3f2fd;
+  border: 1px solid #2196f3;
+  border-radius: 6px;
+  padding: 0.75rem;
+  margin-top: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.requirements-filter-notice p {
+  margin: 0;
+  color: #1565c0;
+}
+
+.link-button {
+  background: none;
+  border: none;
+  color: #1976d2;
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: inherit;
+  padding: 0;
+  margin: 0;
+}
+
+.link-button:hover {
+  color: #1565c0;
+  text-decoration: none;
+}

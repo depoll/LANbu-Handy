@@ -177,3 +177,13 @@ export interface FilamentMatchResponse {
   unmatched_requirements?: number[];
   error_details?: string;
 }
+
+// Plate-specific Filament Requirements API Types
+export interface PlateFilamentRequirementsResponse {
+  success: boolean;
+  message: string;
+  plate_index: number;
+  filament_requirements: FilamentRequirement;
+  is_filtered: boolean; // Indicates if this is a filtered/estimated set
+  error_details?: string;
+}
