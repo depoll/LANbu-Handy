@@ -966,35 +966,35 @@ footer p {
 
 .filament-mapping-row {
   display: flex;
-  align-items: flex-start;
-  gap: 1.5rem;
-  padding: 1.5rem;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
   background: white;
-  border-radius: 12px;
+  border-radius: 6px;
   border: 1px solid #e9ecef;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   margin-bottom: 1rem;
 }
 
 .required-filament {
-  flex: 0 0 240px;
+  flex: 0 0 200px;
   background: #f8f9fa;
-  border-radius: 8px;
-  padding: 1rem;
+  border-radius: 4px;
+  padding: 0.75rem;
   border: 1px solid #e9ecef;
 }
 
 .filament-label {
   font-weight: 600;
   color: #343a40;
-  margin-bottom: 0.75rem;
-  font-size: 0.95rem;
+  margin-bottom: 0.5rem;
+  font-size: 0.9rem;
 }
 
 .filament-details {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.5rem;
 }
 
 .filament-type {
@@ -1045,176 +1045,25 @@ footer p {
 
 .mapping-arrow {
   color: #2196f3;
-  font-size: 1.5rem;
+  font-size: 1.2rem;
   font-weight: bold;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #f0f8ff;
-  border: 2px solid #e3f2fd;
-  border-radius: 50%;
-  width: 40px;
-  height: 40px;
   flex-shrink: 0;
 }
 
 .ams-slot-selection {
   flex: 1;
-  min-width: 250px;
+  min-width: 200px;
 }
 
-.slot-selection-label {
+.ams-slot-selection label {
   display: block;
   font-weight: 500;
   color: #495057;
-  margin-bottom: 1rem;
-  font-size: 0.95rem;
-}
-
-.ams-slots-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 0.75rem;
-  margin-bottom: 1rem;
-}
-
-.ams-slot-card {
-  background: white;
-  border: 2px solid #e9ecef;
-  border-radius: 8px;
-  padding: 1rem;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  position: relative;
-  min-height: 100px;
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.ams-slot-card:hover:not(.disabled) {
-  border-color: #2196f3;
-  box-shadow: 0 2px 8px rgba(33, 150, 243, 0.15);
-  transform: translateY(-1px);
-}
-
-.ams-slot-card.selected {
-  border-color: #2196f3;
-  background: #f0f8ff;
-  box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
-}
-
-.ams-slot-card.disabled {
-  cursor: not-allowed;
-  opacity: 0.6;
-  background: #f8f9fa;
-}
-
-.slot-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.slot-identifier {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: #6c757d;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.selected-indicator {
-  background: #28a745;
-  color: white;
-  border-radius: 50%;
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.8rem;
-  font-weight: bold;
-}
-
-.slot-filament-info {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  flex: 1;
-}
-
-.slot-color-swatch {
-  flex-shrink: 0;
-}
-
-.color-swatch-large {
-  width: 32px;
-  height: 32px;
-  border-radius: 6px;
-  border: 2px solid #ddd;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-.slot-details {
-  flex: 1;
-  min-width: 0;
-}
-
-.slot-filament-type {
-  background: #e3f2fd;
-  color: #1565c0;
-  padding: 0.25rem 0.75rem;
-  border-radius: 12px;
-  font-size: 0.8rem;
-  font-weight: 600;
-  display: inline-block;
-  margin-bottom: 0.25rem;
-}
-
-.slot-color-value {
-  font-size: 0.8rem;
-  color: #6c757d;
-  font-family: monospace;
-  font-weight: 500;
-}
-
-.no-slots-message {
-  grid-column: 1 / -1;
-  text-align: center;
-  padding: 2rem;
-  color: #6c757d;
-  background: #f8f9fa;
-  border: 2px dashed #dee2e6;
-  border-radius: 8px;
-  font-style: italic;
-}
-
-.selected-slot-summary {
-  background: #e8f5e8;
-  border: 1px solid #c3e6cb;
-  border-radius: 6px;
-  padding: 0.75rem;
-  margin-top: 0.5rem;
-}
-
-.current-selection {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
+  margin-bottom: 0.5rem;
   font-size: 0.9rem;
-}
-
-.selection-label {
-  font-weight: 600;
-  color: #155724;
-}
-
-.selection-details {
-  color: #155724;
 }
 
 .ams-slot-select {
@@ -1223,6 +1072,7 @@ footer p {
   border: 1px solid #ced4da;
   border-radius: 4px;
   font-size: 0.9rem;
+  background: white;
 }
 
 .ams-slot-select:focus {
@@ -1273,7 +1123,7 @@ footer p {
   .filament-mapping-row {
     flex-direction: column;
     align-items: stretch;
-    gap: 1.5rem;
+    gap: 1rem;
     padding: 1rem;
   }
 
@@ -1284,34 +1134,10 @@ footer p {
   .mapping-arrow {
     transform: rotate(90deg);
     align-self: center;
-    width: 32px;
-    height: 32px;
-    font-size: 1.2rem;
   }
 
-  .ams-slots-grid {
-    grid-template-columns: 1fr;
-    gap: 0.5rem;
-  }
-
-  .ams-slot-card {
-    min-height: auto;
-    padding: 0.75rem;
-  }
-
-  .slot-filament-info {
-    gap: 0.5rem;
-  }
-
-  .color-swatch-large {
-    width: 28px;
-    height: 28px;
-  }
-
-  .current-selection {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.25rem;
+  .ams-slot-selection {
+    min-width: auto;
   }
 
   .filament-details {
