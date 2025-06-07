@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
   FilamentRequirement,
   AMSStatusResponse,
@@ -22,6 +22,148 @@ interface AMSSlotOption {
   color: string;
   label: string;
   value: string;
+}
+
+interface CustomDropdownProps {
+  value: string;
+  options: AMSSlotOption[];
+  onChange: (value: string) => void;
+  disabled?: boolean;
+  placeholder?: string;
+}
+
+function CustomDropdown({
+  value,
+  options,
+  onChange,
+  disabled = false,
+  placeholder = 'Select AMS Slot...',
+}: CustomDropdownProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsOpen(false);
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  const selectedOption = options.find(option => option.value === value);
+
+  const handleOptionSelect = (optionValue: string) => {
+    onChange(optionValue);
+    setIsOpen(false);
+  };
+
+  const handleKeyDown = (event: React.KeyboardEvent) => {
+    if (disabled) return;
+
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      setIsOpen(!isOpen);
+    } else if (event.key === 'Escape') {
+      setIsOpen(false);
+    }
+  };
+
+  return (
+    <div className="custom-dropdown" ref={dropdownRef}>
+      <div
+        className={`dropdown-trigger ${disabled ? 'disabled' : ''} ${
+          isOpen ? 'open' : ''
+        }`}
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        onKeyDown={handleKeyDown}
+        tabIndex={disabled ? -1 : 0}
+        role="button"
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
+      >
+        {selectedOption ? (
+          <div className="selected-option">
+            <div className="selected-color-swatch">
+              <div
+                className="color-swatch-small"
+                style={{ backgroundColor: selectedOption.color }}
+                title={selectedOption.color}
+              ></div>
+            </div>
+            <div className="selected-details">
+              <span className="selected-label">
+                Unit {selectedOption.unit_id}, Slot {selectedOption.slot_id}
+              </span>
+              <span className="selected-type">
+                {selectedOption.filament_type}
+              </span>
+            </div>
+            <div className="dropdown-arrow">▼</div>
+          </div>
+        ) : (
+          <div className="placeholder-option">
+            <span>{placeholder}</span>
+            <div className="dropdown-arrow">▼</div>
+          </div>
+        )}
+      </div>
+
+      {isOpen && (
+        <div className="dropdown-menu">
+          <div
+            className="dropdown-option clear-option"
+            onClick={() => handleOptionSelect('')}
+            role="option"
+            aria-selected={!value}
+          >
+            <span>Clear selection</span>
+          </div>
+          {options.map(option => (
+            <div
+              key={option.value}
+              className={`dropdown-option ${
+                option.value === value ? 'selected' : ''
+              }`}
+              onClick={() => handleOptionSelect(option.value)}
+              role="option"
+              aria-selected={option.value === value}
+            >
+              <div className="option-color-swatch">
+                <div
+                  className="color-swatch-medium"
+                  style={{ backgroundColor: option.color }}
+                  title={option.color}
+                ></div>
+              </div>
+              <div className="option-details">
+                <div className="option-header">
+                  <span className="option-label">
+                    Unit {option.unit_id}, Slot {option.slot_id}
+                  </span>
+                  {option.value === value && (
+                    <span className="selected-indicator">✓</span>
+                  )}
+                </div>
+                <div className="option-filament-info">
+                  <span className="option-type">{option.filament_type}</span>
+                  <span className="option-color">{option.color}</span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function FilamentMappingConfig({
@@ -226,20 +368,13 @@ function FilamentMappingConfig({
 
                 <div className="ams-slot-selection">
                   <label htmlFor={`filament-mapping-${index}`}>AMS Slot:</label>
-                  <select
-                    id={`filament-mapping-${index}`}
+                  <CustomDropdown
                     value={currentMapping}
-                    onChange={e => handleMappingChange(index, e.target.value)}
+                    options={availableSlots}
+                    onChange={value => handleMappingChange(index, value)}
                     disabled={disabled}
-                    className="ams-slot-select"
-                  >
-                    <option value="">Select AMS Slot...</option>
-                    {availableSlots.map(slot => (
-                      <option key={slot.value} value={slot.value}>
-                        {slot.label}
-                      </option>
-                    ))}
-                  </select>
+                    placeholder="Select AMS Slot..."
+                  />
                 </div>
               </div>
             );
