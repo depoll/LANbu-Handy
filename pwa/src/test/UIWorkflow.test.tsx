@@ -104,10 +104,12 @@ describe('PWA UI Workflow Tests', () => {
       expect(
         screen.queryByText(/Filament Requirements/)
       ).not.toBeInTheDocument();
-      expect(screen.queryByText('AMS Status')).not.toBeInTheDocument();
       expect(
         screen.queryByText(/Configuration Summary/)
       ).not.toBeInTheDocument();
+      
+      // AMS Status should be visible from the start (before model upload)
+      expect(screen.getByText('AMS Status')).toBeInTheDocument();
     });
 
     it('provides clear visual hierarchy and labeling', () => {
