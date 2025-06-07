@@ -961,7 +961,7 @@ footer p {
 .filament-mappings {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 0;
 }
 
 .filament-mapping-row {
@@ -969,65 +969,93 @@ footer p {
   align-items: center;
   gap: 1rem;
   padding: 1rem;
-  background: #f8f9fa;
+  background: white;
   border-radius: 6px;
   border: 1px solid #e9ecef;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  margin-bottom: 1rem;
 }
 
 .required-filament {
-  flex: 1;
-  min-width: 200px;
+  flex: 0 0 200px;
+  background: #f8f9fa;
+  border-radius: 4px;
+  padding: 0.75rem;
+  border: 1px solid #e9ecef;
 }
 
 .filament-label {
-  font-weight: 500;
-  color: #495057;
+  font-weight: 600;
+  color: #343a40;
   margin-bottom: 0.5rem;
+  font-size: 0.9rem;
 }
 
 .filament-details {
   display: flex;
-  align-items: center;
-  gap: 0.75rem;
+  flex-direction: column;
+  gap: 0.5rem;
 }
 
 .filament-type {
   background: #e3f2fd;
   color: #1565c0;
-  padding: 0.25rem 0.75rem;
-  border-radius: 12px;
+  padding: 0.4rem 0.75rem;
+  border-radius: 16px;
   font-size: 0.85rem;
-  font-weight: 500;
+  font-weight: 600;
+  text-align: center;
+  border: 1px solid #bbdefb;
 }
 
 .filament-color .color-info {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.75rem;
+  padding: 0.5rem;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid #dee2e6;
 }
 
 .filament-color .color-swatch {
-  width: 20px;
-  height: 20px;
-  border-radius: 3px;
-  border: 1px solid #ddd;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  border: 2px solid #ddd;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.color-label {
+  font-family: monospace;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #495057;
 }
 
 .color-name {
   color: #495057;
   font-weight: 500;
-  font-size: 0.9rem;
+  padding: 0.5rem;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid #dee2e6;
+  text-align: center;
 }
 
 .mapping-arrow {
-  color: #6c757d;
+  color: #2196f3;
   font-size: 1.2rem;
   font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
 .ams-slot-selection {
   flex: 1;
-  min-width: 250px;
+  min-width: 200px;
 }
 
 .ams-slot-selection label {
@@ -1035,6 +1063,7 @@ footer p {
   font-weight: 500;
   color: #495057;
   margin-bottom: 0.5rem;
+  font-size: 0.9rem;
 }
 
 .ams-slot-select {
@@ -1043,12 +1072,217 @@ footer p {
   border: 1px solid #ced4da;
   border-radius: 4px;
   font-size: 0.9rem;
+  background: white;
 }
 
 .ams-slot-select:focus {
   outline: none;
   border-color: #2196f3;
   box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
+}
+
+/* Custom Dropdown Styles */
+.custom-dropdown {
+  position: relative;
+  width: 100%;
+}
+
+.dropdown-trigger {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #ced4da;
+  border-radius: 6px;
+  background: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+}
+
+.dropdown-trigger:hover:not(.disabled) {
+  border-color: #2196f3;
+  box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.1);
+}
+
+.dropdown-trigger:focus {
+  outline: none;
+  border-color: #2196f3;
+  box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
+}
+
+.dropdown-trigger.open {
+  border-color: #2196f3;
+  box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
+}
+
+.dropdown-trigger.disabled {
+  background: #f8f9fa;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.selected-option {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex: 1;
+}
+
+.selected-color-swatch {
+  flex-shrink: 0;
+}
+
+.color-swatch-small {
+  width: 20px;
+  height: 20px;
+  border-radius: 3px;
+  border: 2px solid #ddd;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.selected-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  flex: 1;
+}
+
+.selected-label {
+  font-weight: 500;
+  font-size: 0.9rem;
+  color: #495057;
+}
+
+.selected-type {
+  font-size: 0.8rem;
+  color: #6c757d;
+}
+
+.placeholder-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: 1;
+  color: #6c757d;
+}
+
+.dropdown-arrow {
+  color: #6c757d;
+  font-size: 0.8rem;
+  transition: transform 0.2s ease;
+}
+
+.dropdown-trigger.open .dropdown-arrow {
+  transform: rotate(180deg);
+}
+
+.dropdown-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid #ced4da;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  max-height: 300px;
+  overflow-y: auto;
+  margin-top: 4px;
+}
+
+.dropdown-option {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  border-bottom: 1px solid #f8f9fa;
+}
+
+.dropdown-option:last-child {
+  border-bottom: none;
+}
+
+.dropdown-option:hover {
+  background: #f8f9fa;
+}
+
+.dropdown-option.selected {
+  background: #e3f2fd;
+  border-color: #bbdefb;
+}
+
+.clear-option {
+  color: #6c757d;
+  font-style: italic;
+  justify-content: center;
+  border-bottom: 1px solid #dee2e6 !important;
+}
+
+.clear-option:hover {
+  background: #f1f3f4 !important;
+}
+
+.option-color-swatch {
+  flex-shrink: 0;
+}
+
+.color-swatch-medium {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  border: 2px solid #ddd;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.option-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  flex: 1;
+}
+
+.option-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.option-label {
+  font-weight: 500;
+  font-size: 0.9rem;
+  color: #495057;
+}
+
+.selected-indicator {
+  color: #2196f3;
+  font-weight: bold;
+  font-size: 0.9rem;
+}
+
+.option-filament-info {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.option-type {
+  background: #e3f2fd;
+  color: #1565c0;
+  padding: 0.2rem 0.5rem;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border: 1px solid #bbdefb;
+}
+
+.option-color {
+  color: #6c757d;
+  font-size: 0.8rem;
+  font-family: monospace;
 }
 
 /* Slice and Print Controls */
@@ -1094,11 +1328,42 @@ footer p {
     flex-direction: column;
     align-items: stretch;
     gap: 1rem;
+    padding: 1rem;
+  }
+
+  .required-filament {
+    flex: none;
   }
 
   .mapping-arrow {
     transform: rotate(90deg);
     align-self: center;
+  }
+
+  .ams-slot-selection {
+    min-width: auto;
+  }
+
+  .filament-details {
+    gap: 0.5rem;
+  }
+
+  /* Custom dropdown mobile styles */
+  .dropdown-menu {
+    max-height: 250px;
+  }
+
+  .dropdown-option {
+    padding: 1rem 0.75rem;
+  }
+
+  .selected-option,
+  .placeholder-option {
+    gap: 0.5rem;
+  }
+
+  .option-details {
+    gap: 0.4rem;
   }
 
   .plate-selection {
