@@ -148,6 +148,17 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({
     setIsLoading(true);
     setError(null);
 
+    // Set a timeout to prevent infinite loading
+    const loadingTimeout = setTimeout(() => {
+      console.error('ModelPreview: Model loading timed out after 30 seconds');
+      setError('Model loading timed out. Please try again.');
+      setIsLoading(false);
+    }, 30000);
+
+    const clearLoadingTimeout = () => {
+      clearTimeout(loadingTimeout);
+    };
+
     // Determine file type from file extension
     const fileExtension = fileId.toLowerCase().split('.').pop();
     const modelUrl = `/api/model/preview/${fileId}`;
@@ -157,6 +168,7 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({
 
     const handleGeometry = (geometry: THREE.BufferGeometry) => {
       try {
+        clearLoadingTimeout(); // Clear timeout on successful geometry processing
         console.log('ModelPreview: Processing geometry');
 
         // Remove existing mesh
@@ -198,6 +210,7 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({
           throw new Error('Geometry bounding box could not be computed');
         }
       } catch (error) {
+        clearLoadingTimeout();
         console.error('ModelPreview: Error processing geometry:', error);
         setError('Failed to process model geometry');
         setIsLoading(false);
@@ -214,6 +227,7 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({
     };
 
     const handleError = (error: Error | ErrorEvent | unknown) => {
+      clearLoadingTimeout(); // Clear timeout on error
       console.error('ModelPreview: Error loading model:', error);
 
       let errorMessage = 'Failed to load model for preview';
@@ -221,7 +235,21 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({
         errorMessage = `Failed to load model: ${error.message}`;
       } else if (typeof error === 'string') {
         errorMessage = `Failed to load model: ${error}`;
+      } else if (error && typeof error === 'object' && 'message' in error) {
+        errorMessage = `Failed to load model: ${
+          (error as { message: string }).message
+        }`;
       }
+
+      // Log additional context for debugging
+      console.error('ModelPreview: Error context:', {
+        fileId,
+        fileExtension,
+        modelUrl,
+        initError,
+        errorType: typeof error,
+        errorName: error instanceof Error ? error.name : 'Unknown',
+      });
 
       setError(errorMessage);
       setIsLoading(false);
@@ -285,9 +313,20 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({
               console.log(
                 `ModelPreview: Found ${geometries.length} geometries in 3MF`
               );
-              // For now, just use the first geometry found
-              // In the future, this could be enhanced to handle multi-material models
-              handleGeometry(geometries[0]);
+
+              // Handle multiple geometries - for now just use the first one
+              // TODO: In future, could merge geometries for complete model display
+              if (geometries.length === 1) {
+                handleGeometry(geometries[0]);
+              } else {
+                console.log(
+                  `ModelPreview: Found ${geometries.length} geometries, using first one`
+                );
+                console.log(
+                  `ModelPreview: Note - Multi-part 3MF models may not display completely`
+                );
+                handleGeometry(geometries[0]);
+              }
             } else {
               handleError(new Error('No valid geometry found in 3MF file'));
             }
@@ -302,10 +341,16 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({
         setIsLoading(false);
       }
     } else {
+      clearLoadingTimeout();
       console.log('ModelPreview: Unsupported file extension:', fileExtension);
       setError(`Unsupported file type: ${fileExtension}`);
       setIsLoading(false);
     }
+
+    // Cleanup function
+    return () => {
+      clearLoadingTimeout();
+    };
   }, [fileId, filamentRequirements, filamentMappings, initError]);
 
   // Update colors when filament mappings change
