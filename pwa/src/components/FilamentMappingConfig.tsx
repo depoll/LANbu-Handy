@@ -225,21 +225,70 @@ function FilamentMappingConfig({
                 <div className="mapping-arrow">→</div>
 
                 <div className="ams-slot-selection">
-                  <label htmlFor={`filament-mapping-${index}`}>AMS Slot:</label>
-                  <select
-                    id={`filament-mapping-${index}`}
-                    value={currentMapping}
-                    onChange={e => handleMappingChange(index, e.target.value)}
-                    disabled={disabled}
-                    className="ams-slot-select"
-                  >
-                    <option value="">Select AMS Slot...</option>
-                    {availableSlots.map(slot => (
-                      <option key={slot.value} value={slot.value}>
-                        {slot.label}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="slot-selection-label">Available AMS Slots:</div>
+                  <div className="ams-slots-grid">
+                    {availableSlots.length === 0 ? (
+                      <div className="no-slots-message">
+                        No AMS slots available
+                      </div>
+                    ) : (
+                      availableSlots.map(slot => {
+                        const isSelected = currentMapping === slot.value;
+                        return (
+                          <div
+                            key={slot.value}
+                            className={`ams-slot-card ${isSelected ? 'selected' : ''} ${disabled ? 'disabled' : ''}`}
+                            onClick={() => !disabled && handleMappingChange(index, isSelected ? '' : slot.value)}
+                            role="button"
+                            tabIndex={disabled ? -1 : 0}
+                            onKeyDown={(e) => {
+                              if (!disabled && (e.key === 'Enter' || e.key === ' ')) {
+                                e.preventDefault();
+                                handleMappingChange(index, isSelected ? '' : slot.value);
+                              }
+                            }}
+                          >
+                            <div className="slot-header">
+                              <div className="slot-identifier">
+                                Unit {slot.unit_id} • Slot {slot.slot_id}
+                              </div>
+                              {isSelected && (
+                                <div className="selected-indicator">✓</div>
+                              )}
+                            </div>
+                            <div className="slot-filament-info">
+                              <div className="slot-color-swatch">
+                                <div
+                                  className="color-swatch-large"
+                                  style={{ backgroundColor: slot.color }}
+                                  title={slot.color}
+                                ></div>
+                              </div>
+                              <div className="slot-details">
+                                <div className="slot-filament-type">{slot.filament_type}</div>
+                                <div className="slot-color-value">{slot.color}</div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                  {currentMapping && (
+                    <div className="selected-slot-summary">
+                      {(() => {
+                        const selectedSlot = availableSlots.find(slot => slot.value === currentMapping);
+                        return selectedSlot ? (
+                          <div className="current-selection">
+                            <span className="selection-label">Selected:</span>
+                            <span className="selection-details">
+                              Unit {selectedSlot.unit_id}, Slot {selectedSlot.slot_id} - {selectedSlot.filament_type} ({selectedSlot.color})
+                            </span>
+                          </div>
+                        ) : null;
+                      })()}
+                    </div>
+                  )}
                 </div>
               </div>
             );
