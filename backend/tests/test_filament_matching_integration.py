@@ -4,9 +4,8 @@ Integration test for the filament matching feature.
 Tests the complete flow from frontend to backend for filament matching.
 """
 
-import pytest
-from fastapi.testclient import TestClient
 from app.main import app
+from fastapi.testclient import TestClient
 
 client = TestClient(app)
 
@@ -54,7 +53,7 @@ class TestFilamentMatchingIntegration:
                             {
                                 "slot_id": 2,
                                 "filament_type": "PLA",
-                                "color": "#FFFFFF",  # Type match for requirement 2 (different color)
+                                "color": "#FFFFFF",  # Type match for req 2
                                 "material_id": "PLA_WHITE",
                             },
                             {

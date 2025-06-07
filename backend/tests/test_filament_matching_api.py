@@ -4,9 +4,8 @@ Tests for the filament matching API endpoint.
 Tests the new /api/filament/match endpoint that exposes the FilamentMatchingService.
 """
 
-import pytest
-from fastapi.testclient import TestClient
 from app.main import app
+from fastapi.testclient import TestClient
 
 client = TestClient(app)
 

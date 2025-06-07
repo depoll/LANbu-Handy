@@ -37,7 +37,9 @@ function FilamentMappingConfig({
   // Function to call backend filament matching service
   const reapplyFilamentMatching = async () => {
     if (!amsStatus || !amsStatus.success || !filamentRequirements) {
-      setMatchingError('Cannot apply matching: AMS status not available or no filament requirements');
+      setMatchingError(
+        'Cannot apply matching: AMS status not available or no filament requirements'
+      );
       return;
     }
 
@@ -185,9 +187,7 @@ function FilamentMappingConfig({
         </div>
         <p>Map each model filament to an available AMS slot</p>
         {matchingError && (
-          <div className="matching-error">
-            ⚠ {matchingError}
-          </div>
+          <div className="matching-error">⚠ {matchingError}</div>
         )}
       </div>
 
