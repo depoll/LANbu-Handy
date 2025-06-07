@@ -155,3 +155,25 @@ export interface PersistentPrintersResponse {
   }[];
   error_details?: string;
 }
+
+// Filament Matching API Types
+export interface FilamentMatchRequest {
+  filament_requirements: FilamentRequirement;
+  ams_status: AMSStatusResponse;
+}
+
+export interface FilamentMatchResult {
+  requirement_index: number;
+  ams_unit_id: number;
+  ams_slot_id: number;
+  match_quality: string; // "perfect", "type_only", "fallback", "none"
+  confidence: number;
+}
+
+export interface FilamentMatchResponse {
+  success: boolean;
+  message: string;
+  matches?: FilamentMatchResult[];
+  unmatched_requirements?: number[];
+  error_details?: string;
+}

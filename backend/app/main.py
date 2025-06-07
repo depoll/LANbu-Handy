@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from app.config import PrinterConfig, get_config
+from app.filament_matching_service import FilamentMatchingService
 from app.job_orchestration import (
     download_model_step,
     slice_model_step,
@@ -54,6 +55,9 @@ model_service = ModelService()
 
 # Initialize printer service
 printer_service = PrinterService()
+
+# Initialize filament matching service
+filament_matching_service = FilamentMatchingService()
 
 # Initialize configuration (for testing compatibility)
 config = get_config()
@@ -289,6 +293,27 @@ class PersistentPrintersResponse(BaseModel):
     success: bool
     message: str
     printers: List[Dict] = None
+    error_details: Optional[str] = None
+
+
+class FilamentMatchRequest(BaseModel):
+    filament_requirements: FilamentRequirementResponse
+    ams_status: AMSStatusResponse
+
+
+class FilamentMatchResult(BaseModel):
+    requirement_index: int
+    ams_unit_id: int
+    ams_slot_id: int
+    match_quality: str  # "perfect", "type_only", "fallback", "none"
+    confidence: float
+
+
+class FilamentMatchResponse(BaseModel):
+    success: bool
+    message: str
+    matches: List[FilamentMatchResult] = None
+    unmatched_requirements: Optional[List[int]] = None
     error_details: Optional[str] = None
 
 
@@ -875,6 +900,96 @@ async def get_ams_status(printer_id: str):
         raise
     except Exception as e:
         msg = f"Internal server error during AMS status query: {str(e)}"
+        raise HTTPException(status_code=500, detail=msg)
+
+
+@app.post("/api/filament/match", response_model=FilamentMatchResponse)
+async def match_filaments(request: FilamentMatchRequest):
+    """
+    Match filament requirements with available AMS filaments.
+
+    Uses the sophisticated backend FilamentMatchingService to suggest optimal
+    mappings between model filament requirements and available AMS slots based
+    on type compatibility and color similarity.
+
+    Args:
+        request: FilamentMatchRequest containing filament requirements and AMS status
+
+    Returns:
+        FilamentMatchResponse with suggested filament mappings
+
+    Raises:
+        HTTPException: If matching fails due to invalid input or internal error
+    """
+    try:
+        # Convert API models to internal service models
+        from app.model_service import FilamentRequirement
+        from app.printer_service import AMSFilament, AMSStatusResult, AMSUnit
+
+        # Convert filament requirements
+        filament_requirements = FilamentRequirement(
+            filament_count=request.filament_requirements.filament_count,
+            filament_types=request.filament_requirements.filament_types,
+            filament_colors=request.filament_requirements.filament_colors,
+            has_multicolor=request.filament_requirements.has_multicolor,
+        )
+
+        # Convert AMS status
+        ams_units = []
+        if request.ams_status.success and request.ams_status.ams_units:
+            for unit_response in request.ams_status.ams_units:
+                filaments = []
+                for filament_response in unit_response.filaments:
+                    ams_filament = AMSFilament(
+                        slot_id=filament_response.slot_id,
+                        filament_type=filament_response.filament_type,
+                        color=filament_response.color,
+                        material_id=filament_response.material_id,
+                    )
+                    filaments.append(ams_filament)
+
+                ams_unit = AMSUnit(unit_id=unit_response.unit_id, filaments=filaments)
+                ams_units.append(ams_unit)
+
+        ams_status = AMSStatusResult(
+            success=request.ams_status.success,
+            message=request.ams_status.message,
+            ams_units=ams_units,
+            error_details=request.ams_status.error_details,
+        )
+
+        # Perform filament matching
+        matching_result = filament_matching_service.match_filaments(
+            requirements=filament_requirements, ams_status=ams_status
+        )
+
+        # Convert result to API response format
+        matches = []
+        if matching_result.matches:
+            for match in matching_result.matches:
+                match_result = FilamentMatchResult(
+                    requirement_index=match.requirement_index,
+                    ams_unit_id=match.ams_unit_id,
+                    ams_slot_id=match.ams_slot_id,
+                    match_quality=match.match_quality,
+                    confidence=match.confidence,
+                )
+                matches.append(match_result)
+
+        return FilamentMatchResponse(
+            success=matching_result.success,
+            message=matching_result.message,
+            matches=matches,
+            unmatched_requirements=matching_result.unmatched_requirements,
+            error_details=matching_result.error_details,
+        )
+
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
+    except Exception as e:
+        msg = f"Internal server error during filament matching: {str(e)}"
+        logger.error(msg)
         raise HTTPException(status_code=500, detail=msg)
 
 
