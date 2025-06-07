@@ -2,12 +2,14 @@ import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { STLLoader } from 'three-stdlib';
 import { ThreeMFLoader } from 'three-stdlib';
-import { FilamentRequirement, FilamentMapping } from '../types/api';
+import { FilamentRequirement, FilamentMapping, PlateInfo } from '../types/api';
 
 interface ModelPreviewProps {
   fileId: string;
   filamentRequirements?: FilamentRequirement;
   filamentMappings?: FilamentMapping[];
+  plates?: PlateInfo[];
+  selectedPlateIndex?: number | null;
   className?: string;
 }
 
@@ -15,6 +17,8 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({
   fileId,
   filamentRequirements,
   filamentMappings = [],
+  plates = [],
+  selectedPlateIndex = null,
   className = '',
 }) => {
   const mountRef = useRef<HTMLDivElement>(null);
@@ -351,7 +355,7 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({
     return () => {
       clearLoadingTimeout();
     };
-  }, [fileId, filamentRequirements, filamentMappings, initError]);
+  }, [fileId, filamentRequirements, filamentMappings, initError, selectedPlateIndex]);
 
   // Update colors when filament mappings change
   useEffect(() => {
@@ -371,7 +375,15 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({
   return (
     <div className={`model-preview ${className}`}>
       <div className="model-preview-header">
-        <h3>Model Preview</h3>
+        <h3>
+          Model Preview
+          {plates.length > 1 && selectedPlateIndex !== null && (
+            <span className="plate-indicator"> - Plate {selectedPlateIndex}</span>
+          )}
+          {plates.length > 1 && selectedPlateIndex === null && (
+            <span className="plate-indicator"> - All Plates</span>
+          )}
+        </h3>
         {initError && (
           <span className="error-text">Initialization Error: {initError}</span>
         )}
@@ -417,6 +429,17 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({
           <small>
             ⚠️ Multi-material models show simplified color preview. Actual print
             will use mapped filament colors.
+          </small>
+        </div>
+      )}
+      {plates.length > 1 && (
+        <div className="preview-note">
+          <small>
+            📋 Multi-plate model detected. Preview shows{' '}
+            {selectedPlateIndex !== null ? `Plate ${selectedPlateIndex} only` : 'combined view of all plates'}.
+            {selectedPlateIndex !== null && (
+              <span> Use plate selector above to change the target plate for slicing.</span>
+            )}
           </small>
         </div>
       )}
