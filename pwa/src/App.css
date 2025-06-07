@@ -49,7 +49,13 @@ header p {
 
 .header-printer-selector .printer-name,
 .header-printer-selector .printer-ip {
-  color: white;
+  color: white; /* General color for these elements in the header selector */
+}
+
+/* Specific override for current printer display due to its light background */
+.header-printer-selector .current-printer-display .printer-name,
+.header-printer-selector .current-printer-display .printer-ip {
+  color: #0d47a1; /* Dark blue for better contrast, matches runtime-badge text */
 }
 
 .header-printer-selector .printer-ip {
