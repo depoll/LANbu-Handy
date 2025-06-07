@@ -19,8 +19,6 @@ wheels/
 .installed.cfg
 *.egg
 MANIFEST
-config/
-data/
 
 # Testing and coverage
 .coverage
@@ -76,3 +74,6 @@ Thumbs.db
 backend/static_pwa/
 test-results/
 .env.test
+
+config/
+data/
