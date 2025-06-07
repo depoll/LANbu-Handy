@@ -1,7 +1,11 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import FilamentMappingConfig from '../components/FilamentMappingConfig';
-import type { FilamentRequirement, AMSStatusResponse, FilamentMapping } from '../types/api';
+import type {
+  FilamentRequirement,
+  AMSStatusResponse,
+  FilamentMapping,
+} from '../types/api';
 
 // Mock fetch globally
 global.fetch = vi.fn();
@@ -47,7 +51,9 @@ describe('FilamentMappingConfig Component', () => {
 
     // Check that the component renders
     expect(screen.getByText('Filament Mapping')).toBeInTheDocument();
-    expect(screen.getByText('Map each model filament to an available AMS slot')).toBeInTheDocument();
+    expect(
+      screen.getByText('Map each model filament to an available AMS slot')
+    ).toBeInTheDocument();
 
     // Check that filament requirements are displayed
     expect(screen.getByText('Filament 1:')).toBeInTheDocument();
@@ -71,12 +77,12 @@ describe('FilamentMappingConfig Component', () => {
 
     // Find and click on the first AMS slot card
     const slotCards = screen.getAllByRole('button');
-    const firstSlotCard = slotCards.find(card => 
+    const firstSlotCard = slotCards.find(card =>
       card.textContent?.includes('Unit 0 • Slot 0')
     );
-    
+
     expect(firstSlotCard).toBeInTheDocument();
-    
+
     if (firstSlotCard) {
       fireEvent.click(firstSlotCard);
       expect(mockOnMappingChange).toHaveBeenCalled();
@@ -99,7 +105,11 @@ describe('FilamentMappingConfig Component', () => {
       />
     );
 
-    expect(screen.getByText('No AMS slots available for mapping. Please ensure your AMS is connected and has filaments loaded.')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'No AMS slots available for mapping. Please ensure your AMS is connected and has filaments loaded.'
+      )
+    ).toBeInTheDocument();
   });
 
   it('shows selection indicator when slot is selected', () => {

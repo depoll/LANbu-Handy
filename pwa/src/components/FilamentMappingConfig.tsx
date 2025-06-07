@@ -225,7 +225,9 @@ function FilamentMappingConfig({
                 <div className="mapping-arrow">→</div>
 
                 <div className="ams-slot-selection">
-                  <div className="slot-selection-label">Available AMS Slots:</div>
+                  <div className="slot-selection-label">
+                    Available AMS Slots:
+                  </div>
                   <div className="ams-slots-grid">
                     {availableSlots.length === 0 ? (
                       <div className="no-slots-message">
@@ -238,13 +240,25 @@ function FilamentMappingConfig({
                           <div
                             key={slot.value}
                             className={`ams-slot-card ${isSelected ? 'selected' : ''} ${disabled ? 'disabled' : ''}`}
-                            onClick={() => !disabled && handleMappingChange(index, isSelected ? '' : slot.value)}
+                            onClick={() =>
+                              !disabled &&
+                              handleMappingChange(
+                                index,
+                                isSelected ? '' : slot.value
+                              )
+                            }
                             role="button"
                             tabIndex={disabled ? -1 : 0}
-                            onKeyDown={(e) => {
-                              if (!disabled && (e.key === 'Enter' || e.key === ' ')) {
+                            onKeyDown={e => {
+                              if (
+                                !disabled &&
+                                (e.key === 'Enter' || e.key === ' ')
+                              ) {
                                 e.preventDefault();
-                                handleMappingChange(index, isSelected ? '' : slot.value);
+                                handleMappingChange(
+                                  index,
+                                  isSelected ? '' : slot.value
+                                );
                               }
                             }}
                           >
@@ -265,8 +279,12 @@ function FilamentMappingConfig({
                                 ></div>
                               </div>
                               <div className="slot-details">
-                                <div className="slot-filament-type">{slot.filament_type}</div>
-                                <div className="slot-color-value">{slot.color}</div>
+                                <div className="slot-filament-type">
+                                  {slot.filament_type}
+                                </div>
+                                <div className="slot-color-value">
+                                  {slot.color}
+                                </div>
                               </div>
                             </div>
                           </div>
@@ -277,12 +295,17 @@ function FilamentMappingConfig({
                   {currentMapping && (
                     <div className="selected-slot-summary">
                       {(() => {
-                        const selectedSlot = availableSlots.find(slot => slot.value === currentMapping);
+                        const selectedSlot = availableSlots.find(
+                          slot => slot.value === currentMapping
+                        );
                         return selectedSlot ? (
                           <div className="current-selection">
                             <span className="selection-label">Selected:</span>
                             <span className="selection-details">
-                              Unit {selectedSlot.unit_id}, Slot {selectedSlot.slot_id} - {selectedSlot.filament_type} ({selectedSlot.color})
+                              Unit {selectedSlot.unit_id}, Slot{' '}
+                              {selectedSlot.slot_id} -{' '}
+                              {selectedSlot.filament_type} ({selectedSlot.color}
+                              )
                             </span>
                           </div>
                         ) : null;
