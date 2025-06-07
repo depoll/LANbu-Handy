@@ -699,6 +699,17 @@ class PrinterService:
                     filament_type = tray.get("tray_type", "Unknown")
                     material_id = tray.get("tray_sub_brands", "Unknown")
                     color = tray.get("tray_color", "Unknown")
+                    if tray.get("state", 10) == 10:
+                        # If state is 10, it means the slot is empty
+                        filaments.append(
+                            AMSFilament(
+                                slot_id=slot_id,
+                                filament_type="Empty",
+                                color="#00000000",
+                                material_id=None,
+                            )
+                        )
+                        continue
                     filaments.append(
                         AMSFilament(
                             slot_id=slot_id,
