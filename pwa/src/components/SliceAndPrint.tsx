@@ -3,6 +3,7 @@ import AMSStatusDisplay from './AMSStatusDisplay';
 import FilamentRequirementsDisplay from './FilamentRequirementsDisplay';
 import FilamentMappingConfig from './FilamentMappingConfig';
 import BuildPlateSelector from './BuildPlateSelector';
+import PlateSelector from './PlateSelector';
 import ConfigurationSummary from './ConfigurationSummary';
 import OperationProgress, { OperationStep } from './OperationProgress';
 import ModelPreview from './ModelPreview';
@@ -14,6 +15,7 @@ import {
   FilamentMapping,
   ConfiguredSliceRequest,
   SliceResponse,
+  PlateInfo,
 } from '../types/api';
 
 interface JobStep {
@@ -43,6 +45,13 @@ function SliceAndPrint() {
     useState<FilamentRequirement | null>(null);
   const [amsStatus, setAmsStatus] = useState<AMSStatusResponse | null>(null);
   const [currentFileId, setCurrentFileId] = useState<string>('');
+
+  // Plate selection state
+  const [plates, setPlates] = useState<PlateInfo[]>([]);
+  const [hasMultiplePlates, setHasMultiplePlates] = useState<boolean>(false);
+  const [selectedPlateIndex, setSelectedPlateIndex] = useState<number | null>(
+    null
+  );
 
   // File upload state
   const [inputMode, setInputMode] = useState<'url' | 'file'>('url');
@@ -123,6 +132,10 @@ function SliceAndPrint() {
     // Reset file upload state
     setSelectedFile(null);
     setUploadProgress(0);
+    // Reset plate state
+    setPlates([]);
+    setHasMultiplePlates(false);
+    setSelectedPlateIndex(null);
   };
 
   const handleModelSubmit = async () => {
@@ -187,6 +200,29 @@ function SliceAndPrint() {
       if (result.success) {
         addStatusMessage(`✅ Model analysis completed: ${result.message}`);
         setCurrentFileId(result.file_id || '');
+
+        // Process plate information
+        if (result.plates && result.plates.length > 0) {
+          setPlates(result.plates);
+          setHasMultiplePlates(result.has_multiple_plates);
+          addStatusMessage(
+            `📋 Found ${result.plates.length} plate(s) in model`
+          );
+
+          // Auto-select first plate if multiple plates, or all plates if only one
+          if (result.has_multiple_plates) {
+            setSelectedPlateIndex(result.plates[0].index);
+            addStatusMessage(
+              `🎯 Auto-selected Plate ${result.plates[0].index} (click to change)`
+            );
+          } else {
+            setSelectedPlateIndex(null); // Use all plates for single plate models
+          }
+        } else {
+          setPlates([]);
+          setHasMultiplePlates(false);
+          setSelectedPlateIndex(null);
+        }
 
         if (result.filament_requirements) {
           setFilamentRequirements(result.filament_requirements);
@@ -328,6 +364,29 @@ function SliceAndPrint() {
       if (result.success) {
         addStatusMessage(`✅ File upload completed: ${result.message}`);
         setCurrentFileId(result.file_id || '');
+
+        // Process plate information
+        if (result.plates && result.plates.length > 0) {
+          setPlates(result.plates);
+          setHasMultiplePlates(result.has_multiple_plates);
+          addStatusMessage(
+            `📋 Found ${result.plates.length} plate(s) in model`
+          );
+
+          // Auto-select first plate if multiple plates, or all plates if only one
+          if (result.has_multiple_plates) {
+            setSelectedPlateIndex(result.plates[0].index);
+            addStatusMessage(
+              `🎯 Auto-selected Plate ${result.plates[0].index} (click to change)`
+            );
+          } else {
+            setSelectedPlateIndex(null); // Use all plates for single plate models
+          }
+        } else {
+          setPlates([]);
+          setHasMultiplePlates(false);
+          setSelectedPlateIndex(null);
+        }
 
         if (result.filament_requirements) {
           setFilamentRequirements(result.filament_requirements);
@@ -526,6 +585,16 @@ function SliceAndPrint() {
 
     // Add configuration details to status
     addStatusMessage(`📋 Build plate: ${selectedBuildPlate}`);
+    if (selectedPlateIndex !== null) {
+      const selectedPlate = plates.find(p => p.index === selectedPlateIndex);
+      if (selectedPlate) {
+        addStatusMessage(
+          `🎯 Slicing Plate ${selectedPlate.index} only (${selectedPlate.object_count} objects)`
+        );
+      }
+    } else if (hasMultiplePlates) {
+      addStatusMessage(`🎯 Slicing all ${plates.length} plates`);
+    }
     if (filamentMappings.length > 0) {
       addStatusMessage(
         `🎨 Using ${filamentMappings.length} mapped filament(s) from AMS`
@@ -540,6 +609,7 @@ function SliceAndPrint() {
         file_id: currentFileId,
         filament_mappings: filamentMappings,
         build_plate_type: selectedBuildPlate,
+        selected_plate_index: selectedPlateIndex,
       };
 
       updateOperationStep(0, 'completed', 'Configuration prepared');
@@ -947,6 +1017,12 @@ function SliceAndPrint() {
         />
       )}
 
+      {/* AMS Status Display - Always available */}
+      <AMSStatusDisplay
+        printerId={defaultPrinterId}
+        onStatusUpdate={handleAMSStatusUpdate}
+      />
+
       {/* Filament Requirements Display */}
       {modelSubmitted && filamentRequirements && (
         <FilamentRequirementsDisplay
@@ -962,17 +1038,11 @@ function SliceAndPrint() {
             fileId={currentFileId}
             filamentRequirements={filamentRequirements || undefined}
             filamentMappings={filamentMappings}
+            plates={plates}
+            selectedPlateIndex={selectedPlateIndex}
             className="workflow-section"
           />
         </div>
-      )}
-
-      {/* AMS Status Display */}
-      {modelSubmitted && (
-        <AMSStatusDisplay
-          printerId={defaultPrinterId}
-          onStatusUpdate={handleAMSStatusUpdate}
-        />
       )}
 
       {/* Configuration Section - Show after model analysis and AMS status */}
@@ -981,9 +1051,20 @@ function SliceAndPrint() {
           <div className="configuration-header">
             <h3>Print Configuration</h3>
             <p>
-              Configure your filament mappings and build plate before slicing
+              Configure your plate selection, filament mappings, and build plate
+              before slicing
             </p>
           </div>
+
+          {/* Plate Selection - Show if multiple plates detected */}
+          {hasMultiplePlates && (
+            <PlateSelector
+              plates={plates}
+              selectedPlateIndex={selectedPlateIndex}
+              onPlateSelect={setSelectedPlateIndex}
+              disabled={isProcessing}
+            />
+          )}
 
           {/* Filament Mapping Configuration */}
           {filamentRequirements.filament_count > 0 && (

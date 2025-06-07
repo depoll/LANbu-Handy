@@ -172,6 +172,14 @@ class ModelURLRequest(BaseModel):
     model_url: str
 
 
+class PlateInfoResponse(BaseModel):
+    index: int
+    prediction_seconds: Optional[int] = None
+    weight_grams: Optional[float] = None
+    has_support: bool = False
+    object_count: int = 0
+
+
 class FilamentRequirementResponse(BaseModel):
     filament_count: int
     filament_types: List[str]
@@ -185,6 +193,8 @@ class ModelSubmissionResponse(BaseModel):
     file_id: str = None
     file_info: dict = None
     filament_requirements: Optional[FilamentRequirementResponse] = None
+    plates: Optional[List[PlateInfoResponse]] = None
+    has_multiple_plates: bool = False
 
 
 class SliceRequest(BaseModel):
@@ -238,6 +248,7 @@ class ConfiguredSliceRequest(BaseModel):
     file_id: str
     filament_mappings: List[FilamentMapping]
     build_plate_type: str
+    selected_plate_index: Optional[int] = None  # None means all plates
 
 
 class SetActivePrinterRequest(BaseModel):
@@ -330,18 +341,32 @@ async def submit_model_url(request: ModelURLRequest):
         # Get file information
         file_info = model_service.get_file_info(file_path)
 
-        # Parse filament requirements if it's a .3mf file
-        filament_requirements = model_service.parse_3mf_filament_requirements(file_path)
+        # Parse comprehensive model information if it's a .3mf file
+        model_info = model_service.parse_3mf_model_info(file_path)
 
-        # Convert to response model if requirements were found
+        # Convert filament requirements to response model if found
         filament_requirements_response = None
-        if filament_requirements:
+        if model_info.filament_requirements:
             filament_requirements_response = FilamentRequirementResponse(
-                filament_count=filament_requirements.filament_count,
-                filament_types=filament_requirements.filament_types,
-                filament_colors=filament_requirements.filament_colors,
-                has_multicolor=filament_requirements.has_multicolor,
+                filament_count=model_info.filament_requirements.filament_count,
+                filament_types=model_info.filament_requirements.filament_types,
+                filament_colors=model_info.filament_requirements.filament_colors,
+                has_multicolor=model_info.filament_requirements.has_multicolor,
             )
+
+        # Convert plate information to response model
+        plates_response = []
+        if model_info.plates:
+            for plate in model_info.plates:
+                plates_response.append(
+                    PlateInfoResponse(
+                        index=plate.index,
+                        prediction_seconds=plate.prediction_seconds,
+                        weight_grams=plate.weight_grams,
+                        has_support=plate.has_support,
+                        object_count=plate.object_count,
+                    )
+                )
 
         # Generate file ID (using the filename without UUID prefix
         # for user display)
@@ -353,6 +378,8 @@ async def submit_model_url(request: ModelURLRequest):
             file_id=file_id,
             file_info=file_info,
             filament_requirements=filament_requirements_response,
+            plates=plates_response if plates_response else None,
+            has_multiple_plates=model_info.has_multiple_plates,
         )
 
     except (ModelValidationError, ModelDownloadError, Exception) as e:
@@ -410,20 +437,32 @@ async def upload_model_file(file: UploadFile = File(...)):
         # Get file information
         file_info = model_service.get_file_info(temp_file_path)
 
-        # Parse filament requirements if it's a .3mf file
-        filament_requirements = model_service.parse_3mf_filament_requirements(
-            temp_file_path
-        )
+        # Parse comprehensive model information if it's a .3mf file
+        model_info = model_service.parse_3mf_model_info(temp_file_path)
 
-        # Convert to response model if requirements were found
+        # Convert filament requirements to response model if found
         filament_requirements_response = None
-        if filament_requirements:
+        if model_info.filament_requirements:
             filament_requirements_response = FilamentRequirementResponse(
-                filament_count=filament_requirements.filament_count,
-                filament_types=filament_requirements.filament_types,
-                filament_colors=filament_requirements.filament_colors,
-                has_multicolor=filament_requirements.has_multicolor,
+                filament_count=model_info.filament_requirements.filament_count,
+                filament_types=model_info.filament_requirements.filament_types,
+                filament_colors=model_info.filament_requirements.filament_colors,
+                has_multicolor=model_info.filament_requirements.has_multicolor,
             )
+
+        # Convert plate information to response model
+        plates_response = []
+        if model_info.plates:
+            for plate in model_info.plates:
+                plates_response.append(
+                    PlateInfoResponse(
+                        index=plate.index,
+                        prediction_seconds=plate.prediction_seconds,
+                        weight_grams=plate.weight_grams,
+                        has_support=plate.has_support,
+                        object_count=plate.object_count,
+                    )
+                )
 
         # Generate file ID (using the filename with UUID prefix for storage)
         file_id = temp_file_path.name
@@ -434,6 +473,8 @@ async def upload_model_file(file: UploadFile = File(...)):
             file_id=file_id,
             file_info=file_info,
             filament_requirements=filament_requirements_response,
+            plates=plates_response if plates_response else None,
+            has_multiple_plates=model_info.has_multiple_plates,
         )
 
     except (ModelValidationError, Exception) as e:
@@ -591,7 +632,9 @@ async def slice_model_with_configuration(request: ConfiguredSliceRequest):
 
         # Build slicing options from the configuration
         slicing_options = build_slicing_options_from_config(
-            request.filament_mappings, request.build_plate_type
+            request.filament_mappings,
+            request.build_plate_type,
+            request.selected_plate_index,
         )
 
         # Slice the model
