@@ -32,6 +32,17 @@ class ModelDownloadError(Exception):
 
 
 @dataclass
+class PlateInfo:
+    """Information about a single plate in a 3MF file."""
+    
+    index: int
+    prediction_seconds: Optional[int] = None
+    weight_grams: Optional[float] = None
+    has_support: bool = False
+    object_count: int = 0
+    
+    
+@dataclass
 class FilamentRequirement:
     """Information about filament requirements for a 3D model."""
 
@@ -43,6 +54,21 @@ class FilamentRequirement:
     def __post_init__(self):
         """Ensure consistency in the data."""
         self.has_multicolor = self.filament_count > 1
+
+
+@dataclass
+class ModelInfo:
+    """Comprehensive information about a 3D model."""
+    
+    filament_requirements: Optional[FilamentRequirement] = None
+    plates: List[PlateInfo] = None
+    has_multiple_plates: bool = False
+    
+    def __post_init__(self):
+        """Ensure consistency in the data."""
+        if self.plates is None:
+            self.plates = []
+        self.has_multiple_plates = len(self.plates) > 1
 
 
 class ModelService:
@@ -357,3 +383,94 @@ class ModelService:
         except Exception:
             # Catch any other unexpected errors
             return None
+
+    def parse_3mf_plate_info(self, file_path: Path) -> List[PlateInfo]:
+        """
+        Parse plate information from a .3mf file.
+
+        Args:
+            file_path: Path to the .3mf file
+
+        Returns:
+            List of PlateInfo objects, empty if parsing fails or file is not .3mf
+        """
+        # Only process .3mf files
+        if file_path.suffix.lower() != ".3mf":
+            return []
+
+        try:
+            import xml.etree.ElementTree as ET
+            
+            with zipfile.ZipFile(file_path, "r") as zip_file:
+                # Check if slice_info.config exists (contains plate information)
+                slice_info_path = "Metadata/slice_info.config"
+                if slice_info_path not in zip_file.namelist():
+                    # No slice info found, assume single plate
+                    return []
+
+                # Read and parse the slice info XML
+                with zip_file.open(slice_info_path) as slice_file:
+                    content = slice_file.read().decode('utf-8')
+                    root = ET.fromstring(content)
+
+                plates = []
+                
+                # Find all plate elements
+                plate_elements = root.findall('.//plate')
+                
+                for plate_elem in plate_elements:
+                    plate_info = PlateInfo(index=0)
+                    
+                    # Extract metadata
+                    for metadata in plate_elem.findall('metadata'):
+                        key = metadata.get('key')
+                        value = metadata.get('value')
+                        
+                        if key == 'index':
+                            plate_info.index = int(value)
+                        elif key == 'prediction':
+                            plate_info.prediction_seconds = int(value)
+                        elif key == 'weight':
+                            plate_info.weight_grams = float(value)
+                        elif key == 'support_used':
+                            plate_info.has_support = value.lower() == 'true'
+                    
+                    # Count objects in this plate
+                    objects = plate_elem.findall('.//object')
+                    plate_info.object_count = len(objects)
+                    
+                    plates.append(plate_info)
+                
+                # Sort by plate index
+                plates.sort(key=lambda p: p.index)
+                return plates
+
+        except (zipfile.BadZipFile, ET.ParseError, ValueError, OSError):
+            # If there's any error in parsing, return empty list
+            return []
+        except Exception:
+            # Catch any other unexpected errors
+            return []
+
+    def parse_3mf_model_info(self, file_path: Path) -> ModelInfo:
+        """
+        Parse comprehensive model information from a .3mf file.
+
+        Args:
+            file_path: Path to the .3mf file
+
+        Returns:
+            ModelInfo object with filament requirements and plate information
+        """
+        model_info = ModelInfo()
+        
+        # Parse filament requirements
+        model_info.filament_requirements = self.parse_3mf_filament_requirements(file_path)
+        
+        # Parse plate information
+        model_info.plates = self.parse_3mf_plate_info(file_path)
+        
+        # Manually update has_multiple_plates
+        model_info.has_multiple_plates = len(model_info.plates) > 1
+        
+        return model_info
