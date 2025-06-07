@@ -849,6 +849,7 @@ function SliceAndPrint() {
               placeholder="https://example.com/model.stl"
               disabled={isProcessing || modelSubmitted}
               className="model-url-input"
+              data-testid="model-url-input"
             />
           </div>
         )}
@@ -903,6 +904,7 @@ function SliceAndPrint() {
               onClick={handleSubmit}
               disabled={isProcessing || !canSubmit()}
               className="slice-and-print-button"
+              data-testid="analyze-model-button"
             >
               {isProcessing
                 ? inputMode === 'url'
@@ -955,12 +957,14 @@ function SliceAndPrint() {
 
       {/* Model Preview */}
       {modelSubmitted && currentFileId && (
-        <ModelPreview
-          fileId={currentFileId}
-          filamentRequirements={filamentRequirements || undefined}
-          filamentMappings={filamentMappings}
-          className="workflow-section"
-        />
+        <div data-testid="model-analysis-success">
+          <ModelPreview
+            fileId={currentFileId}
+            filamentRequirements={filamentRequirements || undefined}
+            filamentMappings={filamentMappings}
+            className="workflow-section"
+          />
+        </div>
       )}
 
       {/* AMS Status Display */}
