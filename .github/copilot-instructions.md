@@ -98,3 +98,4 @@ By following these guidelines, Copilot Workspace can be a powerful assistant in 
 - When possible, include screenshots of any UI changes in the PR after implementing using playwright.
 - If you change UI, provide screenshots of the changes in the PR.
 - Ensure that any new code is well-tested.
+- When asked to review failing checks or details of an issue or PR, use the GitHub tools to fetch recent results.
