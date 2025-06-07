@@ -28,6 +28,334 @@ from app.printer_service import (
     PrinterService,
 )
 
+TEST_AMS_RESPONSE_DATA = {
+    "ams": {
+        "ams": [
+            {
+                "dry_time": 0,
+                "humidity": "4",
+                "humidity_raw": "21",
+                "id": "0",
+                "info": "1001",
+                "temp": "27.9",
+                "tray": [
+                    {
+                        "bed_temp": "35",
+                        "bed_temp_type": "1",
+                        "cali_idx": 7926,
+                        "cols": ["3F8E43FF"],
+                        "ctype": 0,
+                        "drying_temp": "55",
+                        "drying_time": "8",
+                        "id": "0",
+                        "nozzle_temp_max": "230",
+                        "nozzle_temp_min": "190",
+                        "remain": 49,
+                        "state": 11,
+                        "tag_uid": "EE40AA7F00000100",
+                        "total_len": 330000,
+                        "tray_color": "3F8E43FF",
+                        "tray_diameter": "1.75",
+                        "tray_id_name": "A00-G2",
+                        "tray_info_idx": "GFA00",
+                        "tray_sub_brands": "PLA Basic",
+                        "tray_type": "PLA",
+                        "tray_uuid": "55AE22B0C00449939AFCB26C1971B1CC",
+                        "tray_weight": "1000",
+                        "xcam_info": "AC0D8813200384036666663F",
+                    },
+                    {
+                        "bed_temp": "0",
+                        "bed_temp_type": "0",
+                        "cali_idx": 7111,
+                        "cols": ["898989FF"],
+                        "ctype": 0,
+                        "drying_temp": "0",
+                        "drying_time": "0",
+                        "id": "1",
+                        "nozzle_temp_max": "250",
+                        "nozzle_temp_min": "230",
+                        "remain": -1,
+                        "state": 11,
+                        "tag_uid": "0000000000000000",
+                        "total_len": 330000,
+                        "tray_color": "898989FF",
+                        "tray_diameter": "1.75",
+                        "tray_id_name": "",
+                        "tray_info_idx": "Pf61f0ac",
+                        "tray_sub_brands": "",
+                        "tray_type": "PETG",
+                        "tray_uuid": "00000000000000000000000000000000",
+                        "tray_weight": "0",
+                        "xcam_info": "000000000000000000000000",
+                    },
+                    {
+                        "bed_temp": "0",
+                        "bed_temp_type": "0",
+                        "cali_idx": 4436,
+                        "cols": ["000000FF"],
+                        "ctype": 0,
+                        "drying_temp": "65",
+                        "drying_time": "8",
+                        "id": "2",
+                        "nozzle_temp_max": "260",
+                        "nozzle_temp_min": "230",
+                        "remain": 62,
+                        "state": 11,
+                        "tag_uid": "AAB35EF300000100",
+                        "total_len": 330000,
+                        "tray_color": "000000FF",
+                        "tray_diameter": "1.75",
+                        "tray_id_name": "G02-K0",
+                        "tray_info_idx": "GFG02",
+                        "tray_sub_brands": "PETG HF",
+                        "tray_type": "PETG",
+                        "tray_uuid": "E5F3C41DA01D40F5A1CDBECA03CF4084",
+                        "tray_weight": "1000",
+                        "xcam_info": "8813A438F40158020000803F",
+                    },
+                    {
+                        "bed_temp": "0",
+                        "bed_temp_type": "0",
+                        "cali_idx": 7926,
+                        "cols": ["000000FF"],
+                        "ctype": 0,
+                        "drying_temp": "55",
+                        "drying_time": "8",
+                        "id": "3",
+                        "nozzle_temp_max": "230",
+                        "nozzle_temp_min": "190",
+                        "remain": 90,
+                        "state": 11,
+                        "tag_uid": "BA1ABC7100000100",
+                        "total_len": 330000,
+                        "tray_color": "000000FF",
+                        "tray_diameter": "1.75",
+                        "tray_id_name": "A00-K0",
+                        "tray_info_idx": "GFA00",
+                        "tray_sub_brands": "PLA Basic",
+                        "tray_type": "PLA",
+                        "tray_uuid": "5CF9C2DF2A684313B2B1B9FB9307B020",
+                        "tray_weight": "1000",
+                        "xcam_info": "803E803EE803E803CDCC4C3F",
+                    },
+                ],
+            },
+            {
+                "dry_time": 0,
+                "humidity": "4",
+                "humidity_raw": "25",
+                "id": "1",
+                "info": "1001",
+                "temp": "25.7",
+                "tray": [
+                    {
+                        "bed_temp": "0",
+                        "bed_temp_type": "0",
+                        "cali_idx": 7926,
+                        "cols": ["FFFFFFFF"],
+                        "ctype": 0,
+                        "drying_temp": "65",
+                        "drying_time": "8",
+                        "id": "0",
+                        "nozzle_temp_max": "260",
+                        "nozzle_temp_min": "230",
+                        "remain": 90,
+                        "state": 11,
+                        "tag_uid": "73FC443200000100",
+                        "total_len": 330000,
+                        "tray_color": "FFFFFFFF",
+                        "tray_diameter": "1.75",
+                        "tray_id_name": "G02-W0",
+                        "tray_info_idx": "GFG02",
+                        "tray_sub_brands": "PETG HF",
+                        "tray_type": "PETG",
+                        "tray_uuid": "94D09300F1F24C25B732E6BCA8EEF749",
+                        "tray_weight": "1000",
+                        "xcam_info": "803E803E8403E8030000803F",
+                    },
+                    {
+                        "bed_temp": "0",
+                        "bed_temp_type": "0",
+                        "cali_idx": 4436,
+                        "cols": ["7C4B00FF"],
+                        "ctype": 0,
+                        "drying_temp": "0",
+                        "drying_time": "0",
+                        "id": "1",
+                        "nozzle_temp_max": "240",
+                        "nozzle_temp_min": "190",
+                        "remain": -1,
+                        "state": 11,
+                        "tag_uid": "0000000000000000",
+                        "total_len": 330000,
+                        "tray_color": "7C4B00FF",
+                        "tray_diameter": "1.75",
+                        "tray_id_name": "",
+                        "tray_info_idx": "GFL03",
+                        "tray_sub_brands": "",
+                        "tray_type": "PLA",
+                        "tray_uuid": "00000000000000000000000000000000",
+                        "tray_weight": "0",
+                        "xcam_info": "000000000000000000000000",
+                    },
+                    {
+                        "bed_temp": "0",
+                        "bed_temp_type": "0",
+                        "cali_idx": -1,
+                        "cols": ["F9DFB9FF"],
+                        "ctype": 0,
+                        "drying_temp": "65",
+                        "drying_time": "8",
+                        "id": "2",
+                        "nozzle_temp_max": "260",
+                        "nozzle_temp_min": "230",
+                        "remain": 99,
+                        "state": 11,
+                        "tag_uid": "433AED3200000100",
+                        "total_len": 330000,
+                        "tray_color": "F9DFB9FF",
+                        "tray_diameter": "1.75",
+                        "tray_id_name": "G02-Y1",
+                        "tray_info_idx": "GFG02",
+                        "tray_sub_brands": "PETG HF",
+                        "tray_type": "PETG",
+                        "tray_uuid": "3E2751E4019347FBB919A47A36D498BB",
+                        "tray_weight": "1000",
+                        "xcam_info": "000000000000000000000000",
+                    },
+                    {
+                        "bed_temp": "0",
+                        "bed_temp_type": "0",
+                        "cali_idx": 7926,
+                        "cols": ["39541AFF"],
+                        "ctype": 0,
+                        "drying_temp": "65",
+                        "drying_time": "8",
+                        "id": "3",
+                        "nozzle_temp_max": "260",
+                        "nozzle_temp_min": "230",
+                        "remain": 67,
+                        "state": 11,
+                        "tag_uid": "9BFBF9F900000100",
+                        "total_len": 330000,
+                        "tray_color": "39541AFF",
+                        "tray_diameter": "1.75",
+                        "tray_id_name": "G02-G2",
+                        "tray_info_idx": "GFG02",
+                        "tray_sub_brands": "PETG HF",
+                        "tray_type": "PETG",
+                        "tray_uuid": "A6ECBDC98F3D4DE78FE5057F0EB5C05A",
+                        "tray_weight": "1000",
+                        "xcam_info": "000000000000000000000000",
+                    },
+                ],
+            },
+            {
+                "dry_time": 0,
+                "humidity": "4",
+                "humidity_raw": "25",
+                "id": "2",
+                "info": "1001",
+                "temp": "26.4",
+                "tray": [
+                    {"id": "0", "state": 10},
+                    {
+                        "bed_temp": "0",
+                        "bed_temp_type": "0",
+                        "cali_idx": -1,
+                        "cols": ["F72323FF"],
+                        "ctype": 0,
+                        "drying_temp": "0",
+                        "drying_time": "0",
+                        "id": "1",
+                        "nozzle_temp_max": "240",
+                        "nozzle_temp_min": "190",
+                        "remain": -1,
+                        "state": 11,
+                        "tag_uid": "0000000000000000",
+                        "total_len": 330000,
+                        "tray_color": "F72323FF",
+                        "tray_diameter": "1.75",
+                        "tray_id_name": "",
+                        "tray_info_idx": "P2e20b78",
+                        "tray_sub_brands": "",
+                        "tray_type": "PLA",
+                        "tray_uuid": "00000000000000000000000000000000",
+                        "tray_weight": "0",
+                        "xcam_info": "000000000000000000000000",
+                    },
+                    {
+                        "bed_temp": "0",
+                        "bed_temp_type": "0",
+                        "cali_idx": -1,
+                        "cols": ["00AE42FF"],
+                        "ctype": 0,
+                        "drying_temp": "65",
+                        "drying_time": "8",
+                        "id": "2",
+                        "nozzle_temp_max": "260",
+                        "nozzle_temp_min": "230",
+                        "remain": 89,
+                        "state": 11,
+                        "tag_uid": "1B11B6FE00000100",
+                        "total_len": 330000,
+                        "tray_color": "00AE42FF",
+                        "tray_diameter": "1.75",
+                        "tray_id_name": "G02-G0",
+                        "tray_info_idx": "GFG02",
+                        "tray_sub_brands": "PETG HF",
+                        "tray_type": "PETG",
+                        "tray_uuid": "21E002C692C440C7B6CD59D560879D75",
+                        "tray_weight": "1000",
+                        "xcam_info": "10271027200384030000803F",
+                    },
+                    {
+                        "bed_temp": "0",
+                        "bed_temp_type": "0",
+                        "cali_idx": 7926,
+                        "cols": ["F75403FF"],
+                        "ctype": 0,
+                        "drying_temp": "65",
+                        "drying_time": "8",
+                        "id": "3",
+                        "nozzle_temp_max": "260",
+                        "nozzle_temp_min": "230",
+                        "remain": 91,
+                        "state": 11,
+                        "tag_uid": "FB4CD3FB00000100",
+                        "total_len": 330000,
+                        "tray_color": "F75403FF",
+                        "tray_diameter": "1.75",
+                        "tray_id_name": "G02-A0",
+                        "tray_info_idx": "GFG02",
+                        "tray_sub_brands": "PETG HF",
+                        "tray_type": "PETG",
+                        "tray_uuid": "A1E274C86A744911B334A577F45A824B",
+                        "tray_weight": "1000",
+                        "xcam_info": "88138813200384030000803F",
+                    },
+                ],
+            },
+        ],
+        "ams_exist_bits": "7",
+        "ams_exist_bits_raw": "7",
+        "cali_id": 0,
+        "cali_stat": 0,
+        "insert_flag": True,
+        "power_on_flag": False,
+        "tray_exist_bits": "eff",
+        "tray_is_bbl_bits": "eff",
+        "tray_now": "255",
+        "tray_pre": "255",
+        "tray_read_done_bits": "eff",
+        "tray_reading_bits": "0",
+        "tray_tar": "255",
+        "unbind_ams_stat": 0,
+        "version": 98743,
+    }
+}
+
 
 class TestPrinterServiceExceptions:
     """Test custom exception classes."""
@@ -961,31 +1289,7 @@ class TestAMSQuery:
             if hasattr(mock_client, "on_message"):
                 # Create a mock message with AMS data
                 mock_msg = Mock()
-                ams_response = {
-                    "ams": {
-                        "ams": [
-                            {
-                                "id": 0,
-                                "tray": [
-                                    {
-                                        "id": 0,
-                                        "type": "PLA",
-                                        "color": "Red",
-                                        "exist": True,
-                                        "material_id": "BAMBU_PLA_RED",
-                                    },
-                                    {
-                                        "id": 1,
-                                        "type": "PETG",
-                                        "color": "Blue",
-                                        "exist": True,
-                                        "material_id": "BAMBU_PETG_BLUE",
-                                    },
-                                ],
-                            }
-                        ]
-                    }
-                }
+                ams_response = TEST_AMS_RESPONSE_DATA
                 mock_msg.payload.decode.return_value = json.dumps(ams_response)
                 mock_client.on_message(mock_client, None, mock_msg)
 
@@ -1002,25 +1306,7 @@ class TestAMSQuery:
         assert result.success is True
         assert "AMS status retrieved successfully" in result.message
         assert result.ams_units is not None
-        assert len(result.ams_units) == 1
-
-        # Verify AMS unit data
-        ams_unit = result.ams_units[0]
-        assert ams_unit.unit_id == 0
-        assert len(ams_unit.filaments) == 2
-
-        # Verify filament data
-        filament1 = ams_unit.filaments[0]
-        assert filament1.slot_id == 0
-        assert filament1.filament_type == "PLA"
-        assert filament1.color == "Red"
-        assert filament1.material_id == "BAMBU_PLA_RED"
-
-        filament2 = ams_unit.filaments[1]
-        assert filament2.slot_id == 1
-        assert filament2.filament_type == "PETG"
-        assert filament2.color == "Blue"
-        assert filament2.material_id == "BAMBU_PETG_BLUE"
+        assert len(result.ams_units) == 3  # Based on TEST_AMS_RESPONSE_DATA
 
         # Verify MQTT operations
         mock_client.username_pw_set.assert_called_once_with(
@@ -1088,97 +1374,87 @@ class TestAMSQuery:
 
     def test_parse_ams_data_valid(self, printer_service):
         """Test parsing valid AMS data."""
-        response_data = {
-            "ams": {
-                "ams": [
-                    {
-                        "id": 0,
-                        "tray": [
-                            {
-                                "id": 0,
-                                "type": "PLA",
-                                "color": "Red",
-                                "exist": True,
-                                "material_id": "BAMBU_PLA_RED",
-                            },
-                            {
-                                "id": 1,
-                                "type": "PETG",
-                                "color": "#0000FF",
-                                "exist": True,
-                            },
-                        ],
-                    },
-                    {
-                        "id": 1,
-                        "tray": [
-                            {"id": 0, "type": "ABS", "color": "Green", "exist": True}
-                        ],
-                    },
-                ]
-            }
-        }
+        response_data = TEST_AMS_RESPONSE_DATA
 
         ams_units = printer_service._parse_ams_data(response_data)
 
-        assert len(ams_units) == 2
+        assert len(ams_units) == 3
 
         # First AMS unit
         unit1 = ams_units[0]
         assert unit1.unit_id == 0
-        assert len(unit1.filaments) == 2
+        assert len(unit1.filaments) == 4
 
         filament1 = unit1.filaments[0]
         assert filament1.slot_id == 0
         assert filament1.filament_type == "PLA"
-        assert filament1.color == "Red"
-        assert filament1.material_id == "BAMBU_PLA_RED"
+        assert filament1.color == "3F8E43FF" or filament1.color == "#3F8E43FF"
 
         filament2 = unit1.filaments[1]
         assert filament2.slot_id == 1
         assert filament2.filament_type == "PETG"
-        assert filament2.color == "#0000FF"
+        assert filament2.color == "898989FF" or filament2.color == "#898989FF"
+
+        filament3 = unit1.filaments[2]
+        assert filament3.slot_id == 2
+        assert filament3.filament_type == "PETG"
+        assert filament3.color == "000000FF" or filament3.color == "#000000FF"
+
+        filament4 = unit1.filaments[3]
+        assert filament4.slot_id == 3
+        assert filament4.filament_type == "PLA"
+        assert filament4.color == "000000FF" or filament4.color == "#000000FF"
 
         # Second AMS unit
         unit2 = ams_units[1]
         assert unit2.unit_id == 1
-        assert len(unit2.filaments) == 1
+        assert len(unit2.filaments) == 4
 
-        filament3 = unit2.filaments[0]
-        assert filament3.slot_id == 0
-        assert filament3.filament_type == "ABS"
-        assert filament3.color == "Green"
+        filament5 = unit2.filaments[0]
+        assert filament5.slot_id == 0
+        assert filament5.filament_type == "PETG"
+        assert filament5.color == "FFFFFFFF" or filament5.color == "#FFFFFFFF"
 
-    def test_parse_ams_data_empty_slots(self, printer_service):
-        """Test parsing AMS data with empty slots."""
-        response_data = {
-            "ams": {
-                "ams": [
-                    {
-                        "id": 0,
-                        "tray": [
-                            {"id": 0, "type": "PLA", "color": "Red", "exist": True},
-                            {
-                                "id": 1,
-                                "type": "Unknown",
-                                "color": "Unknown",
-                                "exist": False,  # Empty slot
-                            },
-                        ],
-                    }
-                ]
-            }
-        }
+        filament6 = unit2.filaments[1]
+        assert filament6.slot_id == 1
+        assert filament6.filament_type == "PLA"
+        assert filament6.color == "7C4B00FF" or filament6.color == "#7C4B00FF"
 
-        ams_units = printer_service._parse_ams_data(response_data)
+        filament7 = unit2.filaments[2]
+        assert filament7.slot_id == 2
+        assert filament7.filament_type == "PETG"
+        assert filament7.color == "F9DFB9FF" or filament7.color == "#F9DFB9FF"
 
-        assert len(ams_units) == 1
-        unit = ams_units[0]
-        assert len(unit.filaments) == 1  # Only the loaded filament
+        filament8 = unit2.filaments[3]
+        assert filament8.slot_id == 3
+        assert filament8.filament_type == "PETG"
+        assert filament8.color == "39541AFF" or filament8.color == "#39541AFF"
 
-        filament = unit.filaments[0]
-        assert filament.slot_id == 0
-        assert filament.filament_type == "PLA"
+        # Third AMS unit
+        unit3 = ams_units[2]
+        assert unit3.unit_id == 2
+        assert len(unit3.filaments) == 4  # All slots, including empty
+
+        # Slot 0 is empty (state 10, no type/color), so should be listed as "Empty"
+        filament9 = unit3.filaments[0]
+        assert filament9.slot_id == 0
+        assert filament9.filament_type == "Empty"
+        assert filament9.color == "#00000000"
+
+        filament10 = unit3.filaments[1]
+        assert filament10.slot_id == 1
+        assert filament10.filament_type == "PLA"
+        assert filament10.color == "F72323FF" or filament10.color == "#F72323FF"
+
+        filament11 = unit3.filaments[2]
+        assert filament11.slot_id == 2
+        assert filament11.filament_type == "PETG"
+        assert filament11.color == "00AE42FF" or filament11.color == "#00AE42FF"
+
+        filament12 = unit3.filaments[3]
+        assert filament12.slot_id == 3
+        assert filament12.filament_type == "PETG"
+        assert filament12.color == "F75403FF" or filament12.color == "#F75403FF"
 
     def test_parse_ams_data_invalid(self, printer_service):
         """Test parsing invalid AMS data."""

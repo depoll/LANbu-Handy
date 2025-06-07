@@ -687,17 +687,17 @@ class PrinterService:
             ams_list = ams_data.get("ams", [])
 
             for ams_unit_data in ams_list:
-                unit_id = ams_unit_data.get("id", 0)
+                unit_id = int(ams_unit_data.get("id", 0))
                 filaments = []
 
                 # Parse the trays (filament slots)
                 trays = ams_unit_data.get("tray", [])
                 for tray in trays:
-                    slot_id = tray.get("id", 0)
+                    slot_id = int(tray.get("id", 0))
 
                     # Extract filament information
                     filament_type = tray.get("tray_type", "Unknown")
-                    material_id = tray.get("tray_sub_brands", "Unknown")
+                    material_id = tray.get("tray_sub_brands", None)
                     color = tray.get("tray_color", "Unknown")
                     if tray.get("state", 10) == 10:
                         # If state is 10, it means the slot is empty
