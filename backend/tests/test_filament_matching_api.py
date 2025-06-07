@@ -58,7 +58,9 @@ class TestFilamentMatchingAPI:
         assert len(result["matches"]) == 2
 
         # Check that we got matches for both requirements
-        requirement_indices = [match["requirement_index"] for match in result["matches"]]
+        requirement_indices = [
+            match["requirement_index"] for match in result["matches"]
+        ]
         assert 0 in requirement_indices
         assert 1 in requirement_indices
 

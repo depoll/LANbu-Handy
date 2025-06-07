@@ -18,12 +18,12 @@ class TestFilamentMatchingIntegration:
         """Test the complete flow of filament matching from API perspective."""
         # This simulates the data that would come from the frontend
         # after model analysis and AMS status retrieval
-        
+
         # Step 1: Test the model submission endpoint (already exists)
         # This is just to verify the flow is intact
         health_response = client.get("/api/health")
         assert health_response.status_code == 200
-        
+
         # Step 2: Test the filament matching endpoint with realistic data
         request_data = {
             "filament_requirements": {
@@ -81,10 +81,10 @@ class TestFilamentMatchingIntegration:
 
         # Verify the matches are reasonable
         matches = result["matches"]
-        
+
         # Sort matches by requirement_index for easier testing
         matches.sort(key=lambda x: x["requirement_index"])
-        
+
         # Check requirement 0 (Red PLA) - should get perfect match
         req0_match = matches[0]
         assert req0_match["requirement_index"] == 0
@@ -111,7 +111,10 @@ class TestFilamentMatchingIntegration:
         assert req2_match["confidence"] > 0.0
 
         # Verify no unmatched requirements since we have enough filaments
-        assert result["unmatched_requirements"] is None or len(result["unmatched_requirements"]) == 0
+        assert (
+            result["unmatched_requirements"] is None
+            or len(result["unmatched_requirements"]) == 0
+        )
 
     def test_filament_matching_with_insufficient_ams(self):
         """Test filament matching when AMS doesn't have enough filaments."""
