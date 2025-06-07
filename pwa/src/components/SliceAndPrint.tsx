@@ -1017,6 +1017,12 @@ function SliceAndPrint() {
         />
       )}
 
+      {/* AMS Status Display - Always available */}
+      <AMSStatusDisplay
+        printerId={defaultPrinterId}
+        onStatusUpdate={handleAMSStatusUpdate}
+      />
+
       {/* Filament Requirements Display */}
       {modelSubmitted && filamentRequirements && (
         <FilamentRequirementsDisplay
@@ -1037,14 +1043,6 @@ function SliceAndPrint() {
             className="workflow-section"
           />
         </div>
-      )}
-
-      {/* AMS Status Display */}
-      {modelSubmitted && (
-        <AMSStatusDisplay
-          printerId={defaultPrinterId}
-          onStatusUpdate={handleAMSStatusUpdate}
-        />
       )}
 
       {/* Configuration Section - Show after model analysis and AMS status */}
