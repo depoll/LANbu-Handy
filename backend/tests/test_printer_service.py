@@ -1276,28 +1276,23 @@ class TestAMSQuery:
 
         mock_client.loop_start.side_effect = simulate_connection
 
-        # Mock successful publish
+        # Mock successful publish and trigger response immediately
         def mock_publish(topic, payload, qos):
             mock_msg_info = Mock()
             mock_msg_info.is_published.return_value = True
-            return mock_msg_info
 
-        mock_client.publish.side_effect = mock_publish
-
-        # Mock AMS response message
-        def simulate_ams_response():
+            # Trigger AMS response immediately after publish
             if hasattr(mock_client, "on_message"):
                 # Create a mock message with AMS data
+                # Wrap in "print" key as expected by the service
                 mock_msg = Mock()
-                ams_response = TEST_AMS_RESPONSE_DATA
+                ams_response = {"print": TEST_AMS_RESPONSE_DATA}
                 mock_msg.payload.decode.return_value = json.dumps(ams_response)
                 mock_client.on_message(mock_client, None, mock_msg)
 
-        # Simulate the message arriving after a short delay
-        import threading
+            return mock_msg_info
 
-        timer = threading.Timer(0.1, simulate_ams_response)
-        timer.start()
+        mock_client.publish.side_effect = mock_publish
 
         # Execute the AMS query
         result = printer_service.query_ams_status(test_printer_config, timeout=5)
