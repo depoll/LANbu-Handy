@@ -1141,6 +1141,8 @@ footer p {
   z-index: 1000;
   max-height: 300px;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
   margin-top: 4px;
 }
 
@@ -1303,6 +1305,8 @@ footer p {
   /* Custom dropdown mobile styles */
   .dropdown-menu {
     max-height: 250px;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
   }
 
   .dropdown-option {
