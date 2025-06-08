@@ -631,7 +631,7 @@ async def get_model_preview(file_id: str):
                 return FileResponse(
                     path=final_file_path,
                     media_type="model/3mf",
-                    filename=model_file_path.name,
+                    filename=final_file_path.name,
                 )
 
             except ThreeMFRepairError as e:
