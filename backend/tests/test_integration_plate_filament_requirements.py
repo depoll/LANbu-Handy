@@ -133,7 +133,7 @@ class TestPlateSpecificFilamentRequirementsIntegration(unittest.TestCase):
         print("Specific filament types per plate validated successfully")
 
     def test_original_multiplate_file_behavior(self):
-        """Test original multiplate-test.3mf with all plates using all filaments."""
+        """Test original multiplate-test.3mf with correct filament requirements per plate."""
         multiplate_file = self.test_files_dir / "multiplate-test.3mf"
 
         if not multiplate_file.exists():
@@ -150,7 +150,7 @@ class TestPlateSpecificFilamentRequirementsIntegration(unittest.TestCase):
         plates = self.model_service.parse_3mf_plate_info(multiplate_file)
         self.assertEqual(len(plates), 7)  # Should have 7 plates
 
-        # All plates in this file use all 4 filaments (no reduction)
+        # Plates 1-6 use 3 filaments (extruders 2,3,4), plate 7 uses 4 filaments (1,2,3,4)
         for plate in plates:
             plate_requirements = (
                 self.model_service.get_plate_specific_filament_requirements(
@@ -159,14 +159,27 @@ class TestPlateSpecificFilamentRequirementsIntegration(unittest.TestCase):
             )
 
             self.assertIsNotNone(plate_requirements)
-            self.assertEqual(
-                plate_requirements.filament_count,
-                4,
-                f"Plate {plate.index} should use all 4 filaments in this test file",
-            )
-            self.assertEqual(
-                plate_requirements.filament_types, ["PLA", "PLA", "PLA", "PLA"]
-            )
+            
+            if plate.index == 7:
+                # Plate 7 uses all 4 filaments
+                self.assertEqual(
+                    plate_requirements.filament_count,
+                    4,
+                    f"Plate {plate.index} should use all 4 filaments in this test file",
+                )
+                self.assertEqual(
+                    plate_requirements.filament_types, ["PLA", "PLA", "PLA", "PLA"]
+                )
+            else:
+                # Plates 1-6 use 3 filaments (extruders 2, 3, 4)
+                self.assertEqual(
+                    plate_requirements.filament_count,
+                    3,
+                    f"Plate {plate.index} should use 3 filaments in this test file",
+                )
+                self.assertEqual(
+                    plate_requirements.filament_types, ["PLA", "PLA", "PLA"]
+                )
 
         print(
             "Original multiplate-test.3mf: All plates use all 4 filaments "
