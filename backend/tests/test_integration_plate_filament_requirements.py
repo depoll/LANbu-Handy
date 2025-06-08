@@ -150,7 +150,7 @@ class TestPlateSpecificFilamentRequirementsIntegration(unittest.TestCase):
         plates = self.model_service.parse_3mf_plate_info(multiplate_file)
         self.assertEqual(len(plates), 7)  # Should have 7 plates
 
-        # Plates 1-6 use 3 filaments (extruders 2,3,4), plate 7 uses 4 filaments (1,2,3,4)
+        # All plates in this test file use all 4 filaments (based on actual data analysis)
         for plate in plates:
             plate_requirements = (
                 self.model_service.get_plate_specific_filament_requirements(
@@ -160,30 +160,20 @@ class TestPlateSpecificFilamentRequirementsIntegration(unittest.TestCase):
 
             self.assertIsNotNone(plate_requirements)
             
-            if plate.index == 7:
-                # Plate 7 uses all 4 filaments
-                self.assertEqual(
-                    plate_requirements.filament_count,
-                    4,
-                    f"Plate {plate.index} should use all 4 filaments in this test file",
-                )
-                self.assertEqual(
-                    plate_requirements.filament_types, ["PLA", "PLA", "PLA", "PLA"]
-                )
-            else:
-                # Plates 1-6 use 3 filaments (extruders 2, 3, 4)
-                self.assertEqual(
-                    plate_requirements.filament_count,
-                    3,
-                    f"Plate {plate.index} should use 3 filaments in this test file",
-                )
-                self.assertEqual(
-                    plate_requirements.filament_types, ["PLA", "PLA", "PLA"]
-                )
+            # All plates use all 4 filaments in this specific test file
+            # This is because each object has parts using extruders 1,2,3,4
+            self.assertEqual(
+                plate_requirements.filament_count,
+                4,
+                f"Plate {plate.index} should use all 4 filaments in this test file",
+            )
+            self.assertEqual(
+                plate_requirements.filament_types, ["PLA", "PLA", "PLA", "PLA"]
+            )
 
         print(
             "Original multiplate-test.3mf: All plates use all 4 filaments "
-            "(no filtering)"
+            "(each object has parts using extruders 1,2,3,4)"
         )
 
     def test_invalid_plate_index_handling(self):

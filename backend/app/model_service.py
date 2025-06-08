@@ -402,48 +402,31 @@ class ModelService:
             import xml.etree.ElementTree as ET
 
             with zipfile.ZipFile(file_path, "r") as zip_file:
-                # Check if slice_info.config exists (contains plate information)
-                slice_info_path = "Metadata/slice_info.config"
-                if slice_info_path not in zip_file.namelist():
-                    # No slice info found, assume single plate
-                    return []
-
-                # Read and parse the slice info XML
-                with zip_file.open(slice_info_path) as slice_file:
-                    content = slice_file.read().decode("utf-8")
-                    root = ET.fromstring(content)
-
                 plates = []
 
-                # Find all plate elements
-                plate_elements = root.findall(".//plate")
+                # First try model_settings.config (preferred for newer files)
+                model_settings_path = "Metadata/model_settings.config"
+                if model_settings_path in zip_file.namelist():
+                    plates = self._parse_plates_from_model_settings(zip_file)
 
-                for plate_elem in plate_elements:
-                    plate_info = PlateInfo(index=0)
+                # If we got plates from model_settings, try to enhance with slice_info data
+                if plates:
+                    slice_info_path = "Metadata/slice_info.config"
+                    if slice_info_path in zip_file.namelist():
+                        slice_plates = self._parse_plates_from_slice_info(zip_file)
+                        # Merge additional data from slice_info
+                        plates = self._merge_plate_info(plates, slice_plates)
+                    return plates
 
-                    # Extract metadata
-                    for metadata in plate_elem.findall("metadata"):
-                        key = metadata.get("key")
-                        value = metadata.get("value")
+                # Fallback to slice_info.config for older files
+                slice_info_path = "Metadata/slice_info.config"
+                if slice_info_path in zip_file.namelist():
+                    plates = self._parse_plates_from_slice_info(zip_file)
+                    if plates:
+                        return plates
 
-                        if key == "index":
-                            plate_info.index = int(value)
-                        elif key == "prediction":
-                            plate_info.prediction_seconds = int(value)
-                        elif key == "weight":
-                            plate_info.weight_grams = float(value)
-                        elif key == "support_used":
-                            plate_info.has_support = value.lower() == "true"
-
-                    # Count objects in this plate
-                    objects = plate_elem.findall(".//object")
-                    plate_info.object_count = len(objects)
-
-                    plates.append(plate_info)
-
-                # Sort by plate index
-                plates.sort(key=lambda p: p.index)
-                return plates
+                # No plate info found
+                return []
 
         except (zipfile.BadZipFile, ET.ParseError, ValueError, OSError):
             # If there's any error in parsing, return empty list
@@ -451,6 +434,123 @@ class ModelService:
         except Exception:
             # Catch any other unexpected errors
             return []
+
+    def _merge_plate_info(
+        self, primary_plates: List[PlateInfo], secondary_plates: List[PlateInfo]
+    ) -> List[PlateInfo]:
+        """
+        Merge plate information from two sources, using primary as base and enhancing
+        with secondary data.
+
+        Args:
+            primary_plates: Plates from primary source (e.g., model_settings.config)
+            secondary_plates: Plates from secondary source (e.g., slice_info.config)
+
+        Returns:
+            Enhanced list of PlateInfo objects
+        """
+        # Create a lookup for secondary plates by index
+        secondary_by_index = {plate.index: plate for plate in secondary_plates}
+
+        # Enhance primary plates with secondary data
+        for plate in primary_plates:
+            secondary_plate = secondary_by_index.get(plate.index)
+            if secondary_plate:
+                # Only update fields that are None in primary but have values in secondary
+                if (
+                    plate.prediction_seconds is None
+                    and secondary_plate.prediction_seconds is not None
+                ):
+                    plate.prediction_seconds = secondary_plate.prediction_seconds
+                if (
+                    plate.weight_grams is None
+                    and secondary_plate.weight_grams is not None
+                ):
+                    plate.weight_grams = secondary_plate.weight_grams
+                if not plate.has_support and secondary_plate.has_support:
+                    plate.has_support = secondary_plate.has_support
+                # Keep the object_count from primary source as it's more accurate for model_settings
+
+        return primary_plates
+
+    def _parse_plates_from_model_settings(
+        self, zip_file: zipfile.ZipFile
+    ) -> List[PlateInfo]:
+        """Parse plate information from model_settings.config."""
+        import xml.etree.ElementTree as ET
+
+        with zip_file.open("Metadata/model_settings.config") as settings_file:
+            content = settings_file.read().decode("utf-8")
+            root = ET.fromstring(content)
+
+        plates = []
+
+        # Find all plate elements
+        for plate_elem in root.findall(".//plate"):
+            plate_info = PlateInfo(index=0)
+
+            # Extract metadata
+            for metadata in plate_elem.findall("metadata"):
+                key = metadata.get("key")
+                value = metadata.get("value")
+
+                if key == "plater_id":
+                    plate_info.index = int(value)
+                # Note: model_settings.config doesn't typically have prediction/weight data
+
+            # Count model instances (objects) in this plate
+            model_instances = plate_elem.findall(".//model_instance")
+            plate_info.object_count = len(model_instances)
+
+            if plate_info.index > 0:  # Only add plates with valid indices
+                plates.append(plate_info)
+
+        # Sort by plate index
+        plates.sort(key=lambda p: p.index)
+        return plates
+
+    def _parse_plates_from_slice_info(
+        self, zip_file: zipfile.ZipFile
+    ) -> List[PlateInfo]:
+        """Parse plate information from slice_info.config."""
+        import xml.etree.ElementTree as ET
+
+        with zip_file.open("Metadata/slice_info.config") as slice_file:
+            content = slice_file.read().decode("utf-8")
+            root = ET.fromstring(content)
+
+        plates = []
+
+        # Find all plate elements
+        plate_elements = root.findall(".//plate")
+
+        for plate_elem in plate_elements:
+            plate_info = PlateInfo(index=0)
+
+            # Extract metadata
+            for metadata in plate_elem.findall("metadata"):
+                key = metadata.get("key")
+                value = metadata.get("value")
+
+                if key == "index":
+                    plate_info.index = int(value)
+                elif key == "prediction":
+                    plate_info.prediction_seconds = int(value)
+                elif key == "weight":
+                    plate_info.weight_grams = float(value)
+                elif key == "support_used":
+                    plate_info.has_support = value.lower() == "true"
+
+            # Count objects in this plate
+            objects = plate_elem.findall(".//object")
+            plate_info.object_count = len(objects)
+
+            if plate_info.index > 0:  # Only add plates with valid indices
+                plates.append(plate_info)
+
+        # Sort by plate index
+        plates.sort(key=lambda p: p.index)
+        return plates
 
     def parse_3mf_model_info(self, file_path: Path) -> ModelInfo:
         """
@@ -560,39 +660,44 @@ class ModelService:
             # Plate not found
             return None
 
-        # Get the object_id assigned to this plate
-        object_id = None
+        # Get all object_ids assigned to this plate
+        object_ids = []
         for model_instance in target_plate.findall("model_instance"):
             for metadata in model_instance.findall("metadata"):
                 if metadata.get("key") == "object_id":
-                    object_id = metadata.get("value")
-                    break
-            if object_id is not None:
-                break
+                    object_ids.append(metadata.get("value"))
 
-        if object_id is None:
-            # No object assigned to this plate
+        if not object_ids:
+            # No objects assigned to this plate
             return FilamentRequirement(
                 filament_count=1,
                 filament_types=["PLA"],
                 filament_colors=["#000000"],
             )
 
-        # Find the object with this ID and collect all extruders used
+        # Find all objects with these IDs and collect all extruders used
         extruders_used = set()
-        for obj_elem in root.findall(f".//object[@id='{object_id}']"):
-            # Check object-level extruder
-            obj_extruder = obj_elem.get("extruder")
-            if obj_extruder:
-                extruders_used.add(int(obj_extruder))
+        for object_id in object_ids:
+            for obj_elem in root.findall(f".//object[@id='{object_id}']"):
+                # Check object-level extruder attribute
+                obj_extruder = obj_elem.get("extruder")
+                if obj_extruder:
+                    extruders_used.add(int(obj_extruder))
 
-            # Check part-level extruders
-            for part in obj_elem.findall(".//part"):
-                for metadata in part.findall("metadata"):
+                # Check object-level extruder metadata
+                for metadata in obj_elem.findall("metadata"):
                     if metadata.get("key") == "extruder":
                         extruder_id = metadata.get("value")
                         if extruder_id:
                             extruders_used.add(int(extruder_id))
+
+                # Check part-level extruders
+                for part in obj_elem.findall(".//part"):
+                    for metadata in part.findall("metadata"):
+                        if metadata.get("key") == "extruder":
+                            extruder_id = metadata.get("value")
+                            if extruder_id:
+                                extruders_used.add(int(extruder_id))
 
         # If no extruders found, default to extruder 1
         if not extruders_used:
