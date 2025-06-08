@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import Header from './components/Header';
 import Hero from './components/Hero';
-import Features from './components/Features';
 import SliceAndPrint from './components/SliceAndPrint';
 import Footer from './components/Footer';
 import { ToastProvider } from './components/ToastProvider';
@@ -68,10 +67,6 @@ function App() {
     fetchBackendStatus();
   }, []);
 
-  const handleFeatureClick = (featureName: string) => {
-    console.log('Feature card clicked:', featureName);
-  };
-
   return (
     <ToastProvider>
       <div
@@ -108,7 +103,6 @@ function App() {
         <main>
           <Hero />
           <SliceAndPrint />
-          <Features onFeatureClick={handleFeatureClick} />
         </main>
         <Footer />
       </div>
