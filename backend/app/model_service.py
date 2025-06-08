@@ -481,90 +481,111 @@ class ModelService:
         self, file_path: Path, plate_index: int
     ) -> Optional[FilamentRequirement]:
         """
-        Get estimated filament requirements for a specific plate.
+        Get actual filament requirements for a specific plate from 3MF data.
 
-        This provides a simplified/estimated filament requirement for a single plate
-        rather than the full model requirements. For multi-plate models, this helps
-        users see only the filaments likely needed for their selected plate.
+        This extracts the actual filament usage information for a single plate
+        from the 3MF file's slice_info.config, providing accurate filament
+        requirements rather than estimates.
 
         Args:
             file_path: Path to the .3mf file
             plate_index: Index of the plate to get requirements for
 
         Returns:
-            FilamentRequirement object with estimated requirements for the plate,
-            or None if estimation fails or file is not .3mf
+            FilamentRequirement object with actual requirements for the plate,
+            or None if parsing fails, file is not .3mf, or plate not found
         """
         # Only process .3mf files
         if file_path.suffix.lower() != ".3mf":
             return None
 
-        # Get the full model filament requirements first
-        full_requirements = self.parse_3mf_filament_requirements(file_path)
-        if not full_requirements:
+        try:
+            import xml.etree.ElementTree as ET
+
+            with zipfile.ZipFile(file_path, "r") as zip_file:
+                # Check if slice_info.config exists (contains plate filament data)
+                slice_info_path = "Metadata/slice_info.config"
+                if slice_info_path not in zip_file.namelist():
+                    # No slice info found, fallback to full model requirements
+                    return self.parse_3mf_filament_requirements(file_path)
+
+                # Read and parse the slice info XML
+                with zip_file.open(slice_info_path) as slice_file:
+                    content = slice_file.read().decode("utf-8")
+                    root = ET.fromstring(content)
+
+                # Find the specific plate by index
+                target_plate_elem = None
+                for plate_elem in root.findall(".//plate"):
+                    for metadata in plate_elem.findall("metadata"):
+                        if (metadata.get("key") == "index" and
+                                int(metadata.get("value")) == plate_index):
+                            target_plate_elem = plate_elem
+                            break
+                    if target_plate_elem is not None:
+                        break
+
+                if target_plate_elem is None:
+                    # Plate not found
+                    return None
+
+                # Extract filament information from this plate
+                filament_elements = target_plate_elem.findall("filament")
+                if not filament_elements:
+                    # No filament data, fallback to single filament assumption
+                    return FilamentRequirement(
+                        filament_count=1,
+                        filament_types=["PLA"],
+                        filament_colors=["#000000"],
+                    )
+
+                # Extract filament types and colors from the plate data
+                plate_types = []
+                plate_colors = []
+
+                # Sort filaments by ID to maintain consistent ordering
+                filament_elements.sort(key=lambda f: int(f.get("id", "0")))
+
+                for filament_elem in filament_elements:
+                    filament_type = filament_elem.get("type", "PLA")
+                    filament_color = filament_elem.get("color", "#000000")
+
+                    # Only include filaments that are actually used (have usage data)
+                    used_m = filament_elem.get("used_m")
+                    used_g = filament_elem.get("used_g")
+
+                    if used_m and used_g:
+                        try:
+                            # Check if usage is greater than 0
+                            if float(used_m) > 0 or float(used_g) > 0:
+                                plate_types.append(filament_type)
+                                plate_colors.append(filament_color)
+                        except (ValueError, TypeError):
+                            # If we can't parse usage, include the filament anyway
+                            plate_types.append(filament_type)
+                            plate_colors.append(filament_color)
+                    else:
+                        # No usage data, include the filament
+                        plate_types.append(filament_type)
+                        plate_colors.append(filament_color)
+
+                if not plate_types:
+                    # No valid filaments found, return basic requirement
+                    return FilamentRequirement(
+                        filament_count=1,
+                        filament_types=["PLA"],
+                        filament_colors=["#000000"],
+                    )
+
+                return FilamentRequirement(
+                    filament_count=len(plate_types),
+                    filament_types=plate_types,
+                    filament_colors=plate_colors,
+                )
+
+        except (zipfile.BadZipFile, ET.ParseError, ValueError, OSError):
+            # If there's any error in parsing, fallback to full model requirements
+            return self.parse_3mf_filament_requirements(file_path)
+        except Exception:
+            # Catch any other unexpected errors
             return None
-
-        # Get plate information to validate the plate_index
-        plates = self.parse_3mf_plate_info(file_path)
-        target_plate = None
-        for plate in plates:
-            if plate.index == plate_index:
-                target_plate = plate
-                break
-
-        if not target_plate:
-            # Invalid plate index, return None
-            return None
-
-        # For now, implement a simple heuristic:
-        # - If there's only 1 filament type overall, use that
-        # - If there are multiple filaments, estimate based on plate complexity
-        # - For single object plates, assume 1-2 filaments max
-        # - For multi-object plates, allow more filaments but still reduced
-
-        if full_requirements.filament_count == 1:
-            # Single filament model, just return the same requirement
-            return full_requirements
-
-        # Multi-filament model - estimate based on plate characteristics
-        estimated_count = self._estimate_filament_count_for_plate(
-            target_plate, full_requirements
-        )
-
-        # Take the first N filaments from the full requirements
-        # In a more sophisticated implementation, we could analyze which
-        # filaments are actually used by objects on this specific plate
-        estimated_types = full_requirements.filament_types[:estimated_count]
-        estimated_colors = full_requirements.filament_colors[:estimated_count]
-
-        return FilamentRequirement(
-            filament_count=estimated_count,
-            filament_types=estimated_types,
-            filament_colors=estimated_colors,
-        )
-
-    def _estimate_filament_count_for_plate(
-        self, plate: PlateInfo, full_requirements: FilamentRequirement
-    ) -> int:
-        """
-        Estimate how many filaments a specific plate likely needs.
-
-        Args:
-            plate: PlateInfo for the plate
-            full_requirements: Full model filament requirements
-
-        Returns:
-            Estimated number of filaments for this plate (at least 1)
-        """
-        # Simple heuristic based on object count and total filaments
-        if plate.object_count <= 1:
-            # Single object plates likely use 1-2 filaments
-            return min(2, full_requirements.filament_count)
-        elif plate.object_count <= 3:
-            # Small multi-object plates likely use 2-3 filaments
-            return min(3, full_requirements.filament_count)
-        else:
-            # Larger plates might use more filaments but still likely not all
-            # Use at most 75% of total filaments, minimum 1
-            estimated = max(1, int(full_requirements.filament_count * 0.75))
-            return min(estimated, full_requirements.filament_count)
