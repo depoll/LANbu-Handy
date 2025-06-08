@@ -18,10 +18,10 @@ class TestPlateSpecificFilamentRequirementsIntegration(unittest.TestCase):
 
     def test_multiplate_filament_requirements_filtering(self):
         """Test that plate-specific requirements are properly filtered."""
-        multiplate_file = self.test_files_dir / "realistic-multiplate-test.3mf"
+        multiplate_file = self.test_files_dir / "multiplate separated filaments.3mf"
 
         if not multiplate_file.exists():
-            self.skipTest("realistic-multiplate-test.3mf not available")
+            self.skipTest("multiplate separated filaments.3mf not available")
 
         # Get full model requirements
         full_requirements = self.model_service.parse_3mf_filament_requirements(
@@ -29,20 +29,19 @@ class TestPlateSpecificFilamentRequirementsIntegration(unittest.TestCase):
         )
         self.assertIsNotNone(full_requirements)
         self.assertGreater(full_requirements.filament_count, 1)
-        self.assertEqual(full_requirements.filament_count, 4)  # Should have 4 total
+        self.assertEqual(full_requirements.filament_count, 13)  # Should have 13 total
 
         # Get plate information
         plates = self.model_service.parse_3mf_plate_info(multiplate_file)
         self.assertGreater(len(plates), 1)
-        self.assertEqual(len(plates), 5)  # Should have 5 plates
+        self.assertEqual(len(plates), 4)  # Should have 4 plates
 
         # Expected filament counts per plate (based on our test file)
         expected_filament_counts = {
-            1: 1,  # Plate 1: PLA only
-            2: 2,  # Plate 2: PLA + PETG
-            3: 3,  # Plate 3: PLA + ABS + TPU
-            4: 1,  # Plate 4: PETG only
-            5: 4,  # Plate 5: All filaments
+            1: 1,  # Plate 1: 1 filament
+            2: 1,  # Plate 2: 1 filament
+            3: 1,  # Plate 3: 1 filament
+            4: 2,  # Plate 4: 2 filaments
         }
 
         # Test plate-specific requirements for each plate
@@ -88,26 +87,24 @@ class TestPlateSpecificFilamentRequirementsIntegration(unittest.TestCase):
 
     def test_specific_filament_types_per_plate(self):
         """Test that specific filament types are correctly extracted per plate."""
-        multiplate_file = self.test_files_dir / "realistic-multiplate-test.3mf"
+        multiplate_file = self.test_files_dir / "multiplate separated filaments.3mf"
 
         if not multiplate_file.exists():
-            self.skipTest("realistic-multiplate-test.3mf not available")
+            self.skipTest("multiplate separated filaments.3mf not available")
 
         # Expected filament types per plate based on our test file design
         expected_plate_filaments = {
-            1: ["PLA"],  # Red PLA only
-            2: ["PLA", "PETG"],  # Red PLA + Green PETG
-            3: ["PLA", "ABS", "TPU"],  # Red PLA + Blue ABS + Yellow TPU
-            4: ["PETG"],  # Green PETG only
-            5: ["PLA", "PETG", "ABS", "TPU"],  # All filaments
+            1: ["PLA"],  # Single filament
+            2: ["PLA"],  # Single filament
+            3: ["PLA"],  # Single filament
+            4: ["PLA", "PLA"],  # Two filaments
         }
 
         expected_plate_colors = {
-            1: ["#FF0000"],  # Red only
-            2: ["#FF0000", "#00FF00"],  # Red + Green
-            3: ["#FF0000", "#0000FF", "#FFFF00"],  # Red + Blue + Yellow
-            4: ["#00FF00"],  # Green only
-            5: ["#FF0000", "#00FF00", "#0000FF", "#FFFF00"],  # All colors
+            1: ["#996633"],  # Brown
+            2: ["#0000FF"],  # Blue
+            3: ["#515151"],  # Gray
+            4: ["#21FF06", "#800080"],  # Green + Purple
         }
 
         for plate_index, expected_types in expected_plate_filaments.items():
@@ -133,7 +130,7 @@ class TestPlateSpecificFilamentRequirementsIntegration(unittest.TestCase):
         print("Specific filament types per plate validated successfully")
 
     def test_original_multiplate_file_behavior(self):
-        """Test original multiplate-test.3mf with correct filament requirements per plate."""
+        """Test original multiplate-test.3mf with correct requirements per plate."""
         multiplate_file = self.test_files_dir / "multiplate-test.3mf"
 
         if not multiplate_file.exists():
@@ -150,7 +147,7 @@ class TestPlateSpecificFilamentRequirementsIntegration(unittest.TestCase):
         plates = self.model_service.parse_3mf_plate_info(multiplate_file)
         self.assertEqual(len(plates), 7)  # Should have 7 plates
 
-        # All plates in this test file use all 4 filaments (based on actual data analysis)
+        # All plates in this test file use all 4 filaments (actual data)
         for plate in plates:
             plate_requirements = (
                 self.model_service.get_plate_specific_filament_requirements(
@@ -159,7 +156,7 @@ class TestPlateSpecificFilamentRequirementsIntegration(unittest.TestCase):
             )
 
             self.assertIsNotNone(plate_requirements)
-            
+
             # All plates use all 4 filaments in this specific test file
             # This is because each object has parts using extruders 1,2,3,4
             self.assertEqual(
@@ -178,10 +175,10 @@ class TestPlateSpecificFilamentRequirementsIntegration(unittest.TestCase):
 
     def test_invalid_plate_index_handling(self):
         """Test handling of invalid plate indices."""
-        multiplate_file = self.test_files_dir / "realistic-multiplate-test.3mf"
+        multiplate_file = self.test_files_dir / "multiplate separated filaments.3mf"
 
         if not multiplate_file.exists():
-            self.skipTest("realistic-multiplate-test.3mf not available")
+            self.skipTest("multiplate separated filaments.3mf not available")
 
         # Test with invalid plate index
         plate_requirements = (
