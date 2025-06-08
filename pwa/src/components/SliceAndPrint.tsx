@@ -53,6 +53,12 @@ function SliceAndPrint() {
     null
   );
 
+  // Plate-specific filament requirements
+  const [plateFilamentRequirements, setPlateFilamentRequirements] =
+    useState<FilamentRequirement | null>(null);
+  const [isFilamentRequirementsFiltered, setIsFilamentRequirementsFiltered] =
+    useState<boolean>(false);
+
   // File upload state
   const [inputMode, setInputMode] = useState<'url' | 'file'>('url');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -88,6 +94,85 @@ function SliceAndPrint() {
       ...prev,
       `${new Date().toLocaleTimeString()}: ${message}`,
     ]);
+  };
+
+  const fetchPlateFilamentRequirements = async (plateIndex: number) => {
+    if (!currentFileId) {
+      console.warn('No file ID available for fetching plate requirements');
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `/api/model/${currentFileId}/plate/${plateIndex}/filament-requirements`
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result: {
+        success: boolean;
+        message: string;
+        plate_index: number;
+        filament_requirements: FilamentRequirement;
+        is_filtered: boolean;
+        error_details?: string;
+      } = await response.json();
+
+      if (result.success) {
+        setPlateFilamentRequirements(result.filament_requirements);
+        setIsFilamentRequirementsFiltered(result.is_filtered);
+        addStatusMessage(
+          `📋 Loaded filament requirements for Plate ${plateIndex}: ${result.filament_requirements.filament_count} filament(s)`
+        );
+        showInfo(
+          `Showing ${result.filament_requirements.filament_count} filament(s) for Plate ${plateIndex}`,
+          'Plate Requirements'
+        );
+      } else {
+        console.error('Failed to fetch plate requirements:', result.message);
+        showWarning(
+          `Could not load specific requirements for Plate ${plateIndex}`,
+          'Plate Requirements'
+        );
+        // Fall back to full model requirements
+        setPlateFilamentRequirements(null);
+        setIsFilamentRequirementsFiltered(false);
+      }
+    } catch (error) {
+      console.error('Error fetching plate filament requirements:', error);
+      showWarning(
+        `Error loading requirements for Plate ${plateIndex}`,
+        'Plate Requirements'
+      );
+      // Fall back to full model requirements
+      setPlateFilamentRequirements(null);
+      setIsFilamentRequirementsFiltered(false);
+    }
+  };
+
+  const handlePlateSelection = async (plateIndex: number | null) => {
+    // Update the selected plate index
+    setSelectedPlateIndex(plateIndex);
+
+    // Clear existing filament mappings when changing plate selection
+    setFilamentMappings([]);
+
+    if (plateIndex === null) {
+      // "All plates" selected - use full model requirements
+      setPlateFilamentRequirements(null);
+      setIsFilamentRequirementsFiltered(false);
+      addStatusMessage(
+        '🎯 Selected all plates - showing full model requirements'
+      );
+    } else {
+      // Specific plate selected - fetch plate-specific requirements
+      addStatusMessage(
+        `🎯 Selected Plate ${plateIndex} - loading specific requirements...`
+      );
+      await fetchPlateFilamentRequirements(plateIndex);
+    }
   };
 
   const initializeOperationSteps = (stepLabels: string[]) => {
@@ -136,6 +221,9 @@ function SliceAndPrint() {
     setPlates([]);
     setHasMultiplePlates(false);
     setSelectedPlateIndex(null);
+    // Reset plate-specific filament requirements
+    setPlateFilamentRequirements(null);
+    setIsFilamentRequirementsFiltered(false);
   };
 
   const handleModelSubmit = async () => {
@@ -546,14 +634,21 @@ function SliceAndPrint() {
       return;
     }
 
+    // Determine which filament requirements to use for validation
+    const activeFilamentRequirements =
+      plateFilamentRequirements || filamentRequirements;
+
     // Validate that all required filaments are mapped
-    if (filamentRequirements && filamentRequirements.filament_count > 0) {
+    if (
+      activeFilamentRequirements &&
+      activeFilamentRequirements.filament_count > 0
+    ) {
       const mappedIndices = new Set(
         filamentMappings.map(m => m.filament_index)
       );
       const missingMappings = [];
 
-      for (let i = 0; i < filamentRequirements.filament_count; i++) {
+      for (let i = 0; i < activeFilamentRequirements.filament_count; i++) {
         if (!mappedIndices.has(i)) {
           missingMappings.push(i + 1);
         }
@@ -1025,10 +1120,26 @@ function SliceAndPrint() {
 
       {/* Filament Requirements Display */}
       {modelSubmitted && filamentRequirements && (
-        <FilamentRequirementsDisplay
-          requirements={filamentRequirements}
-          className="workflow-section"
-        />
+        <div className="filament-requirements-section workflow-section">
+          <FilamentRequirementsDisplay
+            requirements={plateFilamentRequirements || filamentRequirements}
+            className="workflow-section"
+          />
+          {isFilamentRequirementsFiltered && plateFilamentRequirements && (
+            <div className="requirements-filter-notice">
+              <p>
+                📋 Showing simplified requirements for Plate{' '}
+                {selectedPlateIndex}.{' '}
+                <button
+                  onClick={() => handlePlateSelection(null)}
+                  className="link-button"
+                >
+                  Show all model requirements
+                </button>
+              </p>
+            </div>
+          )}
+        </div>
       )}
 
       {/* Model Preview */}
@@ -1061,21 +1172,25 @@ function SliceAndPrint() {
             <PlateSelector
               plates={plates}
               selectedPlateIndex={selectedPlateIndex}
-              onPlateSelect={setSelectedPlateIndex}
+              onPlateSelect={handlePlateSelection}
               disabled={isProcessing}
             />
           )}
 
           {/* Filament Mapping Configuration */}
-          {filamentRequirements.filament_count > 0 && (
-            <FilamentMappingConfig
-              filamentRequirements={filamentRequirements}
-              amsStatus={amsStatus}
-              filamentMappings={filamentMappings}
-              onMappingChange={setFilamentMappings}
-              disabled={isProcessing}
-            />
-          )}
+          {(plateFilamentRequirements || filamentRequirements) &&
+            (plateFilamentRequirements || filamentRequirements)!
+              .filament_count > 0 && (
+              <FilamentMappingConfig
+                filamentRequirements={
+                  plateFilamentRequirements || filamentRequirements!
+                }
+                amsStatus={amsStatus}
+                filamentMappings={filamentMappings}
+                onMappingChange={setFilamentMappings}
+                disabled={isProcessing}
+              />
+            )}
 
           {/* Build Plate Selection */}
           <BuildPlateSelector
@@ -1086,7 +1201,9 @@ function SliceAndPrint() {
 
           {/* Configuration Summary */}
           <ConfigurationSummary
-            filamentRequirements={filamentRequirements}
+            filamentRequirements={
+              plateFilamentRequirements || filamentRequirements
+            }
             amsStatus={amsStatus}
             filamentMappings={filamentMappings}
             selectedBuildPlate={selectedBuildPlate}
@@ -1108,7 +1225,9 @@ function SliceAndPrint() {
                 disabled={
                   isProcessing ||
                   !currentFileId ||
-                  (filamentRequirements.filament_count > 0 &&
+                  ((plateFilamentRequirements || filamentRequirements) &&
+                    (plateFilamentRequirements || filamentRequirements)!
+                      .filament_count > 0 &&
                     filamentMappings.length === 0)
                 }
                 className="slice-and-print-button"
