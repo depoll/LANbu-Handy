@@ -416,6 +416,8 @@ footer p {
   padding: 1rem;
   max-height: 300px;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
 }
 
 .status-message {
