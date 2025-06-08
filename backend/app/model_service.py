@@ -518,8 +518,10 @@ class ModelService:
                 target_plate_elem = None
                 for plate_elem in root.findall(".//plate"):
                     for metadata in plate_elem.findall("metadata"):
-                        if (metadata.get("key") == "index" and
-                                int(metadata.get("value")) == plate_index):
+                        if (
+                            metadata.get("key") == "index"
+                            and int(metadata.get("value")) == plate_index
+                        ):
                             target_plate_elem = plate_elem
                             break
                     if target_plate_elem is not None:

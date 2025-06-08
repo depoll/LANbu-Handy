@@ -163,10 +163,14 @@ function SliceAndPrint() {
       // "All plates" selected - use full model requirements
       setPlateFilamentRequirements(null);
       setIsFilamentRequirementsFiltered(false);
-      addStatusMessage('🎯 Selected all plates - showing full model requirements');
+      addStatusMessage(
+        '🎯 Selected all plates - showing full model requirements'
+      );
     } else {
       // Specific plate selected - fetch plate-specific requirements
-      addStatusMessage(`🎯 Selected Plate ${plateIndex} - loading specific requirements...`);
+      addStatusMessage(
+        `🎯 Selected Plate ${plateIndex} - loading specific requirements...`
+      );
       await fetchPlateFilamentRequirements(plateIndex);
     }
   };
@@ -631,10 +635,14 @@ function SliceAndPrint() {
     }
 
     // Determine which filament requirements to use for validation
-    const activeFilamentRequirements = plateFilamentRequirements || filamentRequirements;
+    const activeFilamentRequirements =
+      plateFilamentRequirements || filamentRequirements;
 
     // Validate that all required filaments are mapped
-    if (activeFilamentRequirements && activeFilamentRequirements.filament_count > 0) {
+    if (
+      activeFilamentRequirements &&
+      activeFilamentRequirements.filament_count > 0
+    ) {
       const mappedIndices = new Set(
         filamentMappings.map(m => m.filament_index)
       );
@@ -1120,7 +1128,8 @@ function SliceAndPrint() {
           {isFilamentRequirementsFiltered && plateFilamentRequirements && (
             <div className="requirements-filter-notice">
               <p>
-                📋 Showing simplified requirements for Plate {selectedPlateIndex}.{' '}
+                📋 Showing simplified requirements for Plate{' '}
+                {selectedPlateIndex}.{' '}
                 <button
                   onClick={() => handlePlateSelection(null)}
                   className="link-button"
@@ -1170,9 +1179,12 @@ function SliceAndPrint() {
 
           {/* Filament Mapping Configuration */}
           {(plateFilamentRequirements || filamentRequirements) &&
-            (plateFilamentRequirements || filamentRequirements)!.filament_count > 0 && (
+            (plateFilamentRequirements || filamentRequirements)!
+              .filament_count > 0 && (
               <FilamentMappingConfig
-                filamentRequirements={plateFilamentRequirements || filamentRequirements!}
+                filamentRequirements={
+                  plateFilamentRequirements || filamentRequirements!
+                }
                 amsStatus={amsStatus}
                 filamentMappings={filamentMappings}
                 onMappingChange={setFilamentMappings}
@@ -1189,7 +1201,9 @@ function SliceAndPrint() {
 
           {/* Configuration Summary */}
           <ConfigurationSummary
-            filamentRequirements={plateFilamentRequirements || filamentRequirements}
+            filamentRequirements={
+              plateFilamentRequirements || filamentRequirements
+            }
             amsStatus={amsStatus}
             filamentMappings={filamentMappings}
             selectedBuildPlate={selectedBuildPlate}
@@ -1212,7 +1226,8 @@ function SliceAndPrint() {
                   isProcessing ||
                   !currentFileId ||
                   ((plateFilamentRequirements || filamentRequirements) &&
-                    (plateFilamentRequirements || filamentRequirements)!.filament_count > 0 &&
+                    (plateFilamentRequirements || filamentRequirements)!
+                      .filament_count > 0 &&
                     filamentMappings.length === 0)
                 }
                 className="slice-and-print-button"

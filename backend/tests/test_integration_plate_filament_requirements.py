@@ -71,8 +71,10 @@ class TestPlateSpecificFilamentRequirementsIntegration(unittest.TestCase):
             self.skipTest("multiplate-test.3mf not available")
 
         # Test with invalid plate index
-        plate_requirements = self.model_service.get_plate_specific_filament_requirements(
-            multiplate_file, 999
+        plate_requirements = (
+            self.model_service.get_plate_specific_filament_requirements(
+                multiplate_file, 999
+            )
         )
         self.assertIsNone(plate_requirements)
 
@@ -91,8 +93,10 @@ class TestPlateSpecificFilamentRequirementsIntegration(unittest.TestCase):
 
         # For single-plate models, plate-specific should match full requirements
         # or be simplified version
-        plate_requirements = self.model_service.get_plate_specific_filament_requirements(
-            single_plate_file, 1
+        plate_requirements = (
+            self.model_service.get_plate_specific_filament_requirements(
+                single_plate_file, 1
+            )
         )
 
         if plate_requirements:

@@ -4,10 +4,9 @@ Tests for plate-specific filament requirements API endpoint.
 
 import unittest
 from unittest.mock import MagicMock, patch
-from pathlib import Path
 
 from app.main import app
-from app.model_service import FilamentRequirement, PlateInfo
+from app.model_service import FilamentRequirement
 from fastapi.testclient import TestClient
 
 

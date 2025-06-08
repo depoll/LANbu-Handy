@@ -2,8 +2,6 @@
 User workflow test for plate-specific filament requirements feature.
 """
 
-import json
-import tempfile
 import unittest
 from pathlib import Path
 
@@ -20,7 +18,10 @@ class TestPlateSelectionUserWorkflow(unittest.TestCase):
         self.test_files_dir = Path(__file__).parent.parent.parent / "test_files"
 
     def test_multiplate_workflow(self):
-        """Test the complete workflow: upload -> analyze -> select plate -> get filtered requirements."""
+        """
+        Test the complete workflow: upload -> analyze -> select plate
+        -> get filtered requirements.
+        """
         multiplate_file = self.test_files_dir / "multiplate-test.3mf"
 
         if not multiplate_file.exists():
@@ -42,7 +43,10 @@ class TestPlateSelectionUserWorkflow(unittest.TestCase):
         original_filament_count = upload_data["filament_requirements"]["filament_count"]
         plates = upload_data["plates"]
 
-        print(f"Original model has {original_filament_count} filaments and {len(plates)} plates")
+        print(
+            f"Original model has {original_filament_count} filaments "
+            f"and {len(plates)} plates"
+        )
 
         # Step 2: Test plate-specific requirements for each plate
         for plate in plates[:3]:  # Test first 3 plates
@@ -88,14 +92,18 @@ class TestPlateSelectionUserWorkflow(unittest.TestCase):
             "selected_plate_index": plates[0]["index"],
         }
 
-        # Note: This will fail because we don't have Bambu Studio CLI in the test environment,
-        # but we can test that the request is properly formed and accepted
+        # Note: This will fail because we don't have Bambu Studio CLI
+        # in the test environment, but we can test that the request
+        # is properly formed and accepted
         try:
             slice_response = self.client.post(
                 "/api/slice/configured", json=slice_request
             )
-            # We expect this to fail due to missing slicer, but with proper error, not validation error
-            self.assertIn(slice_response.status_code, [500, 404])  # Internal error, not validation error
+            # We expect this to fail due to missing slicer, but with
+            # proper error, not validation error
+            self.assertIn(
+                slice_response.status_code, [500, 404]
+            )  # Internal error, not validation error
         except Exception:
             # Expected - no slicer available in test environment
             pass
@@ -128,7 +136,11 @@ class TestPlateSelectionUserWorkflow(unittest.TestCase):
             if plate_response.status_code == 200:
                 plate_data = plate_response.json()
                 self.assertTrue(plate_data["success"])
-                print(f"Single-plate model: {plate_data['filament_requirements']['filament_count']} filaments")
+                print(
+                    f"Single-plate model: "
+                    f"{plate_data['filament_requirements']['filament_count']} "
+                    f"filaments"
+                )
 
 
 if __name__ == "__main__":
