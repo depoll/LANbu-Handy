@@ -28,7 +28,7 @@ from app.printer_service import (
     PrinterService,
 )
 from app.slicer_service import slice_model
-from app.threemf_repair_service import ThreeMFRepairService, ThreeMFRepairError
+from app.threemf_repair_service import ThreeMFRepairError, ThreeMFRepairService
 from app.utils import (
     build_slicing_options_from_config,
     find_gcode_file,
