@@ -30,7 +30,7 @@ class TestModelPreviewRepairConsistency:
         """Test that model preview serves repaired content with matching filename."""
         # Use a test file that needs repair
         test_file = test_files_dir / "Original3DBenchy3Dprintconceptsnormel.3mf"
-        
+
         if not test_file.exists():
             pytest.skip("Test file not available")
 
@@ -58,29 +58,33 @@ class TestModelPreviewRepairConsistency:
 
             # Verify content matches repaired file
             response_content = response.content
-            assert response_content == expected_content, "Response should serve repaired content"
+            assert (
+                response_content == expected_content
+            ), "Response should serve repaired content"
 
             # Verify filename in Content-Disposition header matches repaired filename
             content_disposition = response.headers.get("content-disposition", "")
-            assert "filename=" in content_disposition, "Response should include filename"
+            assert (
+                "filename=" in content_disposition
+            ), "Response should include filename"
 
             # Extract filename from Content-Disposition header
             filename_part = content_disposition.split("filename=")[1].strip('"')
-            assert filename_part == expected_filename, (
-                f"Filename should be {expected_filename}, got {filename_part}"
-            )
+            assert (
+                filename_part == expected_filename
+            ), f"Filename should be {expected_filename}, got {filename_part}"
 
             # Verify the repaired file is actually different from original
             original_content = test_file_copy.read_bytes()
-            assert response_content != original_content, "Repaired content should differ from original"
+            assert (
+                response_content != original_content
+            ), "Repaired content should differ from original"
 
         finally:
             # Restore original temp dir
             model_service.temp_dir = original_temp_dir
 
-    def test_model_preview_original_file_when_no_repair_needed(
-        self, client, tmp_path
-    ):
+    def test_model_preview_original_file_when_no_repair_needed(self, client, tmp_path):
         """Test that model preview serves original filename when no repair is needed."""
         # Temporarily set model service temp dir
         original_temp_dir = model_service.temp_dir
@@ -113,7 +117,9 @@ endsolid test"""
 
             # Verify content matches original
             expected_content = stl_file.read_bytes()
-            assert response.content == expected_content, "STL content should be unchanged"
+            assert (
+                response.content == expected_content
+            ), "STL content should be unchanged"
 
         finally:
             # Restore original temp dir
