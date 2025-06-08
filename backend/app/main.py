@@ -28,6 +28,7 @@ from app.printer_service import (
     PrinterService,
 )
 from app.slicer_service import slice_model
+from app.threemf_repair_service import ThreeMFRepairError, ThreeMFRepairService
 from app.utils import (
     build_slicing_options_from_config,
     find_gcode_file,
@@ -53,6 +54,9 @@ app = FastAPI(
 # Initialize model service
 model_service = ModelService()
 
+# Initialize 3MF repair service
+threemf_repair_service = ThreeMFRepairService()
+
 # Initialize printer service
 printer_service = PrinterService()
 
@@ -61,6 +65,33 @@ filament_matching_service = FilamentMatchingService()
 
 # Initialize configuration (for testing compatibility)
 config = get_config()
+
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize services and clean up old files on startup."""
+    logger.info("LANbu Handy backend starting up...")
+
+    # Clean up old repaired 3MF files
+    try:
+        threemf_repair_service.cleanup_old_repaired_files(max_age_hours=24)
+        logger.info("Cleaned up old repaired 3MF files")
+    except Exception as e:
+        logger.warning(f"Error during startup cleanup: {e}")
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Clean up resources on shutdown."""
+    logger.info("LANbu Handy backend shutting down...")
+
+    # Clean up old repaired 3MF files
+    try:
+        threemf_repair_service.cleanup_old_repaired_files(max_age_hours=0)
+        logger.info("Final cleanup of repaired 3MF files")
+    except Exception as e:
+        logger.warning(f"Error during shutdown cleanup: {e}")
+
 
 # Path to the PWA static files directory
 # In Docker, this will be /app/static_pwa, but for local testing we use a
@@ -557,12 +588,14 @@ async def get_model_preview(file_id: str):
 
     Returns the raw model file content for client-side 3D rendering.
     Supports both STL and 3MF files for Three.js preview.
+    For 3MF files, automatically repairs Bambu Studio format for better
+    Three.js compatibility.
 
     Args:
         file_id: The file ID from model submission
 
     Returns:
-        FileResponse with the model file content
+        FileResponse with the model file content (repaired if 3MF)
 
     Raises:
         HTTPException: If file is not found or access is denied
@@ -580,16 +613,48 @@ async def get_model_preview(file_id: str):
         if not model_service.validate_file_extension(model_file_path.name):
             raise HTTPException(status_code=400, detail="Invalid file type for preview")
 
-        # Determine media type based on file extension
-        media_type = "application/octet-stream"
-        if model_file_path.suffix.lower() == ".stl":
-            media_type = "model/stl"
-        elif model_file_path.suffix.lower() == ".3mf":
-            media_type = "model/3mf"
+        # Handle 3MF files with repair service
+        if model_file_path.suffix.lower() == ".3mf":
+            try:
+                # Check if the file needs repair
+                if threemf_repair_service.needs_repair(model_file_path):
+                    logger.info(f"Repairing 3MF file for preview: {file_id}")
+                    repaired_file_path = threemf_repair_service.repair_3mf_file(
+                        model_file_path
+                    )
+                    final_file_path = repaired_file_path
+                    logger.info(f"Using repaired 3MF file: {repaired_file_path}")
+                else:
+                    final_file_path = model_file_path
+                    logger.debug(f"3MF file does not need repair: {file_id}")
 
-        return FileResponse(
-            path=model_file_path, media_type=media_type, filename=model_file_path.name
-        )
+                return FileResponse(
+                    path=final_file_path,
+                    media_type="model/3mf",
+                    filename=model_file_path.name,
+                )
+
+            except ThreeMFRepairError as e:
+                logger.warning(f"Failed to repair 3MF file {file_id}: {e}")
+                # Fall back to serving the original file
+                return FileResponse(
+                    path=model_file_path,
+                    media_type="model/3mf",
+                    filename=model_file_path.name,
+                )
+
+        # Handle STL files (no repair needed)
+        else:
+            media_type = (
+                "model/stl"
+                if model_file_path.suffix.lower() == ".stl"
+                else "application/octet-stream"
+            )
+            return FileResponse(
+                path=model_file_path,
+                media_type=media_type,
+                filename=model_file_path.name,
+            )
 
     except HTTPException:
         # Re-raise HTTP exceptions as-is
