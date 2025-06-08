@@ -409,7 +409,8 @@ class ModelService:
                 if model_settings_path in zip_file.namelist():
                     plates = self._parse_plates_from_model_settings(zip_file)
 
-                # If we got plates from model_settings, try to enhance with slice_info data
+                # If we got plates from model_settings,
+                # try to enhance with slice_info data
                 if plates:
                     slice_info_path = "Metadata/slice_info.config"
                     if slice_info_path in zip_file.namelist():
@@ -456,7 +457,8 @@ class ModelService:
         for plate in primary_plates:
             secondary_plate = secondary_by_index.get(plate.index)
             if secondary_plate:
-                # Only update fields that are None in primary but have values in secondary
+                # Only update fields that are None in primary but have values
+                # in secondary
                 if (
                     plate.prediction_seconds is None
                     and secondary_plate.prediction_seconds is not None
@@ -469,7 +471,8 @@ class ModelService:
                     plate.weight_grams = secondary_plate.weight_grams
                 if not plate.has_support and secondary_plate.has_support:
                     plate.has_support = secondary_plate.has_support
-                # Keep the object_count from primary source as it's more accurate for model_settings
+                # Keep the object_count from primary source
+                # as it's more accurate for model_settings
 
         return primary_plates
 
@@ -496,7 +499,8 @@ class ModelService:
 
                 if key == "plater_id":
                     plate_info.index = int(value)
-                # Note: model_settings.config doesn't typically have prediction/weight data
+                # Note: model_settings.config doesn't typically have
+                # prediction/weight data
 
             # Count model instances (objects) in this plate
             model_instances = plate_elem.findall(".//model_instance")
