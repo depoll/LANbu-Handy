@@ -4,6 +4,8 @@ import Hero from './components/Hero';
 import SliceAndPrint from './components/SliceAndPrint';
 import Footer from './components/Footer';
 import { ToastProvider } from './components/ToastProvider';
+import { ThemeProvider } from './contexts/ThemeContext';
+import { ThemeToggle } from './components/ThemeToggle';
 import './App.css';
 
 interface AppStatus {
@@ -68,45 +70,48 @@ function App() {
   }, []);
 
   return (
-    <ToastProvider>
-      <div
-        className={`app ${appStatus.status === 'ready' ? 'app-ready' : ''}`}
-        data-testid={
-          appStatus.status === 'ready' ? 'app-initialized' : 'app-loading'
-        }
-      >
-        <Header />
+    <ThemeProvider>
+      <ToastProvider>
+        <ThemeToggle />
+        <div
+          className={`app ${appStatus.status === 'ready' ? 'app-ready' : ''}`}
+          data-testid={
+            appStatus.status === 'ready' ? 'app-initialized' : 'app-loading'
+          }
+        >
+          <Header />
 
-        {/* Backend Status Display */}
-        <div className="status-bar">
-          {appStatus.status === 'initializing' && (
-            <div className="status-message status-loading">
-              Connecting to backend...
-            </div>
-          )}
+          {/* Backend Status Display */}
+          <div className="status-bar">
+            {appStatus.status === 'initializing' && (
+              <div className="status-message status-loading">
+                Connecting to backend...
+              </div>
+            )}
 
-          {appStatus.status === 'ready' && appStatus.backendData && (
-            <div className="status-message status-success">
-              ✓ {appStatus.backendData.application_name} v
-              {appStatus.backendData.version} - Status:{' '}
-              {appStatus.backendData.status}
-            </div>
-          )}
+            {appStatus.status === 'ready' && appStatus.backendData && (
+              <div className="status-message status-success">
+                ✓ {appStatus.backendData.application_name} v
+                {appStatus.backendData.version} - Status:{' '}
+                {appStatus.backendData.status}
+              </div>
+            )}
 
-          {appStatus.status === 'error' && (
-            <div className="status-message status-error">
-              ⚠ {appStatus.message}
-            </div>
-          )}
+            {appStatus.status === 'error' && (
+              <div className="status-message status-error">
+                ⚠ {appStatus.message}
+              </div>
+            )}
+          </div>
+
+          <main>
+            <Hero />
+            <SliceAndPrint />
+          </main>
+          <Footer />
         </div>
-
-        <main>
-          <Hero />
-          <SliceAndPrint />
-        </main>
-        <Footer />
-      </div>
-    </ToastProvider>
+      </ToastProvider>
+    </ThemeProvider>
   );
 }
 

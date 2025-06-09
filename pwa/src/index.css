@@ -12,13 +12,111 @@
     -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu,
     Cantarell, sans-serif;
   line-height: 1.6;
-  color: #333;
-  background-color: #f8f9fa;
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  
+  /* Light theme colors */
+  --color-text-primary: #333333;
+  --color-text-secondary: #666666;
+  --color-text-muted: #6c757d;
+  --color-text-inverse: #ffffff;
+  
+  --color-bg-primary: #ffffff;
+  --color-bg-secondary: #f8f9fa;
+  --color-bg-tertiary: #e9ecef;
+  --color-bg-accent: #e8f5e9;
+  --color-bg-header: linear-gradient(135deg, #4caf50 0%, #388e3c 100%);
+  --color-bg-footer: #333333;
+  
+  --color-border-primary: #e0e0e0;
+  --color-border-secondary: #dee2e6;
+  --color-border-muted: #e9ecef;
+  
+  --color-primary: #388e3c;
+  --color-primary-hover: #2e7d32;
+  --color-primary-light: #4caf50;
+  --color-primary-accent: #e8f5e9;
+  
+  --color-success: #28a745;
+  --color-success-bg: #d4edda;
+  --color-success-border: #c3e6cb;
+  --color-success-text: #155724;
+  
+  --color-warning: #ffc107;
+  --color-warning-bg: #fff3cd;
+  --color-warning-border: #ffeaa7;
+  --color-warning-text: #856404;
+  
+  --color-error: #dc3545;
+  --color-error-bg: #f8d7da;
+  --color-error-border: #f5c6cb;
+  --color-error-text: #721c24;
+  
+  --color-info: #17a2b8;
+  --color-info-bg: #d1ecf1;
+  --color-info-border: #bee5eb;
+  --color-info-text: #0c5460;
+  
+  --color-shadow: rgba(0, 0, 0, 0.1);
+  --color-shadow-strong: rgba(0, 0, 0, 0.15);
+  
+  /* Set text and background colors for light theme */
+  color: var(--color-text-primary);
+  background-color: var(--color-bg-secondary);
+}
+
+/* Dark theme colors */
+:root.theme-dark {
+  --color-text-primary: #e9ecef;
+  --color-text-secondary: #adb5bd;
+  --color-text-muted: #6c757d;
+  --color-text-inverse: #212529;
+  
+  --color-bg-primary: #212529;
+  --color-bg-secondary: #1a1d20;
+  --color-bg-tertiary: #2d3338;
+  --color-bg-accent: #1e3a21;
+  --color-bg-header: linear-gradient(135deg, #2e7d32 0%, #1b5e20 100%);
+  --color-bg-footer: #1a1d20;
+  
+  --color-border-primary: #495057;
+  --color-border-secondary: #3d4449;
+  --color-border-muted: #343a40;
+  
+  --color-primary: #66bb6a;
+  --color-primary-hover: #4caf50;
+  --color-primary-light: #81c784;
+  --color-primary-accent: #1e3a21;
+  
+  --color-success: #28a745;
+  --color-success-bg: #1e3e22;
+  --color-success-border: #2d5a2f;
+  --color-success-text: #75d679;
+  
+  --color-warning: #ffc107;
+  --color-warning-bg: #3a3121;
+  --color-warning-border: #5a4a2f;
+  --color-warning-text: #ffda6a;
+  
+  --color-error: #dc3545;
+  --color-error-bg: #3a1e21;
+  --color-error-border: #5a2f32;
+  --color-error-text: #f5a3aa;
+  
+  --color-info: #17a2b8;
+  --color-info-bg: #1e2e31;
+  --color-info-border: #2f4649;
+  --color-info-text: #6dd3e5;
+  
+  --color-shadow: rgba(0, 0, 0, 0.3);
+  --color-shadow-strong: rgba(0, 0, 0, 0.5);
+  
+  /* Set text and background colors for dark theme */
+  color: var(--color-text-primary);
+  background-color: var(--color-bg-secondary);
 }
 
 body {
@@ -50,7 +148,7 @@ p {
 
 /* Links */
 a {
-  color: #388e3c;
+  color: var(--color-primary);
   text-decoration: none;
 }
 
@@ -66,18 +164,128 @@ button {
   font-size: 1em;
   font-weight: 500;
   font-family: inherit;
-  background-color: #388e3c;
-  color: white;
+  background-color: var(--color-primary);
+  color: var(--color-text-inverse);
   cursor: pointer;
   transition: background-color 0.25s;
 }
 
 button:hover {
-  background-color: #2e7d32;
+  background-color: var(--color-primary-hover);
 }
 
 button:focus,
 button:focus-visible {
-  outline: 2px solid #4caf50;
+  outline: 2px solid var(--color-primary-light);
   outline-offset: 2px;
+}
+
+/* Compact Theme Toggle Styles */
+.theme-toggle-compact {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 1000;
+}
+
+.theme-toggle-buttons-compact {
+  display: flex;
+  gap: 0.25rem;
+  background: var(--color-bg-primary);
+  border-radius: 12px;
+  padding: 0.25rem;
+  box-shadow: 0 4px 16px var(--color-shadow-strong);
+  border: 1px solid var(--color-border-secondary);
+  backdrop-filter: blur(20px);
+}
+
+.theme-toggle-button-compact {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.theme-toggle-button-compact::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--color-primary-light);
+  opacity: 0;
+  transform: scale(0.8);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 8px;
+}
+
+.theme-toggle-button-compact:hover::before {
+  opacity: 0.1;
+  transform: scale(1);
+}
+
+.theme-toggle-button-compact.active::before {
+  opacity: 0.15;
+  transform: scale(1);
+}
+
+.theme-toggle-button-compact:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px var(--color-shadow);
+}
+
+.theme-toggle-button-compact.active {
+  background: var(--color-primary-accent);
+  border: 1px solid var(--color-primary);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px var(--color-shadow);
+}
+
+.theme-icon-compact {
+  font-size: 1.1rem;
+  line-height: 1;
+  position: relative;
+  z-index: 1;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.theme-toggle-button-compact:hover .theme-icon-compact {
+  transform: scale(1.1);
+}
+
+.theme-toggle-button-compact.active .theme-icon-compact {
+  transform: scale(1.05);
+}
+
+/* Mobile responsive compact theme toggle */
+@media (max-width: 768px) {
+  .theme-toggle-compact {
+    top: 0.75rem;
+    right: 0.75rem;
+  }
+  
+  .theme-toggle-button-compact {
+    width: 40px;
+    height: 40px;
+  }
+  
+  .theme-icon-compact {
+    font-size: 1.2rem;
+  }
+}
+
+/* Dark theme specific adjustments */
+:root.theme-dark .theme-toggle-buttons-compact {
+  background: var(--color-bg-primary);
+  border-color: var(--color-border-primary);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
 }
