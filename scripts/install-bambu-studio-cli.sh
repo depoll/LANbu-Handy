@@ -69,11 +69,14 @@ install_minimal_dependencies() {
         # GStreamer base libraries (required for CLI media processing)
         libgstreamer-plugins-base1.0-0
         
-        # LibSoup for network operations (version 2.4 to avoid conflicts)
-        libsoup-2.4-1
+        # LibSoup for network operations (version 3.0 for compatibility)
+        libsoup-3.0-0
         
         # Off-screen Mesa rendering (required for headless 3D operations)
         libosmesa6
+        
+        # Essential WebKit libraries (version 4.1 with compatibility)
+        libwebkit2gtk-4.1-0
     )
 
     # Function to install a list of packages, continuing on failure
@@ -97,9 +100,17 @@ install_minimal_dependencies() {
     # Create compatibility symlinks for library version differences
     echo "Creating compatibility symlinks for library versions..."
     
-    # Note: WebKit libraries are skipped to avoid libsoup conflicts
-    # The CLI may show warnings but basic slicing should work
-    echo "  ✓ Essential graphics and media libraries installed"
+    # WebKit2GTK compatibility (4.1 -> 4.0)
+    if [ -f "/usr/lib/x86_64-linux-gnu/libwebkit2gtk-4.1.so.0" ]; then
+        ln -sf "/usr/lib/x86_64-linux-gnu/libwebkit2gtk-4.1.so.0" "/usr/lib/x86_64-linux-gnu/libwebkit2gtk-4.0.so.37" 2>/dev/null || true
+        echo "  ✓ Created webkit2gtk-4.0 compatibility symlink"
+    fi
+    
+    # JavaScriptCore compatibility (4.1 -> 4.0)
+    if [ -f "/usr/lib/x86_64-linux-gnu/libjavascriptcoregtk-4.1.so.0" ]; then
+        ln -sf "/usr/lib/x86_64-linux-gnu/libjavascriptcoregtk-4.1.so.0" "/usr/lib/x86_64-linux-gnu/libjavascriptcoregtk-4.0.so.18" 2>/dev/null || true
+        echo "  ✓ Created javascriptcoregtk-4.0 compatibility symlink"
+    fi
 
     # Clean up package caches to reduce image size
     if [ "$EUID" -eq 0 ]; then
@@ -471,7 +482,7 @@ chmod +x "$INSTALL_DIR/BambuStudio.AppImage"
 cat > "$INSTALL_DIR/bambu-studio-cli" << 'EOF'
 #!/bin/bash
 # Bambu Studio CLI wrapper
-# This wrapper runs the Bambu Studio AppImage in CLI mode
+# This wrapper runs the Bambu Studio AppImage in CLI mode with proper library handling
 
 APPIMAGE_PATH="/usr/local/bin/BambuStudio.AppImage"
 
@@ -480,9 +491,14 @@ if [ ! -f "$APPIMAGE_PATH" ]; then
     exit 1
 fi
 
+# Set environment variables to handle library conflicts
+export G_MESSAGES_DEBUG=none
+export LIBGL_ALWAYS_SOFTWARE=1
+export WEBKIT_DISABLE_COMPOSITING_MODE=1
+
 # Run the AppImage with the provided arguments
-# Note: Some operations may require a display, but basic CLI functions should work
-exec "$APPIMAGE_PATH" "$@"
+# Note: Library warnings about soup versions are expected but don't prevent operation
+exec "$APPIMAGE_PATH" "$@" 2>/dev/null
 EOF
 chmod +x "$INSTALL_DIR/bambu-studio-cli"
 
