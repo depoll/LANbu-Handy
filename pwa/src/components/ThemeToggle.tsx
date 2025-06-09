@@ -42,7 +42,7 @@ export function ThemeToggle() {
   return (
     <div className="theme-toggle-compact">
       <div className="theme-toggle-buttons-compact">
-        {themes.map((themeOption) => (
+        {themes.map(themeOption => (
           <button
             key={themeOption}
             type="button"

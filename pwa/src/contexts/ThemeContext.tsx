@@ -1,4 +1,10 @@
-import React, { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from 'react';
 
 export type Theme = 'light' | 'dark' | 'system';
 
@@ -16,7 +22,9 @@ interface ThemeProviderProps {
 
 function getSystemTheme(): 'light' | 'dark' {
   if (typeof window === 'undefined') return 'light';
-  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  return window.matchMedia('(prefers-color-scheme: dark)').matches
+    ? 'dark'
+    : 'light';
 }
 
 function getStoredTheme(): Theme {
@@ -57,13 +65,13 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
 
     const actualTheme = theme === 'system' ? systemTheme : theme;
     const root = document.documentElement;
-    
+
     // Remove existing theme classes
     root.classList.remove('theme-light', 'theme-dark');
-    
+
     // Add current theme class
     root.classList.add(`theme-${actualTheme}`);
-    
+
     // Set data attribute for CSS
     root.setAttribute('data-theme', actualTheme);
   }, [theme, systemTheme]);
