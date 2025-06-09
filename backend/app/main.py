@@ -751,6 +751,7 @@ async def get_model_thumbnail(file_id: str, width: int = 300, height: int = 300)
         raise HTTPException(status_code=500, detail=msg)
 
 
+@app.post("/api/slice/defaults", response_model=SliceResponse)
 async def slice_model_with_defaults(request: SliceRequest):
     """
     Slice a previously downloaded model using default settings.
