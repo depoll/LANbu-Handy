@@ -75,7 +75,7 @@ services:
           {
             "name": "Bambu X1C",
             "ip": "192.168.1.100",
-            "access_code": "12345678", 
+            "access_code": "12345678",
             "serial_number": "01S00C123456789"
           }
         ]

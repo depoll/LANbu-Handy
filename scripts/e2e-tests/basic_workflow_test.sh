@@ -20,7 +20,7 @@ check_service() {
     local url=$1
     local name=$2
     echo "⏳ Checking $name availability..."
-    
+
     for i in {1..10}; do
         if curl -f -s "$url" > /dev/null; then
             echo "✅ $name is available"
@@ -29,7 +29,7 @@ check_service() {
         echo "   Attempt $i/10 failed, retrying in 2s..."
         sleep 2
     done
-    
+
     echo "❌ $name is not available after 10 attempts"
     return 1
 }
@@ -40,9 +40,9 @@ test_api_endpoint() {
     local endpoint=$2
     local data=$3
     local expected_status=${4:-200}
-    
+
     echo "🔍 Testing $method $endpoint"
-    
+
     if [ -n "$data" ]; then
         response=$(curl -s -w "%{http_code}" -X "$method" \
             -H "Content-Type: application/json" \
@@ -52,10 +52,10 @@ test_api_endpoint() {
         response=$(curl -s -w "%{http_code}" -X "$method" \
             "$LANBU_URL$endpoint")
     fi
-    
+
     status_code="${response: -3}"
     body="${response%???}"
-    
+
     if [ "$status_code" = "$expected_status" ]; then
         echo "✅ $method $endpoint - Status: $status_code"
         echo "   Response: ${body:0:100}..."

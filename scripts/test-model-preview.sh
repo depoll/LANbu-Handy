@@ -22,7 +22,7 @@ if ! curl -s -f "$BACKEND_URL/api/status" > /dev/null; then
 fi
 
 if ! curl -s -f "$PWA_URL" > /dev/null; then
-    echo "❌ PWA server not available at $PWA_URL" 
+    echo "❌ PWA server not available at $PWA_URL"
     echo "   Start with: cd pwa && npm run dev -- --host 0.0.0.0 --port 5173"
     exit 1
 fi
@@ -48,17 +48,17 @@ BENCHY_RESPONSE=$(curl -s -X POST "$BACKEND_URL/api/model/submit-url" \
 if echo "$BENCHY_RESPONSE" | jq -e '.success' > /dev/null; then
     BENCHY_FILE_ID=$(echo "$BENCHY_RESPONSE" | jq -r '.file_id')
     echo "✅ Benchy model submitted successfully: $BENCHY_FILE_ID"
-    
+
     # Test preview endpoint
     echo "🖼️  Testing model preview endpoint..."
     PREVIEW_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X GET "$BACKEND_URL/api/model/preview/$BENCHY_FILE_ID")
-    
+
     if [ "$PREVIEW_STATUS" = "200" ]; then
         echo "✅ Model preview endpoint working (HTTP $PREVIEW_STATUS)"
     else
         echo "❌ Model preview endpoint failed (HTTP $PREVIEW_STATUS)"
     fi
-    
+
     # Get model info
     MODEL_INFO=$(echo "$BENCHY_RESPONSE" | jq -r '.file_info | "Size: \(.size_mb)MB, Extension: \(.extension)"')
     FILAMENT_INFO=$(echo "$BENCHY_RESPONSE" | jq -r '.filament_requirements | "Filaments: \(.filament_count), Colors: \(.filament_colors | join(", "))"')
@@ -71,7 +71,7 @@ fi
 
 echo ""
 
-# Test with multicolor 3MF file  
+# Test with multicolor 3MF file
 echo "📥 Testing multicolor 3MF model submission..."
 MULTICOLOR_RESPONSE=$(curl -s -X POST "$BACKEND_URL/api/model/submit-url" \
     -H "Content-Type: application/json" \
@@ -80,21 +80,21 @@ MULTICOLOR_RESPONSE=$(curl -s -X POST "$BACKEND_URL/api/model/submit-url" \
 if echo "$MULTICOLOR_RESPONSE" | jq -e '.success' > /dev/null; then
     MULTICOLOR_FILE_ID=$(echo "$MULTICOLOR_RESPONSE" | jq -r '.file_id')
     echo "✅ Multicolor model submitted successfully: $MULTICOLOR_FILE_ID"
-    
+
     # Test preview endpoint
     PREVIEW_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X GET "$BACKEND_URL/api/model/preview/$MULTICOLOR_FILE_ID")
-    
+
     if [ "$PREVIEW_STATUS" = "200" ]; then
         echo "✅ Multicolor model preview endpoint working (HTTP $PREVIEW_STATUS)"
     else
         echo "❌ Multicolor model preview endpoint failed (HTTP $PREVIEW_STATUS)"
     fi
-    
+
     # Get filament requirements
     FILAMENT_COUNT=$(echo "$MULTICOLOR_RESPONSE" | jq -r '.filament_requirements.filament_count')
     HAS_MULTICOLOR=$(echo "$MULTICOLOR_RESPONSE" | jq -r '.filament_requirements.has_multicolor')
     echo "🎨 Filament Count: $FILAMENT_COUNT, Has Multicolor: $HAS_MULTICOLOR"
-    
+
     if [ "$HAS_MULTICOLOR" = "true" ]; then
         echo "✅ Multicolor model detected correctly"
     else
