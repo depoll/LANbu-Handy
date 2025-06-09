@@ -585,8 +585,8 @@ function getModelColor(
       const colors = [
         0xff6b6b, // Red
         0x4ecdc4, // Teal
-        0x45b7d1, // Blue
-        0x96ceb4, // Green
+        0x4caf50, // Green
+        0x96ceb4, // Light Green
         0xffeaa7, // Yellow
         0xdda0dd, // Plum
         0xffa8a8, // Pink

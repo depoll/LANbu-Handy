@@ -32,7 +32,7 @@ RUN groupadd -r lanbu && \
     mkdir -p /app && \
     chown -R lanbu:lanbu /app
 
-# Install Bambu Studio CLI and dependencies (with minimal deps and cleanup)
+# Install Bambu Studio CLI and dependencies (with essential CLI deps)
 COPY scripts/bambu-studio-version.txt /scripts/
 COPY scripts/install-bambu-studio-cli.sh /tmp/
 RUN chmod +x /tmp/install-bambu-studio-cli.sh && \

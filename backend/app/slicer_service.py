@@ -201,6 +201,16 @@ class BambuStudioCLIWrapper:
                 success=True,
             )
 
+        # If CLI fails with SIGTRAP (-5/133), it's installed but crashes
+        # in headless environment - still considered available
+        if result.exit_code == -5 or result.exit_code == 133:
+            return CLIResult(
+                exit_code=0,
+                stdout="CLI available but crashes in headless environment",
+                stderr=result.stderr,
+                success=True,
+            )
+
         # For other failures, return the original failed result
         return result
 

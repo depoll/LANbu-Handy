@@ -9,7 +9,7 @@
 
 /* Header */
 header {
-  background: linear-gradient(135deg, #2196f3 0%, #1976d2 100%);
+  background: linear-gradient(135deg, #4caf50 0%, #388e3c 100%);
   color: white;
   padding: 1.5rem 1rem;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
@@ -55,7 +55,7 @@ header p {
 /* Specific override for current printer display due to its light background */
 .header-printer-selector .current-printer-display .printer-name,
 .header-printer-selector .current-printer-display .printer-ip {
-  color: #0d47a1; /* Dark blue for better contrast, matches runtime-badge text */
+  color: #1b5e20; /* Dark green for better contrast, matches runtime-badge text */
 }
 
 .header-printer-selector .printer-ip {
@@ -68,7 +68,7 @@ header p {
 
 .header-printer-selector .runtime-badge {
   background: rgba(255, 255, 255, 0.9);
-  color: #0d47a1;
+  color: #1b5e20;
   border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
@@ -86,7 +86,7 @@ header p {
 
 .header-printer-selector .expand-button {
   background: rgba(255, 255, 255, 0.9); /* More opaque for better contrast */
-  color: #0d47a1; /* Darker blue for full WCAG AA compliance */
+  color: #1b5e20; /* Darker green for full WCAG AA compliance */
   border: 1px solid rgba(255, 255, 255, 0.3);
   font-weight: 500; /* Increased font weight */
 }
@@ -145,7 +145,7 @@ main {
 
 .hero h2 {
   font-size: 1.5rem;
-  color: #1976d2;
+  color: #388e3c;
   margin-bottom: 1rem;
 }
 
@@ -217,7 +217,7 @@ footer p {
 }
 
 .slice-and-print-header h2 {
-  color: #1976d2;
+  color: #388e3c;
   font-size: 1.5rem;
   margin-bottom: 0.5rem;
 }
@@ -253,7 +253,7 @@ footer p {
 
 .model-url-input:focus {
   outline: none;
-  border-color: #2196f3;
+  border-color: #4caf50;
 }
 
 .model-url-input:disabled {
@@ -273,7 +273,7 @@ footer p {
   padding: 0.5rem 1rem;
   border: 2px solid #e0e0e0;
   background: white;
-  color: #1976d2; /* Changed text color for non-active state */
+  color: #388e3c; /* Changed text color for non-active state */
   border-radius: 6px;
   cursor: pointer;
   font-size: 0.9rem;
@@ -284,13 +284,13 @@ footer p {
 }
 
 .mode-toggle-button:hover:not(:disabled) {
-  border-color: #2196f3;
-  background: #f5f9ff;
+  border-color: #4caf50;
+  background: #f3f8f3;
 }
 
 .mode-toggle-button.active {
-  border-color: #2196f3;
-  background: #2196f3;
+  border-color: #4caf50;
+  background: #4caf50;
   color: white;
 }
 
@@ -318,8 +318,8 @@ footer p {
 }
 
 .model-file-input:hover:not(:disabled) {
-  border-color: #2196f3;
-  background: #f5f9ff;
+  border-color: #4caf50;
+  background: #f3f8f3;
 }
 
 .model-file-input:disabled {
@@ -332,14 +332,14 @@ footer p {
   flex-direction: column;
   gap: 0.5rem;
   padding: 1rem;
-  background: #f5f9ff;
-  border: 1px solid #e3f2fd;
+  background: #f3f8f3;
+  border: 1px solid #e8f5e9;
   border-radius: 6px;
 }
 
 .file-name {
   font-weight: 500;
-  color: #1976d2;
+  color: #388e3c;
 }
 
 .file-size {
@@ -360,7 +360,7 @@ footer p {
 
 .upload-progress-bar {
   height: 100%;
-  background: linear-gradient(90deg, #4caf50, #2196f3);
+  background: linear-gradient(90deg, #4caf50, #388e3c);
   transition: width 0.3s ease;
   border-radius: 10px;
 }
@@ -380,7 +380,7 @@ footer p {
   padding: 1rem 2rem;
   font-size: 1.1rem;
   font-weight: 600;
-  background-color: #1976d2;
+  background-color: #388e3c;
   color: white;
   border: none;
   border-radius: 6px;
@@ -389,7 +389,7 @@ footer p {
 }
 
 .slice-and-print-button:hover:not(:disabled) {
-  background-color: #1565c0;
+  background-color: #2e7d32;
 }
 
 .slice-and-print-button:disabled {
@@ -469,13 +469,13 @@ footer p {
 }
 
 .status-header h3 {
-  color: #1976d2;
+  color: #388e3c;
   margin: 0;
   font-size: 1.2rem;
 }
 
 .refresh-button {
-  background: #2196f3;
+  background: #4caf50;
   color: white;
   border: none;
   padding: 0.5rem 1rem;
@@ -486,7 +486,7 @@ footer p {
 }
 
 .refresh-button:hover:not(:disabled) {
-  background: #1976d2;
+  background: #388e3c;
 }
 
 .refresh-button:disabled {
@@ -550,8 +550,8 @@ footer p {
 }
 
 .filament-type {
-  background: #e3f2fd;
-  color: #1565c0;
+  background: #e8f5e9;
+  color: #2e7d32;
   padding: 0.25rem 0.5rem;
   border-radius: 12px;
   font-size: 0.8rem;
@@ -629,7 +629,7 @@ footer p {
 }
 
 .requirements-header h3 {
-  color: #1976d2;
+  color: #388e3c;
   margin: 0 0 0.5rem 0;
   font-size: 1.2rem;
 }
@@ -690,8 +690,8 @@ footer p {
 }
 
 .requirement-type {
-  background: #e3f2fd;
-  color: #1565c0;
+  background: #e8f5e9;
+  color: #2e7d32;
   padding: 0.25rem 0.75rem;
   border-radius: 12px;
   font-size: 0.9rem;
@@ -849,8 +849,8 @@ footer p {
 
 .build-plate-select:focus {
   outline: none;
-  border-color: #2196f3;
-  box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
+  border-color: #4caf50;
+  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
 }
 
 /* Filament Mapping Config Styles */
@@ -952,14 +952,14 @@ footer p {
 }
 
 .filament-type {
-  background: #e3f2fd;
-  color: #1565c0;
+  background: #e8f5e9;
+  color: #2e7d32;
   padding: 0.4rem 0.75rem;
   border-radius: 16px;
   font-size: 0.85rem;
   font-weight: 600;
   text-align: center;
-  border: 1px solid #bbdefb;
+  border: 1px solid #c8e6c9;
 }
 
 .filament-color .color-info {
@@ -998,7 +998,7 @@ footer p {
 }
 
 .mapping-arrow {
-  color: #2196f3;
+  color: #4caf50;
   font-size: 1.2rem;
   font-weight: bold;
   display: flex;
@@ -1031,8 +1031,8 @@ footer p {
 
 .ams-slot-select:focus {
   outline: none;
-  border-color: #2196f3;
-  box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
+  border-color: #4caf50;
+  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
 }
 
 /* Custom Dropdown Styles */
@@ -1055,19 +1055,19 @@ footer p {
 }
 
 .dropdown-trigger:hover:not(.disabled) {
-  border-color: #2196f3;
-  box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.1);
+  border-color: #4caf50;
+  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.1);
 }
 
 .dropdown-trigger:focus {
   outline: none;
-  border-color: #2196f3;
-  box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
+  border-color: #4caf50;
+  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
 }
 
 .dropdown-trigger.open {
-  border-color: #2196f3;
-  box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
+  border-color: #4caf50;
+  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
 }
 
 .dropdown-trigger.disabled {
@@ -1167,8 +1167,8 @@ footer p {
 }
 
 .dropdown-option.selected {
-  background: #e3f2fd;
-  border-color: #bbdefb;
+  background: #e8f5e9;
+  border-color: #c8e6c9;
 }
 
 .clear-option {
@@ -1214,7 +1214,7 @@ footer p {
 }
 
 .selected-indicator {
-  color: #2196f3;
+  color: #4caf50;
   font-weight: bold;
   font-size: 0.9rem;
 }
@@ -1226,13 +1226,13 @@ footer p {
 }
 
 .option-type {
-  background: #e3f2fd;
-  color: #1565c0;
+  background: #e8f5e9;
+  color: #2e7d32;
   padding: 0.2rem 0.5rem;
   border-radius: 12px;
   font-size: 0.75rem;
   font-weight: 600;
-  border: 1px solid #bbdefb;
+  border: 1px solid #c8e6c9;
 }
 
 .option-color {
@@ -1414,12 +1414,12 @@ footer p {
 }
 
 .build-plate-value {
-  background: #e7f3ff;
-  color: #0056b3;
+  background: #e8f5e9;
+  color: #2e7d32;
   padding: 0.5rem;
   border-radius: 4px;
   font-weight: 500;
-  border: 1px solid #b3d4fc;
+  border: 1px solid #c8e6c9;
 }
 
 .filament-mappings-summary {
@@ -1459,8 +1459,8 @@ footer p {
 
 .required-type,
 .ams-type {
-  background: #e3f2fd;
-  color: #1565c0;
+  background: #e8f5e9;
+  color: #2e7d32;
   padding: 0.25rem 0.5rem;
   border-radius: 12px;
   font-size: 0.8rem;
@@ -1527,8 +1527,8 @@ footer p {
   justify-content: center;
   gap: 0.75rem;
   padding: 1rem;
-  background: #e3f2fd;
-  border: 1px solid #90caf9;
+  background: #e8f5e9;
+  border: 1px solid #a5d6a7;
   border-radius: 6px;
   margin-bottom: 1rem;
 }
@@ -1536,8 +1536,8 @@ footer p {
 .loading-spinner {
   width: 20px;
   height: 20px;
-  border: 2px solid #e3f2fd;
-  border-top: 2px solid #1976d2;
+  border: 2px solid #e8f5e9;
+  border-top: 2px solid #388e3c;
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
@@ -1552,7 +1552,7 @@ footer p {
 }
 
 .loading-text {
-  color: #1976d2;
+  color: #388e3c;
   font-weight: 500;
   font-size: 0.95rem;
 }
@@ -1804,7 +1804,7 @@ footer p {
 }
 
 .switch-button {
-  background: #007bff;
+  background: #388e3c;
   color: white;
   border: none;
   padding: 0.5rem 1rem;
@@ -1815,7 +1815,7 @@ footer p {
 }
 
 .switch-button:hover:not(:disabled) {
-  background: #0056b3;
+  background: #2e7d32;
 }
 
 .switch-button:disabled {
@@ -1961,7 +1961,7 @@ footer p {
 }
 
 .discovered-printer:hover {
-  border-color: #2196f3;
+  border-color: #4caf50;
 }
 
 .printer-details {
@@ -1993,7 +1993,7 @@ footer p {
 }
 
 .select-printer-button {
-  background: #2196f3;
+  background: #4caf50;
   color: white;
   border: none;
   padding: 0.5rem 1rem;
@@ -2004,7 +2004,7 @@ footer p {
 }
 
 .select-printer-button:hover:not(:disabled) {
-  background: #1976d2;
+  background: #388e3c;
 }
 
 .select-printer-button:disabled {
@@ -2070,8 +2070,8 @@ footer p {
 .name-input:focus,
 .serial-number-input:focus {
   outline: none;
-  border-color: #2196f3;
-  box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
+  border-color: #4caf50;
+  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
 }
 
 .ip-input:disabled,
@@ -2124,7 +2124,7 @@ footer p {
 }
 
 .set-manual-button {
-  background: #2196f3;
+  background: #4caf50;
   color: white;
   border: none;
   padding: 0.75rem 1.5rem;
@@ -2137,7 +2137,7 @@ footer p {
 }
 
 .set-manual-button:hover:not(:disabled) {
-  background: #1976d2;
+  background: #388e3c;
 }
 
 .set-manual-button:disabled {
@@ -2458,7 +2458,7 @@ footer p {
 }
 
 .progress-bar-primary .progress-bar-fill {
-  background: linear-gradient(90deg, #2196f3 0%, #1976d2 100%);
+  background: linear-gradient(90deg, #4caf50 0%, #388e3c 100%);
 }
 
 .progress-bar-success .progress-bar-fill {
@@ -2544,9 +2544,9 @@ footer p {
 }
 
 .operation-step-running {
-  background: #e3f2fd;
-  border-color: #90caf9;
-  box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.1);
+  background: #e8f5e9;
+  border-color: #a5d6a7;
+  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.1);
 }
 
 .operation-step-completed {
@@ -2584,8 +2584,8 @@ footer p {
 }
 
 .operation-step-running .operation-step-indicator {
-  border-color: #2196f3;
-  color: #1976d2;
+  border-color: #4caf50;
+  color: #388e3c;
 }
 
 .operation-step-completed .operation-step-indicator {
@@ -2766,7 +2766,7 @@ footer p {
   width: 40px;
   height: 40px;
   border: 3px solid #e9ecef;
-  border-top: 3px solid #2196f3;
+  border-top: 3px solid #4caf50;
   border-radius: 50%;
   animation: spin 1s linear infinite;
   z-index: 1;
@@ -2843,8 +2843,8 @@ footer p {
 
 .plate-select:focus {
   outline: none;
-  border-color: #2196f3;
-  box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
+  border-color: #4caf50;
+  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
 }
 
 .selected-plate-details,
@@ -2923,8 +2923,8 @@ footer p {
 
 /* Filament requirements filter notice */
 .requirements-filter-notice {
-  background: #e3f2fd;
-  border: 1px solid #2196f3;
+  background: #e8f5e9;
+  border: 1px solid #4caf50;
   border-radius: 6px;
   padding: 0.75rem;
   margin-top: 0.5rem;
@@ -2933,13 +2933,13 @@ footer p {
 
 .requirements-filter-notice p {
   margin: 0;
-  color: #1565c0;
+  color: #2e7d32;
 }
 
 .link-button {
   background: none;
   border: none;
-  color: #1976d2;
+  color: #388e3c;
   text-decoration: underline;
   cursor: pointer;
   font-size: inherit;
@@ -2948,6 +2948,6 @@ footer p {
 }
 
 .link-button:hover {
-  color: #1565c0;
+  color: #2e7d32;
   text-decoration: none;
 }
