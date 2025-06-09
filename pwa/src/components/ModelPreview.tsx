@@ -234,13 +234,18 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({
 
     const tryThumbnailFallback = async () => {
       try {
-        console.log('ModelPreview: Trying thumbnail fallback for fileId:', fileId);
+        console.log(
+          'ModelPreview: Trying thumbnail fallback for fileId:',
+          fileId
+        );
         const thumbnailUrl = `/api/model/thumbnail/${fileId}?width=300&height=300`;
-        
+
         // Test if thumbnail endpoint responds
         const response = await fetch(thumbnailUrl, { method: 'HEAD' });
         if (response.ok) {
-          console.log('ModelPreview: Thumbnail available, switching to thumbnail view');
+          console.log(
+            'ModelPreview: Thumbnail available, switching to thumbnail view'
+          );
           setThumbnailUrl(thumbnailUrl);
           setUseThumbnail(true);
           setError(null);
@@ -249,8 +254,13 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({
           throw new Error(`Thumbnail generation failed: ${response.status}`);
         }
       } catch (thumbnailError) {
-        console.error('ModelPreview: Thumbnail fallback also failed:', thumbnailError);
-        setError('Failed to load model preview and thumbnail generation failed');
+        console.error(
+          'ModelPreview: Thumbnail fallback also failed:',
+          thumbnailError
+        );
+        setError(
+          'Failed to load model preview and thumbnail generation failed'
+        );
         setIsLoading(false);
       }
     };
@@ -340,7 +350,7 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({
                 console.log(
                   `ModelPreview: Found ${geometries.length} geometries, attempting to merge...`
                 );
-                
+
                 try {
                   // Try to merge multiple geometries for better preview
                   const mergedGeometry = mergeGeometries(geometries);
@@ -348,11 +358,16 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({
                     console.log('ModelPreview: Successfully merged geometries');
                     handleGeometry(mergedGeometry);
                   } else {
-                    console.log('ModelPreview: Merge failed, using first geometry');
+                    console.log(
+                      'ModelPreview: Merge failed, using first geometry'
+                    );
                     handleGeometry(geometries[0]);
                   }
                 } catch (mergeError) {
-                  console.warn('ModelPreview: Geometry merge failed:', mergeError);
+                  console.warn(
+                    'ModelPreview: Geometry merge failed:',
+                    mergeError
+                  );
                   console.log('ModelPreview: Falling back to first geometry');
                   handleGeometry(geometries[0]);
                 }
@@ -531,7 +546,9 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({
 /**
  * Merge multiple geometries into a single geometry for better preview
  */
-function mergeGeometries(geometries: THREE.BufferGeometry[]): THREE.BufferGeometry | null {
+function mergeGeometries(
+  geometries: THREE.BufferGeometry[]
+): THREE.BufferGeometry | null {
   try {
     if (geometries.length === 0) return null;
     if (geometries.length === 1) return geometries[0];
@@ -539,7 +556,9 @@ function mergeGeometries(geometries: THREE.BufferGeometry[]): THREE.BufferGeomet
     // For now, just use the first geometry since proper merging is complex
     // This is an improvement over the previous approach as we at least check
     // if there are multiple geometries and could implement proper merging later
-    console.log('ModelPreview: Multiple geometries detected, using first geometry for now');
+    console.log(
+      'ModelPreview: Multiple geometries detected, using first geometry for now'
+    );
     return geometries[0].clone();
   } catch (error) {
     console.error('ModelPreview: Error processing geometries:', error);

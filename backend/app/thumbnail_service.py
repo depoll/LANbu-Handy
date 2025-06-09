@@ -229,7 +229,7 @@ class ThumbnailService:
         Creates a minimal SVG image.
         """
         try:
-            svg_content = f'''<?xml version="1.0" encoding="UTF-8"?>
+            svg_content = f"""<?xml version="1.0" encoding="UTF-8"?>
 <svg width="{width}" height="{height}" xmlns="http://www.w3.org/2000/svg">
   <rect width="{width}" height="{height}" fill="#f5f5f5"/>
   <rect x="{width//4}" y="{height//4}" width="{width//2}" height="{height//2}"
@@ -238,7 +238,7 @@ class ThumbnailService:
         font-family="Arial, sans-serif" font-size="12" fill="#333333">
     3D Model Preview
   </text>
-</svg>'''
+</svg>"""
 
             # Save as SVG (can be displayed in browsers)
             svg_path = thumbnail_path.with_suffix(".svg")
