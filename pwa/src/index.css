@@ -50,7 +50,7 @@ p {
 
 /* Links */
 a {
-  color: #1976d2;
+  color: #388e3c;
   text-decoration: none;
 }
 
@@ -66,18 +66,18 @@ button {
   font-size: 1em;
   font-weight: 500;
   font-family: inherit;
-  background-color: #1976d2;
+  background-color: #388e3c;
   color: white;
   cursor: pointer;
   transition: background-color 0.25s;
 }
 
 button:hover {
-  background-color: #1565c0;
+  background-color: #2e7d32;
 }
 
 button:focus,
 button:focus-visible {
-  outline: 2px solid #2196f3;
+  outline: 2px solid #4caf50;
   outline-offset: 2px;
 }
