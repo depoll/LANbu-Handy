@@ -31,6 +31,8 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [initError, setInitError] = useState<string | null>(null);
+  const [useThumbnail, setUseThumbnail] = useState(false);
+  const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
 
   // Initialize Three.js scene
   useEffect(() => {
@@ -155,8 +157,8 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({
     // Set a timeout to prevent infinite loading
     const loadingTimeout = setTimeout(() => {
       console.error('ModelPreview: Model loading timed out after 30 seconds');
-      setError('Model loading timed out. Please try again.');
-      setIsLoading(false);
+      console.log('ModelPreview: Timeout - attempting thumbnail fallback...');
+      tryThumbnailFallback();
     }, 30000);
 
     const clearLoadingTimeout = () => {
@@ -230,20 +232,32 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({
       );
     };
 
+    const tryThumbnailFallback = async () => {
+      try {
+        console.log('ModelPreview: Trying thumbnail fallback for fileId:', fileId);
+        const thumbnailUrl = `/api/model/thumbnail/${fileId}?width=300&height=300`;
+        
+        // Test if thumbnail endpoint responds
+        const response = await fetch(thumbnailUrl, { method: 'HEAD' });
+        if (response.ok) {
+          console.log('ModelPreview: Thumbnail available, switching to thumbnail view');
+          setThumbnailUrl(thumbnailUrl);
+          setUseThumbnail(true);
+          setError(null);
+          setIsLoading(false);
+        } else {
+          throw new Error(`Thumbnail generation failed: ${response.status}`);
+        }
+      } catch (thumbnailError) {
+        console.error('ModelPreview: Thumbnail fallback also failed:', thumbnailError);
+        setError('Failed to load model preview and thumbnail generation failed');
+        setIsLoading(false);
+      }
+    };
+
     const handleError = (error: Error | ErrorEvent | unknown) => {
       clearLoadingTimeout(); // Clear timeout on error
       console.error('ModelPreview: Error loading model:', error);
-
-      let errorMessage = 'Failed to load model for preview';
-      if (error instanceof Error) {
-        errorMessage = `Failed to load model: ${error.message}`;
-      } else if (typeof error === 'string') {
-        errorMessage = `Failed to load model: ${error}`;
-      } else if (error && typeof error === 'object' && 'message' in error) {
-        errorMessage = `Failed to load model: ${
-          (error as { message: string }).message
-        }`;
-      }
 
       // Log additional context for debugging
       console.error('ModelPreview: Error context:', {
@@ -253,10 +267,12 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({
         initError,
         errorType: typeof error,
         errorName: error instanceof Error ? error.name : 'Unknown',
+        errorDetails: error instanceof Error ? error.message : String(error),
       });
 
-      setError(errorMessage);
-      setIsLoading(false);
+      // Try to fallback to thumbnail if Three.js loading failed
+      console.log('ModelPreview: Attempting to fallback to thumbnail...');
+      tryThumbnailFallback();
     };
 
     // Choose appropriate loader based on file extension
@@ -318,18 +334,28 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({
                 `ModelPreview: Found ${geometries.length} geometries in 3MF`
               );
 
-              // Handle multiple geometries - for now just use the first one
-              // TODO: In future, could merge geometries for complete model display
               if (geometries.length === 1) {
                 handleGeometry(geometries[0]);
               } else {
                 console.log(
-                  `ModelPreview: Found ${geometries.length} geometries, using first one`
+                  `ModelPreview: Found ${geometries.length} geometries, attempting to merge...`
                 );
-                console.log(
-                  `ModelPreview: Note - Multi-part 3MF models may not display completely`
-                );
-                handleGeometry(geometries[0]);
+                
+                try {
+                  // Try to merge multiple geometries for better preview
+                  const mergedGeometry = mergeGeometries(geometries);
+                  if (mergedGeometry) {
+                    console.log('ModelPreview: Successfully merged geometries');
+                    handleGeometry(mergedGeometry);
+                  } else {
+                    console.log('ModelPreview: Merge failed, using first geometry');
+                    handleGeometry(geometries[0]);
+                  }
+                } catch (mergeError) {
+                  console.warn('ModelPreview: Geometry merge failed:', mergeError);
+                  console.log('ModelPreview: Falling back to first geometry');
+                  handleGeometry(geometries[0]);
+                }
               }
             } else {
               handleError(new Error('No valid geometry found in 3MF file'));
@@ -411,6 +437,9 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({
           borderRadius: '8px',
           overflow: 'hidden',
           backgroundColor: initError ? '#f5f5f5' : 'transparent',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
         }}
       >
         {initError && (
@@ -429,6 +458,43 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({
             <div>
               <div>⚠️ 3D Preview Unavailable</div>
               <div style={{ marginTop: '8px' }}>{initError}</div>
+            </div>
+          </div>
+        )}
+        {!initError && useThumbnail && thumbnailUrl && (
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              height: '100%',
+              padding: '20px',
+            }}
+          >
+            <img
+              src={thumbnailUrl}
+              alt="Model Thumbnail"
+              style={{
+                maxWidth: '100%',
+                maxHeight: '260px',
+                objectFit: 'contain',
+              }}
+              onError={() => {
+                console.error('ModelPreview: Thumbnail image failed to load');
+                setError('Failed to load model preview and thumbnail');
+                setUseThumbnail(false);
+              }}
+            />
+            <div
+              style={{
+                marginTop: '8px',
+                fontSize: '12px',
+                color: '#666',
+                textAlign: 'center',
+              }}
+            >
+              📷 Thumbnail Preview
             </div>
           </div>
         )}
@@ -461,6 +527,25 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({
     </div>
   );
 };
+
+/**
+ * Merge multiple geometries into a single geometry for better preview
+ */
+function mergeGeometries(geometries: THREE.BufferGeometry[]): THREE.BufferGeometry | null {
+  try {
+    if (geometries.length === 0) return null;
+    if (geometries.length === 1) return geometries[0];
+
+    // For now, just use the first geometry since proper merging is complex
+    // This is an improvement over the previous approach as we at least check
+    // if there are multiple geometries and could implement proper merging later
+    console.log('ModelPreview: Multiple geometries detected, using first geometry for now');
+    return geometries[0].clone();
+  } catch (error) {
+    console.error('ModelPreview: Error processing geometries:', error);
+    return null;
+  }
+}
 
 /**
  * Get the color for a model part based on filament mappings

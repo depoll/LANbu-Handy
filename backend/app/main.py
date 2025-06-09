@@ -29,6 +29,7 @@ from app.printer_service import (
 )
 from app.slicer_service import slice_model
 from app.threemf_repair_service import ThreeMFRepairError, ThreeMFRepairService
+from app.thumbnail_service import ThumbnailGenerationError, ThumbnailService
 from app.utils import (
     build_slicing_options_from_config,
     find_gcode_file,
@@ -57,6 +58,9 @@ model_service = ModelService()
 # Initialize 3MF repair service
 threemf_repair_service = ThreeMFRepairService()
 
+# Initialize thumbnail service
+thumbnail_service = ThumbnailService()
+
 # Initialize printer service
 printer_service = PrinterService()
 
@@ -79,6 +83,13 @@ async def startup_event():
     except Exception as e:
         logger.warning(f"Error during startup cleanup: {e}")
 
+    # Clean up old thumbnail files
+    try:
+        thumbnail_service.cleanup_old_thumbnails(max_age_hours=24)
+        logger.info("Cleaned up old thumbnail files")
+    except Exception as e:
+        logger.warning(f"Error during thumbnail cleanup: {e}")
+
 
 @app.on_event("shutdown")
 async def shutdown_event():
@@ -91,6 +102,13 @@ async def shutdown_event():
         logger.info("Final cleanup of repaired 3MF files")
     except Exception as e:
         logger.warning(f"Error during shutdown cleanup: {e}")
+
+    # Clean up thumbnail files
+    try:
+        thumbnail_service.cleanup_old_thumbnails(max_age_hours=0)
+        logger.info("Final cleanup of thumbnail files")
+    except Exception as e:
+        logger.warning(f"Error during thumbnail cleanup: {e}")
 
 
 # Path to the PWA static files directory
@@ -664,7 +682,75 @@ async def get_model_preview(file_id: str):
         raise HTTPException(status_code=500, detail=msg)
 
 
-@app.post("/api/slice/defaults", response_model=SliceResponse)
+@app.get("/api/model/thumbnail/{file_id}")
+async def get_model_thumbnail(file_id: str, width: int = 300, height: int = 300):
+    """
+    Generate and serve a thumbnail image for a model file.
+
+    This endpoint generates a thumbnail image for the specified model file using
+    the slicer as a fallback when Three.js previews fail or for complex models.
+    Thumbnails are cached and reused for subsequent requests.
+
+    Args:
+        file_id: The file ID from model submission
+        width: Thumbnail width in pixels (default: 300)
+        height: Thumbnail height in pixels (default: 300)
+
+    Returns:
+        FileResponse with the thumbnail image (PNG or SVG)
+
+    Raises:
+        HTTPException: If file is not found or thumbnail generation fails
+    """
+    try:
+        # Find the model file in the temp directory
+        model_file_path = model_service.temp_dir / file_id
+
+        if not model_file_path.exists():
+            raise HTTPException(
+                status_code=404, detail=f"Model file not found: {file_id}"
+            )
+
+        # Validate file extension for security
+        if not model_service.validate_file_extension(model_file_path.name):
+            raise HTTPException(
+                status_code=400, detail="Invalid file type for thumbnail"
+            )
+
+        # Check if thumbnail already exists
+        if thumbnail_service.thumbnail_exists(model_file_path):
+            thumbnail_path = thumbnail_service.get_thumbnail_path(model_file_path)
+            logger.debug(f"Using existing thumbnail: {thumbnail_path}")
+        else:
+            # Generate new thumbnail
+            logger.info(f"Generating thumbnail for: {file_id}")
+            thumbnail_path = thumbnail_service.generate_thumbnail(
+                model_file_path, width=width, height=height
+            )
+
+        # Determine media type based on file extension
+        media_type = "image/png"
+        if thumbnail_path.suffix.lower() == ".svg":
+            media_type = "image/svg+xml"
+
+        return FileResponse(
+            path=thumbnail_path,
+            media_type=media_type,
+            filename=f"{model_file_path.stem}_thumbnail{thumbnail_path.suffix}",
+        )
+
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
+    except ThumbnailGenerationError as e:
+        raise HTTPException(
+            status_code=500, detail=f"Thumbnail generation failed: {str(e)}"
+        )
+    except Exception as e:
+        msg = f"Internal server error generating thumbnail: {str(e)}"
+        raise HTTPException(status_code=500, detail=msg)
+
+
 async def slice_model_with_defaults(request: SliceRequest):
     """
     Slice a previously downloaded model using default settings.
