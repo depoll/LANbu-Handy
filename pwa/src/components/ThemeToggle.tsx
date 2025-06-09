@@ -1,5 +1,5 @@
-import React from 'react';
-import { useTheme, type Theme } from '../contexts/ThemeContext';
+import { useTheme } from '../hooks/useTheme';
+import { type Theme } from '../types/theme';
 
 export function ThemeToggle() {
   const { theme, actualTheme, setTheme } = useTheme();
@@ -28,13 +28,6 @@ export function ThemeToggle() {
       default:
         return 'Auto theme';
     }
-  };
-
-  const getCurrentIcon = () => {
-    if (theme === 'system') {
-      return actualTheme === 'dark' ? '🌙' : '☀️';
-    }
-    return getThemeIcon(theme);
   };
 
   const themes: Theme[] = ['light', 'dark', 'system'];
