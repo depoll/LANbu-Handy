@@ -5,3 +5,4 @@ uvicorn[standard]>=0.24.0
 python-multipart>=0.0.6
 httpx>=0.25.0
 paho-mqtt>=1.6.0
+Pillow>=10.0.0
