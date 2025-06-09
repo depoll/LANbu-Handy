@@ -69,8 +69,9 @@ install_minimal_dependencies() {
         # GStreamer base libraries (required for CLI media processing)
         libgstreamer-plugins-base1.0-0
         
-        # LibSoup for network operations (version 3.0 for compatibility)
+        # LibSoup for network operations (both old and new versions for compatibility)
         libsoup-3.0-0
+        libsoup2.4-1
         
         # Off-screen Mesa rendering (required for headless 3D operations)
         libosmesa6
