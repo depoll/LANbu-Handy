@@ -11,7 +11,7 @@ import {
 const mockFilamentRequirements: FilamentRequirement = {
   filament_count: 2,
   filament_types: ['PLA', 'PETG'],
-  filament_colors: ['#FF0000', 'Blue'],
+  filament_colors: ['#FF0000', 'Green'],
   has_multicolor: true,
 };
 
@@ -31,8 +31,8 @@ const mockAMSStatus: AMSStatusResponse = {
         {
           slot_id: 2,
           filament_type: 'PETG',
-          color: '#0000FF',
-          material_id: 'PETG-Blue',
+          color: '#4CAF50',
+          material_id: 'PETG-Green',
         },
       ],
     },
@@ -263,6 +263,6 @@ describe('ConfigurationSummary', () => {
       />
     );
 
-    expect(screen.getByText('Blue')).toBeInTheDocument();
+    expect(screen.getByText('Green')).toBeInTheDocument();
   });
 });
