@@ -65,17 +65,17 @@ install_minimal_dependencies() {
         libegl-mesa0
         libgl1-mesa-dri
         libopengl0
-        
+
         # GStreamer base libraries (required for CLI media processing)
         libgstreamer-plugins-base1.0-0
-        
+
         # LibSoup for network operations (both old and new versions for compatibility)
         libsoup-3.0-0
         libsoup2.4-1
-        
+
         # Off-screen Mesa rendering (required for headless 3D operations)
         libosmesa6
-        
+
         # Essential WebKit libraries (version 4.1 with compatibility)
         libwebkit2gtk-4.1-0
     )
@@ -100,13 +100,13 @@ install_minimal_dependencies() {
 
     # Create compatibility symlinks for library version differences
     echo "Creating compatibility symlinks for library versions..."
-    
+
     # WebKit2GTK compatibility (4.1 -> 4.0)
     if [ -f "/usr/lib/x86_64-linux-gnu/libwebkit2gtk-4.1.so.0" ]; then
         ln -sf "/usr/lib/x86_64-linux-gnu/libwebkit2gtk-4.1.so.0" "/usr/lib/x86_64-linux-gnu/libwebkit2gtk-4.0.so.37" 2>/dev/null || true
         echo "  ✓ Created webkit2gtk-4.0 compatibility symlink"
     fi
-    
+
     # JavaScriptCore compatibility (4.1 -> 4.0)
     if [ -f "/usr/lib/x86_64-linux-gnu/libjavascriptcoregtk-4.1.so.0" ]; then
         ln -sf "/usr/lib/x86_64-linux-gnu/libjavascriptcoregtk-4.1.so.0" "/usr/lib/x86_64-linux-gnu/libjavascriptcoregtk-4.0.so.18" 2>/dev/null || true

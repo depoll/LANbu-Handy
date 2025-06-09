@@ -22,7 +22,7 @@ if ! curl -s "$BACKEND_URL/api/status" > /dev/null; then
 fi
 echo "✅ Backend is running"
 
-# Check if file server is running  
+# Check if file server is running
 if ! curl -s "$FILE_SERVER_URL/" > /dev/null; then
     echo "❌ File server not running on $FILE_SERVER_URL"
     exit 1
@@ -69,7 +69,7 @@ MULTICOLOR_RESPONSE=$(curl -s -X POST "$BACKEND_URL/api/model/submit-url" \
 MULTICOLOR_SUCCESS=$(echo "$MULTICOLOR_RESPONSE" | grep -o '"success":true' || echo "false")
 if [[ "$MULTICOLOR_SUCCESS" == "false" ]]; then
     echo "❌ Multicolor model submission failed"
-    echo "Response: $MULTICOLOR_RESPONSE" 
+    echo "Response: $MULTICOLOR_RESPONSE"
     exit 1
 fi
 

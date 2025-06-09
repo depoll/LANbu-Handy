@@ -176,7 +176,7 @@ cat > "$TEST_RESULTS_DIR/manual_testing_guide.html" << 'EOF'
                     <label for="us001-4">Verify filament requirements are displayed</label>
                 </div>
             </div>
-            
+
             <div class="test-case">
                 <h4>Test Case 1.2: Error Handling</h4>
                 <div class="checkbox-container">
@@ -226,7 +226,7 @@ cat > "$TEST_RESULTS_DIR/manual_testing_guide.html" << 'EOF'
                     <label for="us003-3">Verify color swatches are displayed correctly</label>
                 </div>
             </div>
-            
+
             <div class="test-case">
                 <h4>Test Case 3.2: AMS Status Display</h4>
                 <div class="checkbox-container">
@@ -458,7 +458,7 @@ cat > "$TEST_RESULTS_DIR/manual_testing_guide.html" << 'EOF'
 
     <div class="notes-section">
         <h3>📝 Test Notes and Issues</h3>
-        <textarea id="test-notes" style="width: 100%; height: 150px; border: 1px solid #ddd; border-radius: 4px; padding: 10px;" 
+        <textarea id="test-notes" style="width: 100%; height: 150px; border: 1px solid #ddd; border-radius: 4px; padding: 10px;"
                   placeholder="Record any issues, bugs, or observations during testing..."></textarea>
     </div>
 
@@ -477,11 +477,11 @@ cat > "$TEST_RESULTS_DIR/manual_testing_guide.html" << 'EOF'
             const checkboxes = document.querySelectorAll('input[type="checkbox"]');
             const checked = document.querySelectorAll('input[type="checkbox"]:checked').length;
             totalTests = checkboxes.length;
-            
+
             const percentage = Math.round((checked / totalTests) * 100);
-            
+
             document.getElementById('progress-fill').style.width = percentage + '%';
-            document.getElementById('progress-text').textContent = 
+            document.getElementById('progress-text').textContent =
                 `${percentage}% Complete (${checked}/${totalTests} tests)`;
         }
 
@@ -491,7 +491,7 @@ cat > "$TEST_RESULTS_DIR/manual_testing_guide.html" << 'EOF'
                 tab.classList.remove('active');
             });
             event.target.classList.add('active');
-            
+
             // Update content
             document.querySelectorAll('.device-content').forEach(content => {
                 content.classList.remove('active');
@@ -503,21 +503,21 @@ cat > "$TEST_RESULTS_DIR/manual_testing_guide.html" << 'EOF'
             const checkboxes = document.querySelectorAll('input[type="checkbox"]');
             const checked = document.querySelectorAll('input[type="checkbox"]:checked').length;
             const notes = document.getElementById('test-notes').value;
-            
+
             const report = `
                 <h4>Test Execution Summary</h4>
                 <p><strong>Total Tests:</strong> ${totalTests}</p>
                 <p><strong>Passed:</strong> ${checked}</p>
                 <p><strong>Completion Rate:</strong> ${Math.round((checked / totalTests) * 100)}%</p>
-                
+
                 <h4>Test Environment</h4>
                 <p><strong>Application URL:</strong> ${document.getElementById('test-url').textContent}</p>
                 <p><strong>Test Date:</strong> ${new Date().toISOString()}</p>
                 <p><strong>Browser:</strong> ${navigator.userAgent}</p>
-                
+
                 <h4>Notes and Issues</h4>
                 <pre style="background: #f8f9fa; padding: 10px; border-radius: 4px; white-space: pre-wrap;">${notes || 'No notes recorded'}</pre>
-                
+
                 <h4>Next Steps</h4>
                 <ul>
                     <li>Address any failed test cases</li>
@@ -526,10 +526,10 @@ cat > "$TEST_RESULTS_DIR/manual_testing_guide.html" << 'EOF'
                     <li>Cross-browser compatibility testing</li>
                 </ul>
             `;
-            
+
             document.getElementById('report-content').innerHTML = report;
             document.getElementById('test-report').style.display = 'block';
-            
+
             // Scroll to report
             document.getElementById('test-report').scrollIntoView({ behavior: 'smooth' });
         }

@@ -45,15 +45,15 @@ log_header() {
 # Cleanup function
 cleanup() {
     log_info "Cleaning up test environment..."
-    
+
     # Stop Docker containers
     cd "$PROJECT_ROOT"
     docker compose down --remove-orphans > /dev/null 2>&1 || true
-    
+
     # Kill background processes
     pkill -f "python3 -m http.server 8888" > /dev/null 2>&1 || true
     pkill -f "mock_printer_service.py" > /dev/null 2>&1 || true
-    
+
     log_success "Cleanup completed"
 }
 
@@ -63,24 +63,24 @@ trap cleanup EXIT
 # Setup function
 setup_test_environment() {
     log_header "Setting Up Test Environment"
-    
+
     # Create test results directory
     mkdir -p "$TEST_RESULTS_DIR"
-    
+
     # Create test environment file
     cat > "$PROJECT_ROOT/.env.test" << EOF
 BAMBU_PRINTERS=[{"name":"Test Printer X1C","ip":"192.168.1.100","access_code":"12345678"}]
 LOG_LEVEL=debug
 EOF
-    
+
     log_success "Test environment configuration created"
-    
+
     # Build and start LANbu Handy
     log_info "Building and starting LANbu Handy..."
     cd "$PROJECT_ROOT"
     docker compose build > "$TEST_RESULTS_DIR/build.log" 2>&1
     docker compose --env-file .env.test up -d > "$TEST_RESULTS_DIR/startup.log" 2>&1
-    
+
     # Wait for application to be ready
     log_info "Waiting for LANbu Handy to be ready..."
     for i in {1..30}; do
@@ -95,13 +95,13 @@ EOF
         fi
         sleep 1
     done
-    
+
     # Start test file server
     log_info "Starting test file server..."
     cd "$PROJECT_ROOT/test_files"
     python3 -m http.server 8888 > "$TEST_RESULTS_DIR/fileserver.log" 2>&1 &
     sleep 2
-    
+
     # Verify file server
     if curl -f -s "$TEST_FILE_SERVER" > /dev/null; then
         log_success "Test file server is ready"
@@ -109,25 +109,25 @@ EOF
         log_error "Test file server failed to start"
         exit 1
     fi
-    
+
     # Start mock printer service
     log_info "Starting mock printer service..."
     cd "$SCRIPT_DIR"
     python3 mock_printer_service.py > "$TEST_RESULTS_DIR/mock_printer.log" 2>&1 &
     sleep 3
-    
+
     log_success "Test environment setup completed"
 }
 
 # Run API tests
 run_api_tests() {
     log_header "Running API End-to-End Tests"
-    
+
     cd "$SCRIPT_DIR"
-    
+
     # Make sure the script is executable
     chmod +x basic_workflow_test.sh
-    
+
     # Run basic workflow test
     if ./basic_workflow_test.sh > "$TEST_RESULTS_DIR/api_tests.log" 2>&1; then
         log_success "API tests passed"
@@ -142,22 +142,22 @@ run_api_tests() {
 # Run UI tests (if Playwright is available)
 run_ui_tests() {
     log_header "Running UI Automation Tests"
-    
+
     # Check if Playwright is available
     if command -v npx > /dev/null && npx playwright --version > /dev/null 2>&1; then
         log_info "Playwright found, running UI tests..."
-        
+
         cd "$PROJECT_ROOT"
-        
+
         # Install Playwright browsers if needed
         npx playwright install > "$TEST_RESULTS_DIR/playwright_install.log" 2>&1 || true
-        
+
         # Run Playwright tests
         LANBU_URL="$LANBU_URL" TEST_FILE_SERVER="$TEST_FILE_SERVER" \
             npx playwright test "$SCRIPT_DIR/ui_automation_test.spec.ts" \
             --reporter=html --output-dir="$TEST_RESULTS_DIR/playwright" \
             > "$TEST_RESULTS_DIR/ui_tests.log" 2>&1
-        
+
         if [ $? -eq 0 ]; then
             log_success "UI tests passed"
             return 0
@@ -175,9 +175,9 @@ run_ui_tests() {
 # Test individual MVP user stories
 test_mvp_user_stories() {
     log_header "Testing MVP User Stories"
-    
+
     local test_results=()
-    
+
     # US001: Model URL Submission
     log_info "Testing US001: Submit Model URL"
     if curl -X POST "$LANBU_URL/api/model/submit-url" \
@@ -190,7 +190,7 @@ test_mvp_user_stories() {
         log_error "US001 failed"
         test_results+=("US001: ❌")
     fi
-    
+
     # US002: Printer Selection
     log_info "Testing US002: Printer Selection"
     if curl -X GET "$LANBU_URL/api/printers" \
@@ -201,7 +201,7 @@ test_mvp_user_stories() {
         log_error "US002 failed"
         test_results+=("US002: ❌")
     fi
-    
+
     # US003-004: Filament Requirements and AMS Status
     log_info "Testing US003-004: Filament Requirements and AMS Status"
     # These depend on model submission, so we'll check the response from US001
@@ -212,7 +212,7 @@ test_mvp_user_stories() {
         log_warning "US003-004 partial (mock limitations)"
         test_results+=("US003-004: ⚠️")
     fi
-    
+
     # US009: Slicing Configuration
     log_info "Testing US009: Slicing Configuration"
     if curl -X POST "$LANBU_URL/api/slice" \
@@ -225,7 +225,7 @@ test_mvp_user_stories() {
         log_error "US009 failed"
         test_results+=("US009: ❌")
     fi
-    
+
     # US013: Error Handling
     log_info "Testing US013: Error Handling"
     if curl -X POST "$LANBU_URL/api/model/submit-url" \
@@ -244,31 +244,31 @@ test_mvp_user_stories() {
         log_error "US013 failed"
         test_results+=("US013: ❌")
     fi
-    
+
     # Save results summary
     printf "%s\n" "${test_results[@]}" > "$TEST_RESULTS_DIR/mvp_summary.txt"
-    
+
     log_success "MVP user story testing completed"
 }
 
 # Performance testing
 run_performance_tests() {
     log_header "Running Performance Tests"
-    
+
     # Test model processing time
     log_info "Testing model processing performance..."
     local start_time=$(date +%s.%N)
-    
+
     curl -X POST "$LANBU_URL/api/model/submit-url" \
         -H "Content-Type: application/json" \
         -d "{\"model_url\": \"$TEST_FILE_SERVER/Original3DBenchy3Dprintconceptsnormel.3mf\"}" \
         -f -s > "$TEST_RESULTS_DIR/performance.json" 2>&1
-    
+
     local end_time=$(date +%s.%N)
     local duration=$(echo "$end_time - $start_time" | bc -l)
-    
+
     echo "Model processing time: ${duration}s" > "$TEST_RESULTS_DIR/performance.txt"
-    
+
     if (( $(echo "$duration < 30.0" | bc -l) )); then
         log_success "Performance test passed (${duration}s < 30s)"
     else
@@ -279,9 +279,9 @@ run_performance_tests() {
 # Generate test report
 generate_test_report() {
     log_header "Generating Test Report"
-    
+
     local report_file="$TEST_RESULTS_DIR/test_report.md"
-    
+
     cat > "$report_file" << EOF
 # LANbu Handy E2E Test Report
 
@@ -355,35 +355,35 @@ EOF
 # Main test execution
 main() {
     log_header "LANbu Handy End-to-End Test Suite"
-    
+
     local start_time=$(date +%s)
     local overall_success=true
-    
+
     # Setup
     setup_test_environment
-    
+
     # Run tests
     if ! run_api_tests; then
         overall_success=false
     fi
-    
+
     test_mvp_user_stories
-    
+
     run_performance_tests
-    
+
     if ! run_ui_tests; then
         # UI test failure is not critical for overall success
         log_info "UI test issues noted but not failing overall test"
     fi
-    
+
     # Generate report
     generate_test_report
-    
+
     local end_time=$(date +%s)
     local total_time=$((end_time - start_time))
-    
+
     log_header "Test Suite Complete"
-    
+
     if [ "$overall_success" = true ]; then
         log_success "All critical tests passed! (${total_time}s)"
         log_info "Test results available in: $TEST_RESULTS_DIR"

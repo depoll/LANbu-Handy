@@ -78,3 +78,4 @@ test-results/
 config/
 data/
 codemcp.toml
+*.local.*

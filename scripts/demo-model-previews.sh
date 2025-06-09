@@ -28,33 +28,33 @@ for file_info in "${TEST_FILES[@]}"; do
     IFS=':' read -r filename display_name <<< "$file_info"
     echo ""
     echo "📄 Processing $display_name ($filename)..."
-    
+
     # Submit model
     response=$(curl -s -X POST "$BACKEND_URL/api/model/submit-url" \
         -H "Content-Type: application/json" \
         -d "{\"model_url\": \"$FILE_SERVER_URL/$filename\"}")
-    
+
     # Extract file ID
     file_id=$(echo "$response" | grep -o '"file_id":"[^"]*"' | cut -d'"' -f4)
-    
+
     if [[ -n "$file_id" ]]; then
         echo "   ✅ Model submitted (ID: $file_id)"
-        
+
         # Download thumbnail
         thumbnail_path="$OUTPUT_DIR/${display_name}_thumbnail.png"
         curl -s "$BACKEND_URL/api/model/thumbnail/$file_id" -o "$thumbnail_path"
-        
+
         if [[ -f "$thumbnail_path" ]]; then
             size=$(stat -c%s "$thumbnail_path")
             echo "   ✅ Thumbnail saved ($size bytes): $thumbnail_path"
         else
             echo "   ❌ Thumbnail generation failed"
         fi
-        
+
         # Get model info
         filament_count=$(echo "$response" | grep -o '"filament_count":[0-9]*' | cut -d':' -f2)
         has_multicolor=$(echo "$response" | grep -o '"has_multicolor":[^,}]*' | cut -d':' -f2)
-        
+
         echo "   📊 Model info: $filament_count filaments, multicolor: $has_multicolor"
     else
         echo "   ❌ Model submission failed"
@@ -78,7 +78,7 @@ echo ""
 echo "🎯 Enhanced Model Preview System Validation"
 echo "==========================================="
 echo "✅ Thumbnail generation working for multiple model types"
-echo "✅ Single-color models supported"  
+echo "✅ Single-color models supported"
 echo "✅ Multi-color models supported"
 echo "✅ Multi-plate models supported"
 echo "✅ Automatic fallback system operational"
