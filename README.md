@@ -2,6 +2,12 @@
 
 A self-hosted Progressive Web Application (PWA) that enables users to slice 3D model files and send them to Bambu Lab printers operating in LAN-only mode. LANbu Handy restores core Bambu Handy app functionality for users who prefer or require their printers to operate without cloud connectivity.
 
+> **⚠️ UNDER CONSTRUCTION**
+>
+> LANbu Handy is currently in active development and **not yet ready for production use**. While the project structure and documentation are in place, core functionality is still being implemented. See the [Roadmap](#roadmap) section for current development status.
+>
+> This is **not a fully working release** - please check back for updates or follow the project for release announcements.
+
 ## Overview
 
 LANbu Handy provides a streamlined workflow from model URL to print initiation, all within your local network:
