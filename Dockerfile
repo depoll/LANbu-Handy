@@ -1,5 +1,5 @@
-# LANbu Handy - All-in-One Docker Image (Optimized Multi-stage Build)
-# Note: Platform forced via docker-compose.yml for Bambu Studio CLI compatibility
+# LANbu Handy - All-in-One Docker Image (Multi-stage Build)
+# Base: Published Bambu Studio CLI image with Python runtime added
 
 # Stage 1: PWA Build Stage
 FROM node:18-slim AS pwa-builder
@@ -20,14 +20,29 @@ RUN npm config set strict-ssl false && \
 COPY pwa/ ./
 RUN npm run build
 
-# Stage 2: Bambu Studio CLI Stage
-FROM ghcr.io/depoll/lanbu-handy/bambu-studio-cli:latest AS cli-stage
-
-# Stage 3: Python Runtime Stage
-FROM python:3.12-slim
+# Stage 2: Main Runtime Stage
+FROM ghcr.io/depoll/lanbu-handy/bambu-studio-cli:latest
 
 # Set working directory
 WORKDIR /app
+
+# Install Python 3.12 and pip
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        software-properties-common \
+        ca-certificates \
+        curl \
+    && add-apt-repository ppa:deadsnakes/ppa \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends \
+        python3.12 \
+        python3.12-venv \
+        python3.12-dev \
+        python3-pip \
+    && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 1 \
+    && update-alternatives --install /usr/bin/python python /usr/bin/python3.12 1 \
+    && python3 -m pip install --upgrade pip \
+    && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user for security
 RUN groupadd -r lanbu && \
@@ -35,31 +50,14 @@ RUN groupadd -r lanbu && \
     mkdir -p /app && \
     chown -R lanbu:lanbu /app
 
-# Copy Bambu Studio CLI from the CLI stage
-COPY --from=cli-stage /usr/local/bin/bambu-studio-cli /usr/local/bin/bambu-studio-cli
-COPY --from=cli-stage /usr/local/bin/bambu-studio /usr/local/bin/bambu-studio
-COPY --from=cli-stage /usr/local/bin/BambuStudio.AppImage /usr/local/bin/BambuStudio.AppImage
-
-# Install minimal dependencies for CLI operation in the final image
-RUN apt-get update --allow-unauthenticated && \
-    apt-get install -y --no-install-recommends \
-        libfuse2 \
-        libssl3 \
-        libegl1 \
-        libosmesa6 \
-        libgstreamer-plugins-base1.0-0 \
-        libsoup2.4-1 \
-        libwebkit2gtk-4.1-0 \
-    && rm -rf /var/lib/apt/lists/*
-
 # Copy and install Python dependencies (production only)
 COPY backend/requirements-prod.txt ./backend/
-RUN pip install --trusted-host pypi.org \
+RUN python3 -m pip install --trusted-host pypi.org \
     --trusted-host pypi.python.org \
     --trusted-host files.pythonhosted.org \
     --no-cache-dir \
     -r backend/requirements-prod.txt && \
-    pip cache purge
+    python3 -m pip cache purge
 
 # Copy backend application and set proper ownership
 COPY backend/ ./
