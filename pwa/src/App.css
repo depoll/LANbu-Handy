@@ -228,27 +228,7 @@ footer p {
   border: 1px solid var(--color-border-secondary);
 }
 
-.slice-and-print-header {
-  text-align: center;
-  margin-bottom: 2rem;
-  padding-bottom: 1.5rem;
-  border-bottom: 1px solid var(--color-border-primary);
-}
 
-.slice-and-print-header h2 {
-  color: var(--color-primary);
-  font-size: 1.8rem;
-  margin-bottom: 0.5rem;
-  font-weight: 600;
-}
-
-.slice-and-print-header p {
-  color: var(--color-text-secondary);
-  font-size: 1rem;
-  max-width: 700px;
-  margin: 0 auto;
-  line-height: 1.5;
-}
 
 .slice-and-print-form {
   margin-bottom: 2rem;
@@ -463,14 +443,6 @@ footer p {
   .slice-and-print {
     margin: 1rem;
     padding: 1.5rem;
-  }
-
-  .slice-and-print-header h2 {
-    font-size: 1.3rem;
-  }
-
-  .slice-and-print-header p {
-    font-size: 0.9rem;
   }
 }
 

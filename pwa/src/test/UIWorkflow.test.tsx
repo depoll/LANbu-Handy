@@ -27,7 +27,7 @@ describe('PWA UI Workflow Tests', () => {
       renderSliceAndPrint();
 
       // Basic UI elements should be present
-      expect(screen.getByText('LANbu Handy Workflow')).toBeInTheDocument();
+      expect(screen.getByText('Model')).toBeInTheDocument();
       expect(
         screen.getByPlaceholderText('https://example.com/model.stl')
       ).toBeInTheDocument();
@@ -108,15 +108,15 @@ describe('PWA UI Workflow Tests', () => {
         screen.queryByText(/Configuration Summary/)
       ).not.toBeInTheDocument();
 
-      // AMS Status should be visible from the start (before model upload)
-      expect(screen.getByText('AMS Status')).toBeInTheDocument();
+      // Status tab should be available from the start (before model upload)
+      expect(screen.getByText('Status')).toBeInTheDocument();
     });
 
     it('provides clear visual hierarchy and labeling', () => {
       renderSliceAndPrint();
 
-      // Main heading should be present
-      expect(screen.getByText('LANbu Handy Workflow')).toBeInTheDocument();
+      // Main tabs should be present
+      expect(screen.getByText('Model')).toBeInTheDocument();
 
       // Input should have clear placeholder text
       const urlInput = screen.getByPlaceholderText(

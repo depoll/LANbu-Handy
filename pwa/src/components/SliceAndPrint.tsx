@@ -293,14 +293,6 @@ function SliceAndPrint() {
 
   return (
     <div className="slice-and-print">
-      <div className="slice-and-print-header">
-        <h2>LANbu Handy Workflow</h2>
-        <p>
-          Complete workflow for analyzing, configuring, and printing your 3D
-          models with Bambu Lab printers
-        </p>
-      </div>
-
       <TabSystem
         tabs={tabs}
         activeTabId={activeTab}
