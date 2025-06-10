@@ -60,6 +60,21 @@ RUN find . -name "*ambu*" -type f -executable -o -name "*BambuStudio*" -type f -
         exit 1; \
     fi
 
+# Find and copy the built AppImage instead of binary
+RUN find . -name "*.AppImage" -type f | head -10 && \
+    APPIMAGE=$(find . -name "*.AppImage" -type f | head -1) && \
+    if [ -n "$APPIMAGE" ]; then \
+        echo "Found AppImage: $APPIMAGE" && \
+        cp "$APPIMAGE" /usr/local/bin/BambuStudio.AppImage && \
+        chmod +x /usr/local/bin/BambuStudio.AppImage; \
+    else \
+        echo "No AppImage found, checking build results:" && \
+        find . -name "*Bambu*" -type f && \
+        find . -name "*.AppImage" -type f && \
+        ls -la build/ 2>/dev/null || echo "No build directory" && \
+        exit 1; \
+    fi
+
 # Runtime stage
 FROM ubuntu:22.04 AS runtime
 
@@ -73,11 +88,12 @@ RUN apt-get update && \
     libssl3 \
     libgl1-mesa-glx \
     libgtk-3-0 \
+    libegl1 \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Copy the built binary
 COPY --from=builder /usr/local/bin/bambu-studio-cli /usr/local/bin/bambu-studio-cli
-
+COPY --from=builder /usr/local/bin/BambuStudio.AppImage /usr/local/bin/BambuStudio.AppImage
 # Test the installation
 RUN bambu-studio-cli --version || bambu-studio-cli --help || echo "CLI installed"
 
