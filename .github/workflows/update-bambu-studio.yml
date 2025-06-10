@@ -170,16 +170,28 @@ jobs:
 
       - name: Summary
         run: |
-          if [ "${{ steps.check-update.outputs.needs_update }}" == "true" ]; then
-            echo "✅ Created PR #${{ steps.create-pr.outputs.pull-request-number }} to update Bambu Studio to ${{ steps.latest-version.outputs.version }}"
-            echo "The PR will auto-merge once CI checks pass."
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            if [ "${{ steps.check-update.outputs.needs_update }}" == "true" ]; then
+              echo "🔧 Manual workflow triggered: Update available and PR created"
+              echo "✅ Created PR #${{ steps.create-pr.outputs.pull-request-number }} to update Bambu Studio to ${{ steps.latest-version.outputs.version }}"
+              echo "🐳 CLI images will be built and pushed"
+            else
+              echo "🔧 Manual workflow triggered: No update needed but building anyway"
+              echo "ℹ️ Current version ${{ steps.current-version.outputs.version }} is already latest"
+              echo "🐳 CLI images will be built and pushed"
+            fi
           else
-            echo "ℹ️ No update needed - already on latest version ${{ steps.current-version.outputs.version }}"
+            if [ "${{ steps.check-update.outputs.needs_update }}" == "true" ]; then
+              echo "✅ Created PR #${{ steps.create-pr.outputs.pull-request-number }} to update Bambu Studio to ${{ steps.latest-version.outputs.version }}"
+              echo "The PR will auto-merge once CI checks pass."
+            else
+              echo "ℹ️ No update needed - already on latest version ${{ steps.current-version.outputs.version }}"
+            fi
           fi
 
   build-cli-images:
     needs: check-for-updates
-    if: needs.check-for-updates.outputs.needs_update == 'true'
+    if: needs.check-for-updates.outputs.needs_update == 'true' || github.event_name == 'workflow_dispatch'
     strategy:
       matrix:
         include:
@@ -195,7 +207,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          ref: auto-update/bambu-studio-${{ needs.check-for-updates.outputs.latest_version }}
+          ref: ${{ needs.check-for-updates.outputs.needs_update == 'true' && format('auto-update/bambu-studio-{0}', needs.check-for-updates.outputs.latest_version) || github.ref }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -222,6 +234,7 @@ jobs:
 
   create-multi-arch-manifest:
     needs: [check-for-updates, build-cli-images]
+    if: (needs.check-for-updates.outputs.needs_update == 'true' || github.event_name == 'workflow_dispatch') && !cancelled() && !failure()
     runs-on: ubuntu-latest
 
     steps:
