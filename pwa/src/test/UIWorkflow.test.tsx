@@ -27,7 +27,7 @@ describe('PWA UI Workflow Tests', () => {
       renderSliceAndPrint();
 
       // Basic UI elements should be present
-      expect(screen.getByText('Slice and Print')).toBeInTheDocument();
+      expect(screen.getByText('LANbu Handy Workflow')).toBeInTheDocument();
       expect(
         screen.getByPlaceholderText('https://example.com/model.stl')
       ).toBeInTheDocument();
@@ -116,7 +116,7 @@ describe('PWA UI Workflow Tests', () => {
       renderSliceAndPrint();
 
       // Main heading should be present
-      expect(screen.getByText('Slice and Print')).toBeInTheDocument();
+      expect(screen.getByText('LANbu Handy Workflow')).toBeInTheDocument();
 
       // Input should have clear placeholder text
       const urlInput = screen.getByPlaceholderText(

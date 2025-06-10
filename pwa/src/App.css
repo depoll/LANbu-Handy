@@ -217,7 +217,7 @@ footer p {
 .slice-and-print {
   background: var(--color-bg-primary);
   border-radius: 16px;
-  box-shadow: 
+  box-shadow:
     0 8px 32px var(--color-shadow),
     0 4px 16px rgba(0, 0, 0, 0.08);
   padding: 2rem;
