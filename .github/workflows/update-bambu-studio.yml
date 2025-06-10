@@ -227,8 +227,8 @@ jobs:
           platforms: ${{ matrix.platform }}
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}/bambu-studio-cli:${{ needs.check-for-updates.outputs.latest_version }}-${{ matrix.arch }}
-            ghcr.io/${{ github.repository }}/bambu-studio-cli:latest-${{ matrix.arch }}
+            ghcr.io/${{ github.repository | lower }}/bambu-studio-cli:${{ needs.check-for-updates.outputs.latest_version }}-${{ matrix.arch }}
+            ghcr.io/${{ github.repository | lower }}/bambu-studio-cli:latest-${{ matrix.arch }}
           cache-from: type=gha,scope=${{ matrix.arch }}
           cache-to: type=gha,mode=max,scope=${{ matrix.arch }}
 
@@ -248,7 +248,7 @@ jobs:
       - name: Create and push multi-arch manifest
         run: |
           VERSION="${{ needs.check-for-updates.outputs.latest_version }}"
-          REPO="ghcr.io/${{ github.repository }}/bambu-studio-cli"
+          REPO="ghcr.io/${{ github.repository | lower }}/bambu-studio-cli"
 
           # Create multi-arch manifest for version tag
           docker buildx imagetools create -t ${REPO}:${VERSION} \
