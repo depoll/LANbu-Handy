@@ -20,7 +20,10 @@ RUN npm config set strict-ssl false && \
 COPY pwa/ ./
 RUN npm run build
 
-# Stage 2: Python Runtime Stage
+# Stage 2: Bambu Studio CLI Stage
+FROM ghcr.io/depoll/lanbu-handy/bambu-studio-cli:latest AS cli-stage
+
+# Stage 3: Python Runtime Stage
 FROM python:3.12-slim
 
 # Set working directory
@@ -32,12 +35,22 @@ RUN groupadd -r lanbu && \
     mkdir -p /app && \
     chown -R lanbu:lanbu /app
 
-# Install Bambu Studio CLI and dependencies (with essential CLI deps)
-COPY scripts/bambu-studio-version.txt /scripts/
-COPY scripts/install-bambu-studio-cli.sh /tmp/
-RUN chmod +x /tmp/install-bambu-studio-cli.sh && \
-    MINIMAL_DEPS=true /tmp/install-bambu-studio-cli.sh && \
-    rm -f /tmp/install-bambu-studio-cli.sh
+# Copy Bambu Studio CLI from the CLI stage
+COPY --from=cli-stage /usr/local/bin/bambu-studio-cli /usr/local/bin/bambu-studio-cli
+COPY --from=cli-stage /usr/local/bin/bambu-studio /usr/local/bin/bambu-studio
+COPY --from=cli-stage /usr/local/bin/BambuStudio.AppImage /usr/local/bin/BambuStudio.AppImage
+
+# Install minimal dependencies for CLI operation in the final image
+RUN apt-get update --allow-unauthenticated && \
+    apt-get install -y --no-install-recommends \
+        libfuse2 \
+        libssl3 \
+        libegl1 \
+        libosmesa6 \
+        libgstreamer-plugins-base1.0-0 \
+        libsoup2.4-1 \
+        libwebkit2gtk-4.1-0 \
+    && rm -rf /var/lib/apt/lists/*
 
 # Copy and install Python dependencies (production only)
 COPY backend/requirements-prod.txt ./backend/
