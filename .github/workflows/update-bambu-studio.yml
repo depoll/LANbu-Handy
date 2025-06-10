@@ -196,19 +196,18 @@ jobs:
       matrix:
         include:
           - platform: linux/amd64
+            runner: ubuntu-latest
             arch: amd64
           - platform: linux/arm64
+            runner: ubuntu-22.04-arm64
             arch: arm64
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.runner }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           ref: ${{ needs.check-for-updates.outputs.needs_update == 'true' && format('auto-update/bambu-studio-{0}', needs.check-for-updates.outputs.latest_version) || github.ref }}
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
