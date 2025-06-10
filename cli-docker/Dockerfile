@@ -41,8 +41,10 @@ WORKDIR /build/BambuStudio
 # 1. Install system dependencies (-u flag)
 # 2. Build all components (-dsi flags: dependencies, studio, appimage)
 RUN chmod +x BuildLinux.sh && \
-    ./BuildLinux.sh -u && \
-    ./BuildLinux.sh -dsi
+    ./BuildLinux.sh -u
+RUN ./BuildLinux.sh -d
+RUN ./BuildLinux.sh -s
+RUN ./BuildLinux.sh -i
 
 # Find and copy the built binary
 RUN find . -name "*ambu*" -type f -executable -o -name "*BambuStudio*" -type f -executable | head -10 && \
