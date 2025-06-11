@@ -1,6 +1,6 @@
 # Bambu Studio CLI with AppImage Build
 # Multi-stage build: creates both CLI binary and self-contained AppImage
-FROM ubuntu:24.04 AS builder
+FROM ubuntu:22.04 AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=UTC
@@ -31,6 +31,19 @@ RUN apt-get update && \
 WORKDIR /build
 ENV SKIP_RAM_CHECK=1
 
+# ARM64-specific optimizations to prevent OOM during compilation
+RUN if [ "$(uname -m)" = "aarch64" ]; then \
+        echo "Applying ARM64 build optimizations..." && \
+        # Limit parallel jobs to reduce memory usage \
+        echo "export MAKEFLAGS='-j2'" >> /etc/environment && \
+        # Add swap space for memory-intensive linking \
+        fallocate -l 4G /swapfile && \
+        chmod 600 /swapfile && \
+        mkswap /swapfile && \
+        swapon /swapfile && \
+        echo "ARM64 optimizations applied"; \
+    fi
+
 # Clone Bambu Studio source
 ARG BAMBU_VERSION=v02.01.00.59
 RUN git clone --depth 1 --branch ${BAMBU_VERSION} https://github.com/bambulab/BambuStudio.git
@@ -41,10 +54,21 @@ WORKDIR /build/BambuStudio
 # BuildLinux.sh sequence: -u (dependencies), -d (build deps), -s (studio)
 RUN chmod +x BuildLinux.sh && \
     ./BuildLinux.sh -u
-RUN ./BuildLinux.sh -d
+
+# Build dependencies with ARM64 optimizations
+RUN if [ "$(uname -m)" = "aarch64" ]; then \
+        echo "Building dependencies with ARM64 optimizations..." && \
+        export MAKEFLAGS="-j2" && \
+        export CXXFLAGS="-O2" && \
+        export CFLAGS="-O2" && \
+        ./BuildLinux.sh -d; \
+    else \
+        ./BuildLinux.sh -d; \
+    fi
+
 RUN ./BuildLinux.sh -s
 
-# Install tools needed for AppImage creation
+# Install AppImage creation dependencies
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     imagemagick \
@@ -54,7 +78,7 @@ RUN apt-get update && \
     desktop-file-utils \
     && rm -rf /var/lib/apt/lists/*
 
-# Download linuxdeploy for the target architecture (x86_64 or aarch64)
+# Detect architecture and download appropriate linuxdeploy
 RUN ARCH=$(uname -m) && \
     echo "Detected architecture: $ARCH" && \
     if [ "$ARCH" = "x86_64" ]; then \
@@ -71,12 +95,12 @@ RUN ARCH=$(uname -m) && \
     mv squashfs-root linuxdeploy && \
     chmod +x linuxdeploy/AppRun
 
-# Set up AppImage directory structure following FreeDesktop standards
+# Create AppImage manually with correct architecture
 RUN mkdir -p /tmp/appdir/usr/bin && \
     mkdir -p /tmp/appdir/usr/share/applications && \
     mkdir -p /tmp/appdir/usr/share/icons/hicolor/256x256/apps
 
-# Locate the compiled Bambu Studio binary and prepare it for AppImage packaging
+# Find the built BambuStudio binary and copy it to AppImage structure
 RUN BINARY=$(find build -name "bambu-studio" -o -name "BambuStudio" -type f -executable | head -1) && \
     if [ -n "$BINARY" ]; then \
         echo "Found BambuStudio binary: $BINARY" && \
@@ -88,7 +112,7 @@ RUN BINARY=$(find build -name "bambu-studio" -o -name "BambuStudio" -type f -exe
         exit 1; \
     fi
 
-# Generate desktop entry file required for AppImage
+# Create a desktop file for the AppImage
 RUN echo '[Desktop Entry]' > /tmp/appdir/usr/share/applications/BambuStudio.desktop && \
     echo 'Type=Application' >> /tmp/appdir/usr/share/applications/BambuStudio.desktop && \
     echo 'Name=BambuStudio' >> /tmp/appdir/usr/share/applications/BambuStudio.desktop && \
@@ -96,19 +120,19 @@ RUN echo '[Desktop Entry]' > /tmp/appdir/usr/share/applications/BambuStudio.desk
     echo 'Icon=BambuStudio' >> /tmp/appdir/usr/share/applications/BambuStudio.desktop && \
     echo 'Categories=Graphics;3DGraphics;' >> /tmp/appdir/usr/share/applications/BambuStudio.desktop
 
-# Create placeholder icon if none exists in the source
+# Create a simple icon (if one doesn't exist)
 RUN if [ ! -f /tmp/appdir/usr/share/icons/hicolor/256x256/apps/BambuStudio.png ]; then \
         echo "Creating placeholder icon" && \
         convert -size 256x256 xc:blue /tmp/appdir/usr/share/icons/hicolor/256x256/apps/BambuStudio.png 2>/dev/null || \
         touch /tmp/appdir/usr/share/icons/hicolor/256x256/apps/BambuStudio.png; \
     fi
 
-# Package everything into a self-contained AppImage using linuxdeploy
+# Create the AppImage with linuxdeploy
 RUN cd /tmp && \
     ARCH=$(uname -m) && \
     ./linuxdeploy/AppRun --appdir appdir --output appimage --desktop-file appdir/usr/share/applications/BambuStudio.desktop
 
-# Copy both the CLI binary and AppImage to final locations for runtime stage
+# Find and copy the built binary and AppImage
 RUN find /tmp -name "*.AppImage" -type f && \
     APPIMAGE=$(find /tmp -name "*.AppImage" -type f | head -1) && \
     BINARY=$(find build -name "bambu-studio" -o -name "BambuStudio" -type f -executable | head -1) && \
@@ -131,12 +155,12 @@ RUN find /tmp -name "*.AppImage" -type f && \
     fi
 
 
-# Runtime stage - minimal Ubuntu with only necessary dependencies
-FROM ubuntu:24.04 AS runtime
+# Runtime stage
+FROM ubuntu:22.04 AS runtime
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install minimal runtime libraries required by Bambu Studio CLI
+# Install minimal runtime dependencies
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     libglib2.0-0 \
@@ -148,30 +172,28 @@ RUN apt-get update && \
     software-properties-common \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Copy the self-contained AppImage from builder stage
+# Copy the built binary
 COPY --from=builder /usr/local/bin/BambuStudio.AppImage /usr/local/bin/BambuStudio.AppImage
 
-# Extract AppImage for headless/containerized use (avoids FUSE requirement)
-# This creates a usable CLI even in environments without FUSE support
+# Make AppImage executable and extract it for containerized use
 RUN chmod +x /usr/local/bin/BambuStudio.AppImage && \
     cd /tmp && \
     /usr/local/bin/BambuStudio.AppImage --appimage-extract && \
     mv squashfs-root /opt/BambuStudio && \
     ln -s /opt/BambuStudio/AppRun /usr/local/bin/bambu-studio-cli
 
-# Verify the CLI installation works in headless mode
+# Test the installation
 RUN bambu-studio-cli --help
 
 CMD ["bambu-studio-cli", "--help"]
 
 # Build Instructions:
-# docker build -f cli.Dockerfile -t bambu-studio-cli:latest .
+# docker build -f docker/Dockerfile -t bambu-studio-cli:latest .
 #
-# Usage:
-# - CLI Binary: docker run bambu-studio-cli bambu-studio-cli --help
-# - AppImage: docker run bambu-studio-cli /usr/local/bin/BambuStudio.AppImage --help
+# Expected build time: 15-30 minutes depending on system
 #
-# Expected build time: 15-30 minutes depending on system specs
-#
-# Architecture support: x86_64 and aarch64 (ARM64)
-# The AppImage bundles all dependencies for maximum portability
+# The build process:
+# 1. Uses Ubuntu 22.04 (officially supported)
+# 2. Installs exact dependencies from Linux Compile Guide
+# 3. Uses official BuildLinux.sh script with proper flags
+# 4. Creates minimal runtime container with just the CLI
