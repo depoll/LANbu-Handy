@@ -35,12 +35,7 @@ ENV SKIP_RAM_CHECK=1
 RUN if [ "$(uname -m)" = "aarch64" ]; then \
         echo "Applying ARM64 build optimizations..." && \
         # Limit parallel jobs to reduce memory usage \
-        echo "export MAKEFLAGS='-j2'" >> /etc/environment && \
-        # Add swap space for memory-intensive linking \
-        fallocate -l 4G /swapfile && \
-        chmod 600 /swapfile && \
-        mkswap /swapfile && \
-        swapon /swapfile && \
+        echo "export MAKEFLAGS='-j1'" >> /etc/environment && \
         echo "ARM64 optimizations applied"; \
     fi
 
@@ -58,9 +53,9 @@ RUN chmod +x BuildLinux.sh && \
 # Build dependencies with ARM64 optimizations
 RUN if [ "$(uname -m)" = "aarch64" ]; then \
         echo "Building dependencies with ARM64 optimizations..." && \
-        export MAKEFLAGS="-j2" && \
-        export CXXFLAGS="-O2" && \
-        export CFLAGS="-O2" && \
+        export MAKEFLAGS="-j1" && \
+        export CXXFLAGS="-O1" && \
+        export CFLAGS="-O1" && \
         ./BuildLinux.sh -d; \
     else \
         ./BuildLinux.sh -d; \
