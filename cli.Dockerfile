@@ -1,6 +1,6 @@
 # Bambu Studio CLI with AppImage Build
 # Multi-stage build: creates both CLI binary and self-contained AppImage
-FROM ubuntu:22.04 AS builder
+FROM ubuntu:24.04 AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=UTC
@@ -132,7 +132,7 @@ RUN find /tmp -name "*.AppImage" -type f && \
 
 
 # Runtime stage - minimal Ubuntu with only necessary dependencies
-FROM ubuntu:22.04 AS runtime
+FROM ubuntu:24.04 AS runtime
 
 ENV DEBIAN_FRONTEND=noninteractive
 
