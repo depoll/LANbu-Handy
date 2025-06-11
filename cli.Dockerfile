@@ -32,12 +32,12 @@ WORKDIR /build
 ENV SKIP_RAM_CHECK=1
 
 # ARM64-specific optimizations to prevent OOM during compilation
-RUN if [ "$(uname -m)" = "aarch64" ]; then \
-        echo "Applying ARM64 build optimizations..." && \
-        # Limit parallel jobs to reduce memory usage \
-        echo "export MAKEFLAGS='-j1'" >> /etc/environment && \
-        echo "ARM64 optimizations applied"; \
-    fi
+# RUN if [ "$(uname -m)" = "aarch64" ]; then \
+#         echo "Applying ARM64 build optimizations..." && \
+#         # Limit parallel jobs to reduce memory usage \
+#         echo "export MAKEFLAGS='-j1'" >> /etc/environment && \
+#         echo "ARM64 optimizations applied"; \
+#     fi
 
 # Clone Bambu Studio source
 ARG BAMBU_VERSION=v02.01.00.59
@@ -52,10 +52,10 @@ RUN chmod +x BuildLinux.sh && \
 
 # Build dependencies with ARM64 optimizations
 RUN if [ "$(uname -m)" = "aarch64" ]; then \
-        echo "Building dependencies with ARM64 optimizations..." && \
-        export MAKEFLAGS="-j1" && \
-        export CXXFLAGS="-O1" && \
-        export CFLAGS="-O1" && \
+        # echo "Building dependencies with ARM64 optimizations..." && \
+        # export MAKEFLAGS="-j1" && \
+        # export CXXFLAGS="-O1" && \
+        # export CFLAGS="-O1" && \
         ./BuildLinux.sh -d; \
     else \
         ./BuildLinux.sh -d; \
