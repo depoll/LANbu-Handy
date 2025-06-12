@@ -26,21 +26,11 @@ FROM ghcr.io/depoll/lanbu-handy/bambu-studio-cli:latest
 # Set working directory
 WORKDIR /app
 
-# Install Python 3.12 and pip
+# Install pip and upgrade it (Python 3.10 already available in base image)
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        software-properties-common \
-        ca-certificates \
-        curl \
-    && add-apt-repository ppa:deadsnakes/ppa \
-    && apt-get update \
-    && apt-get install -y --no-install-recommends \
-        python3.12 \
-        python3.12-venv \
-        python3.12-dev \
         python3-pip \
-    && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 1 \
-    && update-alternatives --install /usr/bin/python python /usr/bin/python3.12 1 \
+        python3-dev \
     && python3 -m pip install --upgrade pip \
     && rm -rf /var/lib/apt/lists/*
 
