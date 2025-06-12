@@ -8,8 +8,16 @@ on:
     branches: [main]
 
 jobs:
-  lint-and-build:
-    runs-on: ubuntu-latest
+  lint-and-test:
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-latest
+          - platform: linux/arm64
+            runner: [self-hosted, arm64]
+      fail-fast: false
 
     steps:
       - name: Checkout code
@@ -24,6 +32,8 @@ jobs:
 
       - name: Set up Docker Buildx for CLI
         uses: docker/setup-buildx-action@v3
+        with:
+          platforms: ${{ matrix.platform }}
 
       - name: Install backend dependencies
         run: |
@@ -52,8 +62,8 @@ jobs:
 
       - name: Run backend tests with pre-built CLI
         run: |
-          # Use the pre-built CLI image from GHCR
-          docker run --rm \
+          # Use the pre-built CLI image from GHCR for the specific platform
+          docker run --rm --platform=${{ matrix.platform }} \
             -v $(pwd)/backend:/app/backend \
             -v $(pwd)/test_files:/app/test_files \
             -w /app/backend \
@@ -103,25 +113,37 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+        with:
+          platforms: ${{ matrix.platform }}
 
       - name: Build Docker image with cache
         uses: docker/build-push-action@v5
         with:
           context: .
+          platforms: ${{ matrix.platform }}
           push: false
           tags: lanbu-handy:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,key=buildx-${{ matrix.platform }}
+          cache-to: type=gha,mode=max,key=buildx-${{ matrix.platform }}
 
-  publish-docker:
-    runs-on: ubuntu-latest
-    needs: lint-and-build
+  build-docker-images:
+    runs-on: ${{ matrix.runner }}
+    needs: lint-and-test
     permissions:
       contents: read
       packages: write
       attestations: write
       id-token: write
     if: github.event_name == 'push' && (startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main')
+    strategy:
+      matrix:
+        include:
+          - platform: linux/amd64
+            arch: amd64
+            runner: ubuntu-latest
+          - platform: linux/arm64
+            arch: arm64
+            runner: [self-hosted, arm64]
 
     steps:
       - name: Checkout code
@@ -148,16 +170,60 @@ jobs:
         with:
           images: ghcr.io/${{ steps.repo.outputs.name }}
           tags: |
-            type=ref,event=tag
-            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
-            type=raw,value=head,enable={{is_default_branch}}
+            type=ref,event=tag,suffix=-${{ matrix.arch }}
+            type=raw,value=latest-${{ matrix.arch }},enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=raw,value=head-${{ matrix.arch }},enable={{is_default_branch}}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
+          platforms: ${{ matrix.platform }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,key=buildx-${{ matrix.platform }}
+          cache-to: type=gha,mode=max,key=buildx-${{ matrix.platform }}
+
+  publish-multi-arch-manifest:
+    runs-on: ubuntu-latest
+    needs: build-docker-images
+    permissions:
+      contents: read
+      packages: write
+    if: github.event_name == 'push' && (startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main') && !cancelled() && !failure()
+
+    steps:
+      - name: Set lowercase repository name
+        id: repo
+        run: |
+          echo "name=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create and push multi-arch manifests
+        run: |
+          REPO="ghcr.io/${{ steps.repo.outputs.name }}"
+          
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            # For version tags
+            VERSION="${{ github.ref_name }}"
+            docker buildx imagetools create -t ${REPO}:${VERSION} \
+              ${REPO}:${VERSION}-amd64 \
+              ${REPO}:${VERSION}-arm64
+            
+            # Also create latest tag for version releases
+            docker buildx imagetools create -t ${REPO}:latest \
+              ${REPO}:latest-amd64 \
+              ${REPO}:latest-arm64
+          else
+            # For main branch (head)
+            docker buildx imagetools create -t ${REPO}:head \
+              ${REPO}:head-amd64 \
+              ${REPO}:head-arm64
+          fi
