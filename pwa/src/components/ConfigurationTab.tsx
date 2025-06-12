@@ -82,6 +82,19 @@ export function ConfigurationTab({
         </p>
       </div>
 
+      {/* Plate Selection - Show first if multiple plates detected */}
+      {hasMultiplePlates && (
+        <div className="config-section">
+          <PlateSelector
+            plates={plates}
+            selectedPlateIndex={selectedPlateIndex}
+            onPlateSelect={onPlateSelect}
+            disabled={isProcessing}
+            fileId={currentFileId}
+          />
+        </div>
+      )}
+
       {/* Filament Requirements Display */}
       {filamentRequirements && (
         <div className="config-section">
@@ -103,19 +116,6 @@ export function ConfigurationTab({
               </p>
             </div>
           )}
-        </div>
-      )}
-
-      {/* Plate Selection - Show if multiple plates detected */}
-      {hasMultiplePlates && (
-        <div className="config-section">
-          <PlateSelector
-            plates={plates}
-            selectedPlateIndex={selectedPlateIndex}
-            onPlateSelect={onPlateSelect}
-            disabled={isProcessing}
-            fileId={currentFileId}
-          />
         </div>
       )}
 
