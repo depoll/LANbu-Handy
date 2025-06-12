@@ -717,16 +717,13 @@ async def get_model_thumbnail(file_id: str, width: int = 300, height: int = 300)
                 status_code=400, detail="Invalid file type for thumbnail"
             )
 
-        # Check if thumbnail already exists
-        if thumbnail_service.thumbnail_exists(model_file_path):
-            thumbnail_path = thumbnail_service.get_thumbnail_path(model_file_path)
-            logger.debug(f"Using existing thumbnail: {thumbnail_path}")
-        else:
-            # Generate new thumbnail
-            logger.info(f"Generating thumbnail for: {file_id}")
-            thumbnail_path = thumbnail_service.generate_thumbnail(
-                model_file_path, width=width, height=height
-            )
+        # Always try to generate/extract thumbnail to ensure we get the best quality
+        # For 3MF files, this will extract embedded thumbnails
+        # For other files or when extraction fails, it will use CLI or placeholders
+        logger.info(f"Generating thumbnail for: {file_id}")
+        thumbnail_path = thumbnail_service.generate_thumbnail(
+            model_file_path, width=width, height=height, prefer_embedded=True
+        )
 
         # Determine media type based on file extension
         media_type = "image/png"
@@ -749,6 +746,233 @@ async def get_model_thumbnail(file_id: str, width: int = 300, height: int = 300)
     except Exception as e:
         msg = f"Internal server error generating thumbnail: {str(e)}"
         raise HTTPException(status_code=500, detail=msg)
+
+
+@app.get("/api/model/thumbnail/{file_id}/plate/{plate_index}")
+async def get_plate_thumbnail(
+    file_id: str, 
+    plate_index: int, 
+    width: int = 300, 
+    height: int = 300
+):
+    """
+    Generate and serve a thumbnail image for a specific plate in a model file.
+
+    This endpoint extracts or generates a thumbnail for a specific plate from
+    a 3MF file. Falls back to general thumbnail if plate-specific not available.
+
+    Args:
+        file_id: Unique identifier for the downloaded model file
+        plate_index: Index of the plate (0-based)
+        width: Thumbnail width in pixels (default: 300)
+        height: Thumbnail height in pixels (default: 300)
+
+    Returns:
+        FileResponse with the thumbnail image (PNG or SVG)
+
+    Raises:
+        HTTPException: If file is not found or thumbnail generation fails
+    """
+    try:
+        # Find the model file in the temp directory
+        model_file_path = model_service.temp_dir / file_id
+
+        if not model_file_path.exists():
+            raise HTTPException(
+                status_code=404, detail=f"Model file not found: {file_id}"
+            )
+
+        # Validate file extension for security
+        if not model_service.validate_file_extension(model_file_path.name):
+            raise HTTPException(
+                status_code=400, detail="Invalid file type for thumbnail"
+            )
+
+        # Generate plate-specific thumbnail path
+        thumbnail_name = f"{model_file_path.stem}_plate_{plate_index}_thumbnail.png"
+        thumbnail_path = thumbnail_service.temp_dir / thumbnail_name
+
+        # Check if plate-specific thumbnail already exists
+        if thumbnail_path.exists():
+            logger.debug(f"Using existing plate thumbnail: {thumbnail_path}")
+        else:
+            # Extract/generate plate-specific thumbnail
+            logger.info(f"Generating plate {plate_index} thumbnail for: {file_id}")
+            extracted_path = thumbnail_service.extract_plate_thumbnail(
+                model_file_path, plate_index, thumbnail_path
+            )
+            
+            if not extracted_path or not extracted_path.exists():
+                # Fallback to general thumbnail generation with embedded preference
+                thumbnail_path = thumbnail_service.generate_thumbnail(
+                    model_file_path, thumbnail_path, width, height, prefer_embedded=True
+                )
+
+        # Determine media type based on file extension
+        media_type = "image/png"
+        if thumbnail_path.suffix.lower() == ".svg":
+            media_type = "image/svg+xml"
+
+        return FileResponse(
+            path=thumbnail_path,
+            media_type=media_type,
+            filename=f"{model_file_path.stem}_plate_{plate_index}_thumbnail{thumbnail_path.suffix}",
+        )
+
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
+    except Exception as e:
+        msg = f"Internal server error generating plate thumbnail: {str(e)}"
+        raise HTTPException(status_code=500, detail=msg)
+
+
+@app.get("/api/model/thumbnails/{file_id}")
+async def get_available_thumbnails(file_id: str):
+    """
+    Get information about available thumbnails in a model file.
+
+    This endpoint analyzes a 3MF file and returns information about
+    available general and plate-specific thumbnails.
+
+    Args:
+        file_id: Unique identifier for the downloaded model file
+
+    Returns:
+        Dictionary with thumbnail availability information
+
+    Raises:
+        HTTPException: If file is not found
+    """
+    try:
+        # Find the model file in the temp directory
+        model_file_path = model_service.temp_dir / file_id
+
+        if not model_file_path.exists():
+            raise HTTPException(
+                status_code=404, detail=f"Model file not found: {file_id}"
+            )
+
+        # Validate file extension for security
+        if not model_service.validate_file_extension(model_file_path.name):
+            raise HTTPException(
+                status_code=400, detail="Invalid file type for thumbnail analysis"
+            )
+
+        # Analyze available thumbnails
+        thumbnail_info = thumbnail_service.get_available_thumbnails(model_file_path)
+        
+        return {
+            "file_id": file_id,
+            "file_type": model_file_path.suffix.lower(),
+            "thumbnails": thumbnail_info
+        }
+
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
+    except Exception as e:
+        msg = f"Internal server error analyzing thumbnails: {str(e)}"
+        raise HTTPException(status_code=500, detail=msg)
+
+
+@app.get("/api/model/debug-thumbnail/{file_id}")
+async def debug_thumbnail_extraction(file_id: str):
+    """
+    Debug endpoint to test thumbnail extraction step by step.
+    """
+    try:
+        # Find the model file in the temp directory
+        model_file_path = model_service.temp_dir / file_id
+
+        if not model_file_path.exists():
+            return {"error": f"Model file not found: {file_id}", "path": str(model_file_path)}
+
+        debug_info = {
+            "file_id": file_id,
+            "file_path": str(model_file_path),
+            "file_exists": model_file_path.exists(),
+            "file_size": model_file_path.stat().st_size if model_file_path.exists() else 0,
+            "file_extension": model_file_path.suffix.lower(),
+            "is_3mf": model_file_path.suffix.lower() == '.3mf'
+        }
+
+        if model_file_path.suffix.lower() == '.3mf':
+            # Test thumbnail extraction
+            import zipfile
+            try:
+                with zipfile.ZipFile(model_file_path, 'r') as zip_file:
+                    files = zip_file.namelist()
+                    thumbnail_files = [f for f in files if 'thumbnail' in f.lower()]
+                    debug_info['zip_files_count'] = len(files)
+                    debug_info['thumbnail_files'] = thumbnail_files
+                    
+                    if thumbnail_files:
+                        # Try to extract one
+                        test_thumb = thumbnail_files[0]
+                        test_output = thumbnail_service.temp_dir / f"debug_{file_id}_thumb.png"
+                        
+                        with zip_file.open(test_thumb) as thumb_file:
+                            with open(test_output, 'wb') as out_file:
+                                out_file.write(thumb_file.read())
+                        
+                        debug_info['extraction_test'] = {
+                            'extracted_file': test_thumb,
+                            'output_path': str(test_output),
+                            'output_exists': test_output.exists(),
+                            'output_size': test_output.stat().st_size if test_output.exists() else 0
+                        }
+            except Exception as e:
+                debug_info['zip_error'] = str(e)
+
+        # Test thumbnail availability analysis
+        try:
+            available_thumbs = thumbnail_service.get_available_thumbnails(model_file_path)
+            debug_info['available_thumbnails'] = available_thumbs
+        except Exception as e:
+            debug_info['thumbnail_analysis_error'] = str(e)
+
+        # Test plate-specific thumbnail extraction
+        try:
+            debug_info['plate_extractions'] = {}
+            # Test first few plates
+            for plate_idx in [1, 2, 3]:
+                plate_result = thumbnail_service.extract_plate_thumbnail(
+                    model_file_path, plate_idx
+                )
+                if plate_result and plate_result.exists():
+                    debug_info['plate_extractions'][plate_idx] = {
+                        'path': str(plate_result),
+                        'size': plate_result.stat().st_size
+                    }
+                else:
+                    debug_info['plate_extractions'][plate_idx] = None
+        except Exception as e:
+            debug_info['plate_extraction_error'] = str(e)
+
+        # Test the actual thumbnail service
+        try:
+            # First, clear any existing thumbnail to force regeneration
+            existing_thumb = thumbnail_service.get_thumbnail_path(model_file_path)
+            if existing_thumb.exists():
+                existing_thumb.unlink()
+                debug_info['cleared_existing'] = str(existing_thumb)
+            
+            result_path = thumbnail_service.generate_thumbnail(
+                model_file_path, prefer_embedded=True
+            )
+            debug_info['service_result'] = {
+                'path': str(result_path),
+                'exists': result_path.exists(),
+                'size': result_path.stat().st_size if result_path.exists() else 0
+            }
+        except Exception as e:
+            debug_info['service_error'] = str(e)
+
+        return debug_info
+
+    except Exception as e:
+        return {"error": f"Debug failed: {str(e)}"}
 
 
 @app.post("/api/slice/defaults", response_model=SliceResponse)

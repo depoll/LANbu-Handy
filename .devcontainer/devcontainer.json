@@ -18,7 +18,8 @@
         "bradlc.vscode-tailwindcss",
         "esbenp.prettier-vscode",
         "ms-vscode.vscode-typescript-next",
-        "ms-vscode.vscode-eslint"
+        "ms-vscode.vscode-eslint",
+        "vitest.explorer"
       ],
       "settings": {
         "python.defaultInterpreterPath": "/usr/local/bin/python",
