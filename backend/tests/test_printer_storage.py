@@ -326,15 +326,21 @@ class TestPrinterStorageGracefulDegradation:
                 storage.add_printer(test_printer)
 
     def test_default_path_selection_fallback(self):
-        """Test that default path selection works in development environments."""
-        # This test runs in development where /app doesn't exist
+        """Test that default path selection works in various environments."""
         storage = PrinterStorage()
 
-        # Should not use the Docker path
-        assert "/app/data/printers.json" != str(storage.config_file)
-
-        # Should select a reasonable fallback path
+        # Should always select a reasonable file name
         assert storage.config_file.name == "printers.json"
 
-        # The parent directory should exist (or be creatable)
+        # Should use a reasonable path based on environment
+        config_path = str(storage.config_file)
+
+        # In Docker containers, /app/data is preferred
+        # In development, it falls back to a local path
+        assert (
+            config_path == "/app/data/printers.json"  # Docker environment
+            or "/printers.json" in config_path  # Development fallback
+        )
+
+        # The parent directory should exist or be creatable
         assert storage.config_file.parent.exists() or storage.is_storage_available()

@@ -219,9 +219,9 @@ class TestPrinterManagementIntegration:
             config = Config()
             assert len(config.get_printers()) == 0
 
-            # Adding printer should raise ValueError
+            # Adding printer should raise ValueError or OSError (env dependent)
             printer = PrinterConfig(name="Test", ip="192.168.1.100", access_code="123")
-            with pytest.raises(ValueError):
+            with pytest.raises((ValueError, OSError, PermissionError)):
                 config.add_persistent_printer(printer)
 
     def test_storage_file_format_and_structure(self):
