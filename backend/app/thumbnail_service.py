@@ -151,32 +151,65 @@ class ThumbnailService:
 
         try:
             with zipfile.ZipFile(model_path, 'r') as zip_file:
+                all_files = zip_file.namelist()
+                logger.debug(f"3MF contains {len(all_files)} files: {all_files[:10]}...")  # Show first 10 files
+                
+                # Find all potential thumbnail files in the archive
+                thumbnail_files = [f for f in all_files if 'thumbnail' in f.lower() and f.lower().endswith('.png')]
+                logger.info(f"Found potential thumbnail files: {thumbnail_files}")
+                
                 # List of thumbnail files to try, in order of preference
-                thumbnail_files = [
+                # Common paths where thumbnails are stored in 3MF files
+                preferred_paths = [
+                    f"Metadata/thumbnail_{size_preference}.png",
+                    "Metadata/thumbnail_middle.png", 
+                    "Metadata/thumbnail_large.png",
+                    "Metadata/thumbnail_small.png",
+                    "Metadata/thumbnail.png",
                     f"Auxiliaries/.thumbnails/thumbnail_{size_preference}.png",
                     "Auxiliaries/.thumbnails/thumbnail_middle.png",
                     "Auxiliaries/.thumbnails/thumbnail_3mf.png", 
                     "Auxiliaries/.thumbnails/thumbnail_small.png",
+                    # Also check without specific size preference
+                    "thumbnail.png",
+                    "preview.png",
                 ]
-
+                
+                # Try preferred paths first
+                for thumbnail_file in preferred_paths:
+                    if thumbnail_file in all_files:
+                        try:
+                            with zip_file.open(thumbnail_file) as thumb_file:
+                                content = thumb_file.read()
+                                if len(content) > 0:  # Ensure we got actual content
+                                    with open(output_path, 'wb') as out_file:
+                                        out_file.write(content)
+                                    
+                                    logger.info(f"Successfully extracted {thumbnail_file} to {output_path}")
+                                    logger.info(f"Extracted file size: {len(content)} bytes")
+                                    return output_path
+                        except Exception as e:
+                            logger.warning(f"Failed to extract {thumbnail_file}: {e}")
+                            continue
+                
+                # If no preferred paths worked, try any thumbnail file we found
                 for thumbnail_file in thumbnail_files:
                     try:
-                        # Check if this thumbnail exists in the 3MF
-                        if thumbnail_file in zip_file.namelist():
-                            # Extract the thumbnail
-                            with zip_file.open(thumbnail_file) as thumb_file:
+                        with zip_file.open(thumbnail_file) as thumb_file:
+                            content = thumb_file.read()
+                            if len(content) > 0:  # Ensure we got actual content
                                 with open(output_path, 'wb') as out_file:
-                                    out_file.write(thumb_file.read())
-                            
-                            logger.info(f"Successfully extracted {thumbnail_file} to {output_path}")
-                            logger.info(f"Extracted file size: {output_path.stat().st_size} bytes")
-                            return output_path
-
+                                    out_file.write(content)
+                                
+                                logger.info(f"Successfully extracted fallback thumbnail {thumbnail_file} to {output_path}")
+                                logger.info(f"Extracted file size: {len(content)} bytes")
+                                return output_path
                     except Exception as e:
-                        logger.warning(f"Failed to extract {thumbnail_file}: {e}")
+                        logger.warning(f"Failed to extract fallback thumbnail {thumbnail_file}: {e}")
                         continue
 
-                logger.debug(f"No embedded thumbnails found in {model_path}")
+                logger.warning(f"No usable embedded thumbnails found in {model_path}")
+                logger.debug(f"Available files: {[f for f in all_files if any(term in f.lower() for term in ['thumb', 'preview', 'image'])]}")
                 return None
 
         except zipfile.BadZipFile:
@@ -442,21 +475,58 @@ class ThumbnailService:
 
         try:
             with zipfile.ZipFile(model_path, 'r') as zip_file:
-                # Look for plate-specific thumbnails
+                all_files = zip_file.namelist()
+                
+                # Look for plate-specific thumbnails in various common locations
                 plate_thumbnail_patterns = [
+                    # Metadata folder patterns
+                    f"Metadata/plate_{plate_index}_thumbnail.png",
+                    f"Metadata/plate_{plate_index}.png", 
+                    f"Metadata/thumbnail_plate_{plate_index}.png",
+                    f"Metadata/plate{plate_index}_thumbnail.png",
+                    f"Metadata/plate{plate_index}.png",
+                    # Auxiliaries folder patterns (legacy)
                     f"Auxiliaries/.thumbnails/plate_{plate_index}_thumbnail.png",
                     f"Auxiliaries/.thumbnails/plate_{plate_index}.png",
                     f"Auxiliaries/.thumbnails/thumbnail_plate_{plate_index}.png",
+                    # Root level patterns
+                    f"plate_{plate_index}_thumbnail.png",
+                    f"plate_{plate_index}.png",
                 ]
 
+                # First try specific plate patterns
                 for pattern in plate_thumbnail_patterns:
-                    if pattern in zip_file.namelist():
-                        with zip_file.open(pattern) as thumb_file:
-                            with open(output_path, 'wb') as out_file:
-                                out_file.write(thumb_file.read())
-                        
-                        logger.info(f"Extracted plate {plate_index} thumbnail: {output_path}")
-                        return output_path
+                    if pattern in all_files:
+                        try:
+                            with zip_file.open(pattern) as thumb_file:
+                                content = thumb_file.read()
+                                if len(content) > 0:
+                                    with open(output_path, 'wb') as out_file:
+                                        out_file.write(content)
+                                    
+                                    logger.info(f"Extracted plate {plate_index} thumbnail: {pattern} -> {output_path}")
+                                    return output_path
+                        except Exception as e:
+                            logger.warning(f"Failed to extract plate thumbnail {pattern}: {e}")
+                            continue
+
+                # If no specific plate thumbnail found, look for any files containing the plate index
+                plate_files = [f for f in all_files if str(plate_index) in f and 'thumbnail' in f.lower() and f.lower().endswith('.png')]
+                logger.info(f"Found potential plate {plate_index} files: {plate_files}")
+                
+                for plate_file in plate_files:
+                    try:
+                        with zip_file.open(plate_file) as thumb_file:
+                            content = thumb_file.read()
+                            if len(content) > 0:
+                                with open(output_path, 'wb') as out_file:
+                                    out_file.write(content)
+                                
+                                logger.info(f"Extracted plate {plate_index} thumbnail from: {plate_file}")
+                                return output_path
+                    except Exception as e:
+                        logger.warning(f"Failed to extract plate file {plate_file}: {e}")
+                        continue
 
                 # Fallback: extract general thumbnail
                 logger.debug(f"No plate-specific thumbnail found for plate {plate_index}, trying general thumbnail")
@@ -489,7 +559,9 @@ class ThumbnailService:
         try:
             with zipfile.ZipFile(model_path, 'r') as zip_file:
                 files = zip_file.namelist()
-                thumbnail_files = [f for f in files if 'thumbnail' in f.lower() and '.png' in f.lower()]
+                thumbnail_files = [f for f in files if 'thumbnail' in f.lower() and f.lower().endswith('.png')]
+                
+                logger.info(f"Analyzing 3MF thumbnails. Found {len(thumbnail_files)} thumbnail files: {thumbnail_files}")
                 
                 for thumb_file in thumbnail_files:
                     # Get file size
@@ -499,14 +571,23 @@ class ThumbnailService:
                     thumb_info = {
                         "path": thumb_file,
                         "size_kb": round(size_kb, 1),
-                        "type": "unknown"
+                        "type": "unknown",
+                        "location": "unknown"
                     }
 
+                    # Determine location
+                    if thumb_file.startswith("Metadata/"):
+                        thumb_info["location"] = "metadata"
+                    elif thumb_file.startswith("Auxiliaries/"):
+                        thumb_info["location"] = "auxiliaries"
+                    else:
+                        thumb_info["location"] = "root"
+
                     # Categorize thumbnail type
-                    if "plate_" in thumb_file.lower():
+                    if "plate" in thumb_file.lower() or any(f"plate{i}" in thumb_file.lower() for i in range(1, 10)):
                         thumb_info["type"] = "plate_specific"
                         result["plate_thumbnails"].append(thumb_info)
-                    elif any(name in thumb_file.lower() for name in ["thumbnail_small", "thumbnail_middle", "thumbnail_3mf"]):
+                    elif any(name in thumb_file.lower() for name in ["thumbnail_small", "thumbnail_middle", "thumbnail_large", "thumbnail.png"]):
                         thumb_info["type"] = "general"
                         result["general_thumbnails"].append(thumb_info)
                     else:
@@ -515,6 +596,13 @@ class ThumbnailService:
 
                 result["has_embedded"] = len(thumbnail_files) > 0
                 result["total_thumbnails"] = len(thumbnail_files)
+                
+                # Add debug information about all files
+                result["debug_info"] = {
+                    "total_files": len(files),
+                    "metadata_files": [f for f in files if f.startswith("Metadata/")],
+                    "auxiliaries_files": [f for f in files if f.startswith("Auxiliaries/")]
+                }
 
         except Exception as e:
             logger.error(f"Failed to analyze thumbnails in {model_path}: {e}")

@@ -903,25 +903,44 @@ async def debug_thumbnail_extraction(file_id: str):
             try:
                 with zipfile.ZipFile(model_file_path, 'r') as zip_file:
                     files = zip_file.namelist()
-                    thumbnail_files = [f for f in files if 'thumbnail' in f.lower()]
-                    debug_info['zip_files_count'] = len(files)
-                    debug_info['thumbnail_files'] = thumbnail_files
+                    
+                    # Categorize all files for better debugging
+                    metadata_files = [f for f in files if f.startswith('Metadata/')]
+                    auxiliaries_files = [f for f in files if f.startswith('Auxiliaries/')]
+                    thumbnail_files = [f for f in files if 'thumbnail' in f.lower() and f.lower().endswith('.png')]
+                    image_files = [f for f in files if any(ext in f.lower() for ext in ['.png', '.jpg', '.jpeg', '.bmp'])]
+                    
+                    debug_info.update({
+                        'zip_files_count': len(files),
+                        'all_files': files[:20],  # Show first 20 files
+                        'metadata_files': metadata_files,
+                        'auxiliaries_files': auxiliaries_files,
+                        'thumbnail_files': thumbnail_files,
+                        'all_image_files': image_files,
+                    })
                     
                     if thumbnail_files:
-                        # Try to extract one
+                        # Try to extract the first thumbnail we find
                         test_thumb = thumbnail_files[0]
                         test_output = thumbnail_service.temp_dir / f"debug_{file_id}_thumb.png"
                         
                         with zip_file.open(test_thumb) as thumb_file:
+                            content = thumb_file.read()
                             with open(test_output, 'wb') as out_file:
-                                out_file.write(thumb_file.read())
+                                out_file.write(content)
                         
                         debug_info['extraction_test'] = {
                             'extracted_file': test_thumb,
                             'output_path': str(test_output),
                             'output_exists': test_output.exists(),
-                            'output_size': test_output.stat().st_size if test_output.exists() else 0
+                            'output_size': len(content),
+                            'content_length': len(content)
                         }
+                    
+                    # Also test our specific metadata paths
+                    metadata_thumbs = [f for f in files if f.startswith('Metadata/') and 'thumbnail' in f.lower()]
+                    debug_info['metadata_thumbnails'] = metadata_thumbs
+                    
             except Exception as e:
                 debug_info['zip_error'] = str(e)
 
