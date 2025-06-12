@@ -184,3 +184,7 @@ BAMBU_PRINTERS='[{"name":"X1C","ip":"192.168.1.100","access_code":"12345678"}]'
 - Input validation for all API endpoints
 - Secure temporary file handling for model downloads
 - Path traversal protection for file operations
+
+### Development Workflow
+
+- Running tests and pre-commits should happen inside the dev container

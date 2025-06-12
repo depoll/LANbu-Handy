@@ -1,4 +1,9 @@
-import { PlateInfo, FilamentRequirement, AMSStatusResponse, FilamentMapping } from '../types/api';
+import {
+  PlateInfo,
+  FilamentRequirement,
+  AMSStatusResponse,
+  FilamentMapping,
+} from '../types/api';
 
 interface PlateSelectorProps {
   plates: PlateInfo[];
@@ -92,7 +97,10 @@ function PlateSelector({
                 <div className="plate-title">All Plates</div>
                 <div className="plate-stats">
                   <span>{plates.length} plates</span>
-                  <span>{plates.reduce((sum, plate) => sum + plate.object_count, 0)} obj</span>
+                  <span>
+                    {plates.reduce((sum, plate) => sum + plate.object_count, 0)}{' '}
+                    obj
+                  </span>
                 </div>
               </div>
             </div>
@@ -118,7 +126,7 @@ function PlateSelector({
                       borderRadius: '4px',
                       backgroundColor: '#f8f9fa',
                     }}
-                    onError={(e) => {
+                    onError={e => {
                       // Fallback to general thumbnail
                       const img = e.target as HTMLImageElement;
                       img.src = `/api/model/thumbnail/${fileId}?width=150&height=150`;
@@ -147,17 +155,19 @@ function PlateSelector({
             );
             if (!selectedPlate) return null;
 
-            const activeFilamentRequirements = plateFilamentRequirements || filamentRequirements;
+            const activeFilamentRequirements =
+              plateFilamentRequirements || filamentRequirements;
 
             return (
               <div className="plate-details">
                 <div className="plate-details-header">
                   <h5>Plate {selectedPlate.index} Configuration</h5>
-                  {isFilamentRequirementsFiltered && plateFilamentRequirements && (
-                    <span className="filtered-notice">
-                      📋 Showing plate-specific requirements
-                    </span>
-                  )}
+                  {isFilamentRequirementsFiltered &&
+                    plateFilamentRequirements && (
+                      <span className="filtered-notice">
+                        📋 Showing plate-specific requirements
+                      </span>
+                    )}
                 </div>
 
                 <div className="plate-details-grid">
@@ -167,64 +177,87 @@ function PlateSelector({
                     <div className="detail-items">
                       <div className="detail-item">
                         <span className="detail-label">Objects:</span>
-                        <span className="detail-value">{selectedPlate.object_count}</span>
+                        <span className="detail-value">
+                          {selectedPlate.object_count}
+                        </span>
                       </div>
                       <div className="detail-item">
                         <span className="detail-label">Est. Time:</span>
-                        <span className="detail-value">{formatTime(selectedPlate.prediction_seconds)}</span>
+                        <span className="detail-value">
+                          {formatTime(selectedPlate.prediction_seconds)}
+                        </span>
                       </div>
                       <div className="detail-item">
                         <span className="detail-label">Est. Weight:</span>
-                        <span className="detail-value">{formatWeight(selectedPlate.weight_grams)}</span>
+                        <span className="detail-value">
+                          {formatWeight(selectedPlate.weight_grams)}
+                        </span>
                       </div>
                       <div className="detail-item">
                         <span className="detail-label">Support:</span>
-                        <span className="detail-value">{selectedPlate.has_support ? '✓ Yes' : '✗ No'}</span>
+                        <span className="detail-value">
+                          {selectedPlate.has_support ? '✓ Yes' : '✗ No'}
+                        </span>
                       </div>
                     </div>
                   </div>
 
                   {/* Filament Requirements */}
-                  {activeFilamentRequirements && activeFilamentRequirements.filament_count > 0 && (
-                    <div className="detail-section">
-                      <h6>Required Filaments</h6>
-                      <div className="filament-requirements-compact">
-                        {activeFilamentRequirements.filament_types.map((type, index) => (
-                          <div key={index} className="filament-requirement-item">
-                            <div className="filament-info">
-                              <span className="filament-type">{type}</span>
-                              <span 
-                                className="filament-color"
-                                style={{
-                                  backgroundColor: activeFilamentRequirements.filament_colors[index] || '#ddd',
-                                  color: getContrastColor(activeFilamentRequirements.filament_colors[index] || '#ddd')
-                                }}
+                  {activeFilamentRequirements &&
+                    activeFilamentRequirements.filament_count > 0 && (
+                      <div className="detail-section">
+                        <h6>Required Filaments</h6>
+                        <div className="filament-requirements-compact">
+                          {activeFilamentRequirements.filament_types.map(
+                            (type, index) => (
+                              <div
+                                key={index}
+                                className="filament-badge-with-status"
                               >
-                                {activeFilamentRequirements.filament_colors[index] || 'Unknown'}
-                              </span>
-                            </div>
-                            {/* AMS Mapping Status */}
-                            {amsStatus && (
-                              <div className="mapping-status">
-                                {(() => {
-                                  const mapping = filamentMappings.find(m => m.filament_index === index);
-                                  if (mapping) {
-                                    return (
-                                      <span className="mapped">
-                                        ✓ AMS {mapping.ams_unit_id}-{mapping.ams_slot_id}
-                                      </span>
-                                    );
-                                  } else {
-                                    return <span className="unmapped">⚠️ Not mapped</span>;
-                                  }
-                                })()}
+                                <span
+                                  className="filament-type-colored"
+                                  style={{
+                                    backgroundColor:
+                                      activeFilamentRequirements
+                                        .filament_colors[index] || '#ddd',
+                                    color: getContrastColor(
+                                      activeFilamentRequirements
+                                        .filament_colors[index] || '#ddd'
+                                    ),
+                                  }}
+                                >
+                                  {type}
+                                </span>
+                                {/* AMS Mapping Status */}
+                                {amsStatus && (
+                                  <div className="mapping-status-compact">
+                                    {(() => {
+                                      const mapping = filamentMappings.find(
+                                        m => m.filament_index === index
+                                      );
+                                      if (mapping) {
+                                        return (
+                                          <span className="mapped-compact">
+                                            ✓ AMS {mapping.ams_unit_id}-
+                                            {mapping.ams_slot_id}
+                                          </span>
+                                        );
+                                      } else {
+                                        return (
+                                          <span className="unmapped-compact">
+                                            ⚠️ Not mapped
+                                          </span>
+                                        );
+                                      }
+                                    })()}
+                                  </div>
+                                )}
                               </div>
-                            )}
-                          </div>
-                        ))}
+                            )
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
 
                   {/* Build Plate Selection */}
                   {onBuildPlateSelect && (
@@ -233,7 +266,7 @@ function PlateSelector({
                       <div className="build-plate-compact">
                         <select
                           value={selectedBuildPlate || 'auto'}
-                          onChange={(e) => onBuildPlateSelect(e.target.value)}
+                          onChange={e => onBuildPlateSelect(e.target.value)}
                           disabled={disabled}
                           className="compact-build-plate-select"
                         >
@@ -241,7 +274,9 @@ function PlateSelector({
                           <option value="cool_plate">Cool Plate</option>
                           <option value="eng_plate">Engineering Plate</option>
                           <option value="hot_plate">Hot Plate</option>
-                          <option value="textured_pei_plate">Textured PEI Plate</option>
+                          <option value="textured_pei_plate">
+                            Textured PEI Plate
+                          </option>
                         </select>
                       </div>
                     </div>
@@ -252,26 +287,38 @@ function PlateSelector({
                     <h6>Configuration Status</h6>
                     <div className="config-status">
                       {(() => {
-                        const hasFilamentReqs = activeFilamentRequirements && activeFilamentRequirements.filament_count > 0;
-                        const allMapped = hasFilamentReqs && filamentMappings.length === activeFilamentRequirements.filament_count;
-                        const hasBuildPlate = selectedBuildPlate && selectedBuildPlate !== 'auto';
-                        
+                        const hasFilamentReqs =
+                          activeFilamentRequirements &&
+                          activeFilamentRequirements.filament_count > 0;
+                        const allMapped =
+                          hasFilamentReqs &&
+                          filamentMappings.length ===
+                            activeFilamentRequirements.filament_count;
+                        const hasBuildPlate =
+                          selectedBuildPlate && selectedBuildPlate !== 'auto';
+
                         return (
                           <div className="status-items">
                             <div className="status-item">
-                              <span className={`status-indicator ${hasFilamentReqs ? 'complete' : 'pending'}`}>
+                              <span
+                                className={`status-indicator ${hasFilamentReqs ? 'complete' : 'pending'}`}
+                              >
                                 {hasFilamentReqs ? '✓' : '○'}
                               </span>
                               <span>Filament requirements</span>
                             </div>
                             <div className="status-item">
-                              <span className={`status-indicator ${allMapped ? 'complete' : 'pending'}`}>
+                              <span
+                                className={`status-indicator ${allMapped ? 'complete' : 'pending'}`}
+                              >
                                 {allMapped ? '✓' : '○'}
                               </span>
                               <span>AMS mapping</span>
                             </div>
                             <div className="status-item">
-                              <span className={`status-indicator ${hasBuildPlate ? 'complete' : 'pending'}`}>
+                              <span
+                                className={`status-indicator ${hasBuildPlate ? 'complete' : 'pending'}`}
+                              >
                                 {hasBuildPlate ? '✓' : '○'}
                               </span>
                               <span>Build plate</span>
