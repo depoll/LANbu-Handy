@@ -48,9 +48,9 @@ RUN echo "en_US.UTF-8 UTF-8" > /etc/locale.gen && \
 ENV LANG=en_US.UTF-8
 ENV LC_ALL=en_US.UTF-8
 
-# Install Node.js from Debian packages (version 18+ available in jammy)
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends nodejs npm \
+# Install Node.js 22.x from NodeSource repository
+RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
+    && apt-get install -y nodejs \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Create the user

@@ -22,58 +22,8 @@ jobs:
           cache: 'pip'
           cache-dependency-path: 'backend/requirements.txt'
 
-      - name: Get Bambu Studio CLI version
-        id: bambu-version
-        run: |
-          if [ -f "scripts/bambu-studio-version.txt" ]; then
-            version=$(cat scripts/bambu-studio-version.txt | tr -d '[:space:]')
-          else
-            version="latest"
-          fi
-          echo "version=$version" >> $GITHUB_OUTPUT
-          echo "Bambu Studio CLI version: $version"
-
-      - name: Cache Bambu Studio CLI
-        id: cache-bambu-cli
-        uses: actions/cache@v4
-        with:
-          path: |
-            /usr/local/bin/BambuStudio.AppImage
-            /usr/local/bin/bambu-studio-cli
-            /usr/local/bin/bambu-studio
-          key: bambu-cli-${{ steps.bambu-version.outputs.version }}-${{ runner.os }}
-          restore-keys: |
-            bambu-cli-${{ steps.bambu-version.outputs.version }}-
-
-      - name: Install Bambu Studio CLI and dependencies
-        if: steps.cache-bambu-cli.outputs.cache-hit != 'true'
-        run: |
-          chmod +x scripts/install-bambu-studio-cli.sh
-          scripts/install-bambu-studio-cli.sh
-
-      - name: Verify cached Bambu Studio CLI
-        if: steps.cache-bambu-cli.outputs.cache-hit == 'true'
-        run: |
-          echo "Using cached Bambu Studio CLI"
-          echo "Verifying cached files exist:"
-          ls -la /usr/local/bin/BambuStudio.AppImage || echo "AppImage not found"
-          ls -la /usr/local/bin/bambu-studio-cli || echo "CLI wrapper not found"
-          ls -la /usr/local/bin/bambu-studio || echo "CLI symlink not found"
-
-          # Ensure proper permissions on cached files
-          if [ -f "/usr/local/bin/BambuStudio.AppImage" ]; then
-            sudo chmod +x /usr/local/bin/BambuStudio.AppImage
-          fi
-          if [ -f "/usr/local/bin/bambu-studio-cli" ]; then
-            sudo chmod +x /usr/local/bin/bambu-studio-cli
-          fi
-
-      - name: Install dependencies for cached CLI
-        if: steps.cache-bambu-cli.outputs.cache-hit == 'true'
-        run: |
-          echo "Installing system dependencies for cached CLI"
-          chmod +x scripts/install-bambu-studio-cli.sh
-          scripts/install-bambu-studio-cli.sh --deps-only
+      - name: Set up Docker Buildx for CLI
+        uses: docker/setup-buildx-action@v3
 
       - name: Install backend dependencies
         run: |
@@ -95,24 +45,39 @@ jobs:
         run: |
           python -m flake8 backend/
 
-      - name: Verify Bambu Studio CLI installation
+      - name: Set lowercase repository name
+        id: repo
         run: |
-          bambu-studio-cli --help || echo "CLI help command failed, but CLI may still be functional"
-          bambu-studio-cli --version || echo "CLI version command failed, but CLI may still be functional"
+          echo "name=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
 
-      - name: Run backend tests
+      - name: Run backend tests with pre-built CLI
         run: |
-          cd backend
-          # Set up virtual display for headless environment
-          export DISPLAY=:99
-          Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
-          # Run tests with verbose output and coverage
-          python -m pytest tests/ -v --cov=app --cov-report=term-missing -s
+          # Use the pre-built CLI image from GHCR
+          docker run --rm \
+            -v $(pwd)/backend:/app/backend \
+            -v $(pwd)/test_files:/app/test_files \
+            -w /app/backend \
+            --entrypoint="" \
+            ghcr.io/${{ steps.repo.outputs.name }}/bambu-studio-cli:latest \
+            bash -c "
+              # Install Python and test dependencies
+              apt-get update && apt-get install -y python3 python3-pip python3-venv xvfb
+              python3 -m pip install --upgrade pip
+              python3 -m pip install -r requirements.txt
+
+              # Set up virtual display for headless environment
+              export DISPLAY=:99
+              export QT_QPA_PLATFORM=offscreen
+              Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
+
+              # Run tests with verbose output and coverage
+              python3 -m pytest tests/ -v --cov=app --cov-report=term-missing -s
+            "
 
       - name: Set up Node.js for PWA
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
           cache-dependency-path: 'pwa/package-lock.json'
 

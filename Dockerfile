@@ -2,7 +2,7 @@
 # Base: Published Bambu Studio CLI image with Python runtime added
 
 # Stage 1: PWA Build Stage
-FROM node:18-slim AS pwa-builder
+FROM node:22-slim AS pwa-builder
 
 WORKDIR /app/pwa
 
