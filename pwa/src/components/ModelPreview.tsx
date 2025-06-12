@@ -236,9 +236,20 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({
       try {
         console.log(
           'ModelPreview: Trying thumbnail fallback for fileId:',
-          fileId
+          fileId,
+          'selectedPlateIndex:',
+          selectedPlateIndex
         );
-        const thumbnailUrl = `/api/model/thumbnail/${fileId}?width=300&height=300`;
+        
+        // Use plate-specific thumbnail if a specific plate is selected
+        let thumbnailUrl: string;
+        if (selectedPlateIndex !== null && selectedPlateIndex !== undefined) {
+          thumbnailUrl = `/api/model/thumbnail/${fileId}/plate/${selectedPlateIndex}?width=300&height=300`;
+          console.log('ModelPreview: Using plate-specific thumbnail:', thumbnailUrl);
+        } else {
+          thumbnailUrl = `/api/model/thumbnail/${fileId}?width=300&height=300`;
+          console.log('ModelPreview: Using general thumbnail:', thumbnailUrl);
+        }
 
         // Test if thumbnail endpoint responds
         const response = await fetch(thumbnailUrl, { method: 'HEAD' });
@@ -251,6 +262,22 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({
           setError(null);
           setIsLoading(false);
         } else {
+          // If plate-specific thumbnail fails, try general thumbnail as fallback
+          if (selectedPlateIndex !== null && selectedPlateIndex !== undefined) {
+            console.log('ModelPreview: Plate-specific thumbnail failed, trying general thumbnail');
+            const generalThumbnailUrl = `/api/model/thumbnail/${fileId}?width=300&height=300`;
+            const generalResponse = await fetch(generalThumbnailUrl, { method: 'HEAD' });
+            
+            if (generalResponse.ok) {
+              console.log('ModelPreview: General thumbnail available as fallback');
+              setThumbnailUrl(generalThumbnailUrl);
+              setUseThumbnail(true);
+              setError(null);
+              setIsLoading(false);
+              return;
+            }
+          }
+          
           throw new Error(`Thumbnail generation failed: ${response.status}`);
         }
       } catch (thumbnailError) {
@@ -419,6 +446,25 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({
     }
   }, [filamentMappings, filamentRequirements]);
 
+  // Update thumbnail when selected plate changes (for thumbnail view)
+  useEffect(() => {
+    if (!useThumbnail || !fileId) return;
+
+    console.log('ModelPreview: Selected plate changed, updating thumbnail URL');
+    
+    // Use plate-specific thumbnail if a specific plate is selected
+    let newThumbnailUrl: string;
+    if (selectedPlateIndex !== null && selectedPlateIndex !== undefined) {
+      newThumbnailUrl = `/api/model/thumbnail/${fileId}/plate/${selectedPlateIndex}?width=300&height=300`;
+      console.log('ModelPreview: Switching to plate-specific thumbnail:', newThumbnailUrl);
+    } else {
+      newThumbnailUrl = `/api/model/thumbnail/${fileId}?width=300&height=300`;
+      console.log('ModelPreview: Switching to general thumbnail:', newThumbnailUrl);
+    }
+
+    setThumbnailUrl(newThumbnailUrl);
+  }, [selectedPlateIndex, useThumbnail, fileId]);
+
   return (
     <div className={`model-preview ${className}`}>
       <div className="model-preview-header">
@@ -509,7 +555,9 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({
                 textAlign: 'center',
               }}
             >
-              📷 Thumbnail Preview
+              📷 {selectedPlateIndex !== null && selectedPlateIndex !== undefined 
+                   ? `Plate ${selectedPlateIndex} Thumbnail` 
+                   : 'Model Thumbnail'}
             </div>
           </div>
         )}

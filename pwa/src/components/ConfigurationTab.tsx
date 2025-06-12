@@ -114,6 +114,7 @@ export function ConfigurationTab({
             selectedPlateIndex={selectedPlateIndex}
             onPlateSelect={onPlateSelect}
             disabled={isProcessing}
+            fileId={currentFileId}
           />
         </div>
       )}

@@ -65,6 +65,7 @@ describe('PlateSelector Component', () => {
         plates={mockPlates}
         selectedPlateIndex={1}
         onPlateSelect={onPlateSelect}
+        fileId="test-file.3mf"
       />
     );
 
@@ -81,6 +82,7 @@ describe('PlateSelector Component', () => {
         plates={mockPlates}
         selectedPlateIndex={1}
         onPlateSelect={onPlateSelect}
+        fileId="test-file.3mf"
       />
     );
 
@@ -104,6 +106,7 @@ describe('PlateSelector Component', () => {
         plates={mockPlates}
         selectedPlateIndex={2}
         onPlateSelect={onPlateSelect}
+        fileId="test-file.3mf"
       />
     );
 
@@ -122,6 +125,7 @@ describe('PlateSelector Component', () => {
         plates={mockPlates}
         selectedPlateIndex={null}
         onPlateSelect={onPlateSelect}
+        fileId="test-file.3mf"
       />
     );
 
@@ -140,6 +144,7 @@ describe('PlateSelector Component', () => {
         plates={mockPlates}
         selectedPlateIndex={1}
         onPlateSelect={onPlateSelect}
+        fileId="test-file.3mf"
       />
     );
 
@@ -157,6 +162,7 @@ describe('PlateSelector Component', () => {
         plates={mockPlates}
         selectedPlateIndex={1}
         onPlateSelect={onPlateSelect}
+        fileId="test-file.3mf"
       />
     );
 
@@ -175,6 +181,7 @@ describe('PlateSelector Component', () => {
         selectedPlateIndex={1}
         onPlateSelect={onPlateSelect}
         disabled={true}
+        fileId="test-file.3mf"
       />
     );
 
@@ -206,6 +213,7 @@ describe('PlateSelector Component', () => {
         plates={platesWithMissingData}
         selectedPlateIndex={1}
         onPlateSelect={onPlateSelect}
+        fileId="test-file.3mf"
       />
     );
 

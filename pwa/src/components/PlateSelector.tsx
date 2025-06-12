@@ -6,6 +6,7 @@ interface PlateSelectorProps {
   onPlateSelect: (plateIndex: number | null) => void;
   disabled?: boolean;
   className?: string;
+  fileId?: string; // Add fileId for thumbnail support
 }
 
 function PlateSelector({
@@ -14,6 +15,7 @@ function PlateSelector({
   onPlateSelect,
   disabled = false,
   className = '',
+  fileId,
 }: PlateSelectorProps) {
   if (!plates || plates.length <= 1) {
     return null; // Don't show selector for single plate models
@@ -61,6 +63,52 @@ function PlateSelector({
           ))}
         </select>
       </div>
+
+      {/* Thumbnail Grid for Multi-Plate Models */}
+      {fileId && plates.length > 1 && (
+        <div className="plate-thumbnails-grid">
+          <h5>Plate Previews</h5>
+          <div className="thumbnails-container">
+            {plates.map(plate => (
+              <div
+                key={plate.index}
+                className={`plate-thumbnail-card ${
+                  selectedPlateIndex === plate.index ? 'selected' : ''
+                }`}
+                onClick={() => onPlateSelect(plate.index)}
+                style={{ cursor: disabled ? 'not-allowed' : 'pointer' }}
+              >
+                <div className="thumbnail-image">
+                  <img
+                    src={`/api/model/thumbnail/${fileId}/plate/${plate.index}?width=150&height=150`}
+                    alt={`Plate ${plate.index} preview`}
+                    style={{
+                      width: '100%',
+                      height: '120px',
+                      objectFit: 'contain',
+                      borderRadius: '4px',
+                      backgroundColor: '#f8f9fa',
+                    }}
+                    onError={(e) => {
+                      // Fallback to general thumbnail
+                      const img = e.target as HTMLImageElement;
+                      img.src = `/api/model/thumbnail/${fileId}?width=150&height=150`;
+                    }}
+                  />
+                </div>
+                <div className="thumbnail-info">
+                  <div className="plate-title">Plate {plate.index}</div>
+                  <div className="plate-stats">
+                    <span>{plate.object_count} obj</span>
+                    <span>{formatTime(plate.prediction_seconds)}</span>
+                    <span>{formatWeight(plate.weight_grams)}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {selectedPlateIndex !== null && (
         <div className="selected-plate-details">
