@@ -25,6 +25,7 @@ export interface AMSStatusResponse {
 // Model Filament Requirements and Plate Types
 export interface PlateInfo {
   index: number;
+  name?: string;
   prediction_seconds?: number;
   weight_grams?: number;
   has_support: boolean;

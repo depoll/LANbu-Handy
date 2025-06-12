@@ -36,6 +36,7 @@ class PlateInfo:
     """Information about a single plate in a 3MF file."""
 
     index: int
+    name: Optional[str] = None
     prediction_seconds: Optional[int] = None
     weight_grams: Optional[float] = None
     has_support: bool = False
@@ -499,6 +500,8 @@ class ModelService:
 
                 if key == "plater_id":
                     plate_info.index = int(value)
+                elif key == "plater_name":
+                    plate_info.name = value
                 # Note: model_settings.config doesn't typically have
                 # prediction/weight data
 

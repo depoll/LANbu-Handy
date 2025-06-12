@@ -65,6 +65,25 @@ function PlateSelector({
     return brightness > 128 ? '#000000' : '#FFFFFF';
   };
 
+  const getPlateName = (plate: PlateInfo): string => {
+    // Use the name from the 3MF file if available
+    if (plate.name) {
+      return plate.name;
+    }
+    
+    // Fallback to generated meaningful plate names
+    const baseNames = [
+      'Main', 'Secondary', 'Tertiary', 'Support', 'Detail', 'Extra',
+      'Alpha', 'Beta', 'Gamma', 'Delta', 'Echo', 'Foxtrot'
+    ];
+    
+    if (plate.index <= baseNames.length) {
+      return baseNames[plate.index - 1];
+    }
+    
+    return `Plate ${plate.index}`;
+  };
+
   return (
     <div className={`plate-selector ${className}`}>
       <div className="selector-header">
@@ -134,7 +153,7 @@ function PlateSelector({
                   />
                 </div>
                 <div className="thumbnail-info">
-                  <div className="plate-title">Plate {plate.index}</div>
+                  <div className="plate-title">{getPlateName(plate)} ({plate.index})</div>
                   <div className="plate-stats">
                     <span>{plate.object_count} obj</span>
                     <span>{formatTime(plate.prediction_seconds)}</span>
@@ -161,7 +180,7 @@ function PlateSelector({
             return (
               <div className="plate-details">
                 <div className="plate-details-header">
-                  <h5>Plate {selectedPlate.index} Configuration</h5>
+                  <h5>{getPlateName(selectedPlate)} (Plate {selectedPlate.index}) Configuration</h5>
                   {isFilamentRequirementsFiltered &&
                     plateFilamentRequirements && (
                       <span className="filtered-notice">

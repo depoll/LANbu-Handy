@@ -223,6 +223,7 @@ class ModelURLRequest(BaseModel):
 
 class PlateInfoResponse(BaseModel):
     index: int
+    name: Optional[str] = None
     prediction_seconds: Optional[int] = None
     weight_grams: Optional[float] = None
     has_support: bool = False
@@ -410,6 +411,7 @@ async def submit_model_url(request: ModelURLRequest):
                 plates_response.append(
                     PlateInfoResponse(
                         index=plate.index,
+                        name=plate.name,
                         prediction_seconds=plate.prediction_seconds,
                         weight_grams=plate.weight_grams,
                         has_support=plate.has_support,
@@ -506,6 +508,7 @@ async def upload_model_file(file: UploadFile = File(...)):
                 plates_response.append(
                     PlateInfoResponse(
                         index=plate.index,
+                        name=plate.name,
                         prediction_seconds=plate.prediction_seconds,
                         weight_grams=plate.weight_grams,
                         has_support=plate.has_support,
