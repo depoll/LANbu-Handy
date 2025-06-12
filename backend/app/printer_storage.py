@@ -46,9 +46,13 @@ class PrinterStorage:
         # Initialize storage availability flag
         self._storage_available = True
 
-        # Try to ensure the parent directory exists
+        # Try to ensure the parent directory exists and path is writable
         try:
             self.config_file.parent.mkdir(parents=True, exist_ok=True)
+            # Test write access by attempting to touch the file
+            if not self.config_file.exists():
+                self.config_file.touch()
+                self.config_file.unlink()  # Clean up test file
             logger.info(
                 f"Printer storage initialized with config file: {self.config_file}"
             )

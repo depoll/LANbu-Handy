@@ -79,3 +79,4 @@ config/
 data/
 codemcp.toml
 *.local.*
+result.json

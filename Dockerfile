@@ -1,8 +1,8 @@
-# LANbu Handy - All-in-One Docker Image (Optimized Multi-stage Build)
-# Note: Platform forced via docker-compose.yml for Bambu Studio CLI compatibility
+# LANbu Handy - All-in-One Docker Image (Multi-stage Build)
+# Base: Published Bambu Studio CLI image with Python runtime added
 
 # Stage 1: PWA Build Stage
-FROM node:18-slim AS pwa-builder
+FROM node:22-slim AS pwa-builder
 
 WORKDIR /app/pwa
 
@@ -20,11 +20,19 @@ RUN npm config set strict-ssl false && \
 COPY pwa/ ./
 RUN npm run build
 
-# Stage 2: Python Runtime Stage
-FROM python:3.12-slim
+# Stage 2: Main Runtime Stage
+FROM ghcr.io/depoll/lanbu-handy/bambu-studio-cli:latest
 
 # Set working directory
 WORKDIR /app
+
+# Install pip and upgrade it (Python 3.10 already available in base image)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        python3-pip \
+        python3-dev \
+    && python3 -m pip install --upgrade pip \
+    && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user for security
 RUN groupadd -r lanbu && \
@@ -32,21 +40,14 @@ RUN groupadd -r lanbu && \
     mkdir -p /app && \
     chown -R lanbu:lanbu /app
 
-# Install Bambu Studio CLI and dependencies (with essential CLI deps)
-COPY scripts/bambu-studio-version.txt /scripts/
-COPY scripts/install-bambu-studio-cli.sh /tmp/
-RUN chmod +x /tmp/install-bambu-studio-cli.sh && \
-    MINIMAL_DEPS=true /tmp/install-bambu-studio-cli.sh && \
-    rm -f /tmp/install-bambu-studio-cli.sh
-
 # Copy and install Python dependencies (production only)
 COPY backend/requirements-prod.txt ./backend/
-RUN pip install --trusted-host pypi.org \
+RUN python3 -m pip install --trusted-host pypi.org \
     --trusted-host pypi.python.org \
     --trusted-host files.pythonhosted.org \
     --no-cache-dir \
     -r backend/requirements-prod.txt && \
-    pip cache purge
+    python3 -m pip cache purge
 
 # Copy backend application and set proper ownership
 COPY backend/ ./

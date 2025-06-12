@@ -114,10 +114,34 @@ class BambuStudioCLIWrapper:
         """
         Get the version of Bambu Studio CLI.
 
+        Since there's no --version option, we extract version from help output.
+
         Returns:
             CLIResult with version information
         """
-        return self._run_command(["--version"])
+        help_result = self.get_help()
+        if help_result.success:
+            # Extract version from help output header (e.g., "BambuStudio-02.01.00.59:")
+            lines = help_result.stdout.split("\n")
+            for line in lines:
+                if line.startswith("BambuStudio-") and ":" in line:
+                    version_line = line.split(":")[0]
+                    return CLIResult(
+                        exit_code=0,
+                        stdout=version_line,
+                        stderr="",
+                        success=True,
+                    )
+            # If version not found in expected format, return help output
+            return CLIResult(
+                exit_code=0,
+                stdout=f"Version info from help: {help_result.stdout[:100]}...",
+                stderr="",
+                success=True,
+            )
+        else:
+            # Return the help result as-is if it failed
+            return help_result
 
     def get_help(self) -> CLIResult:
         """
@@ -161,7 +185,14 @@ class BambuStudioCLIWrapper:
         output_dir.mkdir(parents=True, exist_ok=True)
 
         # Build command arguments
-        args = ["--slice", str(input_path), "--output", str(output_dir)]
+        # Input file comes first as positional argument
+        args = [str(input_path)]
+
+        # Add slice option (0 means all plates)
+        args.extend(["--slice", "0"])
+
+        # Add output directory
+        args.extend(["--outputdir", str(output_dir)])
 
         # Add any additional options
         if options:

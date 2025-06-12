@@ -1,7 +1,6 @@
 services:
   lanbuhandy:
     image: ghcr.io/depoll/lanbu-handy:latest
-    platform: linux/amd64
     ports:
       - '8080:8000'
     restart: unless-stopped
