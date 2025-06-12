@@ -2979,6 +2979,77 @@ footer p {
   text-overflow: ellipsis;
 }
 
+/* All Plates Option Styles */
+.plate-thumbnail-card.all-plates-option {
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  border: 2px dashed var(--color-border-secondary);
+}
+
+.plate-thumbnail-card.all-plates-option:hover {
+  border-color: var(--color-primary);
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+}
+
+.plate-thumbnail-card.all-plates-option.selected {
+  border-style: solid;
+  background: linear-gradient(135deg, rgba(40, 167, 69, 0.05) 0%, rgba(40, 167, 69, 0.1) 100%);
+}
+
+.all-plates-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+}
+
+.all-plates-icon {
+  position: relative;
+  width: 60px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.plate-stack {
+  position: relative;
+  width: 50px;
+  height: 50px;
+}
+
+.plate-layer {
+  position: absolute;
+  width: 40px;
+  height: 30px;
+  border: 2px solid var(--color-text-secondary);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.plate-layer.plate-1 {
+  top: 0;
+  left: 0;
+  background: rgba(76, 175, 80, 0.3);
+  border-color: var(--color-primary);
+  z-index: 3;
+}
+
+.plate-layer.plate-2 {
+  top: 8px;
+  left: 5px;
+  background: rgba(76, 175, 80, 0.2);
+  border-color: var(--color-primary);
+  z-index: 2;
+}
+
+.plate-layer.plate-3 {
+  top: 16px;
+  left: 10px;
+  background: rgba(76, 175, 80, 0.1);
+  border-color: var(--color-primary);
+  z-index: 1;
+}
+
 /* Mobile responsiveness for plate selector */
 @media (max-width: 768px) {
   .plate-selector .plate-selection {

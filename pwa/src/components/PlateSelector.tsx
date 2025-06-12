@@ -40,42 +40,44 @@ function PlateSelector({
         <p>Choose to slice/print a specific plate or all plates at once</p>
       </div>
 
-      <div className="plate-selection">
-        <label htmlFor="plate-select">Select Plate:</label>
-        <select
-          id="plate-select"
-          value={selectedPlateIndex ?? 'all'}
-          onChange={e => {
-            const value = e.target.value;
-            onPlateSelect(value === 'all' ? null : parseInt(value, 10));
-          }}
-          disabled={disabled}
-          className="plate-select"
-        >
-          <option value="all">All Plates ({plates.length} plates)</option>
-          {plates.map(plate => (
-            <option key={plate.index} value={plate.index}>
-              Plate {plate.index} ({plate.object_count} object
-              {plate.object_count !== 1 ? 's' : ''},{' '}
-              {formatTime(plate.prediction_seconds)},{' '}
-              {formatWeight(plate.weight_grams)})
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {/* Thumbnail Grid for Multi-Plate Models */}
-      {fileId && plates.length > 1 && (
+      {/* Visual Plate Selection Grid */}
+      {fileId && (
         <div className="plate-thumbnails-grid">
-          <h5>Plate Previews</h5>
           <div className="thumbnails-container">
+            {/* All Plates Option */}
+            <div
+              className={`plate-thumbnail-card all-plates-option ${
+                selectedPlateIndex === null ? 'selected' : ''
+              }`}
+              onClick={() => !disabled && onPlateSelect(null)}
+              style={{ cursor: disabled ? 'not-allowed' : 'pointer' }}
+            >
+              <div className="thumbnail-image all-plates-preview">
+                <div className="all-plates-icon">
+                  <div className="plate-stack">
+                    <div className="plate-layer plate-1"></div>
+                    <div className="plate-layer plate-2"></div>
+                    <div className="plate-layer plate-3"></div>
+                  </div>
+                </div>
+              </div>
+              <div className="thumbnail-info">
+                <div className="plate-title">All Plates</div>
+                <div className="plate-stats">
+                  <span>{plates.length} plates</span>
+                  <span>{plates.reduce((sum, plate) => sum + plate.object_count, 0)} obj</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Individual Plate Options */}
             {plates.map(plate => (
               <div
                 key={plate.index}
                 className={`plate-thumbnail-card ${
                   selectedPlateIndex === plate.index ? 'selected' : ''
                 }`}
-                onClick={() => onPlateSelect(plate.index)}
+                onClick={() => !disabled && onPlateSelect(plate.index)}
                 style={{ cursor: disabled ? 'not-allowed' : 'pointer' }}
               >
                 <div className="thumbnail-image">

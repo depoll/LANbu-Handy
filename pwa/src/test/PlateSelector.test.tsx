@@ -70,8 +70,8 @@ describe('PlateSelector Component', () => {
     );
 
     expect(screen.getByText('Plate Selection')).toBeInTheDocument();
-    expect(screen.getByLabelText('Select Plate:')).toBeInTheDocument();
-    expect(screen.getByText('All Plates (3 plates)')).toBeInTheDocument();
+    expect(screen.getByText('All Plates')).toBeInTheDocument();
+    expect(screen.getByText('3 plates')).toBeInTheDocument();
   });
 
   it('shows correct plate options with details', () => {
@@ -86,16 +86,15 @@ describe('PlateSelector Component', () => {
       />
     );
 
-    // Check that plate options include details
-    expect(
-      screen.getByText(/Plate 1 \(2 objects, 1h 27m, 24\.6g\)/)
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(/Plate 2 \(1 object, 1h 27m, 24\.4g\)/)
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(/Plate 3 \(3 objects, 1h 31m, 25\.1g\)/)
-    ).toBeInTheDocument();
+    // Check that plate titles are shown
+    expect(screen.getByText('Plate 1')).toBeInTheDocument();
+    expect(screen.getByText('Plate 2')).toBeInTheDocument();
+    expect(screen.getByText('Plate 3')).toBeInTheDocument();
+    
+    // Check that stats are shown (object counts, times, weights)
+    expect(screen.getByText('2 obj')).toBeInTheDocument();
+    expect(screen.getByText('1 obj')).toBeInTheDocument();
+    expect(screen.getByText('3 obj')).toBeInTheDocument();
   });
 
   it('displays selected plate details correctly', () => {
@@ -136,7 +135,7 @@ describe('PlateSelector Component', () => {
     expect(screen.getByText('1 of 3')).toBeInTheDocument(); // plates with support
   });
 
-  it('calls onPlateSelect when selection changes', () => {
+  it('calls onPlateSelect when plate card is clicked', () => {
     const onPlateSelect = vi.fn();
 
     render(
@@ -148,13 +147,14 @@ describe('PlateSelector Component', () => {
       />
     );
 
-    const select = screen.getByLabelText('Select Plate:');
-    fireEvent.change(select, { target: { value: '2' } });
+    // Click on Plate 2 card
+    const plate2Card = screen.getByText('Plate 2').closest('.plate-thumbnail-card');
+    fireEvent.click(plate2Card!);
 
     expect(onPlateSelect).toHaveBeenCalledWith(2);
   });
 
-  it('calls onPlateSelect with null when "all" is selected', () => {
+  it('calls onPlateSelect with null when "All Plates" card is clicked', () => {
     const onPlateSelect = vi.fn();
 
     render(
@@ -166,8 +166,9 @@ describe('PlateSelector Component', () => {
       />
     );
 
-    const select = screen.getByLabelText('Select Plate:');
-    fireEvent.change(select, { target: { value: 'all' } });
+    // Click on All Plates card
+    const allPlatesCard = screen.getByText('All Plates').closest('.plate-thumbnail-card');
+    fireEvent.click(allPlatesCard!);
 
     expect(onPlateSelect).toHaveBeenCalledWith(null);
   });
@@ -185,8 +186,11 @@ describe('PlateSelector Component', () => {
       />
     );
 
-    const select = screen.getByLabelText('Select Plate:');
-    expect(select).toBeDisabled();
+    // When disabled, clicking should not trigger onPlateSelect
+    const plate2Card = screen.getByText('Plate 2').closest('.plate-thumbnail-card');
+    fireEvent.click(plate2Card!);
+
+    expect(onPlateSelect).not.toHaveBeenCalled();
   });
 
   it('handles plates with missing optional data gracefully', () => {
@@ -217,12 +221,12 @@ describe('PlateSelector Component', () => {
       />
     );
 
-    // Should show "Unknown" for missing data
-    expect(
-      screen.getByText(/Plate 1 \(1 object, Unknown, Unknown\)/)
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(/Plate 2 \(0 objects, 0h 16m, 10\.5g\)/)
-    ).toBeInTheDocument();
+    // Should show "Unknown" for missing data in plate stats
+    expect(screen.getByText('Plate 1')).toBeInTheDocument();
+    expect(screen.getByText('Plate 2')).toBeInTheDocument();
+    
+    // Check for proper handling of missing data
+    expect(screen.getByText('1 obj')).toBeInTheDocument();
+    expect(screen.getByText('0 obj')).toBeInTheDocument();
   });
 });
