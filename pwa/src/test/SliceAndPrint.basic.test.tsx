@@ -15,7 +15,7 @@ describe('SliceAndPrint Basic Tests', () => {
 
   it('renders without crashing', () => {
     renderWithToast(<SliceAndPrint />);
-    expect(screen.getByText('Slice and Print')).toBeInTheDocument();
+    expect(screen.getByText('Model')).toBeInTheDocument();
   });
 
   it('renders model URL input', () => {
