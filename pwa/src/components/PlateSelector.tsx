@@ -263,21 +263,54 @@ function PlateSelector({
                   {onBuildPlateSelect && (
                     <div className="detail-section">
                       <h6>Build Plate</h6>
-                      <div className="build-plate-compact">
-                        <select
-                          value={selectedBuildPlate || 'auto'}
-                          onChange={e => onBuildPlateSelect(e.target.value)}
-                          disabled={disabled}
-                          className="compact-build-plate-select"
-                        >
-                          <option value="auto">Auto</option>
-                          <option value="cool_plate">Cool Plate</option>
-                          <option value="eng_plate">Engineering Plate</option>
-                          <option value="hot_plate">Hot Plate</option>
-                          <option value="textured_pei_plate">
-                            Textured PEI Plate
-                          </option>
-                        </select>
+                      <div className="build-plate-selector">
+                        {[
+                          {
+                            id: 'textured_pei_plate',
+                            name: 'Textured PEI',
+                            icon: '⬛',
+                            color: '#2c2c2c',
+                          },
+                          {
+                            id: 'cool_plate',
+                            name: 'Cool Plate',
+                            icon: '🔷',
+                            color: '#4a90e2',
+                          },
+                          {
+                            id: 'eng_plate',
+                            name: 'Engineering',
+                            icon: '🔶',
+                            color: '#f5a623',
+                          },
+                          {
+                            id: 'hot_plate',
+                            name: 'Hot Plate',
+                            icon: '🔴',
+                            color: '#e74c3c',
+                          },
+                        ].map(plate => (
+                          <div
+                            key={plate.id}
+                            className={`build-plate-option ${(selectedBuildPlate || 'textured_pei_plate') === plate.id ? 'selected' : ''}`}
+                            onClick={() =>
+                              !disabled && onBuildPlateSelect(plate.id)
+                            }
+                            style={{
+                              cursor: disabled ? 'not-allowed' : 'pointer',
+                            }}
+                          >
+                            <div className="plate-visual">
+                              <div
+                                className="plate-icon"
+                                style={{ backgroundColor: plate.color }}
+                              >
+                                {plate.icon}
+                              </div>
+                            </div>
+                            <div className="plate-name">{plate.name}</div>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   )}
@@ -295,7 +328,7 @@ function PlateSelector({
                           filamentMappings.length ===
                             activeFilamentRequirements.filament_count;
                         const hasBuildPlate =
-                          selectedBuildPlate && selectedBuildPlate !== 'auto';
+                          selectedBuildPlate || 'textured_pei_plate';
 
                         return (
                           <div className="status-items">

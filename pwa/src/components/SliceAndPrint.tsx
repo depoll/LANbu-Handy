@@ -62,15 +62,19 @@ function SliceAndPrint() {
     ]);
   };
 
-  const fetchPlateFilamentRequirements = async (plateIndex: number) => {
-    if (!currentFileId) {
+  const fetchPlateFilamentRequirements = async (
+    plateIndex: number,
+    fileId?: string
+  ) => {
+    const targetFileId = fileId || currentFileId;
+    if (!targetFileId) {
       console.warn('No file ID available for fetching plate requirements');
       return;
     }
 
     try {
       const response = await fetch(
-        `/api/model/${currentFileId}/plate/${plateIndex}/filament-requirements`
+        `/api/model/${targetFileId}/plate/${plateIndex}/filament-requirements`
       );
 
       if (!response.ok) {
@@ -154,6 +158,9 @@ function SliceAndPrint() {
       addStatusMessage(
         `🎯 Auto-selected Plate ${data.plates[0].index} (click to change)`
       );
+
+      // Fetch plate-specific filament requirements for the auto-selected plate
+      fetchPlateFilamentRequirements(data.plates[0].index, data.fileId);
     } else {
       setSelectedPlateIndex(null);
     }
