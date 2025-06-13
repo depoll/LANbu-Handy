@@ -1,0 +1,225 @@
+/* LANbu Handy PWA - Slice and Print Component Styles */
+
+/* Slice and Print Component */
+.slice-and-print {
+  max-width: 1200px;
+  margin: 2rem auto;
+}
+
+.slice-and-print-form {
+  margin-bottom: 2rem;
+}
+
+.input-group {
+  margin-bottom: 1.5rem;
+}
+
+.input-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+
+.model-url-input {
+  width: 100%;
+  padding: 0.75rem;
+  border: 2px solid var(--color-border-primary);
+  border-radius: 6px;
+  font-size: 1rem;
+  transition: border-color 0.2s ease;
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+}
+
+.model-url-input:focus {
+  outline: none;
+  border-color: var(--color-primary-light);
+}
+
+.model-url-input:disabled {
+  background-color: var(--color-bg-tertiary);
+  cursor: not-allowed;
+}
+
+/* Input Mode Toggle */
+.input-mode-toggle {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+  justify-content: center;
+}
+
+.mode-toggle-button {
+  padding: 0.5rem 1rem;
+  border: 2px solid var(--color-border-primary);
+  background: var(--color-bg-primary);
+  color: var(--color-primary);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.mode-toggle-button:hover:not(:disabled) {
+  border-color: var(--color-primary-light);
+  background: var(--color-primary-accent);
+}
+
+.mode-toggle-button.active {
+  border-color: var(--color-primary-light);
+  background: var(--color-primary-light);
+  color: var(--color-text-inverse);
+}
+
+.mode-toggle-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* File Input */
+.file-input-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.model-file-input {
+  width: 100%;
+  padding: 0.75rem;
+  border: 2px dashed var(--color-border-primary);
+  border-radius: 6px;
+  font-size: 1rem;
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+  cursor: pointer;
+  transition: border-color 0.2s ease;
+}
+
+.model-file-input:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  background: var(--color-bg-accent);
+}
+
+.model-file-input:disabled {
+  background-color: var(--color-bg-tertiary);
+  color: var(--color-text-muted);
+  cursor: not-allowed;
+}
+
+.selected-file-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1rem;
+  background: var(--color-bg-accent);
+  border: 1px solid var(--color-border-secondary);
+  border-radius: 6px;
+}
+
+.file-name {
+  font-weight: 500;
+  color: #388e3c;
+}
+
+.file-size {
+  font-size: 0.9rem;
+  color: var(--color-text-secondary);
+}
+
+/* Upload Progress */
+.upload-progress {
+  position: relative;
+  width: 100%;
+  height: 20px;
+  background: #e0e0e0;
+  border-radius: 10px;
+  overflow: hidden;
+  margin-top: 0.5rem;
+}
+
+.upload-progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #4caf50, #388e3c);
+  transition: width 0.3s ease;
+  border-radius: 10px;
+}
+
+.upload-progress-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--color-text-inverse);
+}
+
+.slice-and-print-button {
+  width: 100%;
+  padding: 1rem 2rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+  background-color: var(--color-primary);
+  color: var(--color-text-inverse);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.slice-and-print-button:hover:not(:disabled) {
+  background-color: var(--color-primary-hover);
+}
+
+.slice-and-print-button:disabled {
+  background-color: var(--color-text-muted);
+  color: var(--color-text-inverse);
+  cursor: not-allowed;
+}
+
+.status-display {
+  border-top: 1px solid var(--color-border-primary);
+  padding-top: 2rem;
+}
+
+.status-display h3 {
+  color: var(--color-text-primary);
+  font-size: 1.2rem;
+  margin-bottom: 1rem;
+}
+
+.status-messages {
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-primary);
+  border-radius: 6px;
+  padding: 1rem;
+  max-height: 300px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+}
+
+.status-message {
+  font-family: 'Courier New', monospace;
+  font-size: 0.9rem;
+  margin-bottom: 0.5rem;
+  padding: 0.25rem 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.status-message:last-child {
+  margin-bottom: 0;
+}
+
+/* Mobile responsiveness for slice and print */
+@media (max-width: 768px) {
+  .slice-and-print {
+    margin: 1rem;
+    padding: 1.5rem;
+  }
+}

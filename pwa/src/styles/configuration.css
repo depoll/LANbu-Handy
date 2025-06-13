@@ -1,0 +1,589 @@
+/* LANbu Handy PWA - Configuration Component Styles */
+
+/* Configuration Section Styles */
+.configuration-section {
+  margin: 1.5rem 0;
+  padding: 1.5rem;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+}
+
+.configuration-header {
+  margin-bottom: 1.5rem;
+}
+
+.configuration-header h3 {
+  margin: 0 0 0.5rem 0;
+  color: #343a40;
+}
+
+.configuration-header p {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 0.9rem;
+}
+
+/* Build Plate Selector Styles */
+.build-plate-selector {
+  margin: 1.5rem 0;
+  padding: 1rem;
+  background: var(--color-bg-primary);
+  border-radius: 6px;
+  border: 1px solid var(--color-border-secondary);
+}
+
+.build-plate-selector .selector-header h4 {
+  margin: 0 0 0.5rem 0;
+  color: #495057;
+}
+
+.build-plate-selector .selector-header p {
+  margin: 0 0 1rem 0;
+  color: #6c757d;
+  font-size: 0.9rem;
+}
+
+.plate-selection {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.plate-selection label {
+  font-weight: 500;
+  color: #495057;
+  min-width: 100px;
+}
+
+.build-plate-select {
+  flex: 1;
+  padding: 0.5rem;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+
+.build-plate-select:focus {
+  outline: none;
+  border-color: #4caf50;
+  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
+}
+
+/* Filament Mapping Config Styles */
+.filament-mapping-config {
+  margin: 1.5rem 0;
+  padding: 1rem;
+  background: var(--color-bg-primary);
+  border-radius: 6px;
+  border: 1px solid var(--color-border-secondary);
+}
+
+.mapping-header h4 {
+  margin: 0 0 0.5rem 0;
+  color: #495057;
+}
+
+.mapping-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.reapply-matching-button {
+  background: #17a2b8;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.reapply-matching-button:hover:not(:disabled) {
+  background: #138496;
+}
+
+.reapply-matching-button:disabled {
+  background: #6c757d;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.matching-error {
+  background: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+  border-radius: 4px;
+  padding: 0.75rem;
+  margin-top: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.mapping-header p {
+  margin: 0 0 1rem 0;
+  color: #6c757d;
+  font-size: 0.9rem;
+}
+
+.filament-mappings {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.filament-mapping-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid #e9ecef;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  margin-bottom: 1rem;
+}
+
+.required-filament {
+  flex: 0 0 200px;
+  background: #f8f9fa;
+  border-radius: 4px;
+  padding: 0.75rem;
+  border: 1px solid #e9ecef;
+}
+
+.filament-label {
+  font-weight: 600;
+  color: #343a40;
+  margin-bottom: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.filament-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.filament-type {
+  background: #e8f5e9;
+  color: #2e7d32;
+  padding: 0.4rem 0.75rem;
+  border-radius: 16px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-align: center;
+  border: 1px solid #c8e6c9;
+}
+
+.filament-color .color-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid #dee2e6;
+}
+
+.filament-color .color-swatch {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  border: 2px solid #ddd;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.color-label {
+  font-family: monospace;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #495057;
+}
+
+.color-name {
+  color: #495057;
+  font-weight: 500;
+  padding: 0.5rem;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid #dee2e6;
+  text-align: center;
+}
+
+.mapping-arrow {
+  color: #4caf50;
+  font-size: 1.2rem;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.ams-slot-selection {
+  flex: 1;
+  min-width: 200px;
+}
+
+.ams-slot-selection label {
+  display: block;
+  font-weight: 500;
+  color: #495057;
+  margin-bottom: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.ams-slot-select {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid var(--color-border-secondary);
+  border-radius: 4px;
+  font-size: 0.9rem;
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+}
+
+.ams-slot-select:focus {
+  outline: none;
+  border-color: #4caf50;
+  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
+}
+
+/* Slice and Print Controls */
+.slice-print-controls {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #dee2e6;
+}
+
+.print-ready-section {
+  text-align: center;
+}
+
+.slice-success {
+  background: #d4edda;
+  color: #155724;
+  padding: 0.75rem;
+  border-radius: 4px;
+  margin-bottom: 1rem;
+  font-weight: 500;
+}
+
+.print-controls {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+}
+
+/* Configuration Summary Styles */
+.configuration-summary {
+  margin: 1.5rem 0;
+  padding: 1rem;
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+}
+
+.summary-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid #dee2e6;
+}
+
+.summary-header h4 {
+  margin: 0;
+  color: #495057;
+  font-size: 1.1rem;
+}
+
+.config-status {
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.status-complete {
+  color: #155724;
+  background: #d4edda;
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  border: 1px solid #c3e6cb;
+}
+
+.status-incomplete {
+  color: #856404;
+  background: #fff3cd;
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  border: 1px solid #ffeaa7;
+}
+
+.summary-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.summary-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.section-label {
+  font-weight: 600;
+  color: #495057;
+  font-size: 0.95rem;
+}
+
+.section-value {
+  font-size: 0.9rem;
+  color: var(--color-text-secondary);
+}
+
+.build-plate-value {
+  background: #e8f5e9;
+  color: #2e7d32;
+  padding: 0.5rem;
+  border-radius: 4px;
+  font-weight: 500;
+  border: 1px solid #c8e6c9;
+}
+
+.filament-mappings-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.mapping-summary-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem;
+  background: white;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+}
+
+.required-info,
+.assigned-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+}
+
+.filament-number {
+  background: #6c757d;
+  color: white;
+  padding: 0.25rem 0.5rem;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  min-width: 28px;
+  text-align: center;
+}
+
+.required-type,
+.ams-type {
+  background: #e8f5e9;
+  color: #2e7d32;
+  padding: 0.25rem 0.5rem;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.ams-slot {
+  background: #f3e5f5;
+  color: #7b1fa2;
+  padding: 0.25rem 0.5rem;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.color-swatch.small {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid #ddd;
+  flex-shrink: 0;
+}
+
+.not-assigned {
+  color: #dc3545;
+  font-style: italic;
+  font-size: 0.9rem;
+}
+
+.mapping-arrow {
+  color: #6c757d;
+  font-weight: bold;
+}
+
+/* Workflow Loading Indicator */
+.workflow-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: #e8f5e9;
+  border: 1px solid #a5d6a7;
+  border-radius: 6px;
+  margin-bottom: 1rem;
+}
+
+.loading-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #e8f5e9;
+  border-top: 2px solid #388e3c;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.loading-text {
+  color: #388e3c;
+  font-weight: 500;
+  font-size: 0.95rem;
+}
+
+/* Enhanced button states for better feedback */
+.slice-and-print-button:disabled,
+.secondary-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  position: relative;
+}
+
+.slice-and-print-button:disabled::after,
+.secondary-button:disabled::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 1rem;
+  width: 16px;
+  height: 16px;
+  border: 2px solid transparent;
+  border-top: 2px solid currentColor;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  display: none;
+}
+
+.slice-and-print-button:disabled[data-loading='true']::after,
+.secondary-button:disabled[data-loading='true']::after {
+  display: block;
+}
+
+.workflow-section {
+  margin: 1.5rem 0;
+}
+
+/* Mobile responsiveness for new components */
+@media (max-width: 768px) {
+  .mapping-title-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+
+  .reapply-matching-button {
+    font-size: 0.9rem;
+    padding: 0.75rem;
+  }
+
+  .filament-mapping-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+    padding: 1rem;
+  }
+
+  .required-filament {
+    flex: none;
+  }
+
+  .mapping-arrow {
+    transform: rotate(90deg);
+    align-self: center;
+  }
+
+  .ams-slot-selection {
+    min-width: auto;
+  }
+
+  .filament-details {
+    gap: 0.5rem;
+  }
+
+  .plate-selection {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+
+  .plate-selection label {
+    min-width: auto;
+  }
+
+  .print-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .configuration-section {
+    margin: 1rem;
+    padding: 1rem;
+  }
+
+  .summary-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+
+  .mapping-summary-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+
+  .mapping-arrow {
+    transform: rotate(90deg);
+    align-self: center;
+  }
+
+  .required-info,
+  .assigned-info {
+    justify-content: center;
+  }
+
+  .button-group {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .secondary-button,
+  .slice-and-print-button {
+    width: 100%;
+  }
+}
