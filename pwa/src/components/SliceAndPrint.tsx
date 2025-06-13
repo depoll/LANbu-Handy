@@ -38,7 +38,7 @@ function SliceAndPrint() {
   const [filamentMappings, setFilamentMappings] = useState<FilamentMapping[]>(
     []
   );
-  const [selectedBuildPlate, setSelectedBuildPlate] = useState<string>('auto');
+  const [selectedBuildPlate, setSelectedBuildPlate] = useState<string>('textured_pei_plate');
 
   // Operation state
   const [isProcessing, setIsProcessing] = useState(false);
@@ -145,13 +145,6 @@ function SliceAndPrint() {
     hasMultiplePlates: boolean;
     modelUrl: string;
   }) => {
-    console.log('handleModelAnalyzed called with:', {
-      fileId: data.fileId,
-      platesCount: data.plates.length,
-      hasMultiplePlates: data.hasMultiplePlates,
-      plateIndices: data.plates.map(p => p.index)
-    });
-    
     setCurrentFileId(data.fileId);
     setFilamentRequirements(data.filamentRequirements);
     setPlates(data.plates);

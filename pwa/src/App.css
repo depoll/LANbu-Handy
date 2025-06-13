@@ -2921,8 +2921,8 @@ footer p {
 
 .plate-thumbnail-card.selected {
   border-color: var(--color-primary) !important;
-  background: rgba(40, 167, 69, 0.2) !important;
-  box-shadow: 0 4px 12px rgba(40, 167, 69, 0.4) !important;
+  background: rgba(40, 167, 69, 0.1) !important;
+  box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3) !important;
   border-width: 3px !important;
 }
 
@@ -3185,6 +3185,13 @@ footer p {
   display: flex;
   gap: 0.75rem;
   flex-wrap: wrap;
+}
+
+.build-plate-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin-top: 1rem;
 }
 
 .build-plate-option {

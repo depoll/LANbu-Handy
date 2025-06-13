@@ -75,8 +75,6 @@ function PlateSelector({
     return `Plate ${plate.index}`;
   };
 
-  // Debug logging
-  console.log('PlateSelector render:', { selectedPlateIndex, platesCount: plates.length, plateIndices: plates.map(p => p.index) });
 
   return (
     <div className={`plate-selector ${className}`}>
@@ -127,8 +125,6 @@ function PlateSelector({
                 }`}
                 onClick={() => !disabled && onPlateSelect(plate.index)}
                 style={{ cursor: disabled ? 'not-allowed' : 'pointer' }}
-                data-plate-index={plate.index}
-                data-selected-index={selectedPlateIndex}
               >
                 <div className="thumbnail-image">
                   <img

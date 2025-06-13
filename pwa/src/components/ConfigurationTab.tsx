@@ -43,13 +43,6 @@ export function ConfigurationTab({
   isProcessing,
   currentFileId,
 }: ConfigurationTabProps) {
-  
-  // Debug logging
-  console.log('ConfigurationTab render:', { 
-    hasMultiplePlates, 
-    platesCount: plates.length, 
-    selectedPlateIndex 
-  });
   const activeFilamentRequirements =
     plateFilamentRequirements || filamentRequirements;
 
