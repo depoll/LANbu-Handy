@@ -34,12 +34,12 @@ def get_default_slicing_options() -> Dict[str, str]:
     Returns:
         Dict[str, str]: Default CLI options for the slicer
     """
-    return {
-        "profile": "pla",
-        "layer-height": "0.2",
-        "infill": "15",
-        "support": "auto",
-    }
+    # Note: Bambu Studio CLI doesn't support direct profile/layer-height/infill options
+    # It relies on either:
+    # 1. Settings embedded in 3MF files
+    # 2. External JSON settings files via --load-settings and --load-filaments
+    # For now, we'll return empty options and rely on 3MF embedded settings
+    return {}
 
 
 def handle_model_errors(e: Exception) -> HTTPException:
@@ -249,20 +249,8 @@ def build_slicing_options_from_config(
     Returns:
         Dictionary of CLI options for the slicer
     """
-    options = {}
-
-    # Add build plate type
-    if build_plate_type:
-        options["build-plate"] = build_plate_type
-
-    # Add plate selection if specified
-    if selected_plate_index is not None:
-        options["plate-index"] = str(selected_plate_index)
-
-    # Add filament mappings
-    for mapping in filament_mappings:
-        slot_key = f"filament-slot-{mapping.filament_index}"
-        slot_value = f"{mapping.ams_unit_id}-{mapping.ams_slot_id}"
-        options[slot_key] = slot_value
-
-    return options
+    # Note: Bambu Studio CLI doesn't support these options directly
+    # It requires JSON settings files for configuration
+    # For now, return empty options and rely on 3MF embedded settings
+    # TODO: Implement JSON settings file generation for custom configurations
+    return {}

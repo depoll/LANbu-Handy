@@ -68,6 +68,7 @@ export interface SliceResponse {
   message: string;
   gcode_path?: string;
   error_details?: string;
+  updated_plates?: PlateInfo[];
 }
 
 // Printer Configuration Types

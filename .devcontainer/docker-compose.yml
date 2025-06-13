@@ -9,6 +9,7 @@ services:
     volumes:
       - ..:/workspace:cached
       - /var/run/docker.sock:/var/run/docker.sock
+      - claude:/claude
     command: sleep infinity
     ports:
       - '8000:8000'
@@ -18,3 +19,5 @@ services:
       - PYTHONPATH=/workspace/backend
       - NODE_ENV=development
     working_dir: /workspace
+volumes:
+  claude:

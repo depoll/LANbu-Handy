@@ -38,7 +38,8 @@ function SliceAndPrint() {
   const [filamentMappings, setFilamentMappings] = useState<FilamentMapping[]>(
     []
   );
-  const [selectedBuildPlate, setSelectedBuildPlate] = useState<string>('textured_pei_plate');
+  const [selectedBuildPlate, setSelectedBuildPlate] =
+    useState<string>('textured_pei_plate');
 
   // Operation state
   const [isProcessing, setIsProcessing] = useState(false);
@@ -289,6 +290,7 @@ function SliceAndPrint() {
           isProcessing={isProcessing}
           onProcessingChange={setIsProcessing}
           onStatusMessage={addStatusMessage}
+          onPlatesUpdate={setPlates}
         />
       ),
     },

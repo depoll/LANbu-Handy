@@ -35,7 +35,6 @@ function PlateSelector({
   isFilamentRequirementsFiltered,
   amsStatus,
   filamentMappings = [],
-  onMappingChange,
   selectedBuildPlate,
   onBuildPlateSelect,
 }: PlateSelectorProps) {
@@ -44,14 +43,14 @@ function PlateSelector({
   }
 
   const formatTime = (seconds?: number): string => {
-    if (!seconds) return 'Unknown';
+    if (!seconds) return 'After slice';
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
     return `${hours}h ${minutes}m`;
   };
 
   const formatWeight = (grams?: number): string => {
-    if (!grams) return 'Unknown';
+    if (!grams) return 'After slice';
     return `${grams.toFixed(1)}g`;
   };
 
@@ -70,11 +69,10 @@ function PlateSelector({
     if (plate.name) {
       return `Plate ${plate.index}: ${plate.name}`;
     }
-    
+
     // Just show plate number when no name is available
     return `Plate ${plate.index}`;
   };
-
 
   return (
     <div className={`plate-selector ${className}`}>
@@ -172,7 +170,10 @@ function PlateSelector({
             return (
               <div className="plate-details">
                 <div className="plate-details-header">
-                  <h5>{getPlateName(selectedPlate)} (Plate {selectedPlate.index}) Configuration</h5>
+                  <h5>
+                    {getPlateName(selectedPlate)} (Plate {selectedPlate.index})
+                    Configuration
+                  </h5>
                   {isFilamentRequirementsFiltered &&
                     plateFilamentRequirements && (
                       <span className="filtered-notice">

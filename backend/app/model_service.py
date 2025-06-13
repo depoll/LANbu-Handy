@@ -582,7 +582,360 @@ class ModelService:
         # Manually update has_multiple_plates
         model_info.has_multiple_plates = len(model_info.plates) > 1
 
+        # TODO: Implement async slicing for estimates in the future
+        # Auto-slicing is too slow for synchronous HTTP requests
+        # For now, estimates will be available after manual slicing
+
         return model_info
+
+    def _enhance_plates_with_slice_estimates(
+        self, file_path: Path, plates: List[PlateInfo]
+    ) -> None:
+        """
+        Automatically slice the model to get time and weight estimates for each plate.
+        Updates the plates list in-place with the estimates.
+        """
+        try:
+            from .slicer_service import BambuStudioCLIWrapper
+
+            logger.info(f"Importing slicer service for {file_path}")
+
+            # Create temporary output directory for slicing
+            import tempfile
+
+            with tempfile.TemporaryDirectory() as temp_dir:
+                temp_dir_path = Path(temp_dir)
+                logger.info(f"Created temp directory: {temp_dir_path}")
+
+                # Initialize the CLI wrapper
+                cli_wrapper = BambuStudioCLIWrapper()
+                logger.info("Initialized CLI wrapper")
+
+                # Slice the model to get estimates (shorter timeout for estimates)
+                logger.info(f"Starting slice operation for {file_path}")
+
+                # Use a shorter timeout for estimates (2 minutes instead of 5)
+                args = [
+                    str(file_path),
+                    "--slice",
+                    "0",
+                    "--outputdir",
+                    str(temp_dir_path),
+                ]
+                result = cli_wrapper._run_command(args, timeout=120)
+
+                if result.stderr:
+                    logger.warning(f"Slicer stderr: {result.stderr}")
+                if result.stdout:
+                    logger.info(
+                        f"Slicer stdout: {result.stdout[:500]}..."
+                    )  # First 500 chars
+                logger.info(
+                    f"Slice operation completed. Success: {result.success}, "
+                    f"Exit code: {result.exit_code}"
+                )
+
+                if result.success:
+                    # Look for the output files (could be 3MF or G-code)
+                    output_3mf_files = list(temp_dir_path.glob("*.3mf"))
+                    output_gcode_files = list(temp_dir_path.glob("*.gcode"))
+
+                    # Try to parse 3MF files first (they contain the most
+                    # complete slice data)
+                    if output_3mf_files:
+                        sliced_3mf_path = output_3mf_files[0]
+
+                        # Parse the sliced 3MF to extract time/weight estimates
+                        sliced_plates = self.parse_3mf_plate_info(sliced_3mf_path)
+
+                        # Update the original plates with the estimates
+                        sliced_by_index = {p.index: p for p in sliced_plates}
+                        for plate in plates:
+                            sliced_plate = sliced_by_index.get(plate.index)
+                            if sliced_plate:
+                                if sliced_plate.prediction_seconds:
+                                    plate.prediction_seconds = (
+                                        sliced_plate.prediction_seconds
+                                    )
+                                if sliced_plate.weight_grams:
+                                    plate.weight_grams = sliced_plate.weight_grams
+                                # Also update support info if available
+                                if sliced_plate.has_support:
+                                    plate.has_support = sliced_plate.has_support
+
+                        logger.info(
+                            f"Successfully enhanced plates with slice estimates "
+                            f"from {file_path}"
+                        )
+                    elif output_gcode_files:
+                        # Parse G-code metadata for estimates (fallback approach)
+                        self._parse_gcode_estimates(output_gcode_files, plates)
+                        logger.info(
+                            f"Enhanced plates with G-code estimates from {file_path}"
+                        )
+                    else:
+                        logger.warning(
+                            f"No output files found after slicing {file_path}"
+                        )
+                else:
+                    logger.warning(
+                        f"Failed to slice model for estimates: {result.stderr}"
+                    )
+
+        except Exception as e:
+            logger.warning(f"Failed to get slice estimates for {file_path}: {str(e)}")
+            # Don't fail the entire model analysis if slicing fails
+            pass
+
+    def _parse_gcode_estimates(
+        self, gcode_files: List[Path], plates: List[PlateInfo]
+    ) -> None:
+        """
+        Parse G-code files to extract time and weight estimates.
+        Updates the plates list in-place with the estimates found in G-code metadata.
+        """
+        try:
+            for gcode_file in gcode_files:
+                # Try to determine which plate this G-code corresponds to
+                # G-code filenames often contain plate numbers
+                plate_index = self._extract_plate_index_from_filename(gcode_file.name)
+
+                # Find the corresponding plate
+                target_plate = None
+                if plate_index is not None:
+                    target_plate = next(
+                        (p for p in plates if p.index == plate_index), None
+                    )
+                elif len(plates) == 1:
+                    # If only one plate, assume this G-code is for it
+                    target_plate = plates[0]
+                else:
+                    target_plate = None
+
+                if target_plate:
+                    # Parse the G-code file for metadata
+                    estimates = self._extract_estimates_from_gcode(gcode_file)
+                    if estimates:
+                        if estimates.get("time_seconds"):
+                            target_plate.prediction_seconds = estimates["time_seconds"]
+                        if estimates.get("weight_grams"):
+                            target_plate.weight_grams = estimates["weight_grams"]
+
+        except Exception as e:
+            logger.error(f"Failed to parse G-code estimates: {str(e)}", exc_info=True)
+
+    def _extract_plate_index_from_filename(self, filename: str) -> Optional[int]:
+        """Extract plate index from G-code filename."""
+        import re
+
+        # Look for patterns like "plate_1.gcode", "_plate1_", etc.
+        match = re.search(r"plate[_\s]*(\d+)", filename, re.IGNORECASE)
+        if match:
+            return int(match.group(1))
+        return None
+
+    def _extract_estimates_from_gcode(self, gcode_file: Path) -> Optional[dict]:
+        """
+        Extract time and weight estimates from G-code file metadata.
+
+        Returns:
+            Dict with 'time_seconds' and 'weight_grams' if found, None otherwise
+        """
+        try:
+            estimates = {}
+            with open(gcode_file, "r", encoding="utf-8", errors="ignore") as f:
+                # Read only the first few KB where metadata is typically stored
+                header = f.read(8192)
+
+                # Look for common G-code metadata patterns
+                lines = header.split("\n")
+
+                for line in lines:
+                    line = line.strip()
+                    if line.startswith(";"):
+                        # Parse comment lines that often contain metadata
+                        if (
+                            "estimated printing time" in line.lower()
+                            or "print time" in line.lower()
+                            or "model printing time" in line.lower()
+                            or "total estimated time" in line.lower()
+                        ):
+                            time_seconds = self._parse_time_from_comment(line)
+                            if time_seconds:
+                                estimates["time_seconds"] = time_seconds
+
+                        if (
+                            "filament used" in line.lower()
+                            or "material usage" in line.lower()
+                            or "total filament weight" in line.lower()
+                        ):
+                            weight_grams = self._parse_weight_from_comment(line)
+                            if weight_grams:
+                                estimates["weight_grams"] = weight_grams
+
+                return estimates if estimates else None
+
+        except Exception as e:
+            logger.error(
+                f"Failed to parse G-code file {gcode_file}: {str(e)}", exc_info=True
+            )
+            return None
+
+    def _parse_time_from_comment(self, comment: str) -> Optional[int]:
+        """Parse time in seconds from a G-code comment."""
+        import re
+
+        # Pattern for "Xh Ym Zs" format (e.g., "1h 9m 44s")
+        match = re.search(r"(\d+)h\s*(\d+)m\s*(\d+)s", comment, re.IGNORECASE)
+        if match:
+            hours = int(match.group(1))
+            minutes = int(match.group(2))
+            seconds = int(match.group(3))
+            total_seconds = hours * 3600 + minutes * 60 + seconds
+            return total_seconds
+
+        # Pattern for "Xm Ys" format (e.g., "35m 50s")
+        match = re.search(r"(\d+)m\s*(\d+)s", comment, re.IGNORECASE)
+        if match:
+            minutes = int(match.group(1))
+            seconds = int(match.group(2))
+            total_seconds = minutes * 60 + seconds
+            return total_seconds
+
+        # Pattern for "Xh Ym" format (e.g., "1h 30m")
+        match = re.search(r"(\d+)h\s*(\d+)m", comment, re.IGNORECASE)
+        if match:
+            hours = int(match.group(1))
+            minutes = int(match.group(2))
+            total_seconds = hours * 3600 + minutes * 60
+            return total_seconds
+
+        # Pattern for "Xm" format (e.g., "90m")
+        match = re.search(
+            r"(\d+)m(?!\d)", comment, re.IGNORECASE
+        )  # negative lookahead to avoid matching "mm"
+        if match:
+            minutes = int(match.group(1))
+            total_seconds = minutes * 60
+            return total_seconds
+
+        # Pattern for "Xs" format (e.g., "5400s")
+        match = re.search(
+            r"(\d+)s(?!\d)", comment, re.IGNORECASE
+        )  # negative lookahead to avoid matching longer numbers
+        if match:
+            seconds = int(match.group(1))
+            return seconds
+
+        # Pattern for decimal hours (e.g., "1.5h")
+        match = re.search(r"(\d+\.?\d*)h", comment, re.IGNORECASE)
+        if match:
+            hours = float(match.group(1))
+            total_seconds = int(hours * 3600)
+            return total_seconds
+
+        return None
+
+    def _parse_weight_from_comment(self, comment: str) -> Optional[float]:
+        """Parse weight in grams from a G-code comment."""
+        import re
+
+        # Pattern for Bambu Studio format: "; total filament weight [g] : 6.11,3.25"
+        bambu_match = re.search(
+            r"total filament weight.*?:\s*([\d.,\s]+)", comment, re.IGNORECASE
+        )
+        if bambu_match:
+            weight_str = bambu_match.group(1)
+            # Split by comma and sum all weights
+            weights = []
+            for w in weight_str.split(","):
+                w = w.strip()
+                if w and re.match(r"^\d+\.?\d*$", w):
+                    weights.append(float(w))
+            if weights:
+                total_weight = sum(weights)
+                return total_weight
+
+        # Pattern for standard grams format
+        match = re.search(r"(\d+\.?\d*)g", comment, re.IGNORECASE)
+        if match:
+            return float(match.group(1))
+
+        # Pattern for kilograms
+        match = re.search(r"(\d+\.?\d*)kg", comment, re.IGNORECASE)
+        if match:
+            return float(match.group(1)) * 1000
+
+        return None
+
+    def update_plate_estimates_from_slice_output(
+        self, file_path: Path, output_dir: Path
+    ) -> List[PlateInfo]:
+        """
+        Update plate estimates from slicing output and return updated plates.
+        This method extracts time/weight estimates from slice output files
+        and returns the updated plate information.
+        """
+        try:
+            # Re-parse the model to get current plate info
+            model_info = self.parse_3mf_model_info(file_path)
+            if not model_info.plates:
+                return []
+
+            # Look for slice output files
+            output_3mf_files = list(output_dir.glob("*.3mf"))
+            output_gcode_files = list(output_dir.glob("*.gcode"))
+
+            estimates_updated = False
+
+            # Try to parse 3MF files first (most complete data)
+            if output_3mf_files:
+                for output_3mf in output_3mf_files:
+                    sliced_plates = self.parse_3mf_plate_info(output_3mf)
+                    if sliced_plates:
+                        # Update original plates with estimates
+                        sliced_by_index = {p.index: p for p in sliced_plates}
+                        for plate in model_info.plates:
+                            sliced_plate = sliced_by_index.get(plate.index)
+                            if sliced_plate:
+                                if sliced_plate.prediction_seconds:
+                                    plate.prediction_seconds = (
+                                        sliced_plate.prediction_seconds
+                                    )
+                                    estimates_updated = True
+                                if sliced_plate.weight_grams:
+                                    plate.weight_grams = sliced_plate.weight_grams
+                                    estimates_updated = True
+                                if sliced_plate.has_support:
+                                    plate.has_support = sliced_plate.has_support
+
+            # Fallback to G-code parsing
+            elif output_gcode_files:
+                self._parse_gcode_estimates(output_gcode_files, model_info.plates)
+                # Check if any estimates were actually added
+                for plate in model_info.plates:
+                    if plate.prediction_seconds or plate.weight_grams:
+                        estimates_updated = True
+                        break
+
+            if estimates_updated:
+                logger.info(
+                    f"Updated plate estimates for {file_path} from slice output"
+                )
+
+            return model_info.plates
+
+        except Exception as e:
+            logger.error(
+                f"Failed to update plate estimates from slice output: {str(e)}",
+                exc_info=True,
+            )
+            # Return original plates without estimates if parsing fails
+            try:
+                model_info = self.parse_3mf_model_info(file_path)
+                return model_info.plates if model_info.plates else []
+            except Exception:
+                return []
 
     def get_plate_specific_filament_requirements(
         self, file_path: Path, plate_index: int

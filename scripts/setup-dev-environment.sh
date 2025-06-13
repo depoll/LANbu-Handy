@@ -111,6 +111,21 @@ else
     fi
 fi
 
+# Create Claude configuration directory and files if they don't exist
+if [ ! -d "/claude/.claude" ]; then
+    sudo mkdir -p /claude/.claude
+fi
+
+if [ ! -f "/claude/.claude.json" ]; then
+    sudo touch /claude/.claude.json
+fi
+
+# Create symlinks to home directory
+ln -sf /claude/.claude /home/vscode/.claude
+ln -sf /claude/.claude.json /home/vscode/.claude.json
+sudo chown -R vscode:vscode /claude
+echo "🔗 Symlinks created for Claude configuration"
+
 echo ""
 echo "🎉 Development environment setup complete!"
 echo ""

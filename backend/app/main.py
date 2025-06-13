@@ -256,6 +256,7 @@ class SliceResponse(BaseModel):
     message: str
     gcode_path: str = None
     error_details: str = None
+    updated_plates: Optional[List[PlateInfoResponse]] = None
 
 
 class JobStartRequest(BaseModel):
@@ -267,6 +268,7 @@ class JobStartResponse(BaseModel):
     message: str
     job_steps: dict = None
     error_details: str = None
+    updated_plates: Optional[List[PlateInfoResponse]] = None
 
 
 class AMSFilamentResponse(BaseModel):
@@ -753,10 +755,7 @@ async def get_model_thumbnail(file_id: str, width: int = 300, height: int = 300)
 
 @app.get("/api/model/thumbnail/{file_id}/plate/{plate_index}")
 async def get_plate_thumbnail(
-    file_id: str, 
-    plate_index: int, 
-    width: int = 300, 
-    height: int = 300
+    file_id: str, plate_index: int, width: int = 300, height: int = 300
 ):
     """
     Generate and serve a thumbnail image for a specific plate in a model file.
@@ -804,7 +803,7 @@ async def get_plate_thumbnail(
             extracted_path = thumbnail_service.extract_plate_thumbnail(
                 model_file_path, plate_index, thumbnail_path
             )
-            
+
             if not extracted_path or not extracted_path.exists():
                 # Fallback to general thumbnail generation with embedded preference
                 thumbnail_path = thumbnail_service.generate_thumbnail(
@@ -819,7 +818,10 @@ async def get_plate_thumbnail(
         return FileResponse(
             path=thumbnail_path,
             media_type=media_type,
-            filename=f"{model_file_path.stem}_plate_{plate_index}_thumbnail{thumbnail_path.suffix}",
+            filename=(
+                f"{model_file_path.stem}_plate_{plate_index}_thumbnail"
+                f"{thumbnail_path.suffix}"
+            ),
         )
 
     except HTTPException:
@@ -864,11 +866,11 @@ async def get_available_thumbnails(file_id: str):
 
         # Analyze available thumbnails
         thumbnail_info = thumbnail_service.get_available_thumbnails(model_file_path)
-        
+
         return {
             "file_id": file_id,
             "file_type": model_file_path.suffix.lower(),
-            "thumbnails": thumbnail_info
+            "thumbnails": thumbnail_info,
         }
 
     except HTTPException:
@@ -889,88 +891,117 @@ async def debug_thumbnail_extraction(file_id: str):
         model_file_path = model_service.temp_dir / file_id
 
         if not model_file_path.exists():
-            return {"error": f"Model file not found: {file_id}", "path": str(model_file_path)}
+            return {
+                "error": f"Model file not found: {file_id}",
+                "path": str(model_file_path),
+            }
 
         debug_info = {
             "file_id": file_id,
             "file_path": str(model_file_path),
             "file_exists": model_file_path.exists(),
-            "file_size": model_file_path.stat().st_size if model_file_path.exists() else 0,
+            "file_size": (
+                model_file_path.stat().st_size if model_file_path.exists() else 0
+            ),
             "file_extension": model_file_path.suffix.lower(),
-            "is_3mf": model_file_path.suffix.lower() == '.3mf'
+            "is_3mf": model_file_path.suffix.lower() == ".3mf",
         }
 
-        if model_file_path.suffix.lower() == '.3mf':
+        if model_file_path.suffix.lower() == ".3mf":
             # Test thumbnail extraction
             import zipfile
+
             try:
-                with zipfile.ZipFile(model_file_path, 'r') as zip_file:
+                with zipfile.ZipFile(model_file_path, "r") as zip_file:
                     files = zip_file.namelist()
-                    
+
                     # Categorize all files for better debugging
-                    metadata_files = [f for f in files if f.startswith('Metadata/')]
-                    auxiliaries_files = [f for f in files if f.startswith('Auxiliaries/')]
-                    thumbnail_files = [f for f in files if 'thumbnail' in f.lower() and f.lower().endswith('.png')]
-                    image_files = [f for f in files if any(ext in f.lower() for ext in ['.png', '.jpg', '.jpeg', '.bmp'])]
-                    
-                    debug_info.update({
-                        'zip_files_count': len(files),
-                        'all_files': files[:20],  # Show first 20 files
-                        'metadata_files': metadata_files,
-                        'auxiliaries_files': auxiliaries_files,
-                        'thumbnail_files': thumbnail_files,
-                        'all_image_files': image_files,
-                    })
-                    
+                    metadata_files = [f for f in files if f.startswith("Metadata/")]
+                    auxiliaries_files = [
+                        f for f in files if f.startswith("Auxiliaries/")
+                    ]
+                    thumbnail_files = [
+                        f
+                        for f in files
+                        if "thumbnail" in f.lower() and f.lower().endswith(".png")
+                    ]
+                    image_files = [
+                        f
+                        for f in files
+                        if any(
+                            ext in f.lower()
+                            for ext in [".png", ".jpg", ".jpeg", ".bmp"]
+                        )
+                    ]
+
+                    debug_info.update(
+                        {
+                            "zip_files_count": len(files),
+                            "all_files": files[:20],  # Show first 20 files
+                            "metadata_files": metadata_files,
+                            "auxiliaries_files": auxiliaries_files,
+                            "thumbnail_files": thumbnail_files,
+                            "all_image_files": image_files,
+                        }
+                    )
+
                     if thumbnail_files:
                         # Try to extract the first thumbnail we find
                         test_thumb = thumbnail_files[0]
-                        test_output = thumbnail_service.temp_dir / f"debug_{file_id}_thumb.png"
-                        
+                        test_output = (
+                            thumbnail_service.temp_dir / f"debug_{file_id}_thumb.png"
+                        )
+
                         with zip_file.open(test_thumb) as thumb_file:
                             content = thumb_file.read()
-                            with open(test_output, 'wb') as out_file:
+                            with open(test_output, "wb") as out_file:
                                 out_file.write(content)
-                        
-                        debug_info['extraction_test'] = {
-                            'extracted_file': test_thumb,
-                            'output_path': str(test_output),
-                            'output_exists': test_output.exists(),
-                            'output_size': len(content),
-                            'content_length': len(content)
+
+                        debug_info["extraction_test"] = {
+                            "extracted_file": test_thumb,
+                            "output_path": str(test_output),
+                            "output_exists": test_output.exists(),
+                            "output_size": len(content),
+                            "content_length": len(content),
                         }
-                    
+
                     # Also test our specific metadata paths
-                    metadata_thumbs = [f for f in files if f.startswith('Metadata/') and 'thumbnail' in f.lower()]
-                    debug_info['metadata_thumbnails'] = metadata_thumbs
-                    
+                    metadata_thumbs = [
+                        f
+                        for f in files
+                        if f.startswith("Metadata/") and "thumbnail" in f.lower()
+                    ]
+                    debug_info["metadata_thumbnails"] = metadata_thumbs
+
             except Exception as e:
-                debug_info['zip_error'] = str(e)
+                debug_info["zip_error"] = str(e)
 
         # Test thumbnail availability analysis
         try:
-            available_thumbs = thumbnail_service.get_available_thumbnails(model_file_path)
-            debug_info['available_thumbnails'] = available_thumbs
+            available_thumbs = thumbnail_service.get_available_thumbnails(
+                model_file_path
+            )
+            debug_info["available_thumbnails"] = available_thumbs
         except Exception as e:
-            debug_info['thumbnail_analysis_error'] = str(e)
+            debug_info["thumbnail_analysis_error"] = str(e)
 
         # Test plate-specific thumbnail extraction
         try:
-            debug_info['plate_extractions'] = {}
+            debug_info["plate_extractions"] = {}
             # Test first few plates
             for plate_idx in [1, 2, 3]:
                 plate_result = thumbnail_service.extract_plate_thumbnail(
                     model_file_path, plate_idx
                 )
                 if plate_result and plate_result.exists():
-                    debug_info['plate_extractions'][plate_idx] = {
-                        'path': str(plate_result),
-                        'size': plate_result.stat().st_size
+                    debug_info["plate_extractions"][plate_idx] = {
+                        "path": str(plate_result),
+                        "size": plate_result.stat().st_size,
                     }
                 else:
-                    debug_info['plate_extractions'][plate_idx] = None
+                    debug_info["plate_extractions"][plate_idx] = None
         except Exception as e:
-            debug_info['plate_extraction_error'] = str(e)
+            debug_info["plate_extraction_error"] = str(e)
 
         # Test the actual thumbnail service
         try:
@@ -978,18 +1009,18 @@ async def debug_thumbnail_extraction(file_id: str):
             existing_thumb = thumbnail_service.get_thumbnail_path(model_file_path)
             if existing_thumb.exists():
                 existing_thumb.unlink()
-                debug_info['cleared_existing'] = str(existing_thumb)
-            
+                debug_info["cleared_existing"] = str(existing_thumb)
+
             result_path = thumbnail_service.generate_thumbnail(
                 model_file_path, prefer_embedded=True
             )
-            debug_info['service_result'] = {
-                'path': str(result_path),
-                'exists': result_path.exists(),
-                'size': result_path.stat().st_size if result_path.exists() else 0
+            debug_info["service_result"] = {
+                "path": str(result_path),
+                "exists": result_path.exists(),
+                "size": result_path.stat().st_size if result_path.exists() else 0,
             }
         except Exception as e:
-            debug_info['service_error'] = str(e)
+            debug_info["service_error"] = str(e)
 
         return debug_info
 
@@ -1037,10 +1068,32 @@ async def slice_model_with_defaults(request: SliceRequest):
         if result.success:
             try:
                 gcode_path = str(find_gcode_file(output_dir))
+
+                # Update plate estimates from slice output
+                updated_plates = model_service.update_plate_estimates_from_slice_output(
+                    model_file_path, output_dir
+                )
+
+                # Convert to response format
+                plates_response = []
+                if updated_plates:
+                    for plate in updated_plates:
+                        plates_response.append(
+                            PlateInfoResponse(
+                                index=plate.index,
+                                name=plate.name,
+                                prediction_seconds=plate.prediction_seconds,
+                                weight_grams=plate.weight_grams,
+                                has_support=plate.has_support,
+                                object_count=plate.object_count,
+                            )
+                        )
+
                 return SliceResponse(
                     success=True,
                     message="Model sliced successfully with default settings",
                     gcode_path=gcode_path,
+                    updated_plates=plates_response if plates_response else None,
                 )
             except FileNotFoundError:
                 return SliceResponse(
@@ -1112,10 +1165,32 @@ async def slice_model_with_configuration(request: ConfiguredSliceRequest):
         if result.success:
             try:
                 gcode_path = str(find_gcode_file(output_dir))
+
+                # Update plate estimates from slice output
+                updated_plates = model_service.update_plate_estimates_from_slice_output(
+                    model_file_path, output_dir
+                )
+
+                # Convert to response format
+                plates_response = []
+                if updated_plates:
+                    for plate in updated_plates:
+                        plates_response.append(
+                            PlateInfoResponse(
+                                index=plate.index,
+                                name=plate.name,
+                                prediction_seconds=plate.prediction_seconds,
+                                weight_grams=plate.weight_grams,
+                                has_support=plate.has_support,
+                                object_count=plate.object_count,
+                            )
+                        )
+
                 return SliceResponse(
                     success=True,
                     message="Model sliced successfully with user configuration",
                     gcode_path=gcode_path,
+                    updated_plates=plates_response if plates_response else None,
                 )
             except FileNotFoundError:
                 return SliceResponse(
@@ -1219,6 +1294,18 @@ async def start_basic_job(request: JobStartRequest):
 
         gcode_path = slice_result["gcode_path"]
 
+        # Extract plate estimates from slice output if successful
+        updated_plates = None
+        if slice_result["success"]:
+            try:
+                output_dir = get_gcode_output_dir()
+                updated_plates = model_service.update_plate_estimates_from_slice_output(
+                    file_path, output_dir
+                )
+            except Exception as e:
+                logger.warning(f"Failed to extract plate estimates in basic job: {e}")
+                # Don't fail the job if estimate extraction fails
+
         # Step 3: Upload G-code to printer
         upload_result = upload_gcode_step(printer_service, printer_config, gcode_path)
         job_steps["upload"].update(
@@ -1249,11 +1336,27 @@ async def start_basic_job(request: JobStartRequest):
             }
         )
 
+        # Convert updated plates to response format
+        plates_response = []
+        if updated_plates:
+            for plate in updated_plates:
+                plates_response.append(
+                    PlateInfoResponse(
+                        index=plate.index,
+                        name=plate.name,
+                        prediction_seconds=plate.prediction_seconds,
+                        weight_grams=plate.weight_grams,
+                        has_support=plate.has_support,
+                        object_count=plate.object_count,
+                    )
+                )
+
         if print_result["success"]:
             return JobStartResponse(
                 success=True,
                 message="Job completed successfully - print started",
                 job_steps=job_steps,
+                updated_plates=plates_response if plates_response else None,
             )
         else:
             return JobStartResponse(
@@ -1261,6 +1364,7 @@ async def start_basic_job(request: JobStartRequest):
                 message="Job failed at print initiation step",
                 job_steps=job_steps,
                 error_details=print_result["details"],
+                updated_plates=plates_response if plates_response else None,
             )
 
     except HTTPException:
