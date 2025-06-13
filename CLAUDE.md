@@ -189,11 +189,6 @@ BAMBU_PRINTERS='[{"name":"X1C","ip":"192.168.1.100","access_code":"12345678"}]'
 
 - Running tests and pre-commits should happen inside the dev container
 
-### Commit Notes
-
-- If precommits are passing in the dev container, commit with noverify from outside of the container
-
 ## Memories
 
-- The bambu studio cli is documented here: https://github.com/bambulab/BambuStudio/wiki/Command-Line-Usage. Use this documentation to help guide calls to the CLI.
-- Actually, use `bambu-studio-cli --help` as the canonical documentation for the cli's functionality. Where something is already built into the CLI, use it!
+- Use `bambu-studio-cli --help` as the canonical documentation for the cli's functionality. Where something is already built into the CLI, use it! There is some additional (but incomplete) documentation here that has some examples of usage: https://github.com/bambulab/BambuStudio/wiki/Command-Line-Usage
