@@ -23,6 +23,7 @@
   --color-text-secondary: #666666;
   --color-text-muted: #6c757d;
   --color-text-inverse: #ffffff;
+  --color-text-header: #ffffff;
 
   --color-bg-primary: #ffffff;
   --color-bg-secondary: #f8f9fa;
@@ -74,6 +75,7 @@
   --color-text-secondary: #adb5bd;
   --color-text-muted: #6c757d;
   --color-text-inverse: #212529;
+  --color-text-header: #ffffff;
 
   --color-bg-primary: #212529;
   --color-bg-secondary: #1a1d20;
@@ -231,6 +233,7 @@ button:focus-visible {
   border: none;
   border-radius: 12px;
   background: transparent;
+  color: var(--color-text-primary);
   cursor: pointer;
   transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   position: relative;

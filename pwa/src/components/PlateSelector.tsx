@@ -133,8 +133,8 @@ function PlateSelector({
                       height: '120px',
                       objectFit: 'contain',
                       borderRadius: '4px',
-                      backgroundColor: '#f8f9fa',
                     }}
+                    className="plate-thumbnail-image"
                     onError={e => {
                       // Fallback to general thumbnail
                       const img = e.target as HTMLImageElement;

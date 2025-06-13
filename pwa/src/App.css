@@ -10,7 +10,7 @@
 /* Header */
 header {
   background: var(--color-bg-header);
-  color: var(--color-text-inverse);
+  color: var(--color-text-header);
   padding: 1.5rem 1rem;
   box-shadow: 0 2px 4px var(--color-shadow);
   display: flex;
@@ -57,6 +57,15 @@ header p {
 .header-printer-selector .current-printer-display .printer-name,
 .header-printer-selector .current-printer-display .printer-ip {
   color: #1b5e20; /* Dark green for better contrast, matches runtime-badge text */
+}
+
+/* Dark mode override for header current printer display */
+:root.theme-dark
+  .header-printer-selector
+  .current-printer-display
+  .printer-name,
+:root.theme-dark .header-printer-selector .current-printer-display .printer-ip {
+  color: var(--color-text-primary); /* Light text for dark mode */
 }
 
 .header-printer-selector .printer-ip {
@@ -303,21 +312,23 @@ footer p {
 .model-file-input {
   width: 100%;
   padding: 0.75rem;
-  border: 2px dashed #e0e0e0;
+  border: 2px dashed var(--color-border-primary);
   border-radius: 6px;
   font-size: 1rem;
-  background: #fafafa;
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
   cursor: pointer;
   transition: border-color 0.2s ease;
 }
 
 .model-file-input:hover:not(:disabled) {
-  border-color: #4caf50;
-  background: #f3f8f3;
+  border-color: var(--color-primary);
+  background: var(--color-bg-accent);
 }
 
 .model-file-input:disabled {
-  background-color: #f5f5f5;
+  background-color: var(--color-bg-tertiary);
+  color: var(--color-text-muted);
   cursor: not-allowed;
 }
 
@@ -326,8 +337,8 @@ footer p {
   flex-direction: column;
   gap: 0.5rem;
   padding: 1rem;
-  background: #f3f8f3;
-  border: 1px solid #e8f5e9;
+  background: var(--color-bg-accent);
+  border: 1px solid var(--color-border-secondary);
   border-radius: 6px;
 }
 
@@ -338,7 +349,7 @@ footer p {
 
 .file-size {
   font-size: 0.9rem;
-  color: #666;
+  color: var(--color-text-secondary);
 }
 
 /* Upload Progress */
@@ -366,7 +377,7 @@ footer p {
   transform: translate(-50%, -50%);
   font-size: 0.8rem;
   font-weight: 500;
-  color: #333;
+  color: var(--color-text-inverse);
 }
 
 .slice-and-print-button {
@@ -437,7 +448,7 @@ footer p {
 
 /* AMS Status Display Component */
 .ams-status-display {
-  background: white;
+  background: var(--color-bg-primary);
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   padding: 1.5rem;
@@ -481,6 +492,12 @@ footer p {
   cursor: not-allowed;
 }
 
+/* Dark mode override for disabled refresh button */
+:root.theme-dark .refresh-button:disabled {
+  background: #4a4a4a;
+  color: var(--color-text-secondary);
+}
+
 .ams-content .status-message {
   color: #155724;
   background: #d4edda;
@@ -505,7 +522,7 @@ footer p {
 
 .ams-unit h4 {
   margin: 0 0 0.75rem 0;
-  color: #333;
+  color: var(--color-text-primary);
   font-size: 1rem;
 }
 
@@ -516,8 +533,8 @@ footer p {
 }
 
 .filament-slot {
-  background: white;
-  border: 1px solid #ddd;
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border-secondary);
   border-radius: 4px;
   padding: 0.75rem;
 }
@@ -531,7 +548,7 @@ footer p {
 
 .slot-id {
   font-weight: 600;
-  color: #666;
+  color: var(--color-text-secondary);
   font-size: 0.9rem;
 }
 
@@ -561,12 +578,12 @@ footer p {
 
 .color-label {
   font-size: 0.9rem;
-  color: #333;
+  color: var(--color-text-primary);
 }
 
 .material-id {
   font-size: 0.8rem;
-  color: #666;
+  color: var(--color-text-secondary);
   margin-top: 0.25rem;
 }
 
@@ -577,7 +594,7 @@ footer p {
 .no-data {
   text-align: center;
   padding: 1rem;
-  color: #666;
+  color: var(--color-text-secondary);
   font-style: italic;
 }
 
@@ -600,7 +617,7 @@ footer p {
 
 /* Filament Requirements Display Component */
 .filament-requirements-display {
-  background: white;
+  background: var(--color-bg-primary);
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   padding: 1.5rem;
@@ -627,7 +644,7 @@ footer p {
 }
 
 .requirement-count {
-  color: #333;
+  color: var(--color-text-primary);
   font-weight: 500;
 }
 
@@ -642,7 +659,7 @@ footer p {
 }
 
 .no-count {
-  color: #666;
+  color: var(--color-text-secondary);
   font-style: italic;
 }
 
@@ -705,7 +722,7 @@ footer p {
 .no-requirements {
   text-align: center;
   padding: 1rem;
-  color: #666;
+  color: var(--color-text-secondary);
   font-style: italic;
 }
 
@@ -769,6 +786,12 @@ footer p {
   cursor: not-allowed;
 }
 
+/* Dark mode override for disabled secondary button */
+:root.theme-dark .secondary-button:disabled {
+  background: #4a4a4a;
+  color: var(--color-text-secondary);
+}
+
 /* Configuration Section Styles */
 .configuration-section {
   margin: 1.5rem 0;
@@ -789,7 +812,7 @@ footer p {
 
 .configuration-header p {
   margin: 0;
-  color: #6c757d;
+  color: var(--color-text-secondary);
   font-size: 0.9rem;
 }
 
@@ -797,9 +820,9 @@ footer p {
 .build-plate-selector {
   margin: 1.5rem 0;
   padding: 1rem;
-  background: white;
+  background: var(--color-bg-primary);
   border-radius: 6px;
-  border: 1px solid #dee2e6;
+  border: 1px solid var(--color-border-secondary);
 }
 
 .build-plate-selector .selector-header h4 {
@@ -843,9 +866,9 @@ footer p {
 .filament-mapping-config {
   margin: 1.5rem 0;
   padding: 1rem;
-  background: white;
+  background: var(--color-bg-primary);
   border-radius: 6px;
-  border: 1px solid #dee2e6;
+  border: 1px solid var(--color-border-secondary);
 }
 
 .mapping-header h4 {
@@ -1009,10 +1032,11 @@ footer p {
 .ams-slot-select {
   width: 100%;
   padding: 0.5rem;
-  border: 1px solid #ced4da;
+  border: 1px solid var(--color-border-secondary);
   border-radius: 4px;
   font-size: 0.9rem;
-  background: white;
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
 }
 
 .ams-slot-select:focus {
@@ -1122,8 +1146,8 @@ footer p {
   top: 100%;
   left: 0;
   right: 0;
-  background: white;
-  border: 1px solid #ced4da;
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border-secondary);
   border-radius: 6px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   z-index: 1000;
@@ -1396,7 +1420,7 @@ footer p {
 
 .section-value {
   font-size: 0.9rem;
-  color: #6c757d;
+  color: var(--color-text-secondary);
 }
 
 .build-plate-value {
@@ -1590,16 +1614,16 @@ footer p {
 /* Printer Selector Styles */
 .printer-selector {
   margin: 1rem 0;
-  background: white;
+  background: var(--color-bg-primary);
   border-radius: 8px;
-  border: 1px solid #e9ecef;
+  border: 1px solid var(--color-border-secondary);
   overflow: hidden;
 }
 
 .current-printer-display {
   padding: 1rem;
-  background: #f8f9fa;
-  border-bottom: 1px solid #e9ecef;
+  background: var(--color-bg-secondary);
+  border-bottom: 1px solid var(--color-border-secondary);
 }
 
 .printer-status {
@@ -1635,12 +1659,12 @@ footer p {
 
 .printer-name {
   font-weight: 600;
-  color: #343a40;
+  color: var(--color-text-primary);
   font-size: 0.95rem;
 }
 
 .printer-ip {
-  color: #6c757d;
+  color: var(--color-text-secondary);
   font-size: 0.85rem;
   font-family: monospace;
 }
@@ -1686,6 +1710,11 @@ footer p {
   font-weight: 500;
 }
 
+/* Dark mode overrides for printer text elements */
+:root.theme-dark .no-printer-text {
+  color: #f8d7da;
+}
+
 .expand-button {
   background: #6c757d;
   color: white;
@@ -1708,6 +1737,12 @@ footer p {
   background: #cccccc;
   color: #3e3e3e; /* Dark text for proper contrast on light background */
   cursor: not-allowed;
+}
+
+/* Dark mode override for disabled expand button */
+:root.theme-dark .expand-button:disabled {
+  background: #4a4a4a;
+  color: var(--color-text-secondary);
 }
 
 .list-button {
@@ -1734,10 +1769,16 @@ footer p {
   cursor: not-allowed;
 }
 
+/* Dark mode override for disabled list button */
+:root.theme-dark .list-button:disabled {
+  background: #4a4a4a;
+  color: var(--color-text-secondary);
+}
+
 .printer-list-panel {
   padding: 1.5rem;
-  background: white;
-  border-top: 1px solid #e9ecef;
+  background: var(--color-bg-primary);
+  border-top: 1px solid var(--color-border-secondary);
 }
 
 .printer-list {
@@ -1751,8 +1792,8 @@ footer p {
   justify-content: space-between;
   align-items: center;
   padding: 1rem;
-  background: #f8f9fa;
-  border: 1px solid #e9ecef;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-secondary);
   border-radius: 6px;
   transition: all 0.3s ease;
 }
@@ -1768,6 +1809,20 @@ footer p {
 
 .printer-item.active:hover {
   background: #d4edda;
+}
+
+/* Dark mode overrides for printer item states */
+:root.theme-dark .printer-item.active {
+  background: #1a4d1a;
+  border-color: #28a745;
+}
+
+:root.theme-dark .printer-item:hover {
+  background: var(--color-bg-tertiary);
+}
+
+:root.theme-dark .printer-item.active:hover {
+  background: #236f23;
 }
 
 .printer-info-section {
@@ -1810,6 +1865,12 @@ footer p {
   cursor: not-allowed;
 }
 
+/* Dark mode override for disabled switch button */
+:root.theme-dark .switch-button:disabled {
+  background: #4a4a4a;
+  color: var(--color-text-secondary);
+}
+
 .delete-button {
   background: #dc3545;
   color: white;
@@ -1829,6 +1890,12 @@ footer p {
   background: #cccccc;
   color: #3e3e3e;
   cursor: not-allowed;
+}
+
+/* Dark mode override for disabled delete button */
+:root.theme-dark .delete-button:disabled {
+  background: #4a4a4a;
+  color: var(--color-text-secondary);
 }
 
 .active-badge {
@@ -1852,15 +1919,15 @@ footer p {
 .no-printers-message {
   text-align: center;
   padding: 2rem;
-  color: #6c757d;
-  background: #f8f9fa;
+  color: var(--color-text-secondary);
+  background: var(--color-bg-secondary);
   border-radius: 6px;
-  border: 1px solid #e9ecef;
+  border: 1px solid var(--color-border-secondary);
 }
 
 .printer-selection-panel {
   padding: 1.5rem;
-  background: white;
+  background: var(--color-bg-primary);
 }
 
 .panel-header {
@@ -1883,9 +1950,9 @@ footer p {
 .manual-entry-section {
   margin-bottom: 2rem;
   padding: 1rem;
-  background: #f8f9fa;
+  background: var(--color-bg-secondary);
   border-radius: 6px;
-  border: 1px solid #e9ecef;
+  border: 1px solid var(--color-border-secondary);
 }
 
 .section-header {
@@ -1928,6 +1995,12 @@ footer p {
   cursor: not-allowed;
 }
 
+/* Dark mode override for disabled discover button */
+:root.theme-dark .discover-button:disabled {
+  background: #4a4a4a;
+  color: var(--color-text-secondary);
+}
+
 .discovered-printers {
   margin-top: 1rem;
   display: flex;
@@ -1964,16 +2037,16 @@ footer p {
 .printer-primary .printer-ip {
   font-family: monospace;
   font-weight: 600;
-  color: #343a40;
+  color: var(--color-text-primary);
 }
 
 .printer-primary .printer-hostname {
-  color: #6c757d;
+  color: var(--color-text-secondary);
   font-size: 0.9rem;
 }
 
 .printer-model {
-  color: #17a2b8;
+  color: var(--color-accent);
   font-size: 0.85rem;
   font-weight: 500;
 }
@@ -1997,6 +2070,12 @@ footer p {
   background: #cccccc;
   color: #3e3e3e; /* Dark text for proper contrast on light background */
   cursor: not-allowed;
+}
+
+/* Dark mode override for disabled select printer button */
+:root.theme-dark .select-printer-button:disabled {
+  background: #4a4a4a;
+  color: var(--color-text-secondary);
 }
 
 .discovery-error {
@@ -2130,6 +2209,12 @@ footer p {
   background: #cccccc;
   color: #3e3e3e; /* Dark text for proper contrast on light background */
   cursor: not-allowed;
+}
+
+/* Dark mode override for disabled set manual button */
+:root.theme-dark .set-manual-button:disabled {
+  background: #4a4a4a;
+  color: var(--color-text-secondary);
 }
 
 .status-message {
@@ -2676,8 +2761,8 @@ footer p {
 
 /* Model Preview Component Styles */
 .model-preview {
-  background: white;
-  border: 1px solid #e9ecef;
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border-secondary);
   border-radius: 8px;
   padding: 1.5rem;
   margin: 1rem 0;
@@ -2790,9 +2875,9 @@ footer p {
 .plate-selector {
   margin: 1.5rem 0;
   padding: 1rem;
-  background: white;
+  background: var(--color-bg-primary);
   border-radius: 6px;
-  border: 1px solid #dee2e6;
+  border: 1px solid var(--color-border-secondary);
 }
 
 .plate-selector .selector-header h4 {
@@ -2837,15 +2922,15 @@ footer p {
 .all-plates-summary {
   margin-top: 1rem;
   padding: 1rem;
-  background: #f8f9fa;
-  border: 1px solid #e9ecef;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-secondary);
   border-radius: 6px;
 }
 
 .selected-plate-details h5,
 .all-plates-summary h5 {
   margin: 0 0 1rem 0;
-  color: #495057;
+  color: var(--color-text-primary);
   font-size: 1rem;
 }
 
@@ -2863,18 +2948,18 @@ footer p {
 
 .detail-label {
   font-weight: 600;
-  color: #6c757d;
+  color: var(--color-text-secondary);
   font-size: 0.85rem;
 }
 
 .detail-value {
   font-weight: 500;
-  color: #343a40;
+  color: var(--color-text-primary);
   font-size: 0.9rem;
 }
 
 .plate-indicator {
-  color: #6c757d;
+  color: var(--color-text-secondary);
   font-weight: normal;
   font-size: 0.9rem;
 }
@@ -2903,7 +2988,7 @@ footer p {
 }
 
 .plate-thumbnail-card {
-  background: white;
+  background: var(--color-bg-primary);
   border: 2px solid var(--color-border-secondary);
   border-radius: 8px;
   padding: 0.75rem;
@@ -2949,7 +3034,7 @@ footer p {
   margin-bottom: 0.5rem;
   border-radius: 4px;
   overflow: hidden;
-  background: #f8f9fa;
+  background: var(--color-bg-secondary);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2984,13 +3069,21 @@ footer p {
 
 /* All Plates Option Styles */
 .plate-thumbnail-card.all-plates-option {
-  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  background: linear-gradient(
+    135deg,
+    var(--color-bg-secondary) 0%,
+    var(--color-bg-tertiary) 100%
+  );
   border: 2px dashed var(--color-border-secondary);
 }
 
 .plate-thumbnail-card.all-plates-option:hover {
   border-color: var(--color-primary);
-  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  background: linear-gradient(
+    135deg,
+    var(--color-bg-secondary) 0%,
+    var(--color-bg-tertiary) 100%
+  );
 }
 
 .plate-thumbnail-card.all-plates-option.selected {
@@ -3007,6 +3100,10 @@ footer p {
   align-items: center;
   justify-content: center;
   background: transparent;
+}
+
+.plate-thumbnail-image {
+  background-color: var(--color-bg-secondary);
 }
 
 .all-plates-icon {
@@ -3091,7 +3188,7 @@ footer p {
 }
 
 .detail-section {
-  background: white;
+  background: var(--color-bg-primary);
   border: 1px solid var(--color-border-secondary);
   border-radius: 6px;
   padding: 1rem;
