@@ -145,6 +145,13 @@ function SliceAndPrint() {
     hasMultiplePlates: boolean;
     modelUrl: string;
   }) => {
+    console.log('handleModelAnalyzed called with:', {
+      fileId: data.fileId,
+      platesCount: data.plates.length,
+      hasMultiplePlates: data.hasMultiplePlates,
+      plateIndices: data.plates.map(p => p.index)
+    });
+    
     setCurrentFileId(data.fileId);
     setFilamentRequirements(data.filamentRequirements);
     setPlates(data.plates);

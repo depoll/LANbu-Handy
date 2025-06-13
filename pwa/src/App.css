@@ -2920,9 +2920,10 @@ footer p {
 }
 
 .plate-thumbnail-card.selected {
-  border-color: var(--color-primary);
-  background: rgba(40, 167, 69, 0.05);
-  box-shadow: 0 4px 12px rgba(40, 167, 69, 0.2);
+  border-color: var(--color-primary) !important;
+  background: rgba(40, 167, 69, 0.2) !important;
+  box-shadow: 0 4px 12px rgba(40, 167, 69, 0.4) !important;
+  border-width: 3px !important;
 }
 
 .plate-thumbnail-card.selected::before {
@@ -2932,14 +2933,16 @@ footer p {
   right: 0.5rem;
   background: var(--color-primary);
   color: white;
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.75rem;
+  font-size: 0.9rem;
   font-weight: bold;
+  z-index: 10;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 .thumbnail-image {
