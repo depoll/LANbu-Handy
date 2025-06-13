@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import ModelPreview from './ModelPreview';
 import OperationProgress, { OperationStep } from './OperationProgress';
+import SliceProgressTracker from './SliceProgressTracker';
 import { useToast } from '../hooks/useToast';
 import {
   ModelSubmissionResponse,
@@ -24,6 +25,7 @@ interface ModelTabProps {
   filamentMappings: FilamentMapping[];
   isProcessing: boolean;
   onProcessingChange: (processing: boolean) => void;
+  isInitialSlicing?: boolean;
 }
 
 export function ModelTab({
@@ -35,6 +37,7 @@ export function ModelTab({
   filamentMappings,
   isProcessing,
   onProcessingChange,
+  isInitialSlicing = false,
 }: ModelTabProps) {
   const [modelUrl, setModelUrl] = useState('');
   const [inputMode, setInputMode] = useState<'url' | 'file'>('url');
@@ -527,6 +530,15 @@ export function ModelTab({
           title="Analysis Progress"
           steps={operationSteps}
           className="workflow-section"
+        />
+      )}
+
+      {/* Initial Slice Progress Tracker */}
+      {isInitialSlicing && plates.length > 0 && (
+        <SliceProgressTracker
+          isSlicing={isInitialSlicing}
+          plates={plates}
+          selectedPlateIndex={null}
         />
       )}
 

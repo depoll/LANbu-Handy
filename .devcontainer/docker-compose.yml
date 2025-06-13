@@ -3,13 +3,12 @@ services:
     build:
       context: ..
       dockerfile: .devcontainer/Dockerfile
-      platforms:
-        - linux/amd64
-    platform: linux/amd64
     volumes:
       - ..:/workspace:cached
       - /var/run/docker.sock:/var/run/docker.sock
       - claude:/claude
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
     command: sleep infinity
     ports:
       - '8000:8000'

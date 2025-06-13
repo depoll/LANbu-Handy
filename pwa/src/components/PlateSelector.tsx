@@ -1,9 +1,11 @@
+import { useState, useEffect, useCallback } from 'react';
 import {
   PlateInfo,
   FilamentRequirement,
   AMSStatusResponse,
   FilamentMapping,
 } from '../types/api';
+import StreamingSliceTracker from './StreamingSliceTracker';
 
 interface PlateSelectorProps {
   plates: PlateInfo[];
@@ -21,6 +23,7 @@ interface PlateSelectorProps {
   onMappingChange?: (mappings: FilamentMapping[]) => void;
   selectedBuildPlate?: string;
   onBuildPlateSelect?: (plate: string) => void;
+  onPlatesUpdate?: (plates: PlateInfo[]) => void;
 }
 
 function PlateSelector({
@@ -37,20 +40,149 @@ function PlateSelector({
   filamentMappings = [],
   selectedBuildPlate,
   onBuildPlateSelect,
+  onPlatesUpdate,
 }: PlateSelectorProps) {
+  const [isSlicing, setIsSlicing] = useState(false);
+  const [lastSliceConfig, setLastSliceConfig] = useState<string>('');
+  const [hasSliced, setHasSliced] = useState(false);
+
+  // Check if configuration is complete
+  const isConfigurationComplete = useCallback((): boolean => {
+    // Must have a valid file ID and plates
+    if (!fileId || !plates || plates.length === 0) {
+      console.log('Config incomplete: missing fileId or plates');
+      return false;
+    }
+
+    // Must have a build plate selected
+    if (!selectedBuildPlate) {
+      console.log('Config incomplete: no build plate selected');
+      return false;
+    }
+
+    const activeFilamentRequirements =
+      plateFilamentRequirements || filamentRequirements;
+
+    // Configuration is complete when we have a file and build plate
+    // Filament mapping is optional - by default slicer uses settings from the 3MF file
+    // Only when filament mappings are configured do we override with AMS-specific settings
+    console.log(
+      'Config complete: file and build plate ready, using 3MF embedded settings'
+    );
+    return true;
+  }, [
+    fileId,
+    plates,
+    selectedBuildPlate,
+    plateFilamentRequirements,
+    filamentRequirements,
+    filamentMappings,
+  ]);
+
+  // Generate config hash to detect changes
+  const generateConfigHash = useCallback(() => {
+    return JSON.stringify({
+      fileId: fileId,
+      mappings: [...filamentMappings].sort(
+        (a, b) => a.filament_index - b.filament_index
+      ),
+      buildPlate: selectedBuildPlate,
+      plateIndex: selectedPlateIndex,
+    });
+  }, [fileId, filamentMappings, selectedBuildPlate, selectedPlateIndex]);
+
+  // Trigger sequential slicing when configuration is complete
+  const triggerSequentialSlicing = useCallback(() => {
+    console.log('triggerSequentialSlicing called:', {
+      fileId,
+      isSlicing,
+      configComplete: isConfigurationComplete(),
+    });
+    if (!fileId || isSlicing) return;
+
+    // Only slice if configuration is complete
+    if (!isConfigurationComplete()) return;
+
+    console.log(
+      'Setting isSlicing to true - StreamingSliceTracker should start'
+    );
+    // The StreamingSliceTracker will handle the actual slicing
+    setIsSlicing(true);
+  }, [fileId, isSlicing, isConfigurationComplete]);
+
+  // Auto-slice when configuration changes (simplified logic)
+  useEffect(() => {
+    console.log('Auto-slice effect triggered:', {
+      configComplete: isConfigurationComplete(),
+      isSlicing,
+      fileId,
+      lastSliceConfig,
+    });
+
+    // Only proceed if configuration is truly complete
+    if (!isConfigurationComplete()) {
+      console.log('Auto-slice: config not complete, returning');
+      return;
+    }
+
+    // Don't auto-slice if already slicing
+    if (isSlicing) {
+      console.log('Auto-slice: already slicing, returning');
+      return;
+    }
+
+    const configHash = generateConfigHash();
+    console.log('Auto-slice: checking config hash:', {
+      configHash,
+      lastSliceConfig,
+    });
+
+    if (configHash !== lastSliceConfig && configHash !== '""' && !hasSliced) {
+      // Ignore empty configs and don't re-slice
+      console.log(
+        'Auto-slice: config changed and not yet sliced, setting immediate timer'
+      );
+      setLastSliceConfig(configHash);
+
+      // Use immediate execution with a ref to prevent race conditions
+      const timer = setTimeout(() => {
+        console.log('Auto-slice timer fired, triggering slice');
+        setHasSliced(true); // Mark that we've sliced for this config
+        triggerSequentialSlicing();
+      }, 500); // Very short delay
+
+      return () => {
+        console.log('Auto-slice timer cleanup');
+        clearTimeout(timer);
+      };
+    } else {
+      console.log('Auto-slice: not triggering', {
+        configChanged: configHash !== lastSliceConfig,
+        notEmpty: configHash !== '""',
+        notSliced: !hasSliced,
+      });
+    }
+  }, [fileId, selectedBuildPlate, selectedPlateIndex, hasSliced]); // Include hasSliced to prevent re-triggering
+
+  // Reset hasSliced when file changes
+  useEffect(() => {
+    setHasSliced(false);
+    console.log('File changed, resetting hasSliced flag');
+  }, [fileId]);
+
   if (!plates || plates.length <= 1) {
     return null; // Don't show selector for single plate models
   }
 
   const formatTime = (seconds?: number): string => {
-    if (!seconds) return 'After slice';
+    if (!seconds) return isSlicing ? 'Calculating...' : 'After slice';
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
     return `${hours}h ${minutes}m`;
   };
 
   const formatWeight = (grams?: number): string => {
-    if (!grams) return 'After slice';
+    if (!grams) return isSlicing ? 'Calculating...' : 'After slice';
     return `${grams.toFixed(1)}g`;
   };
 
@@ -80,6 +212,18 @@ function PlateSelector({
         <h4>Plate Selection</h4>
         <p>Choose to slice/print a specific plate or all plates at once</p>
       </div>
+
+      {/* Streaming Slice Tracker */}
+      <StreamingSliceTracker
+        isSlicing={isSlicing}
+        plates={plates}
+        selectedPlateIndex={selectedPlateIndex}
+        currentFileId={fileId || ''}
+        filamentMappings={filamentMappings || []}
+        selectedBuildPlate={selectedBuildPlate || 'textured_pei_plate'}
+        onPlatesUpdate={onPlatesUpdate}
+        onSliceComplete={() => setIsSlicing(false)}
+      />
 
       {/* Visual Plate Selection Grid */}
       {fileId && (
@@ -367,6 +511,22 @@ function PlateSelector({
                                 {hasBuildPlate ? '✓' : '○'}
                               </span>
                               <span>Build plate</span>
+                            </div>
+                            <div className="status-item">
+                              <span
+                                className={`status-indicator ${isSlicing ? 'calculating' : isConfigurationComplete() && !isSlicing ? 'complete' : 'pending'}`}
+                              >
+                                {isSlicing
+                                  ? '🔄'
+                                  : isConfigurationComplete() && !isSlicing
+                                    ? '✓'
+                                    : '○'}
+                              </span>
+                              <span>
+                                {isSlicing
+                                  ? 'Calculating estimates...'
+                                  : 'Print estimates'}
+                              </span>
                             </div>
                           </div>
                         );

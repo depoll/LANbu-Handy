@@ -10,6 +10,8 @@ import {
   AMSStatusResponse,
   FilamentMapping,
   PlateInfo,
+  SliceRequest,
+  SliceResponse,
 } from '../types/api';
 import { OperationStep } from './OperationProgress';
 
@@ -46,6 +48,7 @@ function SliceAndPrint() {
   const [statusMessages, setStatusMessages] = useState<string[]>([]);
   const [operationSteps] = useState<OperationStep[]>([]);
   const [showOperationProgress] = useState(false);
+  const [isInitialSlicing, setIsInitialSlicing] = useState(false);
 
   // Model URL for quick slice and print
   const [modelUrl, setModelUrl] = useState('');
@@ -139,6 +142,71 @@ function SliceAndPrint() {
     }
   };
 
+  const performInitialSlice = async (fileId: string) => {
+    try {
+      setIsInitialSlicing(true);
+      addStatusMessage('🔄 Getting initial time and filament estimates...');
+
+      // Use the default slice endpoint for initial estimates with timeout
+      const request: SliceRequest = { file_id: fileId };
+
+      // Add abort controller for timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
+      const response = await fetch('/api/slice/defaults', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(request),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        console.warn('Initial slice failed:', response.statusText);
+        addStatusMessage(
+          '⚠ Could not get initial estimates - will calculate after configuration'
+        );
+        return;
+      }
+
+      const result: SliceResponse = await response.json();
+
+      if (result.success && result.updated_plates) {
+        setPlates(result.updated_plates);
+        addStatusMessage(
+          '✅ Initial estimates ready - showing time and filament usage'
+        );
+        showInfo(
+          'Initial estimates calculated successfully',
+          'Estimates Ready'
+        );
+      } else {
+        console.warn('Initial slice failed:', result.message);
+        addStatusMessage(
+          '⚠ Could not get initial estimates - will calculate after configuration'
+        );
+      }
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        console.warn('Initial slice timed out');
+        addStatusMessage(
+          '⚠ Initial slice timed out - will calculate after configuration'
+        );
+      } else {
+        console.warn('Initial slice error:', error);
+        addStatusMessage(
+          '⚠ Could not get initial estimates - will calculate after configuration'
+        );
+      }
+    } finally {
+      setIsInitialSlicing(false);
+    }
+  };
+
   const handleModelAnalyzed = (data: {
     fileId: string;
     filamentRequirements: FilamentRequirement | null;
@@ -168,6 +236,9 @@ function SliceAndPrint() {
 
     // Automatically switch to configuration tab when model is analyzed
     setActiveTab('configuration');
+
+    // Let the Configuration tab handle slicing with streaming progress
+    // No initial slice needed here - streaming slice will happen automatically in PlateSelector
   };
 
   const handleAMSStatusUpdate = (status: AMSStatusResponse) => {
@@ -228,6 +299,7 @@ function SliceAndPrint() {
           filamentMappings={filamentMappings}
           isProcessing={isProcessing}
           onProcessingChange={setIsProcessing}
+          isInitialSlicing={isInitialSlicing}
         />
       ),
     },
@@ -253,6 +325,7 @@ function SliceAndPrint() {
           onPlateSelect={handlePlateSelection}
           isProcessing={isProcessing}
           currentFileId={currentFileId}
+          onPlatesUpdate={setPlates}
         />
       ),
     },

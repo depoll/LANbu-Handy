@@ -700,3 +700,191 @@
     padding: 0.375rem;
   }
 }
+
+/* Streaming Progress Tiles */
+.streaming-slice-tracker {
+  margin: 1rem 0;
+  padding: 1rem;
+  background: var(--color-bg-secondary);
+  border-radius: 8px;
+  border: 1px solid var(--color-border-secondary);
+}
+
+.streaming-slice-tracker .progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--color-border-secondary);
+}
+
+.streaming-slice-tracker .progress-header h5 {
+  margin: 0;
+  color: var(--color-text-primary);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.streaming-slice-tracker .progress-stats {
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}
+
+.plates-progress-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.plate-progress-tile {
+  position: relative;
+  background: var(--color-bg-primary);
+  border: 2px solid var(--color-border-secondary);
+  border-radius: 8px;
+  padding: 0.75rem;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.plate-progress-tile.processing {
+  border-color: var(--color-primary);
+  box-shadow: 0 2px 8px rgba(76, 175, 80, 0.2);
+}
+
+.plate-progress-tile.completed {
+  border-color: var(--color-success);
+  background: var(--color-bg-primary);
+}
+
+.plate-progress-tile.pending {
+  border-color: var(--color-border-secondary);
+  opacity: 0.8;
+}
+
+.plate-progress-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    var(--color-primary) 0%,
+    rgba(76, 175, 80, 0.6) 100%
+  );
+  transition: width 0.3s ease;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.plate-status-header {
+  position: relative;
+  z-index: 10;
+  margin-bottom: 0.5rem;
+  display: flex;
+  justify-content: center;
+  min-height: 1.5rem;
+}
+
+.status-text {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.25rem 0.5rem;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.status-text.processing {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.status-text.completed {
+  color: var(--color-success);
+  border-color: var(--color-success);
+}
+
+.status-text.pending {
+  color: var(--color-text-secondary);
+  border-color: var(--color-border-secondary);
+}
+
+.plate-progress-tile .plate-thumbnail {
+  position: relative;
+  z-index: 5;
+  margin-bottom: 0.5rem;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--color-bg-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 120px;
+}
+
+.plate-progress-tile .plate-thumbnail img {
+  width: 100%;
+  height: 120px;
+  object-fit: contain;
+  border-radius: 4px;
+}
+
+.plate-progress-tile .plate-info {
+  position: relative;
+  z-index: 5;
+  text-align: center;
+}
+
+.plate-progress-tile .plate-name {
+  font-weight: 600;
+  color: var(--color-text-primary);
+  font-size: 0.9rem;
+  margin-bottom: 0.25rem;
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8);
+}
+
+.plate-progress-tile .plate-details {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8);
+}
+
+.plate-progress-tile .support-indicator {
+  color: var(--color-warning);
+  font-weight: 600;
+}
+
+/* Mobile responsiveness for progress tiles */
+@media (max-width: 768px) {
+  .plates-progress-grid {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  .plate-progress-tile {
+    padding: 0.5rem;
+  }
+
+  .plate-progress-tile .plate-thumbnail {
+    min-height: 100px;
+  }
+
+  .plate-progress-tile .plate-thumbnail img {
+    height: 100px;
+  }
+
+  .status-text {
+    font-size: 0.7rem;
+    padding: 0.2rem 0.4rem;
+  }
+
+  .streaming-slice-tracker .progress-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+  }
+}

@@ -25,6 +25,7 @@ interface ConfigurationTabProps {
   onPlateSelect: (plateIndex: number | null) => void;
   isProcessing: boolean;
   currentFileId: string;
+  onPlatesUpdate?: (plates: PlateInfo[]) => void;
 }
 
 export function ConfigurationTab({
@@ -42,6 +43,7 @@ export function ConfigurationTab({
   onPlateSelect,
   isProcessing,
   currentFileId,
+  onPlatesUpdate,
 }: ConfigurationTabProps) {
   const activeFilamentRequirements =
     plateFilamentRequirements || filamentRequirements;
@@ -99,6 +101,7 @@ export function ConfigurationTab({
             onMappingChange={onMappingChange}
             selectedBuildPlate={selectedBuildPlate}
             onBuildPlateSelect={onBuildPlateSelect}
+            onPlatesUpdate={onPlatesUpdate}
           />
         </div>
       ) : (
@@ -108,7 +111,9 @@ export function ConfigurationTab({
           {filamentRequirements && (
             <div className="config-section">
               <FilamentRequirementsDisplay
-                requirements={activeFilamentRequirements || filamentRequirements}
+                requirements={
+                  activeFilamentRequirements || filamentRequirements
+                }
                 className="workflow-section"
               />
             </div>
@@ -146,6 +151,10 @@ export function ConfigurationTab({
                 amsStatus={amsStatus}
                 filamentMappings={filamentMappings}
                 selectedBuildPlate={selectedBuildPlate}
+                currentFileId={currentFileId}
+                selectedPlateIndex={selectedPlateIndex}
+                plates={plates}
+                onPlatesUpdate={onPlatesUpdate}
               />
             </div>
           )}

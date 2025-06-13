@@ -56,11 +56,29 @@ export interface FilamentMapping {
   ams_slot_id: number;
 }
 
+export interface SliceRequest {
+  file_id: string;
+}
+
 export interface ConfiguredSliceRequest {
   file_id: string;
   filament_mappings: FilamentMapping[];
   build_plate_type: string;
   selected_plate_index?: number | null; // null means all plates
+}
+
+export interface StartProgressSliceRequest {
+  file_id: string;
+  filament_mappings: FilamentMapping[];
+  build_plate_type: string;
+  selected_plate_index?: number | null; // null means all plates
+}
+
+export interface StartProgressSliceResponse {
+  success: boolean;
+  message: string;
+  session_id?: string;
+  error_details?: string;
 }
 
 export interface SliceResponse {

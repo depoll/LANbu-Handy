@@ -455,3 +455,711 @@
     font-size: 0.85rem;
   }
 }
+
+/* Slice Progress Tracker Styles */
+.slice-progress-tracker {
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin: 1rem 0;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.slice-progress-tracker .progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.slice-progress-tracker .progress-header h5 {
+  margin: 0;
+  color: #495057;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.slice-progress-tracker .progress-stats {
+  font-size: 0.9rem;
+  color: #6c757d;
+  font-weight: 500;
+}
+
+.slice-progress-tracker .progress-bar-container {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.slice-progress-tracker .progress-bar {
+  flex: 1;
+  height: 12px;
+  background: #e9ecef;
+  border-radius: 6px;
+  overflow: hidden;
+  position: relative;
+}
+
+.slice-progress-tracker .progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #007bff 0%, #0056b3 100%);
+  border-radius: 6px;
+  transition: width 0.5s ease;
+  position: relative;
+}
+
+.slice-progress-tracker .progress-fill::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.3) 50%,
+    transparent 100%
+  );
+  animation: progress-shimmer 2s infinite;
+}
+
+@keyframes progress-shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.slice-progress-tracker .progress-percentage {
+  font-weight: 600;
+  color: #495057;
+  min-width: 3rem;
+  text-align: right;
+}
+
+.slice-progress-tracker .progress-phase {
+  color: #6c757d;
+  font-size: 0.9rem;
+  margin-bottom: 1rem;
+  font-style: italic;
+}
+
+.slice-progress-tracker .plates-status {
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e9ecef;
+}
+
+.slice-progress-tracker .plates-status h6 {
+  margin: 0 0 0.75rem 0;
+  color: #495057;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.slice-progress-tracker .plates-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.slice-progress-tracker .plate-status-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid #e9ecef;
+}
+
+.slice-progress-tracker .plate-icon {
+  font-size: 1.2rem;
+}
+
+.slice-progress-tracker .plate-info {
+  flex: 1;
+}
+
+.slice-progress-tracker .plate-name {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #495057;
+  margin-bottom: 0.25rem;
+}
+
+.slice-progress-tracker .plate-objects {
+  font-size: 0.75rem;
+  color: #6c757d;
+}
+
+.slice-progress-tracker .support-indicator {
+  color: #ffc107;
+  font-weight: 500;
+}
+
+.slice-progress-tracker .plate-status-indicator {
+  font-size: 1rem;
+}
+
+.slice-progress-tracker .progress-footer {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e9ecef;
+  text-align: center;
+}
+
+.slice-progress-tracker .progress-footer small {
+  color: #6c757d;
+  line-height: 1.4;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .slice-progress-tracker {
+    padding: 1rem;
+    margin: 0.75rem 0;
+  }
+
+  .slice-progress-tracker .progress-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .slice-progress-tracker .progress-bar-container {
+    gap: 0.75rem;
+  }
+
+  .slice-progress-tracker .plates-grid {
+    gap: 0.75rem;
+  }
+
+  .slice-progress-tracker .plate-status-item {
+    padding: 0.75rem;
+  }
+}
+
+/* Sequential Plate Slice Tracker Styles */
+.sequential-plate-slice-tracker {
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin: 1rem 0;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.sequential-plate-slice-tracker .progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.sequential-plate-slice-tracker .progress-header h5 {
+  margin: 0;
+  color: #495057;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.sequential-plate-slice-tracker .progress-stats {
+  font-size: 0.9rem;
+  color: #6c757d;
+  font-weight: 500;
+}
+
+.sequential-plate-slice-tracker .overall-progress {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.sequential-plate-slice-tracker .progress-bar {
+  flex: 1;
+  height: 12px;
+  background: #e9ecef;
+  border-radius: 6px;
+  overflow: hidden;
+  position: relative;
+}
+
+.sequential-plate-slice-tracker .progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #28a745 0%, #20c997 100%);
+  border-radius: 6px;
+  transition: width 0.5s ease;
+}
+
+.sequential-plate-slice-tracker .progress-percentage {
+  font-weight: 600;
+  color: #495057;
+  min-width: 3rem;
+  text-align: right;
+}
+
+.sequential-plate-slice-tracker .plates-progress-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.sequential-plate-slice-tracker .plate-progress-card {
+  background: white;
+  border: 2px solid #e9ecef;
+  border-radius: 8px;
+  padding: 1rem;
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.sequential-plate-slice-tracker .plate-progress-card.pending {
+  border-color: #e9ecef;
+  opacity: 0.7;
+}
+
+.sequential-plate-slice-tracker .plate-progress-card.processing {
+  border-color: #007bff;
+  background: linear-gradient(
+    45deg,
+    #ffffff 25%,
+    transparent 25%,
+    transparent 50%,
+    #ffffff 50%,
+    #ffffff 75%,
+    transparent 75%,
+    transparent
+  );
+  background-size: 20px 20px;
+  animation: progress-stripe 1s linear infinite;
+}
+
+.sequential-plate-slice-tracker .plate-progress-card.completed {
+  border-color: #28a745;
+  background: #f8fff9;
+}
+
+@keyframes progress-stripe {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 20px 20px;
+  }
+}
+
+.sequential-plate-slice-tracker .plate-thumbnail {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  margin: 0 auto 0.75rem;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #f8f9fa;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sequential-plate-slice-tracker .plate-thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.sequential-plate-slice-tracker .plate-overlay {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0 6px 0 6px;
+  font-size: 0.8rem;
+}
+
+.sequential-plate-slice-tracker .plate-progress-card.completed .plate-overlay {
+  background: #28a745;
+}
+
+.sequential-plate-slice-tracker .plate-progress-card.processing .plate-overlay {
+  background: #007bff;
+}
+
+.sequential-plate-slice-tracker .plate-progress-card.pending .plate-overlay {
+  background: #6c757d;
+}
+
+.sequential-plate-slice-tracker .status-icon {
+  font-size: 0.8rem;
+  filter: brightness(0) invert(1);
+}
+
+.sequential-plate-slice-tracker .plate-info {
+  text-align: center;
+}
+
+.sequential-plate-slice-tracker .plate-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #495057;
+  margin-bottom: 0.25rem;
+}
+
+.sequential-plate-slice-tracker .plate-details {
+  font-size: 0.75rem;
+  color: #6c757d;
+  margin-bottom: 0.5rem;
+}
+
+.sequential-plate-slice-tracker .support-indicator {
+  color: #ffc107;
+  font-weight: 500;
+}
+
+.sequential-plate-slice-tracker .plate-estimates {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.sequential-plate-slice-tracker .estimate {
+  font-size: 0.7rem;
+  background: #e9ecef;
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+  color: #495057;
+  font-weight: 500;
+}
+
+.sequential-plate-slice-tracker .plate-status {
+  font-size: 0.75rem;
+  color: #007bff;
+  font-weight: 500;
+  font-style: italic;
+}
+
+.sequential-plate-slice-tracker .progress-footer {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e9ecef;
+  text-align: center;
+}
+
+.sequential-plate-slice-tracker .progress-footer small {
+  color: #6c757d;
+  line-height: 1.4;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .sequential-plate-slice-tracker {
+    padding: 1rem;
+    margin: 0.75rem 0;
+  }
+
+  .sequential-plate-slice-tracker .progress-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .sequential-plate-slice-tracker .plates-progress-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 0.75rem;
+  }
+
+  .sequential-plate-slice-tracker .plate-progress-card {
+    padding: 0.75rem;
+  }
+
+  .sequential-plate-slice-tracker .plate-thumbnail {
+    width: 60px;
+    height: 60px;
+  }
+}
+
+/* Streaming Slice Tracker Styles */
+.streaming-slice-tracker {
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin: 1rem 0;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.streaming-slice-tracker .progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.streaming-slice-tracker .progress-header h5 {
+  margin: 0;
+  color: #495057;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.streaming-slice-tracker .progress-stats {
+  font-size: 0.9rem;
+  color: #6c757d;
+  font-weight: 500;
+}
+
+.streaming-slice-tracker .overall-progress {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.streaming-slice-tracker .progress-bar {
+  flex: 1;
+  height: 12px;
+  background: #e9ecef;
+  border-radius: 6px;
+  overflow: hidden;
+  position: relative;
+}
+
+.streaming-slice-tracker .progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #007bff 0%, #0056b3 100%);
+  border-radius: 6px;
+  transition: width 0.5s ease;
+  position: relative;
+}
+
+.streaming-slice-tracker .progress-fill::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.3) 50%,
+    transparent 100%
+  );
+  animation: progress-shimmer 2s infinite;
+}
+
+.streaming-slice-tracker .progress-percentage {
+  font-weight: 600;
+  color: #495057;
+  min-width: 3rem;
+  text-align: right;
+}
+
+.streaming-slice-tracker .current-phase {
+  color: #6c757d;
+  font-size: 0.9rem;
+  margin-bottom: 1.5rem;
+  font-style: italic;
+  text-align: center;
+  padding: 0.5rem;
+  background: rgba(0, 123, 255, 0.1);
+  border-radius: 6px;
+  border-left: 3px solid #007bff;
+}
+
+.streaming-slice-tracker .plates-progress-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.streaming-slice-tracker .plate-progress-card {
+  background: white;
+  border: 2px solid #e9ecef;
+  border-radius: 8px;
+  padding: 1rem;
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.streaming-slice-tracker .plate-progress-card.pending {
+  border-color: #e9ecef;
+  opacity: 0.7;
+}
+
+.streaming-slice-tracker .plate-progress-card.processing {
+  border-color: #007bff;
+  background: #f8ffff;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.1);
+}
+
+.streaming-slice-tracker .plate-progress-card.completed {
+  border-color: #28a745;
+  background: #f8fff9;
+}
+
+.streaming-slice-tracker .plate-thumbnail {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  margin: 0 auto 0.75rem;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #f8f9fa;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.streaming-slice-tracker .plate-thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.streaming-slice-tracker .plate-overlay {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0 6px 0 6px;
+  font-size: 0.8rem;
+}
+
+.streaming-slice-tracker .plate-progress-card.completed .plate-overlay {
+  background: #28a745;
+}
+
+.streaming-slice-tracker .plate-progress-card.processing .plate-overlay {
+  background: #007bff;
+}
+
+.streaming-slice-tracker .plate-progress-card.pending .plate-overlay {
+  background: #6c757d;
+}
+
+.streaming-slice-tracker .status-icon {
+  font-size: 0.8rem;
+  filter: brightness(0) invert(1);
+}
+
+.streaming-slice-tracker .plate-info {
+  text-align: center;
+}
+
+.streaming-slice-tracker .plate-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #495057;
+  margin-bottom: 0.25rem;
+}
+
+.streaming-slice-tracker .plate-details {
+  font-size: 0.75rem;
+  color: #6c757d;
+  margin-bottom: 0.5rem;
+}
+
+.streaming-slice-tracker .support-indicator {
+  color: #ffc107;
+  font-weight: 500;
+}
+
+.streaming-slice-tracker .plate-progress-bar {
+  margin-top: 0.5rem;
+}
+
+.streaming-slice-tracker .progress-bar-mini {
+  height: 6px;
+  background: #e9ecef;
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 0.25rem;
+}
+
+.streaming-slice-tracker .progress-fill-mini {
+  height: 100%;
+  background: linear-gradient(90deg, #007bff 0%, #0056b3 100%);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.streaming-slice-tracker .progress-text {
+  font-size: 0.7rem;
+  color: #007bff;
+  font-weight: 500;
+}
+
+.streaming-slice-tracker .plate-completion {
+  margin-top: 0.5rem;
+}
+
+.streaming-slice-tracker .completion-text {
+  font-size: 0.75rem;
+  color: #28a745;
+  font-weight: 500;
+}
+
+.streaming-slice-tracker .plate-status {
+  font-size: 0.75rem;
+  color: #6c757d;
+  font-style: italic;
+  margin-top: 0.5rem;
+}
+
+.streaming-slice-tracker .progress-footer {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e9ecef;
+  text-align: center;
+}
+
+.streaming-slice-tracker .progress-footer small {
+  color: #6c757d;
+  line-height: 1.4;
+}
+
+/* Mobile responsiveness for streaming tracker */
+@media (max-width: 768px) {
+  .streaming-slice-tracker {
+    padding: 1rem;
+    margin: 0.75rem 0;
+  }
+
+  .streaming-slice-tracker .progress-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .streaming-slice-tracker .plates-progress-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 0.75rem;
+  }
+
+  .streaming-slice-tracker .plate-progress-card {
+    padding: 0.75rem;
+  }
+
+  .streaming-slice-tracker .plate-thumbnail {
+    width: 60px;
+    height: 60px;
+  }
+}
