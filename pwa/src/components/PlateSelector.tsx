@@ -68,21 +68,15 @@ function PlateSelector({
   const getPlateName = (plate: PlateInfo): string => {
     // Use the name from the 3MF file if available
     if (plate.name) {
-      return plate.name;
+      return `Plate ${plate.index}: ${plate.name}`;
     }
     
-    // Fallback to generated meaningful plate names
-    const baseNames = [
-      'Main', 'Secondary', 'Tertiary', 'Support', 'Detail', 'Extra',
-      'Alpha', 'Beta', 'Gamma', 'Delta', 'Echo', 'Foxtrot'
-    ];
-    
-    if (plate.index <= baseNames.length) {
-      return baseNames[plate.index - 1];
-    }
-    
+    // Just show plate number when no name is available
     return `Plate ${plate.index}`;
   };
+
+  // Debug logging
+  console.log('PlateSelector render:', { selectedPlateIndex, platesCount: plates.length, plateIndices: plates.map(p => p.index) });
 
   return (
     <div className={`plate-selector ${className}`}>
@@ -133,6 +127,8 @@ function PlateSelector({
                 }`}
                 onClick={() => !disabled && onPlateSelect(plate.index)}
                 style={{ cursor: disabled ? 'not-allowed' : 'pointer' }}
+                data-plate-index={plate.index}
+                data-selected-index={selectedPlateIndex}
               >
                 <div className="thumbnail-image">
                   <img
@@ -153,7 +149,7 @@ function PlateSelector({
                   />
                 </div>
                 <div className="thumbnail-info">
-                  <div className="plate-title">{getPlateName(plate)} ({plate.index})</div>
+                  <div className="plate-title">{getPlateName(plate)}</div>
                   <div className="plate-stats">
                     <span>{plate.object_count} obj</span>
                     <span>{formatTime(plate.prediction_seconds)}</span>

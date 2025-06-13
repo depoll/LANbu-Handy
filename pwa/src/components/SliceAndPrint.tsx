@@ -152,8 +152,8 @@ function SliceAndPrint() {
     setModelSubmitted(true);
     setModelUrl(data.modelUrl); // Store the model URL for later use
 
-    // Auto-select first plate if multiple plates, or all plates if only one
-    if (data.hasMultiplePlates && data.plates.length > 0) {
+    // Auto-select first plate if any plates are available
+    if (data.plates.length > 0) {
       setSelectedPlateIndex(data.plates[0].index);
       addStatusMessage(
         `🎯 Auto-selected Plate ${data.plates[0].index} (click to change)`
