@@ -1,11 +1,12 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   PlateInfo,
   FilamentRequirement,
   AMSStatusResponse,
   FilamentMapping,
+  StartProgressSliceRequest,
+  StartProgressSliceResponse,
 } from '../types/api';
-import StreamingSliceTracker from './StreamingSliceTracker';
 
 interface PlateSelectorProps {
   plates: PlateInfo[];
@@ -24,6 +25,19 @@ interface PlateSelectorProps {
   selectedBuildPlate?: string;
   onBuildPlateSelect?: (plate: string) => void;
   onPlatesUpdate?: (plates: PlateInfo[]) => void;
+}
+
+interface SliceProgress {
+  plate_index?: number;
+  phase: string;
+  progress_percent: number;
+  message: string;
+  timestamp: number;
+  is_complete: boolean;
+  estimates?: {
+    prediction_seconds?: number;
+    weight_grams?: number;
+  };
 }
 
 function PlateSelector({
@@ -45,30 +59,40 @@ function PlateSelector({
   const [isSlicing, setIsSlicing] = useState(false);
   const [lastSliceConfig, setLastSliceConfig] = useState<string>('');
   const [hasSliced, setHasSliced] = useState(false);
+  const [, setSessionId] = useState<string | null>(null);
+  const [plateProgress, setPlateProgress] = useState<
+    Map<number, SliceProgress>
+  >(new Map());
+  const [currentPhase, setCurrentPhase] = useState<string>('');
+  const [overallProgress, setOverallProgress] = useState<number>(0);
+  const [isStreaming, setIsStreaming] = useState(false);
+  const eventSourceRef = useRef<EventSource | null>(null);
+  const [allProcessingPlates, setAllProcessingPlates] = useState<Set<number>>(
+    new Set()
+  );
+  const [completedPlates, setCompletedPlates] = useState<Set<number>>(
+    new Set()
+  );
+  const [fadingPlates, setFadingPlates] = useState<Set<number>>(new Set());
+  const [plateEstimates, setPlateEstimates] = useState<
+    Map<number, { prediction_seconds?: number; weight_grams?: number }>
+  >(new Map());
 
   // Check if configuration is complete
   const isConfigurationComplete = useCallback((): boolean => {
     // Must have a valid file ID and plates
     if (!fileId || !plates || plates.length === 0) {
-      console.log('Config incomplete: missing fileId or plates');
       return false;
     }
 
     // Must have a build plate selected
     if (!selectedBuildPlate) {
-      console.log('Config incomplete: no build plate selected');
       return false;
     }
-
-    const activeFilamentRequirements =
-      plateFilamentRequirements || filamentRequirements;
 
     // Configuration is complete when we have a file and build plate
     // Filament mapping is optional - by default slicer uses settings from the 3MF file
     // Only when filament mappings are configured do we override with AMS-specific settings
-    console.log(
-      'Config complete: file and build plate ready, using 3MF embedded settings'
-    );
     return true;
   }, [
     fileId,
@@ -91,99 +115,363 @@ function PlateSelector({
     });
   }, [fileId, filamentMappings, selectedBuildPlate, selectedPlateIndex]);
 
+  // Start streaming slice progress
+  const startStreamingSlice = useCallback(async () => {
+    if (!fileId || isStreaming) return;
+
+    try {
+      setIsStreaming(true);
+      setPlateProgress(new Map());
+      setOverallProgress(0);
+      setCurrentPhase('Initializing...');
+      setAllProcessingPlates(new Set());
+      setCompletedPlates(new Set());
+      setFadingPlates(new Set());
+
+      // Start the slice progress session - always slice all plates for configuration estimates
+      const request: StartProgressSliceRequest = {
+        file_id: fileId,
+        filament_mappings: filamentMappings,
+        build_plate_type: selectedBuildPlate || 'textured_pei_plate',
+        selected_plate_index: null,
+      };
+
+      const startResponse = await fetch('/api/slice/start-progress', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(request),
+      });
+
+      if (!startResponse.ok) {
+        setIsStreaming(false);
+        return;
+      }
+
+      const startResult: StartProgressSliceResponse =
+        await startResponse.json();
+      if (!startResult.success) {
+        setIsStreaming(false);
+        return;
+      }
+
+      const newSessionId = startResult.session_id!;
+      setSessionId(newSessionId);
+
+      // Connect to the progress stream
+      const streamUrl = `/api/slice/progress/${newSessionId}/stream`;
+      const eventSource = new EventSource(streamUrl);
+      eventSourceRef.current = eventSource;
+
+      eventSource.onmessage = event => {
+        try {
+          const eventData = JSON.parse(event.data);
+
+          if (eventData.type === 'progress') {
+            const progress: SliceProgress = eventData.data;
+
+            // Track any new plates we discover
+            if (progress.plate_index !== undefined) {
+              setAllProcessingPlates(
+                prev => new Set([...prev, progress.plate_index!])
+              );
+            }
+
+            // Update plate-specific progress
+            setPlateProgress(prev => {
+              const newMap = new Map(prev);
+              if (progress.plate_index !== undefined) {
+                newMap.set(progress.plate_index, progress);
+              }
+              return newMap;
+            });
+
+            // Update current phase
+            setCurrentPhase(progress.message);
+
+            // If this plate just completed and has estimates, cache them and update plates
+            if (progress.is_complete && progress.estimates && onPlatesUpdate) {
+              const plateIndex = progress.plate_index;
+
+              // Cache the estimates for this plate
+              if (plateIndex !== undefined && progress.estimates) {
+                setPlateEstimates(prev => {
+                  const newMap = new Map(prev);
+                  newMap.set(plateIndex, {
+                    prediction_seconds: progress.estimates?.prediction_seconds,
+                    weight_grams: progress.estimates?.weight_grams,
+                  });
+                  return newMap;
+                });
+              }
+
+              // Mark plate as completed and start fade timer
+              if (plateIndex !== undefined) {
+                setCompletedPlates(prev => new Set([...prev, plateIndex]));
+
+                // Start fade timer after 3 seconds
+                setTimeout(() => {
+                  setFadingPlates(prev => new Set([...prev, plateIndex]));
+
+                  // Remove overlay after fade completes (1 second fade duration)
+                  setTimeout(() => {
+                    setCompletedPlates(prev => {
+                      const newSet = new Set(prev);
+                      newSet.delete(plateIndex);
+                      return newSet;
+                    });
+                    setFadingPlates(prev => {
+                      const newSet = new Set(prev);
+                      newSet.delete(plateIndex);
+                      return newSet;
+                    });
+                  }, 1000);
+                }, 3000);
+              }
+
+              const updatedPlates = plates.map(plate => {
+                if (plate.index === plateIndex) {
+                  const updated = {
+                    ...plate,
+                    prediction_seconds:
+                      progress.estimates?.prediction_seconds ||
+                      plate.prediction_seconds,
+                    weight_grams:
+                      progress.estimates?.weight_grams || plate.weight_grams,
+                  };
+                  return updated;
+                }
+                return plate;
+              });
+
+              // If this is a newly discovered plate, add it
+              if (!plates.find(p => p.index === plateIndex)) {
+                updatedPlates.push({
+                  index: plateIndex!,
+                  name: `Plate ${plateIndex}`,
+                  object_count: 1,
+                  has_support: false,
+                  prediction_seconds: progress.estimates?.prediction_seconds,
+                  weight_grams: progress.estimates?.weight_grams,
+                });
+              }
+
+              onPlatesUpdate(updatedPlates);
+            }
+
+            // Calculate overall progress
+            const totalPlates = Math.max(
+              plates.length,
+              allProcessingPlates.size
+            );
+            if (totalPlates > 0) {
+              const completedPlates = Array.from(plateProgress.values()).filter(
+                p => p.is_complete
+              ).length;
+              const currentPlateProgress = progress.progress_percent / 100;
+              const totalProgress =
+                ((completedPlates + currentPlateProgress) / totalPlates) * 100;
+              setOverallProgress(Math.min(totalProgress, 100));
+            }
+          } else if (eventData.type === 'complete') {
+            setCurrentPhase('All plates sliced successfully!');
+            setOverallProgress(100);
+
+            // Update all plates with final estimates
+            if (onPlatesUpdate) {
+              const updatedPlates = plates.map(plate => {
+                const progress = plateProgress.get(plate.index);
+                if (progress && progress.is_complete && progress.estimates) {
+                  return {
+                    ...plate,
+                    prediction_seconds:
+                      progress.estimates.prediction_seconds ||
+                      plate.prediction_seconds,
+                    weight_grams:
+                      progress.estimates.weight_grams || plate.weight_grams,
+                  };
+                }
+                return plate;
+              });
+
+              // Add any newly discovered plates
+              for (const [plateIndex, progress] of plateProgress) {
+                if (
+                  !plates.find(p => p.index === plateIndex) &&
+                  progress.is_complete
+                ) {
+                  updatedPlates.push({
+                    index: plateIndex,
+                    name: `Plate ${plateIndex}`,
+                    object_count: 1,
+                    has_support: false,
+                    prediction_seconds: progress.estimates?.prediction_seconds,
+                    weight_grams: progress.estimates?.weight_grams,
+                  });
+                }
+              }
+
+              onPlatesUpdate(updatedPlates);
+            }
+
+            // Close the event source
+            if (eventSourceRef.current) {
+              eventSourceRef.current.close();
+              eventSourceRef.current = null;
+            }
+
+            setIsStreaming(false);
+            setIsSlicing(false);
+          } else if (eventData.type === 'error') {
+            setCurrentPhase(`Error: ${eventData.data.error}`);
+
+            if (eventSourceRef.current) {
+              eventSourceRef.current.close();
+              eventSourceRef.current = null;
+            }
+
+            setIsStreaming(false);
+            setIsSlicing(false);
+          }
+        } catch (e) {
+          console.error('Error parsing progress event:', e);
+        }
+      };
+
+      eventSource.onerror = error => {
+        setCurrentPhase('Connection error occurred');
+        setIsStreaming(false);
+        setIsSlicing(false);
+
+        if (eventSourceRef.current) {
+          eventSourceRef.current.close();
+          eventSourceRef.current = null;
+        }
+      };
+    } catch (error) {
+      setIsStreaming(false);
+      setIsSlicing(false);
+    }
+  }, [fileId, isStreaming, filamentMappings, selectedBuildPlate]);
+
   // Trigger sequential slicing when configuration is complete
   const triggerSequentialSlicing = useCallback(() => {
-    console.log('triggerSequentialSlicing called:', {
-      fileId,
-      isSlicing,
-      configComplete: isConfigurationComplete(),
-    });
     if (!fileId || isSlicing) return;
 
     // Only slice if configuration is complete
     if (!isConfigurationComplete()) return;
 
-    console.log(
-      'Setting isSlicing to true - StreamingSliceTracker should start'
-    );
-    // The StreamingSliceTracker will handle the actual slicing
     setIsSlicing(true);
-  }, [fileId, isSlicing, isConfigurationComplete]);
+    startStreamingSlice();
+  }, [fileId, isSlicing, isConfigurationComplete, startStreamingSlice]);
 
   // Auto-slice when configuration changes (simplified logic)
   useEffect(() => {
-    console.log('Auto-slice effect triggered:', {
-      configComplete: isConfigurationComplete(),
-      isSlicing,
-      fileId,
-      lastSliceConfig,
-    });
-
     // Only proceed if configuration is truly complete
     if (!isConfigurationComplete()) {
-      console.log('Auto-slice: config not complete, returning');
       return;
     }
 
     // Don't auto-slice if already slicing
     if (isSlicing) {
-      console.log('Auto-slice: already slicing, returning');
       return;
     }
 
     const configHash = generateConfigHash();
-    console.log('Auto-slice: checking config hash:', {
-      configHash,
-      lastSliceConfig,
-    });
 
     if (configHash !== lastSliceConfig && configHash !== '""' && !hasSliced) {
       // Ignore empty configs and don't re-slice
-      console.log(
-        'Auto-slice: config changed and not yet sliced, setting immediate timer'
-      );
       setLastSliceConfig(configHash);
 
       // Use immediate execution with a ref to prevent race conditions
       const timer = setTimeout(() => {
-        console.log('Auto-slice timer fired, triggering slice');
         setHasSliced(true); // Mark that we've sliced for this config
         triggerSequentialSlicing();
       }, 500); // Very short delay
 
       return () => {
-        console.log('Auto-slice timer cleanup');
         clearTimeout(timer);
       };
-    } else {
-      console.log('Auto-slice: not triggering', {
-        configChanged: configHash !== lastSliceConfig,
-        notEmpty: configHash !== '""',
-        notSliced: !hasSliced,
-      });
     }
   }, [fileId, selectedBuildPlate, selectedPlateIndex, hasSliced]); // Include hasSliced to prevent re-triggering
 
   // Reset hasSliced when file changes
   useEffect(() => {
     setHasSliced(false);
-    console.log('File changed, resetting hasSliced flag');
   }, [fileId]);
+
+  // Cleanup event source on unmount
+  useEffect(() => {
+    return () => {
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
+      }
+    };
+  }, []);
 
   if (!plates || plates.length <= 1) {
     return null; // Don't show selector for single plate models
   }
 
-  const formatTime = (seconds?: number): string => {
-    if (!seconds) return isSlicing ? 'Calculating...' : 'After slice';
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    return `${hours}h ${minutes}m`;
+  const formatTime = (seconds?: number, plateIndex?: number): string => {
+    // First check for actual seconds value
+    if (seconds && seconds > 0) {
+      const hours = Math.floor(seconds / 3600);
+      const minutes = Math.floor((seconds % 3600) / 60);
+      return `${hours}h ${minutes}m`;
+    }
+
+    // Check cached estimates if no seconds value
+    if (plateIndex !== undefined) {
+      const cachedEstimate = plateEstimates.get(plateIndex);
+      if (
+        cachedEstimate?.prediction_seconds &&
+        cachedEstimate.prediction_seconds > 0
+      ) {
+        const hours = Math.floor(cachedEstimate.prediction_seconds / 3600);
+        const minutes = Math.floor(
+          (cachedEstimate.prediction_seconds % 3600) / 60
+        );
+        return `${hours}h ${minutes}m`;
+      }
+    }
+
+    // Check if plate is actively being sliced right now
+    if (plateIndex !== undefined && isSlicing) {
+      const progress = plateProgress.get(plateIndex);
+      // Only show "Calculating..." if this plate is actively being processed (not complete)
+      if (progress && !progress.is_complete) {
+        return 'Calculating...';
+      }
+    }
+
+    return 'After slice';
   };
 
-  const formatWeight = (grams?: number): string => {
-    if (!grams) return isSlicing ? 'Calculating...' : 'After slice';
-    return `${grams.toFixed(1)}g`;
+  const formatWeight = (grams?: number, plateIndex?: number): string => {
+    // First check for actual grams value
+    if (grams && grams > 0) {
+      return `${grams.toFixed(1)}g`;
+    }
+
+    // Check cached estimates if no grams value
+    if (plateIndex !== undefined) {
+      const cachedEstimate = plateEstimates.get(plateIndex);
+      if (cachedEstimate?.weight_grams && cachedEstimate.weight_grams > 0) {
+        return `${cachedEstimate.weight_grams.toFixed(1)}g`;
+      }
+    }
+
+    // Check if plate is actively being sliced right now
+    if (plateIndex !== undefined && isSlicing) {
+      const progress = plateProgress.get(plateIndex);
+      // Only show "Calculating..." if this plate is actively being processed (not complete)
+      if (progress && !progress.is_complete) {
+        return 'Calculating...';
+      }
+    }
+
+    return 'After slice';
   };
 
   const getContrastColor = (hexColor: string): string => {
@@ -213,18 +501,6 @@ function PlateSelector({
         <p>Choose to slice/print a specific plate or all plates at once</p>
       </div>
 
-      {/* Streaming Slice Tracker */}
-      <StreamingSliceTracker
-        isSlicing={isSlicing}
-        plates={plates}
-        selectedPlateIndex={selectedPlateIndex}
-        currentFileId={fileId || ''}
-        filamentMappings={filamentMappings || []}
-        selectedBuildPlate={selectedBuildPlate || 'textured_pei_plate'}
-        onPlatesUpdate={onPlatesUpdate}
-        onSliceComplete={() => setIsSlicing(false)}
-      />
-
       {/* Visual Plate Selection Grid */}
       {fileId && (
         <div className="plate-thumbnails-grid">
@@ -237,6 +513,26 @@ function PlateSelector({
               onClick={() => !disabled && onPlateSelect(null)}
               style={{ cursor: disabled ? 'not-allowed' : 'pointer' }}
             >
+              {/* Progress overlay for All Plates */}
+              {isSlicing && selectedPlateIndex === null && (
+                <div className="plate-progress-overlay">
+                  <div
+                    className="progress-fill"
+                    style={{
+                      width: `${overallProgress}%`,
+                    }}
+                  />
+                  <div className="progress-status">
+                    {overallProgress < 100 ? (
+                      <span className="status-text processing">
+                        🔄 {currentPhase} {Math.round(overallProgress)}%
+                      </span>
+                    ) : (
+                      <span className="status-text completed">✅ Complete</span>
+                    )}
+                  </div>
+                </div>
+              )}
               <div className="thumbnail-image all-plates-preview">
                 <div className="all-plates-icon">
                   <div className="plate-stack">
@@ -259,43 +555,92 @@ function PlateSelector({
             </div>
 
             {/* Individual Plate Options */}
-            {plates.map(plate => (
-              <div
-                key={plate.index}
-                className={`plate-thumbnail-card ${
-                  selectedPlateIndex === plate.index ? 'selected' : ''
-                }`}
-                onClick={() => !disabled && onPlateSelect(plate.index)}
-                style={{ cursor: disabled ? 'not-allowed' : 'pointer' }}
-              >
-                <div className="thumbnail-image">
-                  <img
-                    src={`/api/model/thumbnail/${fileId}/plate/${plate.index}?width=150&height=150`}
-                    alt={`Plate ${plate.index} preview`}
-                    style={{
-                      width: '100%',
-                      height: '120px',
-                      objectFit: 'contain',
-                      borderRadius: '4px',
-                    }}
-                    className="plate-thumbnail-image"
-                    onError={e => {
-                      // Fallback to general thumbnail
-                      const img = e.target as HTMLImageElement;
-                      img.src = `/api/model/thumbnail/${fileId}?width=150&height=150`;
-                    }}
-                  />
-                </div>
-                <div className="thumbnail-info">
-                  <div className="plate-title">{getPlateName(plate)}</div>
-                  <div className="plate-stats">
-                    <span>{plate.object_count} obj</span>
-                    <span>{formatTime(plate.prediction_seconds)}</span>
-                    <span>{formatWeight(plate.weight_grams)}</span>
+            {plates.map(plate => {
+              const progress = plateProgress.get(plate.index);
+              const isProcessing = progress && !progress.is_complete;
+              const isComplete = progress && progress.is_complete;
+              const progressPercent = progress ? progress.progress_percent : 0;
+              const isCompletedPlate = completedPlates.has(plate.index);
+              const isFading = fadingPlates.has(plate.index);
+              const shouldShowOverlay =
+                isSlicing && (isProcessing || isCompletedPlate);
+
+              return (
+                <div
+                  key={plate.index}
+                  className={`plate-thumbnail-card ${
+                    selectedPlateIndex === plate.index ? 'selected' : ''
+                  }`}
+                  onClick={() => !disabled && onPlateSelect(plate.index)}
+                  style={{ cursor: disabled ? 'not-allowed' : 'pointer' }}
+                >
+                  {/* Progress overlay */}
+                  {shouldShowOverlay && (
+                    <div
+                      className={`plate-progress-overlay ${isFading ? 'fading' : ''}`}
+                    >
+                      <div
+                        className="progress-fill"
+                        style={{
+                          width: isProcessing
+                            ? `${progressPercent}%`
+                            : isComplete || isCompletedPlate
+                              ? '100%'
+                              : '0%',
+                        }}
+                      />
+                      <div className="progress-status">
+                        {isProcessing && (
+                          <span className="status-text processing">
+                            🔄 {progress.phase} {Math.round(progressPercent)}%
+                          </span>
+                        )}
+                        {(isComplete || isCompletedPlate) && (
+                          <span className="status-text completed">
+                            ✅ Complete
+                          </span>
+                        )}
+                        {!progress && isSlicing && (
+                          <span className="status-text pending">
+                            ⏳ Waiting
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  <div className="thumbnail-image">
+                    <img
+                      src={`/api/model/thumbnail/${fileId}/plate/${plate.index}?width=150&height=150`}
+                      alt={`Plate ${plate.index} preview`}
+                      style={{
+                        width: '100%',
+                        height: '120px',
+                        objectFit: 'contain',
+                        borderRadius: '4px',
+                      }}
+                      className="plate-thumbnail-image"
+                      onError={e => {
+                        // Fallback to general thumbnail
+                        const img = e.target as HTMLImageElement;
+                        img.src = `/api/model/thumbnail/${fileId}?width=150&height=150`;
+                      }}
+                    />
+                  </div>
+                  <div className="thumbnail-info">
+                    <div className="plate-title">{getPlateName(plate)}</div>
+                    <div className="plate-stats">
+                      <span>{plate.object_count} obj</span>
+                      <span>
+                        {formatTime(plate.prediction_seconds, plate.index)}
+                      </span>
+                      <span>
+                        {formatWeight(plate.weight_grams, plate.index)}
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -340,13 +685,19 @@ function PlateSelector({
                       <div className="detail-item">
                         <span className="detail-label">Est. Time:</span>
                         <span className="detail-value">
-                          {formatTime(selectedPlate.prediction_seconds)}
+                          {formatTime(
+                            selectedPlate.prediction_seconds,
+                            selectedPlate.index
+                          )}
                         </span>
                       </div>
                       <div className="detail-item">
                         <span className="detail-label">Est. Weight:</span>
                         <span className="detail-value">
-                          {formatWeight(selectedPlate.weight_grams)}
+                          {formatWeight(
+                            selectedPlate.weight_grams,
+                            selectedPlate.index
+                          )}
                         </span>
                       </div>
                       <div className="detail-item">

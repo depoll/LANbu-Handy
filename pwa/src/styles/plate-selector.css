@@ -127,6 +127,70 @@
   overflow: hidden;
 }
 
+/* Progress overlay for plate thumbnails */
+.plate-thumbnail-card .plate-progress-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+  pointer-events: none;
+  transition: opacity 1s ease-out;
+}
+
+.plate-thumbnail-card .plate-progress-overlay.fading {
+  opacity: 0;
+}
+
+.plate-thumbnail-card .progress-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    rgba(76, 175, 80, 0.05) 0%,
+    rgba(76, 175, 80, 0.03) 100%
+  );
+  transition: width 0.3s ease;
+}
+
+.plate-thumbnail-card .progress-status {
+  position: absolute;
+  top: 0.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+}
+
+.plate-thumbnail-card .status-text {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.2rem 0.5rem;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  white-space: nowrap;
+}
+
+.plate-thumbnail-card .status-text.processing {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.plate-thumbnail-card .status-text.completed {
+  color: var(--color-success);
+  border-color: var(--color-success);
+}
+
+.plate-thumbnail-card .status-text.pending {
+  color: var(--color-text-secondary);
+  border-color: var(--color-border-secondary);
+}
+
 .plate-thumbnail-card:hover {
   border-color: var(--color-primary);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
@@ -168,6 +232,7 @@
   align-items: center;
   justify-content: center;
   min-height: 120px;
+  position: relative;
 }
 
 .thumbnail-info {
@@ -763,6 +828,7 @@
   opacity: 0.8;
 }
 
+/* Old streaming tracker overlay - removed
 .plate-progress-overlay {
   position: absolute;
   top: 0;
@@ -776,7 +842,7 @@
   transition: width 0.3s ease;
   z-index: 1;
   pointer-events: none;
-}
+} */
 
 .plate-status-header {
   position: relative;
