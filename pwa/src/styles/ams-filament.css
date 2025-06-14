@@ -88,30 +88,40 @@
 .filament-slot {
   background: var(--color-bg-primary);
   border: 1px solid var(--color-border-secondary);
-  border-radius: 4px;
-  padding: 0.75rem;
+  border-radius: 8px;
+  padding: 1rem;
+  transition: all 0.2s ease;
+}
+
+.filament-slot:hover {
+  border-color: var(--color-border-primary);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 .slot-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.75rem;
 }
 
 .slot-id {
   font-weight: 600;
   color: var(--color-text-secondary);
-  font-size: 0.9rem;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .filament-type {
   background: #e8f5e9;
   color: #2e7d32;
-  padding: 0.25rem 0.5rem;
-  border-radius: 12px;
-  font-size: 0.8rem;
-  font-weight: 500;
+  padding: 0.25rem 0.75rem;
+  border-radius: 16px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .color-info {
@@ -121,12 +131,38 @@
 }
 
 .color-swatch {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  border: 2px solid #ddd;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 2px solid rgba(0, 0, 0, 0.1);
   display: inline-block;
   flex-shrink: 0;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.color-labels {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.color-name {
+  font-size: 0.875rem;
+  color: var(--color-text-primary);
+  font-weight: 500;
+  line-height: 1.2;
+  margin: 0;
+}
+
+.color-hex {
+  font-size: 0.7rem;
+  color: var(--color-text-secondary);
+  opacity: 0.6;
+  font-family: 'SF Mono', 'Monaco', 'Cascadia Code', 'Roboto Mono', monospace;
+  line-height: 1;
+  margin: 0;
 }
 
 .color-label {
@@ -135,9 +171,26 @@
 }
 
 .material-id {
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   color: var(--color-text-secondary);
-  margin-top: 0.25rem;
+  margin-top: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  background: var(--color-bg-secondary, #f8f9fa);
+  border-radius: 4px;
+  border: 1px solid var(--color-border-tertiary, #e9ecef);
+}
+
+.empty-slot-info {
+  display: flex;
+  align-items: center;
+  padding: 0.5rem 0;
+}
+
+.empty-indicator {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  opacity: 0.7;
+  font-style: italic;
 }
 
 .no-filaments,

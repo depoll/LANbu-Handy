@@ -207,11 +207,6 @@
 .color-name {
   color: #495057;
   font-weight: 500;
-  padding: 0.5rem;
-  background: white;
-  border-radius: 6px;
-  border: 1px solid #dee2e6;
-  text-align: center;
 }
 
 .mapping-arrow {
