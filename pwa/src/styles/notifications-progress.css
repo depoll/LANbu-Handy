@@ -458,12 +458,13 @@
 
 /* Slice Progress Tracker Styles */
 .slice-progress-tracker {
-  background: #f8f9fa;
-  border: 1px solid #e9ecef;
+  background: rgba(233, 236, 239, 0.98);
+  backdrop-filter: blur(10px);
+  border: 1px solid #ced4da;
   border-radius: 12px;
   padding: 1.5rem;
   margin: 1rem 0;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
 }
 
 .slice-progress-tracker .progress-header {
