@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   FilamentRequirement,
   AMSStatusResponse,
@@ -175,15 +175,34 @@ function FilamentMappingConfig({
 }: FilamentMappingConfigProps) {
   const [isMatching, setIsMatching] = useState(false);
   const [matchingError, setMatchingError] = useState<string | null>(null);
+  const [hasTriggeredAutoMatch, setHasTriggeredAutoMatch] = useState(false);
 
   // Function to call backend filament matching service
-  const reapplyFilamentMatching = async () => {
+  const reapplyFilamentMatching = useCallback(async () => {
     if (!amsStatus || !amsStatus.success || !filamentRequirements) {
-      setMatchingError(
-        'Cannot apply matching: AMS status not available or no filament requirements'
-      );
+      const errorMsg =
+        'Cannot apply matching: AMS status not available or no filament requirements';
+      console.warn('Filament matching precondition failed:', {
+        hasAmsStatus: !!amsStatus,
+        amsSuccess: amsStatus?.success,
+        hasFilamentRequirements: !!filamentRequirements,
+        filamentCount: filamentRequirements?.filament_count,
+      });
+      setMatchingError(errorMsg);
       return;
     }
+
+    console.log('Starting filament matching...', {
+      filamentRequirements,
+      amsStatus: {
+        success: amsStatus.success,
+        unitCount: amsStatus.ams_units?.length,
+        totalSlots: amsStatus.ams_units?.reduce(
+          (sum, unit) => sum + unit.filaments.length,
+          0
+        ),
+      },
+    });
 
     setIsMatching(true);
     setMatchingError(null);
@@ -203,10 +222,12 @@ function FilamentMappingConfig({
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        const errorText = await response.text();
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
       }
 
       const result: FilamentMatchResponse = await response.json();
+      console.log('Filament matching result:', result);
 
       if (result.success && result.matches) {
         // Convert backend matches to frontend FilamentMapping format
@@ -216,20 +237,25 @@ function FilamentMappingConfig({
           ams_slot_id: match.ams_slot_id,
         }));
 
+        console.log('Applying new filament mappings:', newMappings);
         onMappingChange(newMappings);
         setMatchingError(null);
+        // Mark that we've successfully matched, so auto-matching won't re-trigger unnecessarily
+        setHasTriggeredAutoMatch(true);
       } else {
-        setMatchingError(result.message || 'Filament matching failed');
+        const errorMsg = result.message || 'Filament matching failed';
+        console.error('Filament matching failed:', errorMsg);
+        setMatchingError(errorMsg);
       }
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error occurred';
-      setMatchingError(`Failed to apply filament matching: ${errorMessage}`);
       console.error('Filament matching error:', error);
+      setMatchingError(`Failed to apply filament matching: ${errorMessage}`);
     } finally {
       setIsMatching(false);
     }
-  };
+  }, [amsStatus, filamentRequirements, onMappingChange]);
 
   // Build list of available AMS slots
   const getAvailableSlots = (): AMSSlotOption[] => {
@@ -283,17 +309,64 @@ function FilamentMappingConfig({
     onMappingChange(newMappings);
   };
 
-  // Auto-populate mappings on first load if none exist using backend service
-  if (
-    filamentMappings.length === 0 &&
-    filamentRequirements.filament_count > 0 &&
-    availableSlots.length > 0 &&
-    amsStatus?.success &&
-    !isMatching
-  ) {
-    // Use the backend matching service for initial auto-population
-    reapplyFilamentMatching();
-  }
+  // Auto-populate mappings when conditions are met (first load or AMS status loads)
+  useEffect(() => {
+    const shouldAutoMatch =
+      filamentMappings.length === 0 &&
+      filamentRequirements.filament_count > 0 &&
+      availableSlots.length > 0 &&
+      amsStatus?.success &&
+      !isMatching &&
+      !hasTriggeredAutoMatch;
+
+    if (shouldAutoMatch) {
+      console.log('Auto-triggering filament matching...', {
+        trigger: 'AMS status or requirements changed',
+        filamentMappings: filamentMappings.length,
+        filamentCount: filamentRequirements.filament_count,
+        availableSlots: availableSlots.length,
+        amsSuccess: amsStatus?.success,
+        isMatching,
+        hasTriggeredAutoMatch,
+      });
+      setHasTriggeredAutoMatch(true);
+      reapplyFilamentMatching();
+    }
+  }, [
+    filamentMappings.length,
+    filamentRequirements.filament_count,
+    availableSlots.length,
+    amsStatus?.success,
+    isMatching,
+    hasTriggeredAutoMatch,
+    reapplyFilamentMatching,
+  ]);
+
+  // Reset auto-match trigger when filament requirements change (new model loaded)
+  useEffect(() => {
+    setHasTriggeredAutoMatch(false);
+    setMatchingError(null);
+  }, [filamentRequirements]);
+
+  // Debug AMS status changes
+  useEffect(() => {
+    console.log('AMS status changed:', {
+      success: amsStatus?.success,
+      unitCount: amsStatus?.ams_units?.length,
+      totalSlots: amsStatus?.ams_units?.reduce(
+        (sum, unit) => sum + unit.filaments.length,
+        0
+      ),
+      availableSlots: availableSlots.length,
+      hasTriggeredAutoMatch,
+      currentMappings: filamentMappings.length,
+    });
+  }, [
+    amsStatus,
+    availableSlots.length,
+    hasTriggeredAutoMatch,
+    filamentMappings.length,
+  ]);
 
   if (
     !amsStatus?.success ||
@@ -324,12 +397,26 @@ function FilamentMappingConfig({
             className="reapply-matching-button"
             title="Reapply automatic filament matching using the backend matching algorithm"
           >
-            {isMatching ? 'Matching...' : 'Re-apply Matching'}
+            {isMatching ? '🔄 Matching...' : '🎯 Re-apply Matching'}
           </button>
         </div>
-        <p>Map each model filament to an available AMS slot</p>
+        <p>
+          Map each model filament to an available AMS slot.
+          {filamentMappings.length === 0 && !isMatching && (
+            <span className="auto-match-note">
+              {' '}
+              Auto-matching will suggest optimal slots based on type and color
+              compatibility when AMS status loads.
+            </span>
+          )}
+        </p>
+        {isMatching && (
+          <div className="matching-status">
+            🔄 Auto-selecting optimal filament matches...
+          </div>
+        )}
         {matchingError && (
-          <div className="matching-error">⚠ {matchingError}</div>
+          <div className="matching-error">⚠️ {matchingError}</div>
         )}
       </div>
 

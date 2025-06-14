@@ -360,6 +360,10 @@ export function ModelTab({
 
       setSelectedFile(file);
       setUploadProgress(0);
+      // Clear URL input when file is selected
+      if (modelUrl.trim()) {
+        setModelUrl('');
+      }
       showInfo(
         `Selected file: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`,
         'File Selected'
@@ -367,30 +371,17 @@ export function ModelTab({
     }
   };
 
-  const handleModeSwitch = (mode: 'url' | 'file') => {
-    setInputMode(mode);
-    if (mode === 'url') {
-      setSelectedFile(null);
-      setUploadProgress(0);
-    } else {
-      setModelUrl('');
-    }
-  };
-
   const handleSubmit = async () => {
-    if (inputMode === 'url') {
-      await handleModelSubmit();
-    } else {
+    // Auto-detect input method based on what the user has provided
+    if (selectedFile) {
       await handleFileUpload();
+    } else if (modelUrl.trim()) {
+      await handleModelSubmit();
     }
   };
 
   const canSubmit = () => {
-    if (inputMode === 'url') {
-      return modelUrl.trim() !== '';
-    } else {
-      return selectedFile !== null;
-    }
+    return selectedFile !== null || modelUrl.trim() !== '';
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -405,44 +396,29 @@ export function ModelTab({
         <h3>Model Analysis</h3>
         <p>
           {!modelSubmitted
-            ? 'Enter a URL or upload your 3D model file (.stl or .3mf) to analyze filament requirements'
+            ? 'Enter a URL or upload your 3D model file (.stl or .3mf) to analyze filament requirements. You can use either option.'
             : 'Your model has been analyzed and is ready for configuration'}
         </p>
       </div>
 
       {/* Model Input Section */}
       <div className="model-input-section">
-        {/* Input Mode Toggle */}
-        {!modelSubmitted && (
-          <div className="input-mode-toggle">
-            <button
-              type="button"
-              className={`mode-toggle-button ${inputMode === 'url' ? 'active' : ''}`}
-              onClick={() => handleModeSwitch('url')}
-              disabled={isProcessing}
-            >
-              🔗 URL
-            </button>
-            <button
-              type="button"
-              className={`mode-toggle-button ${inputMode === 'file' ? 'active' : ''}`}
-              onClick={() => handleModeSwitch('file')}
-              disabled={isProcessing}
-            >
-              📁 File Upload
-            </button>
-          </div>
-        )}
-
         {/* URL Input */}
-        {inputMode === 'url' && (
+        {!modelSubmitted && (
           <div className="input-group">
-            <label htmlFor="model-url">Model URL:</label>
+            <label htmlFor="model-url">🔗 Model URL:</label>
             <input
               id="model-url"
               type="url"
               value={modelUrl}
-              onChange={e => setModelUrl(e.target.value)}
+              onChange={e => {
+                setModelUrl(e.target.value);
+                // Clear file input when URL is entered
+                if (e.target.value.trim() && selectedFile) {
+                  setSelectedFile(null);
+                  setUploadProgress(0);
+                }
+              }}
               onKeyPress={handleKeyPress}
               placeholder="https://example.com/model.stl"
               disabled={isProcessing || modelSubmitted}
@@ -453,9 +429,9 @@ export function ModelTab({
         )}
 
         {/* File Upload Input */}
-        {inputMode === 'file' && (
+        {!modelSubmitted && (
           <div className="input-group">
-            <label htmlFor="model-file">Model File:</label>
+            <label htmlFor="model-file">📁 Model File:</label>
             <div className="file-input-container">
               <input
                 id="model-file"
@@ -505,12 +481,12 @@ export function ModelTab({
               data-testid="analyze-model-button"
             >
               {isProcessing
-                ? inputMode === 'url'
-                  ? 'Analyzing...'
-                  : 'Uploading...'
-                : inputMode === 'url'
-                  ? 'Analyze Model'
-                  : 'Upload & Analyze'}
+                ? selectedFile
+                  ? 'Uploading...'
+                  : 'Analyzing...'
+                : selectedFile
+                  ? 'Upload & Analyze'
+                  : 'Analyze Model'}
             </button>
           ) : (
             <button

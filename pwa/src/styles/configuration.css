@@ -123,6 +123,35 @@
   font-size: 0.9rem;
 }
 
+.matching-status {
+  background: #d1ecf1;
+  color: #0c5460;
+  border: 1px solid #bee5eb;
+  border-radius: 4px;
+  padding: 0.75rem;
+  margin-top: 0.5rem;
+  font-size: 0.9rem;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.auto-match-note {
+  color: #17a2b8;
+  font-style: italic;
+  font-size: 0.85rem;
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
 .mapping-header p {
   margin: 0 0 1rem 0;
   color: #6c757d;
