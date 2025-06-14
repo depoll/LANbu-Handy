@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { TabSystem, Tab } from './TabSystem';
 import { ModelTab } from './ModelTab';
 import { ConfigurationTab } from './ConfigurationTab';
 import { StatusTab } from './StatusTab';
 import { PrintTab } from './PrintTab';
 import { useToast } from '../hooks/useToast';
+import { useCurrentPrinter } from '../hooks/useCurrentPrinter';
+import { useProactiveAMSStatus } from '../hooks/useProactiveAMSStatus';
 import {
   FilamentRequirement,
   AMSStatusResponse,
@@ -53,18 +55,82 @@ function SliceAndPrint() {
   // Model URL for quick slice and print
   const [modelUrl, setModelUrl] = useState('');
 
-  // Default printer ID
-  const defaultPrinterId = 'default';
+  // Current printer management
+  const {
+    currentPrinterId,
+    currentPrinterName,
+    loading: printerLoading,
+  } = useCurrentPrinter();
 
   // Toast notifications
   const { showSuccess, showError, showWarning, showInfo } = useToast();
 
-  const addStatusMessage = (message: string) => {
+  const addStatusMessage = useCallback((message: string) => {
     setStatusMessages(prev => [
       ...prev,
       `${new Date().toLocaleTimeString()}: ${message}`,
     ]);
-  };
+  }, []);
+
+  // AMS status update handler
+  const handleAMSStatusUpdate = useCallback(
+    (status: AMSStatusResponse) => {
+      setAmsStatus(status);
+      if (status.success) {
+        addStatusMessage('✅ AMS status retrieved successfully');
+        if (status.ams_units && status.ams_units.length > 0) {
+          const totalFilaments = status.ams_units.reduce(
+            (total, unit) => total + unit.filaments.length,
+            0
+          );
+          addStatusMessage(
+            `📊 Found ${status.ams_units.length} AMS unit(s) with ${totalFilaments} loaded filament(s)`
+          );
+          showSuccess(
+            `Found ${status.ams_units.length} AMS unit(s) with ${totalFilaments} loaded filament(s)`,
+            'AMS Connected'
+          );
+        } else {
+          addStatusMessage('⚠ No AMS units or filaments detected');
+          showWarning('No AMS units or filaments detected', 'AMS Status');
+        }
+      } else {
+        addStatusMessage('❌ Failed to retrieve AMS status');
+        showError(status.message || 'AMS status retrieval failed', 'AMS Error');
+      }
+    },
+    [addStatusMessage, showSuccess, showWarning, showError]
+  );
+
+  // Proactive AMS status fetching
+  const { error: amsError } = useProactiveAMSStatus({
+    printerId: currentPrinterId,
+    refreshInterval: 30000, // 30 seconds
+    onStatusUpdate: handleAMSStatusUpdate,
+  });
+
+  // Add status messages for initial setup
+  useEffect(() => {
+    if (currentPrinterId && currentPrinterId !== 'default' && !printerLoading) {
+      addStatusMessage(
+        `🖨️ Connected to printer: ${currentPrinterName || currentPrinterId}`
+      );
+      addStatusMessage(
+        '🔄 Starting automatic AMS status monitoring (30s intervals)'
+      );
+    } else if (!printerLoading) {
+      addStatusMessage(
+        '⚠ No printer configured - please select a printer first'
+      );
+    }
+  }, [currentPrinterId, printerLoading, currentPrinterName, addStatusMessage]);
+
+  // Handle AMS error states
+  useEffect(() => {
+    if (amsError) {
+      addStatusMessage(`❌ AMS status error: ${amsError}`);
+    }
+  }, [amsError, addStatusMessage]);
 
   const fetchPlateFilamentRequirements = async (
     plateIndex: number,
@@ -191,7 +257,7 @@ function SliceAndPrint() {
         );
       }
     } catch (error) {
-      if (error.name === 'AbortError') {
+      if (error instanceof Error && error.name === 'AbortError') {
         console.warn('Initial slice timed out');
         addStatusMessage(
           '⚠ Initial slice timed out - will calculate after configuration'
@@ -239,32 +305,6 @@ function SliceAndPrint() {
 
     // Let the Configuration tab handle slicing with streaming progress
     // No initial slice needed here - streaming slice will happen automatically in PlateSelector
-  };
-
-  const handleAMSStatusUpdate = (status: AMSStatusResponse) => {
-    setAmsStatus(status);
-    if (status.success) {
-      addStatusMessage('✅ AMS status retrieved successfully');
-      if (status.ams_units && status.ams_units.length > 0) {
-        const totalFilaments = status.ams_units.reduce(
-          (total, unit) => total + unit.filaments.length,
-          0
-        );
-        addStatusMessage(
-          `📊 Found ${status.ams_units.length} AMS unit(s) with ${totalFilaments} loaded filament(s)`
-        );
-        showSuccess(
-          `Found ${status.ams_units.length} AMS unit(s) with ${totalFilaments} loaded filament(s)`,
-          'AMS Connected'
-        );
-      } else {
-        addStatusMessage('⚠ No AMS units or filaments detected');
-        showWarning('No AMS units or filaments detected', 'AMS Status');
-      }
-    } else {
-      addStatusMessage(`❌ AMS status query failed: ${status.message}`);
-      showError(`AMS status query failed: ${status.message}`, 'AMS Error');
-    }
   };
 
   const getTabBadge = (tabId: string): string | number | undefined => {
@@ -336,7 +376,7 @@ function SliceAndPrint() {
       badge: getTabBadge('status'),
       content: (
         <StatusTab
-          printerId={defaultPrinterId}
+          printerId={currentPrinterId || 'default'}
           onAMSStatusUpdate={handleAMSStatusUpdate}
           operationSteps={operationSteps}
           showOperationProgress={showOperationProgress}

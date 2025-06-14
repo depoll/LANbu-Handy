@@ -49,7 +49,7 @@ interface FilamentPillWithDropdownProps {
     filament_type: string;
     color: string;
   } | null;
-  amsStatus: AMSStatusResponse | null;
+  amsStatus?: AMSStatusResponse | null;
   filamentMappings?: FilamentMapping[];
   onMappingChange?: (mappings: FilamentMapping[]) => void;
   disabled?: boolean;
@@ -191,7 +191,7 @@ function FilamentPillWithDropdown({
               <span>Clear mapping</span>
             </div>
           )}
-          {amsStatus.ams_units.map(unit =>
+          {amsStatus?.ams_units?.map(unit =>
             unit.filaments.map(filament => {
               const isSelected =
                 mapping?.ams_unit_id === unit.unit_id &&
