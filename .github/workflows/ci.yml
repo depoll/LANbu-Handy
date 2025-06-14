@@ -209,14 +209,14 @@ jobs:
       - name: Create and push multi-arch manifests
         run: |
           REPO="ghcr.io/${{ steps.repo.outputs.name }}"
-          
+
           if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
             # For version tags
             VERSION="${{ github.ref_name }}"
             docker buildx imagetools create -t ${REPO}:${VERSION} \
               ${REPO}:${VERSION}-amd64 \
               ${REPO}:${VERSION}-arm64
-            
+
             # Also create latest tag for version releases
             docker buildx imagetools create -t ${REPO}:latest \
               ${REPO}:latest-amd64 \

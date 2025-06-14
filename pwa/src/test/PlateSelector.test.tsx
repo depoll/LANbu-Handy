@@ -90,7 +90,7 @@ describe('PlateSelector Component', () => {
     expect(screen.getByText('Plate 1')).toBeInTheDocument();
     expect(screen.getByText('Plate 2')).toBeInTheDocument();
     expect(screen.getByText('Plate 3')).toBeInTheDocument();
-    
+
     // Check that stats are shown (object counts, times, weights)
     expect(screen.getByText('2 obj')).toBeInTheDocument();
     expect(screen.getByText('1 obj')).toBeInTheDocument();
@@ -106,14 +106,24 @@ describe('PlateSelector Component', () => {
         selectedPlateIndex={2}
         onPlateSelect={onPlateSelect}
         fileId="test-file.3mf"
+        selectedBuildPlate="textured_pei_plate"
       />
     );
 
-    expect(screen.getByText('Plate 2 Details')).toBeInTheDocument();
-    expect(screen.getByText('1')).toBeInTheDocument(); // object count
-    expect(screen.getByText('1h 27m')).toBeInTheDocument(); // prediction time
-    expect(screen.getByText('24.4g')).toBeInTheDocument(); // weight
-    expect(screen.getByText('✓ Yes')).toBeInTheDocument(); // has support
+    expect(
+      screen.getByText('Plate 2 (Plate 2) Configuration')
+    ).toBeInTheDocument();
+
+    // Find the detail section
+    const detailSection = screen
+      .getByText('Plate Information')
+      .closest('.detail-section');
+
+    // Check details within the detail section
+    expect(detailSection).toHaveTextContent('Objects:1');
+    expect(detailSection).toHaveTextContent('Est. Time:1h 27m');
+    expect(detailSection).toHaveTextContent('Est. Weight:24.4g');
+    expect(detailSection).toHaveTextContent('Support:✓ Yes');
   });
 
   it('displays all plates summary when no specific plate selected', () => {
@@ -129,10 +139,15 @@ describe('PlateSelector Component', () => {
     );
 
     expect(screen.getByText('All Plates Summary')).toBeInTheDocument();
-    expect(screen.getByText('6')).toBeInTheDocument(); // total objects (2+1+3)
-    expect(screen.getByText('4h 26m')).toBeInTheDocument(); // total time (5239+5272+5460=15971s=4h26m)
-    expect(screen.getByText('74.2g')).toBeInTheDocument(); // total weight
-    expect(screen.getByText('1 of 3')).toBeInTheDocument(); // plates with support
+
+    // Find the summary details
+    const summarySection = screen.getByText('All Plates Summary').parentElement;
+
+    // Check summary details
+    expect(summarySection).toHaveTextContent('Total Objects:6'); // 2+1+3
+    expect(summarySection).toHaveTextContent('Total Est. Time:4h 26m'); // 5239+5272+5460=15971s
+    expect(summarySection).toHaveTextContent('Total Est. Weight:74.2g'); // 24.63+24.42+25.1
+    expect(summarySection).toHaveTextContent('Plates with Support:1 of 3');
   });
 
   it('calls onPlateSelect when plate card is clicked', () => {
@@ -148,7 +163,9 @@ describe('PlateSelector Component', () => {
     );
 
     // Click on Plate 2 card
-    const plate2Card = screen.getByText('Plate 2').closest('.plate-thumbnail-card');
+    const plate2Card = screen
+      .getByText('Plate 2')
+      .closest('.plate-thumbnail-card');
     fireEvent.click(plate2Card!);
 
     expect(onPlateSelect).toHaveBeenCalledWith(2);
@@ -167,7 +184,9 @@ describe('PlateSelector Component', () => {
     );
 
     // Click on All Plates card
-    const allPlatesCard = screen.getByText('All Plates').closest('.plate-thumbnail-card');
+    const allPlatesCard = screen
+      .getByText('All Plates')
+      .closest('.plate-thumbnail-card');
     fireEvent.click(allPlatesCard!);
 
     expect(onPlateSelect).toHaveBeenCalledWith(null);
@@ -187,7 +206,9 @@ describe('PlateSelector Component', () => {
     );
 
     // When disabled, clicking should not trigger onPlateSelect
-    const plate2Card = screen.getByText('Plate 2').closest('.plate-thumbnail-card');
+    const plate2Card = screen
+      .getByText('Plate 2')
+      .closest('.plate-thumbnail-card');
     fireEvent.click(plate2Card!);
 
     expect(onPlateSelect).not.toHaveBeenCalled();
@@ -218,15 +239,24 @@ describe('PlateSelector Component', () => {
         selectedPlateIndex={1}
         onPlateSelect={onPlateSelect}
         fileId="test-file.3mf"
+        selectedBuildPlate="textured_pei_plate"
       />
     );
 
-    // Should show "Unknown" for missing data in plate stats
+    // Should show plate titles
     expect(screen.getByText('Plate 1')).toBeInTheDocument();
     expect(screen.getByText('Plate 2')).toBeInTheDocument();
-    
-    // Check for proper handling of missing data
-    expect(screen.getByText('1 obj')).toBeInTheDocument();
+
+    // Check that the component renders without crashing with missing data
+    // Since there are multiple "1 obj" elements, use getAllByText
+    const oneObjElements = screen.getAllByText('1 obj');
+    expect(oneObjElements.length).toBeGreaterThan(0);
+
+    // Check for "0 obj"
     expect(screen.getByText('0 obj')).toBeInTheDocument();
+
+    // Check that "After slice" is shown for missing time/weight data
+    const afterSliceElements = screen.getAllByText('After slice');
+    expect(afterSliceElements.length).toBeGreaterThan(0);
   });
 });

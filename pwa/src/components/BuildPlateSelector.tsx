@@ -11,29 +11,29 @@ function BuildPlateSelector({
 }: BuildPlateSelectorProps) {
   // Common Bambu Lab build plate types (removed auto option)
   const buildPlateOptions = [
-    { 
-      value: 'textured_pei_plate', 
-      label: 'Textured PEI', 
+    {
+      value: 'textured_pei_plate',
+      label: 'Textured PEI',
       icon: '🔹',
-      description: 'Best for most prints' 
+      description: 'Best for most prints',
     },
-    { 
-      value: 'smooth_pei_plate', 
-      label: 'Smooth PEI', 
+    {
+      value: 'smooth_pei_plate',
+      label: 'Smooth PEI',
       icon: '⚪',
-      description: 'Smooth bottom finish' 
+      description: 'Smooth bottom finish',
     },
-    { 
-      value: 'cool_plate', 
-      label: 'Cool Plate', 
+    {
+      value: 'cool_plate',
+      label: 'Cool Plate',
       icon: '❄️',
-      description: 'For delicate materials' 
+      description: 'For delicate materials',
     },
-    { 
-      value: 'engineering_plate', 
-      label: 'Engineering', 
+    {
+      value: 'engineering_plate',
+      label: 'Engineering',
       icon: '🔧',
-      description: 'High-temp materials' 
+      description: 'High-temp materials',
     },
   ];
 

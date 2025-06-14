@@ -84,23 +84,32 @@ class ThumbnailService:
         thumbnail_path.parent.mkdir(parents=True, exist_ok=True)
 
         # Try to extract embedded thumbnail from 3MF first
-        if prefer_embedded and model_path.suffix.lower() == '.3mf':
-            logger.info(f"Attempting to extract embedded thumbnail from 3MF: {model_path}")
+        if prefer_embedded and model_path.suffix.lower() == ".3mf":
+            logger.info(
+                f"Attempting to extract embedded thumbnail from 3MF: {model_path}"
+            )
             try:
-                extracted_path = self._extract_embedded_thumbnail(model_path, thumbnail_path)
+                extracted_path = self._extract_embedded_thumbnail(
+                    model_path, thumbnail_path
+                )
                 if extracted_path and extracted_path.exists():
-                    logger.info(f"Successfully extracted embedded thumbnail: {extracted_path}")
+                    logger.info(
+                        f"Successfully extracted embedded thumbnail: {extracted_path}"
+                    )
                     return extracted_path
                 else:
-                    logger.warning(f"Embedded thumbnail extraction returned no result")
+                    logger.warning("Embedded thumbnail extraction returned no result")
             except Exception as e:
                 logger.warning(f"Failed to extract embedded thumbnail: {e}")
                 import traceback
+
                 logger.debug(traceback.format_exc())
 
         # Try to generate thumbnail using 3D rendering libraries
         try:
-            rendered_path = self._render_3d_model(model_path, thumbnail_path, width, height)
+            rendered_path = self._render_3d_model(
+                model_path, thumbnail_path, width, height
+            )
             if rendered_path and rendered_path.exists():
                 logger.info(f"3D rendered thumbnail: {rendered_path}")
                 return rendered_path
@@ -125,15 +134,12 @@ class ThumbnailService:
         )
 
     def _extract_embedded_thumbnail(
-        self,
-        model_path: Path,
-        output_path: Path,
-        size_preference: str = "middle"
+        self, model_path: Path, output_path: Path, size_preference: str = "middle"
     ) -> Optional[Path]:
         """
         Extract embedded thumbnail from 3MF file.
 
-        3MF files contain pre-rendered thumbnails in the Auxiliaries/.thumbnails/ directory:
+        3MF files contain pre-rendered thumbnails in Auxiliaries/.thumbnails/:
         - thumbnail_small.png (typically 50-80KB)
         - thumbnail_middle.png (typically 400-440KB)
         - thumbnail_3mf.png (typically 75KB)
@@ -146,35 +152,41 @@ class ThumbnailService:
         Returns:
             Path to extracted thumbnail if successful, None otherwise
         """
-        if model_path.suffix.lower() != '.3mf':
+        if model_path.suffix.lower() != ".3mf":
             return None
 
         try:
-            with zipfile.ZipFile(model_path, 'r') as zip_file:
+            with zipfile.ZipFile(model_path, "r") as zip_file:
                 all_files = zip_file.namelist()
-                logger.debug(f"3MF contains {len(all_files)} files: {all_files[:10]}...")  # Show first 10 files
-                
+                logger.debug(
+                    f"3MF contains {len(all_files)} files: {all_files[:10]}..."
+                )  # Show first 10 files
+
                 # Find all potential thumbnail files in the archive
-                thumbnail_files = [f for f in all_files if 'thumbnail' in f.lower() and f.lower().endswith('.png')]
+                thumbnail_files = [
+                    f
+                    for f in all_files
+                    if "thumbnail" in f.lower() and f.lower().endswith(".png")
+                ]
                 logger.info(f"Found potential thumbnail files: {thumbnail_files}")
-                
+
                 # List of thumbnail files to try, in order of preference
                 # Common paths where thumbnails are stored in 3MF files
                 preferred_paths = [
                     f"Metadata/thumbnail_{size_preference}.png",
-                    "Metadata/thumbnail_middle.png", 
+                    "Metadata/thumbnail_middle.png",
                     "Metadata/thumbnail_large.png",
                     "Metadata/thumbnail_small.png",
                     "Metadata/thumbnail.png",
                     f"Auxiliaries/.thumbnails/thumbnail_{size_preference}.png",
                     "Auxiliaries/.thumbnails/thumbnail_middle.png",
-                    "Auxiliaries/.thumbnails/thumbnail_3mf.png", 
+                    "Auxiliaries/.thumbnails/thumbnail_3mf.png",
                     "Auxiliaries/.thumbnails/thumbnail_small.png",
                     # Also check without specific size preference
                     "thumbnail.png",
                     "preview.png",
                 ]
-                
+
                 # Try preferred paths first
                 for thumbnail_file in preferred_paths:
                     if thumbnail_file in all_files:
@@ -182,34 +194,52 @@ class ThumbnailService:
                             with zip_file.open(thumbnail_file) as thumb_file:
                                 content = thumb_file.read()
                                 if len(content) > 0:  # Ensure we got actual content
-                                    with open(output_path, 'wb') as out_file:
+                                    with open(output_path, "wb") as out_file:
                                         out_file.write(content)
-                                    
-                                    logger.info(f"Successfully extracted {thumbnail_file} to {output_path}")
-                                    logger.info(f"Extracted file size: {len(content)} bytes")
+
+                                    logger.info(
+                                        f"Successfully extracted {thumbnail_file} "
+                                        f"to {output_path}"
+                                    )
+                                    logger.info(
+                                        f"Extracted file size: {len(content)} bytes"
+                                    )
                                     return output_path
                         except Exception as e:
                             logger.warning(f"Failed to extract {thumbnail_file}: {e}")
                             continue
-                
+
                 # If no preferred paths worked, try any thumbnail file we found
                 for thumbnail_file in thumbnail_files:
                     try:
                         with zip_file.open(thumbnail_file) as thumb_file:
                             content = thumb_file.read()
                             if len(content) > 0:  # Ensure we got actual content
-                                with open(output_path, 'wb') as out_file:
+                                with open(output_path, "wb") as out_file:
                                     out_file.write(content)
-                                
-                                logger.info(f"Successfully extracted fallback thumbnail {thumbnail_file} to {output_path}")
-                                logger.info(f"Extracted file size: {len(content)} bytes")
+
+                                logger.info(
+                                    f"Successfully extracted fallback thumbnail "
+                                    f"{thumbnail_file} to {output_path}"
+                                )
+                                logger.info(
+                                    f"Extracted file size: {len(content)} bytes"
+                                )
                                 return output_path
                     except Exception as e:
-                        logger.warning(f"Failed to extract fallback thumbnail {thumbnail_file}: {e}")
+                        logger.warning(
+                            f"Failed to extract fallback thumbnail "
+                            f"{thumbnail_file}: {e}"
+                        )
                         continue
 
                 logger.warning(f"No usable embedded thumbnails found in {model_path}")
-                logger.debug(f"Available files: {[f for f in all_files if any(term in f.lower() for term in ['thumb', 'preview', 'image'])]}")
+                files_with_thumb = [
+                    f
+                    for f in all_files
+                    if any(term in f.lower() for term in ["thumb", "preview", "image"])
+                ]
+                logger.debug(f"Available files: {files_with_thumb}")
                 return None
 
         except zipfile.BadZipFile:
@@ -232,8 +262,10 @@ class ThumbnailService:
         try:
             # Try simple mesh extraction and visualization with matplotlib
             # This is more likely to work without additional dependencies
-            return self._render_with_matplotlib(model_path, thumbnail_path, width, height)
-            
+            return self._render_with_matplotlib(
+                model_path, thumbnail_path, width, height
+            )
+
         except Exception as e:
             logger.error(f"3D rendering failed: {e}")
             return None
@@ -250,16 +282,15 @@ class ThumbnailService:
         """
         try:
             import matplotlib.pyplot as plt
-            from mpl_toolkits.mplot3d import Axes3D
             import numpy as np
-            
+
             logger.info("Attempting matplotlib 3D rendering")
-            
-            # For now, just create a simple 3D placeholder since full mesh parsing is complex
+
+            # Create a simple 3D placeholder since full mesh parsing is complex
             # This could be enhanced later with proper STL/3MF parsing
-            fig = plt.figure(figsize=(width/100, height/100), dpi=100)
-            ax = fig.add_subplot(111, projection='3d')
-            
+            fig = plt.figure(figsize=(width / 100, height / 100), dpi=100)
+            ax = fig.add_subplot(111, projection="3d")
+
             # Create a simple 3D shape to represent the model
             # In the future, this could parse actual mesh data
             u = np.linspace(0, 2 * np.pi, 20)
@@ -267,23 +298,30 @@ class ThumbnailService:
             x = np.outer(np.cos(u), np.sin(v))
             y = np.outer(np.sin(u), np.sin(v))
             z = np.outer(np.ones(np.size(u)), np.cos(v))
-            
-            ax.plot_surface(x, y, z, alpha=0.7, color='lightblue')
-            ax.set_box_aspect([1,1,1])
+
+            ax.plot_surface(x, y, z, alpha=0.7, color="lightblue")
+            ax.set_box_aspect([1, 1, 1])
             ax.set_axis_off()
             ax.view_init(elev=20, azim=45)
-            
+
             plt.tight_layout()
-            plt.savefig(thumbnail_path, dpi=100, bbox_inches='tight', 
-                       facecolor='white', edgecolor='none')
+            plt.savefig(
+                thumbnail_path,
+                dpi=100,
+                bbox_inches="tight",
+                facecolor="white",
+                edgecolor="none",
+            )
             plt.close()
-            
+
             if thumbnail_path.exists():
-                logger.info(f"Successfully rendered 3D model with matplotlib: {thumbnail_path}")
+                logger.info(
+                    f"Successfully rendered 3D model with matplotlib: {thumbnail_path}"
+                )
                 return thumbnail_path
-            
+
             return None
-            
+
         except ImportError:
             logger.info("matplotlib not available for 3D rendering")
             return None
@@ -451,10 +489,7 @@ class ThumbnailService:
             )
 
     def extract_plate_thumbnail(
-        self,
-        model_path: Path,
-        plate_index: int,
-        output_path: Optional[Path] = None
+        self, model_path: Path, plate_index: int, output_path: Optional[Path] = None
     ) -> Optional[Path]:
         """
         Extract plate-specific thumbnail from 3MF file.
@@ -467,21 +502,23 @@ class ThumbnailService:
         Returns:
             Path to extracted thumbnail if successful, None otherwise
         """
-        if model_path.suffix.lower() != '.3mf':
+        if model_path.suffix.lower() != ".3mf":
             return None
 
         if output_path is None:
-            output_path = self.temp_dir / f"{model_path.stem}_plate_{plate_index}_thumbnail.png"
+            output_path = (
+                self.temp_dir / f"{model_path.stem}_plate_{plate_index}_thumbnail.png"
+            )
 
         try:
-            with zipfile.ZipFile(model_path, 'r') as zip_file:
+            with zipfile.ZipFile(model_path, "r") as zip_file:
                 all_files = zip_file.namelist()
-                
+
                 # Look for plate-specific thumbnails in various common locations
                 plate_thumbnail_patterns = [
                     # Metadata folder patterns
                     f"Metadata/plate_{plate_index}_thumbnail.png",
-                    f"Metadata/plate_{plate_index}.png", 
+                    f"Metadata/plate_{plate_index}.png",
                     f"Metadata/thumbnail_plate_{plate_index}.png",
                     f"Metadata/plate{plate_index}_thumbnail.png",
                     f"Metadata/plate{plate_index}.png",
@@ -501,35 +538,54 @@ class ThumbnailService:
                             with zip_file.open(pattern) as thumb_file:
                                 content = thumb_file.read()
                                 if len(content) > 0:
-                                    with open(output_path, 'wb') as out_file:
+                                    with open(output_path, "wb") as out_file:
                                         out_file.write(content)
-                                    
-                                    logger.info(f"Extracted plate {plate_index} thumbnail: {pattern} -> {output_path}")
+
+                                    logger.info(
+                                        f"Extracted plate {plate_index} thumbnail: "
+                                        f"{pattern} -> {output_path}"
+                                    )
                                     return output_path
                         except Exception as e:
-                            logger.warning(f"Failed to extract plate thumbnail {pattern}: {e}")
+                            logger.warning(
+                                f"Failed to extract plate thumbnail {pattern}: {e}"
+                            )
                             continue
 
-                # If no specific plate thumbnail found, look for any files containing the plate index
-                plate_files = [f for f in all_files if str(plate_index) in f and 'thumbnail' in f.lower() and f.lower().endswith('.png')]
+                # If no specific plate thumbnail found, look for files with plate index
+                plate_files = [
+                    f
+                    for f in all_files
+                    if str(plate_index) in f
+                    and "thumbnail" in f.lower()
+                    and f.lower().endswith(".png")
+                ]
                 logger.info(f"Found potential plate {plate_index} files: {plate_files}")
-                
+
                 for plate_file in plate_files:
                     try:
                         with zip_file.open(plate_file) as thumb_file:
                             content = thumb_file.read()
                             if len(content) > 0:
-                                with open(output_path, 'wb') as out_file:
+                                with open(output_path, "wb") as out_file:
                                     out_file.write(content)
-                                
-                                logger.info(f"Extracted plate {plate_index} thumbnail from: {plate_file}")
+
+                                logger.info(
+                                    f"Extracted plate {plate_index} thumbnail from: "
+                                    f"{plate_file}"
+                                )
                                 return output_path
                     except Exception as e:
-                        logger.warning(f"Failed to extract plate file {plate_file}: {e}")
+                        logger.warning(
+                            f"Failed to extract plate file {plate_file}: {e}"
+                        )
                         continue
 
                 # Fallback: extract general thumbnail
-                logger.debug(f"No plate-specific thumbnail found for plate {plate_index}, trying general thumbnail")
+                logger.debug(
+                    f"No plate-specific thumbnail found for plate {plate_index}, "
+                    f"trying general thumbnail"
+                )
                 return self._extract_embedded_thumbnail(model_path, output_path)
 
         except Exception as e:
@@ -550,19 +606,26 @@ class ThumbnailService:
             "general_thumbnails": [],
             "plate_thumbnails": [],
             "has_embedded": False,
-            "total_thumbnails": 0
+            "total_thumbnails": 0,
         }
 
-        if model_path.suffix.lower() != '.3mf':
+        if model_path.suffix.lower() != ".3mf":
             return result
 
         try:
-            with zipfile.ZipFile(model_path, 'r') as zip_file:
+            with zipfile.ZipFile(model_path, "r") as zip_file:
                 files = zip_file.namelist()
-                thumbnail_files = [f for f in files if 'thumbnail' in f.lower() and f.lower().endswith('.png')]
-                
-                logger.info(f"Analyzing 3MF thumbnails. Found {len(thumbnail_files)} thumbnail files: {thumbnail_files}")
-                
+                thumbnail_files = [
+                    f
+                    for f in files
+                    if "thumbnail" in f.lower() and f.lower().endswith(".png")
+                ]
+
+                logger.info(
+                    f"Analyzing 3MF thumbnails. Found {len(thumbnail_files)} "
+                    f"thumbnail files: {thumbnail_files}"
+                )
+
                 for thumb_file in thumbnail_files:
                     # Get file size
                     file_info = zip_file.getinfo(thumb_file)
@@ -572,7 +635,7 @@ class ThumbnailService:
                         "path": thumb_file,
                         "size_kb": round(size_kb, 1),
                         "type": "unknown",
-                        "location": "unknown"
+                        "location": "unknown",
                     }
 
                     # Determine location
@@ -584,10 +647,20 @@ class ThumbnailService:
                         thumb_info["location"] = "root"
 
                     # Categorize thumbnail type
-                    if "plate" in thumb_file.lower() or any(f"plate{i}" in thumb_file.lower() for i in range(1, 10)):
+                    if "plate" in thumb_file.lower() or any(
+                        f"plate{i}" in thumb_file.lower() for i in range(1, 10)
+                    ):
                         thumb_info["type"] = "plate_specific"
                         result["plate_thumbnails"].append(thumb_info)
-                    elif any(name in thumb_file.lower() for name in ["thumbnail_small", "thumbnail_middle", "thumbnail_large", "thumbnail.png"]):
+                    elif any(
+                        name in thumb_file.lower()
+                        for name in [
+                            "thumbnail_small",
+                            "thumbnail_middle",
+                            "thumbnail_large",
+                            "thumbnail.png",
+                        ]
+                    ):
                         thumb_info["type"] = "general"
                         result["general_thumbnails"].append(thumb_info)
                     else:
@@ -596,12 +669,14 @@ class ThumbnailService:
 
                 result["has_embedded"] = len(thumbnail_files) > 0
                 result["total_thumbnails"] = len(thumbnail_files)
-                
+
                 # Add debug information about all files
                 result["debug_info"] = {
                     "total_files": len(files),
                     "metadata_files": [f for f in files if f.startswith("Metadata/")],
-                    "auxiliaries_files": [f for f in files if f.startswith("Auxiliaries/")]
+                    "auxiliaries_files": [
+                        f for f in files if f.startswith("Auxiliaries/")
+                    ],
                 }
 
         except Exception as e:

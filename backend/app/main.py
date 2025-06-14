@@ -1628,8 +1628,11 @@ async def stream_slice_progress(session_id: str):
                                 )
 
                                 # Try to extract estimates from the slice output
-                                updated_plates = model_service.update_plate_estimates_from_slice_output(
-                                    model_file_path, plate_output_dir
+                                svc = model_service
+                                updated_plates = (
+                                    svc.update_plate_estimates_from_slice_output(
+                                        model_file_path, plate_output_dir
+                                    )
                                 )
 
                                 # Find the estimates for this specific plate
@@ -1662,7 +1665,7 @@ async def stream_slice_progress(session_id: str):
                                     f"completed successfully",
                                     "timestamp": time.time(),
                                     "is_complete": True,
-                                    "estimates": estimates,  # Include the extracted estimates
+                                    "estimates": estimates,  # Include estimates
                                 },
                             }
                             yield f"data: {json.dumps(plate_complete_event)}\n\n"
@@ -1691,7 +1694,9 @@ async def stream_slice_progress(session_id: str):
                                 "plate_index": plate_index,
                                 "phase": "error",
                                 "progress_percent": 0.0,
-                                "message": f"Plate {plate_index} slicing error: {str(e)}",
+                                "message": (
+                                    f"Plate {plate_index} slicing error: {str(e)}"
+                                ),
                                 "timestamp": time.time(),
                                 "is_complete": True,
                             },
