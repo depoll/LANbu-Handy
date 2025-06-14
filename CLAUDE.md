@@ -192,3 +192,5 @@ BAMBU_PRINTERS='[{"name":"X1C","ip":"192.168.1.100","access_code":"12345678"}]'
 ## Memories
 
 - Use `bambu-studio-cli --help` as the canonical documentation for the cli's functionality. Where something is already built into the CLI, use it! There is some additional (but incomplete) documentation here that has some examples of usage: https://github.com/bambulab/BambuStudio/wiki/Command-Line-Usage
+- make sure we don't get out of sync with upstream in a way that will require us to revert changes to restore. As much as possible, keep the commits linear. So before committing, ensure we're in sync with the remote for the current branch (if there is one). If there are pending changes, that's fine -- just keep building up the changelist until we're ready to commit.
+- use scripts/start-dev.sh to start both the frontend and backend
