@@ -471,6 +471,182 @@
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
 }
 
+/* Interactive Filament Pill Styles */
+.filament-pill-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.filament-pill-interactive {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 120px;
+  height: 80px;
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  border: 2px solid transparent;
+}
+
+.filament-pill-interactive:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.filament-pill-interactive.open {
+  border-color: #007bff;
+  box-shadow: 0 4px 16px rgba(0, 123, 255, 0.3);
+}
+
+.pill-top-half,
+.pill-bottom-half {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  position: relative;
+}
+
+.pill-top-half {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.pill-full {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 12px;
+  gap: 4px;
+}
+
+.pill-type {
+  font-weight: 600;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.pill-number {
+  font-size: 0.75rem;
+  opacity: 0.8;
+}
+
+.unmapped-label {
+  font-size: 0.7rem;
+  opacity: 0.7;
+  font-style: italic;
+}
+
+.mapped-info {
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.mapped-type {
+  font-size: 0.7rem;
+  opacity: 0.9;
+}
+
+.dropdown-indicator {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.7rem;
+  opacity: 0.6;
+  transition: opacity 0.2s ease;
+}
+
+.filament-pill-interactive:hover .dropdown-indicator {
+  opacity: 1;
+}
+
+/* Dropdown Menu Styles */
+.filament-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 200px;
+  background: white;
+  border: 1px solid #e9ecef;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.dropdown-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+  border-bottom: 1px solid #f8f9fa;
+}
+
+.dropdown-option:last-child {
+  border-bottom: none;
+}
+
+.dropdown-option:hover {
+  background-color: #f8f9fa;
+}
+
+.dropdown-option.selected {
+  background-color: #e8f4fd;
+}
+
+.dropdown-option.clear-option {
+  color: #dc3545;
+  font-weight: 500;
+  justify-content: center;
+  border-bottom: 2px solid #e9ecef;
+}
+
+.dropdown-option.clear-option:hover {
+  background-color: #fff5f5;
+}
+
+.option-color-swatch {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid #e9ecef;
+  flex-shrink: 0;
+}
+
+.option-details {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.option-label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #495057;
+}
+
+.option-type {
+  font-size: 0.75rem;
+  color: #6c757d;
+}
+
+.selected-indicator {
+  color: #28a745;
+  font-weight: bold;
+  font-size: 1rem;
+}
+
 /* Build Plate Selector */
 .build-plate-selector {
   display: flex;

@@ -40,6 +40,194 @@ interface SliceProgress {
   };
 }
 
+interface FilamentPillWithDropdownProps {
+  index: number;
+  type: string;
+  requiredColor: string;
+  mapping?: FilamentMapping;
+  mappedSlot?: {
+    filament_type: string;
+    color: string;
+  } | null;
+  amsStatus: AMSStatusResponse | null;
+  filamentMappings?: FilamentMapping[];
+  onMappingChange?: (mappings: FilamentMapping[]) => void;
+  disabled?: boolean;
+}
+
+// Component for interactive filament pill with dropdown
+function FilamentPillWithDropdown({
+  index,
+  type,
+  requiredColor,
+  mapping,
+  mappedSlot,
+  amsStatus,
+  filamentMappings = [],
+  onMappingChange,
+  disabled = false,
+}: FilamentPillWithDropdownProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const getContrastColor = (hexColor: string): string => {
+    const hex = hexColor.replace('#', '');
+    const r = parseInt(hex.substr(0, 2), 16);
+    const g = parseInt(hex.substr(2, 2), 16);
+    const b = parseInt(hex.substr(4, 2), 16);
+    const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+    return brightness > 128 ? '#000000' : '#FFFFFF';
+  };
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsOpen(false);
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  const handleMappingSelect = (unitId: number, slotId: number) => {
+    if (!onMappingChange) return;
+
+    // Start with current mappings
+    const newMappings = [...filamentMappings];
+
+    // Remove any existing mapping for this filament index
+    const filteredMappings = newMappings.filter(
+      m => m.filament_index !== index
+    );
+
+    // Add the new mapping
+    filteredMappings.push({
+      filament_index: index,
+      ams_unit_id: unitId,
+      ams_slot_id: slotId,
+    });
+
+    onMappingChange(filteredMappings);
+    setIsOpen(false);
+  };
+
+  const handleClearMapping = () => {
+    if (!onMappingChange) return;
+
+    // Remove mapping for this filament index
+    const newMappings = filamentMappings.filter(
+      m => m.filament_index !== index
+    );
+    onMappingChange(newMappings);
+    setIsOpen(false);
+  };
+
+  return (
+    <div className="filament-pill-wrapper" ref={dropdownRef}>
+      <div
+        className={`filament-pill-interactive ${mapping ? 'mapped' : 'unmapped'} ${
+          isOpen ? 'open' : ''
+        }`}
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        style={{ cursor: disabled ? 'not-allowed' : 'pointer' }}
+      >
+        {/* Split color design */}
+        {mapping && mappedSlot ? (
+          <>
+            <div
+              className="pill-top-half"
+              style={{
+                backgroundColor: requiredColor,
+                color: getContrastColor(requiredColor),
+              }}
+            >
+              <span className="pill-type">{type}</span>
+              <span className="pill-number">#{index + 1}</span>
+            </div>
+            <div
+              className="pill-bottom-half"
+              style={{
+                backgroundColor: mappedSlot.color,
+                color: getContrastColor(mappedSlot.color),
+              }}
+            >
+              <span className="mapped-info">
+                AMS {mapping.ams_unit_id}-{mapping.ams_slot_id}
+              </span>
+              <span className="mapped-type">{mappedSlot.filament_type}</span>
+            </div>
+          </>
+        ) : (
+          <div
+            className="pill-full"
+            style={{
+              backgroundColor: requiredColor,
+              color: getContrastColor(requiredColor),
+            }}
+          >
+            <span className="pill-type">{type}</span>
+            <span className="pill-number">#{index + 1}</span>
+            <span className="unmapped-label">Click to map</span>
+          </div>
+        )}
+        <div className="dropdown-indicator">{isOpen ? '▲' : '▼'}</div>
+      </div>
+
+      {/* Dropdown menu */}
+      {isOpen && amsStatus?.ams_units && (
+        <div className="filament-dropdown-menu">
+          {mapping && (
+            <div
+              className="dropdown-option clear-option"
+              onClick={handleClearMapping}
+            >
+              <span>Clear mapping</span>
+            </div>
+          )}
+          {amsStatus.ams_units.map(unit =>
+            unit.filaments.map(filament => {
+              const isSelected =
+                mapping?.ams_unit_id === unit.unit_id &&
+                mapping?.ams_slot_id === filament.slot_id;
+
+              return (
+                <div
+                  key={`${unit.unit_id}-${filament.slot_id}`}
+                  className={`dropdown-option ${isSelected ? 'selected' : ''}`}
+                  onClick={() =>
+                    handleMappingSelect(unit.unit_id, filament.slot_id)
+                  }
+                >
+                  <div
+                    className="option-color-swatch"
+                    style={{ backgroundColor: filament.color }}
+                  />
+                  <div className="option-details">
+                    <span className="option-label">
+                      AMS {unit.unit_id}-{filament.slot_id}
+                    </span>
+                    <span className="option-type">
+                      {filament.filament_type}
+                    </span>
+                  </div>
+                  {isSelected && <span className="selected-indicator">✓</span>}
+                </div>
+              );
+            })
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PlateSelector({
   plates,
   selectedPlateIndex,
@@ -716,51 +904,40 @@ function PlateSelector({
                         <h6>Required Filaments</h6>
                         <div className="filament-requirements-compact">
                           {activeFilamentRequirements.filament_types.map(
-                            (type, index) => (
-                              <div
-                                key={index}
-                                className="filament-badge-with-status"
-                              >
-                                <span
-                                  className="filament-type-colored"
-                                  style={{
-                                    backgroundColor:
-                                      activeFilamentRequirements
-                                        .filament_colors[index] || '#ddd',
-                                    color: getContrastColor(
-                                      activeFilamentRequirements
-                                        .filament_colors[index] || '#ddd'
-                                    ),
-                                  }}
-                                >
-                                  {type}
-                                </span>
-                                {/* AMS Mapping Status */}
-                                {amsStatus && (
-                                  <div className="mapping-status-compact">
-                                    {(() => {
-                                      const mapping = filamentMappings.find(
-                                        m => m.filament_index === index
-                                      );
-                                      if (mapping) {
-                                        return (
-                                          <span className="mapped-compact">
-                                            ✓ AMS {mapping.ams_unit_id}-
-                                            {mapping.ams_slot_id}
-                                          </span>
-                                        );
-                                      } else {
-                                        return (
-                                          <span className="unmapped-compact">
-                                            ⚠️ Not mapped
-                                          </span>
-                                        );
-                                      }
-                                    })()}
-                                  </div>
-                                )}
-                              </div>
-                            )
+                            (type, index) => {
+                              const mapping = filamentMappings?.find(
+                                m => m.filament_index === index
+                              );
+                              const mappedSlot =
+                                mapping && amsStatus?.ams_units
+                                  ? amsStatus.ams_units
+                                      .find(
+                                        u => u.unit_id === mapping.ams_unit_id
+                                      )
+                                      ?.filaments.find(
+                                        f => f.slot_id === mapping.ams_slot_id
+                                      )
+                                  : null;
+
+                              return (
+                                <FilamentPillWithDropdown
+                                  key={index}
+                                  index={index}
+                                  type={type}
+                                  requiredColor={
+                                    activeFilamentRequirements.filament_colors[
+                                      index
+                                    ] || '#ddd'
+                                  }
+                                  mapping={mapping}
+                                  mappedSlot={mappedSlot}
+                                  amsStatus={amsStatus}
+                                  filamentMappings={filamentMappings}
+                                  onMappingChange={onMappingChange}
+                                  disabled={disabled || !amsStatus}
+                                />
+                              );
+                            }
                           )}
                         </div>
                       </div>
