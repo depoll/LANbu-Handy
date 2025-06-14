@@ -240,6 +240,7 @@ function PlateSelector({
   isFilamentRequirementsFiltered,
   amsStatus,
   filamentMappings = [],
+  onMappingChange,
   selectedBuildPlate,
   onBuildPlateSelect,
   onPlatesUpdate,
