@@ -55,11 +55,10 @@ class TestPlateSelectionAPI(unittest.TestCase):
         call_args = mock_slice_model.call_args
         options = call_args[1]["options"]  # keyword arguments
 
-        # Should include plate index in options
-        self.assertIn("plate-index", options)
-        self.assertEqual(options["plate-index"], "2")
-        self.assertIn("build-plate", options)
-        self.assertEqual(options["build-plate"], "cool_plate")
+        # Bambu Studio CLI doesn't support these options directly
+        # Options should be empty dict, relying on 3MF embedded settings
+        self.assertIsInstance(options, dict)
+        self.assertEqual(len(options), 0)
 
     @patch("app.main.slice_model")
     @patch("app.main.find_gcode_file")
@@ -99,10 +98,10 @@ class TestPlateSelectionAPI(unittest.TestCase):
         call_args = mock_slice_model.call_args
         options = call_args[1]["options"]  # keyword arguments
 
-        # Should NOT include plate index in options when None
-        self.assertNotIn("plate-index", options)
-        self.assertIn("build-plate", options)
-        self.assertEqual(options["build-plate"], "cool_plate")
+        # Bambu Studio CLI doesn't support these options directly
+        # Options should be empty dict, relying on 3MF embedded settings
+        self.assertIsInstance(options, dict)
+        self.assertEqual(len(options), 0)
 
     @patch("app.main.slice_model")
     @patch("app.main.find_gcode_file")
@@ -142,8 +141,10 @@ class TestPlateSelectionAPI(unittest.TestCase):
         call_args = mock_slice_model.call_args
         options = call_args[1]["options"]  # keyword arguments
 
-        # Should NOT include plate index in options when explicitly None
-        self.assertNotIn("plate-index", options)
+        # Bambu Studio CLI doesn't support these options directly
+        # Options should be empty dict, relying on 3MF embedded settings
+        self.assertIsInstance(options, dict)
+        self.assertEqual(len(options), 0)
 
 
 if __name__ == "__main__":

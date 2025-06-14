@@ -37,19 +37,20 @@ describe('Status Messages Scrolling', () => {
       </ToastProvider>
     );
 
-    // Enter a model URL and submit to generate status messages
-    const urlInput = screen.getByTestId('model-url-input');
-    const analyzeButton = screen.getByTestId('analyze-model-button');
+    // Navigate to the Status tab first
+    const statusTab = screen.getByRole('tab', { name: /Status/ });
+    fireEvent.click(statusTab);
 
-    fireEvent.change(urlInput, {
-      target: { value: 'https://example.com/model.stl' },
+    // Wait for the status tab to be displayed
+    await waitFor(() => {
+      expect(screen.getByText('System Status')).toBeInTheDocument();
     });
-    fireEvent.click(analyzeButton);
 
     // Wait for status messages to appear
     await waitFor(() => {
-      const statusDisplay = document.querySelector('.status-display');
-      expect(statusDisplay).toBeInTheDocument();
+      const statusMessagesContainer =
+        document.querySelector('.status-messages');
+      expect(statusMessagesContainer).toBeInTheDocument();
     });
 
     // Find the status messages container
@@ -72,20 +73,24 @@ describe('Status Messages Scrolling', () => {
       </ToastProvider>
     );
 
-    // Enter a model URL and submit to generate status messages
-    const urlInput = screen.getByTestId('model-url-input');
-    const analyzeButton = screen.getByTestId('analyze-model-button');
+    // Navigate to the Status tab first
+    const statusTab = screen.getByRole('tab', { name: /Status/ });
+    fireEvent.click(statusTab);
 
-    fireEvent.change(urlInput, {
-      target: { value: 'https://example.com/model.stl' },
+    // Wait for the status tab to be displayed
+    await waitFor(() => {
+      expect(screen.getByText('System Status')).toBeInTheDocument();
     });
-    fireEvent.click(analyzeButton);
 
     // Wait for status messages to appear
     await waitFor(() => {
-      const statusDisplay = document.querySelector('.status-display');
-      expect(statusDisplay).toBeInTheDocument();
+      const statusMessagesContainer =
+        document.querySelector('.status-messages');
+      expect(statusMessagesContainer).toBeInTheDocument();
     });
+
+    // Verify the status tab shows the correct structure
+    expect(screen.getByText('System Log')).toBeInTheDocument();
 
     // Find the status messages container
     const statusMessagesContainer = document.querySelector('.status-messages');
@@ -97,8 +102,6 @@ describe('Status Messages Scrolling', () => {
 
     // Verify status messages contain expected content
     const messagesText = Array.from(statusMessages).map(msg => msg.textContent);
-    expect(messagesText.some(text => text?.includes('Submitting model'))).toBe(
-      true
-    );
+    expect(messagesText.some(text => text?.includes('AMS status'))).toBe(true);
   });
 });

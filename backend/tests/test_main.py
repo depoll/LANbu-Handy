@@ -494,10 +494,9 @@ class TestSliceEndpoint:
 
             # Verify default options were passed
             options = call_args[1]["options"]
-            assert options["profile"] == "pla"
-            assert options["layer-height"] == "0.2"
-            assert options["infill"] == "15"
-            assert options["support"] == "auto"
+            # Bambu Studio CLI doesn't support these options directly
+            assert isinstance(options, dict)
+            assert len(options) == 0  # Should be empty dict
 
         finally:
             # Clean up test file
@@ -634,9 +633,9 @@ class TestConfiguredSliceEndpoint:
 
             # Verify configured options were passed
             options = call_args[1]["options"]
-            assert options["build-plate"] == "Textured PEI Plate"
-            assert options["filament-slot-0"] == "0-1"
-            assert options["filament-slot-1"] == "0-2"
+            # Bambu Studio CLI doesn't support these options directly
+            assert isinstance(options, dict)
+            assert len(options) == 0  # Should be empty dict
 
         finally:
             # Clean up test file
@@ -696,9 +695,9 @@ class TestConfiguredSliceEndpoint:
 
         options = build_slicing_options_from_config(filament_mappings, build_plate_type)
 
-        assert options["build-plate"] == "Cool Plate"
-        assert options["filament-slot-0"] == "0-1"
-        assert options["filament-slot-1"] == "1-3"
+        # Bambu Studio CLI doesn't support these options directly
+        assert isinstance(options, dict)
+        assert len(options) == 0  # Should be empty dict
 
     def test_build_slicing_options_empty_mappings(self):
         """Test the helper function with empty filament mappings."""
@@ -706,8 +705,9 @@ class TestConfiguredSliceEndpoint:
 
         options = build_slicing_options_from_config([], "Smooth PEI Plate")
 
-        assert options["build-plate"] == "Smooth PEI Plate"
-        assert len(options) == 1  # Only build plate option
+        # Bambu Studio CLI doesn't support these options directly
+        assert isinstance(options, dict)
+        assert len(options) == 0  # Should be empty dict
 
 
 class TestJobStartEndpoint:

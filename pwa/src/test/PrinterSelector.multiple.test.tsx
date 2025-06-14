@@ -295,7 +295,10 @@ describe('PrinterSelector Multiple Printers Management', () => {
               },
             }),
         });
-      } else if (url === '/api/printers/add' && options?.method === 'POST') {
+      } else if (
+        url === '/api/printer/configure' &&
+        options?.method === 'POST'
+      ) {
         return Promise.resolve({
           ok: true,
           json: () =>
@@ -331,9 +334,9 @@ describe('PrinterSelector Multiple Printers Management', () => {
 
     fireEvent.click(switchButtons[0]);
 
-    // Should call the add printer API to switch
+    // Should call the printer configure API to switch
     await waitFor(() => {
-      expect(mockFetch).toHaveBeenCalledWith('/api/printers/add', {
+      expect(mockFetch).toHaveBeenCalledWith('/api/printer/configure', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: expect.stringContaining('"ip":"192.168.1.101"'),
