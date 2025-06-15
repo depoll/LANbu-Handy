@@ -28,19 +28,22 @@ describe('PlateSelector Component', () => {
     },
   ];
 
-  it('renders nothing for single plate models', () => {
+  it('renders for single plate models using multi-plate UI', () => {
     const singlePlate = [mockPlates[0]];
     const onPlateSelect = vi.fn();
 
-    const { container } = render(
+    const { container, getByText } = render(
       <PlateSelector
         plates={singlePlate}
         selectedPlateIndex={1}
         onPlateSelect={onPlateSelect}
+        fileId="test-file-id"
       />
     );
 
-    expect(container.firstChild).toBeNull();
+    expect(container.firstChild).not.toBeNull();
+    expect(getByText('Plate Selection')).toBeInTheDocument();
+    expect(getByText('All Plates')).toBeInTheDocument();
   });
 
   it('renders nothing for empty plates array', () => {
