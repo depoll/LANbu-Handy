@@ -419,11 +419,14 @@ async def submit_model_url(request: ModelURLRequest):
         # Download and validate the model
         file_path = await model_service.download_model(request.model_url)
 
-        # Get file information
-        file_info = model_service.get_file_info(file_path)
+        # Parse comprehensive model information (may convert STL to 3MF)
+        model_info, final_file_path = model_service.parse_3mf_model_info(file_path)
 
-        # Parse comprehensive model information if it's a .3mf file
-        model_info = model_service.parse_3mf_model_info(file_path)
+        # Update file_path to point to the actual file (potentially converted to 3MF)
+        file_path = final_file_path
+
+        # Get file information (using potentially updated file_path)
+        file_info = model_service.get_file_info(file_path)
 
         # Convert filament requirements to response model if found
         filament_requirements_response = None
@@ -450,8 +453,7 @@ async def submit_model_url(request: ModelURLRequest):
                     )
                 )
 
-        # Generate file ID (using the filename without UUID prefix
-        # for user display)
+        # Generate file ID (using the actual filename after any conversion)
         file_id = file_path.name
 
         return ModelSubmissionResponse(
@@ -516,11 +518,14 @@ async def upload_model_file(file: UploadFile = File(...)):
         with open(temp_file_path, "wb") as f:
             f.write(content)
 
-        # Get file information
-        file_info = model_service.get_file_info(temp_file_path)
+        # Parse comprehensive model information (may convert STL to 3MF)
+        model_info, final_file_path = model_service.parse_3mf_model_info(temp_file_path)
 
-        # Parse comprehensive model information if it's a .3mf file
-        model_info = model_service.parse_3mf_model_info(temp_file_path)
+        # Update temp_file_path to point to the actual file (converted to 3MF)
+        temp_file_path = final_file_path
+
+        # Get file information (using potentially updated file_path)
+        file_info = model_service.get_file_info(temp_file_path)
 
         # Convert filament requirements to response model if found
         filament_requirements_response = None
@@ -547,7 +552,7 @@ async def upload_model_file(file: UploadFile = File(...)):
                     )
                 )
 
-        # Generate file ID (using the filename with UUID prefix for storage)
+        # Generate file ID (using the actual filename after any conversion)
         file_id = temp_file_path.name
 
         return ModelSubmissionResponse(
@@ -737,6 +742,11 @@ async def get_model_thumbnail(file_id: str, width: int = 300, height: int = 300)
         HTTPException: If file is not found or thumbnail generation fails
     """
     try:
+        # Debug logging
+        logger.info(
+            f"Thumbnail request: file_id='{file_id}', width={width}, height={height}"
+        )
+
         # Find the model file in the temp directory
         model_file_path = model_service.temp_dir / file_id
 
@@ -758,6 +768,10 @@ async def get_model_thumbnail(file_id: str, width: int = 300, height: int = 300)
         thumbnail_path = thumbnail_service.generate_thumbnail(
             model_file_path, width=width, height=height, prefer_embedded=True
         )
+        logger.info(
+            f"Thumbnail result: {thumbnail_path}, exists: {thumbnail_path.exists()}, "
+            f"size: {thumbnail_path.stat().st_size if thumbnail_path.exists() else 'N/A'}"
+        )
 
         # Determine media type based on file extension
         media_type = "image/png"
@@ -768,6 +782,11 @@ async def get_model_thumbnail(file_id: str, width: int = 300, height: int = 300)
             path=thumbnail_path,
             media_type=media_type,
             filename=f"{model_file_path.stem}_thumbnail{thumbnail_path.suffix}",
+            headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0",
+            },
         )
 
     except HTTPException:
@@ -851,6 +870,11 @@ async def get_plate_thumbnail(
                 f"{model_file_path.stem}_plate_{plate_index}_thumbnail"
                 f"{thumbnail_path.suffix}"
             ),
+            headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0",
+            },
         )
 
     except HTTPException:

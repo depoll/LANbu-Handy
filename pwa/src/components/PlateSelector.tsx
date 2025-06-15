@@ -266,6 +266,10 @@ function PlateSelector({
   const [plateEstimates, setPlateEstimates] = useState<
     Map<number, { prediction_seconds?: number; weight_grams?: number }>
   >(new Map());
+  const [sliceError, setSliceError] = useState<string | null>(null);
+  const [failedThumbnails, setFailedThumbnails] = useState<Set<string>>(
+    new Set()
+  );
 
   // Check if configuration is complete
   const isConfigurationComplete = useCallback((): boolean => {
@@ -310,6 +314,7 @@ function PlateSelector({
 
     try {
       setIsStreaming(true);
+      setSliceError(null); // Clear any previous errors
       setPlateProgress(new Map());
       setOverallProgress(0);
       setCurrentPhase('Initializing...');
@@ -333,14 +338,21 @@ function PlateSelector({
       });
 
       if (!startResponse.ok) {
+        const errorText = await startResponse.text();
+        setSliceError(`Slice request failed: ${errorText}`);
         setIsStreaming(false);
+        setIsSlicing(false);
         return;
       }
 
       const startResult: StartProgressSliceResponse =
         await startResponse.json();
       if (!startResult.success) {
+        setSliceError(
+          `Slice initialization failed: ${startResult.error || 'Unknown error'}`
+        );
         setIsStreaming(false);
+        setIsSlicing(false);
         return;
       }
 
@@ -528,10 +540,11 @@ function PlateSelector({
             setIsStreaming(false);
             setIsSlicing(false);
           } else if (eventData.type === 'error') {
-            setCurrentPhase(`Error: ${eventData.data.error}`);
+            const errorMessage = eventData.data.error || 'Unknown error';
+            setCurrentPhase(`Error: ${errorMessage}`);
+            setSliceError(`Slicing failed: ${errorMessage}`);
 
             // Log backend parameter errors for debugging
-            const errorMessage = eventData.data.error || '';
             if (
               (errorMessage.includes('filament_flush_temp') ||
                 errorMessage.includes('Param values in 3mf/config error')) &&
@@ -558,6 +571,7 @@ function PlateSelector({
       eventSource.onerror = error => {
         console.error('EventSource error:', error);
         setCurrentPhase('Connection error occurred');
+        setSliceError('Connection error occurred during slicing');
         setIsStreaming(false);
         setIsSlicing(false);
 
@@ -575,6 +589,9 @@ function PlateSelector({
       };
     } catch (error) {
       console.error('Failed to start streaming slice:', error);
+      setSliceError(
+        `Network error: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
       setIsStreaming(false);
       setIsSlicing(false);
       setCurrentPhase('Failed to start slicing');
@@ -599,8 +616,8 @@ function PlateSelector({
       return;
     }
 
-    // Don't auto-slice if already slicing
-    if (isSlicing) {
+    // Don't auto-slice if already slicing or if there's an error
+    if (isSlicing || sliceError) {
       return;
     }
 
@@ -620,11 +637,13 @@ function PlateSelector({
         clearTimeout(timer);
       };
     }
-  }, [fileId, selectedBuildPlate, selectedPlateIndex, hasSliced]); // Include hasSliced to prevent re-triggering
+  }, [fileId, selectedBuildPlate, selectedPlateIndex, hasSliced, sliceError]); // Include sliceError to prevent re-triggering
 
-  // Reset hasSliced when file changes
+  // Reset hasSliced and error when file changes
   useEffect(() => {
     setHasSliced(false);
+    setSliceError(null);
+    setFailedThumbnails(new Set()); // Reset failed thumbnails for new file
   }, [fileId]);
 
   // Cleanup event source on unmount
@@ -848,9 +867,29 @@ function PlateSelector({
                       }}
                       className="plate-thumbnail-image"
                       onError={e => {
-                        // Fallback to general thumbnail
                         const img = e.target as HTMLImageElement;
-                        img.src = `/api/model/thumbnail/${fileId}?width=150&height=150`;
+                        const currentSrc = img.src;
+                        const thumbnailKey = `${fileId}-${plate.index}`;
+
+                        // Prevent infinite retry loops
+                        if (failedThumbnails.has(thumbnailKey)) {
+                          img.style.display = 'none';
+                          return;
+                        }
+
+                        // If this is the plate-specific thumbnail failing, try general thumbnail
+                        if (currentSrc.includes(`/plate/${plate.index}`)) {
+                          setFailedThumbnails(
+                            prev => new Set([...prev, thumbnailKey])
+                          );
+                          img.src = `/api/model/thumbnail/${fileId}?width=150&height=150`;
+                        } else {
+                          // General thumbnail also failed, mark as failed and hide
+                          setFailedThumbnails(
+                            prev => new Set([...prev, thumbnailKey])
+                          );
+                          img.style.display = 'none';
+                        }
                       }}
                     />
                   </div>

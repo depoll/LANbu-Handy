@@ -6,3 +6,5 @@ python-multipart>=0.0.6
 httpx>=0.25.0
 paho-mqtt>=1.6.0
 Pillow>=10.0.0
+numpy-stl>=3.2.0
+matplotlib>=3.10.0

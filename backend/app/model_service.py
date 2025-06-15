@@ -559,16 +559,29 @@ class ModelService:
         plates.sort(key=lambda p: p.index)
         return plates
 
-    def parse_3mf_model_info(self, file_path: Path) -> ModelInfo:
+    def parse_3mf_model_info(self, file_path: Path) -> tuple[ModelInfo, Path]:
         """
-        Parse comprehensive model information from a .3mf file.
+        Parse model information from a .3mf file or convert STL to 3MF first.
 
         Args:
-            file_path: Path to the .3mf file
+            file_path: Path to the .3mf or .stl file
 
         Returns:
-            ModelInfo object with filament requirements and plate information
+            Tuple of (ModelInfo object with filament/plate info, final file path)
         """
+        # Check if this is an STL file that needs conversion
+        if file_path.suffix.lower() == ".stl":
+            file_path = self._convert_stl_to_3mf(file_path)
+            # Verify the conversion was successful
+            if not file_path.exists() or file_path.suffix.lower() != ".3mf":
+                raise ModelValidationError(
+                    "STL to 3MF conversion failed: output file invalid"
+                )
+
+        # Ensure we have a valid 3MF file at this point
+        if file_path.suffix.lower() != ".3mf":
+            raise ModelValidationError(f"Expected 3MF file, got {file_path.suffix}")
+
         model_info = ModelInfo()
 
         # Parse filament requirements
@@ -586,7 +599,118 @@ class ModelService:
         # Auto-slicing is too slow for synchronous HTTP requests
         # For now, estimates will be available after manual slicing
 
-        return model_info
+        return model_info, file_path
+
+    def _convert_stl_to_3mf(self, stl_file_path: Path) -> Path:
+        """
+        Convert an STL file to 3MF format using Bambu Studio CLI.
+        Also generates PNG thumbnails for the model.
+
+        Args:
+            stl_file_path: Path to the STL file
+
+        Returns:
+            Path to the converted 3MF file
+
+        Raises:
+            ModelValidationError: If conversion fails
+        """
+        import subprocess
+
+        # Generate output 3MF filename in the same directory
+        output_3mf_path = stl_file_path.with_suffix(".3mf")
+
+        try:
+            # Use Bambu Studio CLI to convert STL to 3MF
+            cmd = [
+                "bambu-studio-cli",
+                str(stl_file_path),
+                "--export-3mf",
+                str(output_3mf_path),
+                "--ensure-on-bed",  # Make sure object is on the bed
+                "--arrange",
+                "1",  # Enable auto-arrange
+            ]
+
+            logger.info(f"Converting STL to 3MF: {stl_file_path} -> {output_3mf_path}")
+
+            subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=30,  # 30 second timeout
+                check=True,
+            )
+
+            # Check if output file was created
+            if not output_3mf_path.exists():
+                raise ModelValidationError(
+                    "3MF conversion failed: output file not created"
+                )
+
+            logger.info(f"Successfully converted STL to 3MF: {output_3mf_path}")
+
+            # Generate preview using Python-based STL preview service
+            # This is more reliable than CLI in headless environments
+            try:
+                from .stl_preview_service import STLPreviewService
+
+                preview_service = STLPreviewService()
+                # Generate a preview from the original STL file (before cleanup)
+                preview_path = preview_service.generate_preview(
+                    stl_file_path, output_3mf_path.with_suffix(".png")
+                )
+                logger.info(f"STL preview generated: {preview_path}")
+
+            except Exception as e:
+                logger.warning(f"STL preview generation failed: {e}")
+
+                # Fallback to CLI-based thumbnail generation
+                thumbnail_cmd = [
+                    "bambu-studio-cli",
+                    str(output_3mf_path),
+                    "--export-png",
+                    "0",  # Export PNG thumbnails for all plates
+                ]
+
+                logger.info(
+                    f"Falling back to CLI thumbnail generation: {output_3mf_path}"
+                )
+
+                thumbnail_result = subprocess.run(
+                    thumbnail_cmd,
+                    capture_output=True,
+                    text=True,
+                    timeout=30,  # 30 second timeout
+                    check=False,  # Don't fail if thumbnail generation fails
+                )
+
+                if thumbnail_result.returncode != 0:
+                    logger.warning(
+                        f"CLI thumbnail generation also failed for {output_3mf_path}: "
+                        f"{thumbnail_result.stderr}"
+                    )
+
+            # Clean up the original STL file
+            try:
+                stl_file_path.unlink()
+            except Exception as e:
+                logger.warning(f"Failed to cleanup STL file {stl_file_path}: {e}")
+
+            return output_3mf_path
+
+        except subprocess.TimeoutExpired:
+            raise ModelValidationError("STL to 3MF conversion timed out")
+        except subprocess.CalledProcessError as e:
+            error_msg = (
+                f"STL to 3MF conversion failed: {e.stderr if e.stderr else str(e)}"
+            )
+            logger.error(error_msg)
+            raise ModelValidationError(error_msg)
+        except Exception as e:
+            error_msg = f"Unexpected error during STL to 3MF conversion: {str(e)}"
+            logger.error(error_msg)
+            raise ModelValidationError(error_msg)
 
     def _enhance_plates_with_slice_estimates(
         self, file_path: Path, plates: List[PlateInfo]
@@ -878,7 +1002,7 @@ class ModelService:
         """
         try:
             # Re-parse the model to get current plate info
-            model_info = self.parse_3mf_model_info(file_path)
+            model_info, _ = self.parse_3mf_model_info(file_path)
             if not model_info.plates:
                 return []
 
@@ -932,7 +1056,7 @@ class ModelService:
             )
             # Return original plates without estimates if parsing fails
             try:
-                model_info = self.parse_3mf_model_info(file_path)
+                model_info, _ = self.parse_3mf_model_info(file_path)
                 return model_info.plates if model_info.plates else []
             except Exception:
                 return []

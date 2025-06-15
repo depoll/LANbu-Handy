@@ -84,82 +84,25 @@ export function ConfigurationTab({
         </p>
       </div>
 
-      {/* Integrated Plate Selection and Configuration */}
-      {hasMultiplePlates ? (
-        <div className="config-section">
-          <PlateSelector
-            plates={plates}
-            selectedPlateIndex={selectedPlateIndex}
-            onPlateSelect={onPlateSelect}
-            disabled={isProcessing}
-            fileId={currentFileId}
-            filamentRequirements={filamentRequirements}
-            plateFilamentRequirements={plateFilamentRequirements}
-            isFilamentRequirementsFiltered={isFilamentRequirementsFiltered}
-            amsStatus={amsStatus}
-            filamentMappings={filamentMappings}
-            onMappingChange={onMappingChange}
-            selectedBuildPlate={selectedBuildPlate}
-            onBuildPlateSelect={onBuildPlateSelect}
-            onPlatesUpdate={onPlatesUpdate}
-          />
-        </div>
-      ) : (
-        /* Single plate - show traditional configuration sections */
-        <>
-          {/* Filament Requirements Display */}
-          {filamentRequirements && (
-            <div className="config-section">
-              <FilamentRequirementsDisplay
-                requirements={
-                  activeFilamentRequirements || filamentRequirements
-                }
-                className="workflow-section"
-              />
-            </div>
-          )}
-
-          {/* Filament Mapping Configuration */}
-          {activeFilamentRequirements &&
-            activeFilamentRequirements.filament_count > 0 &&
-            amsStatus && (
-              <div className="config-section">
-                <FilamentMappingConfig
-                  filamentRequirements={activeFilamentRequirements}
-                  amsStatus={amsStatus}
-                  filamentMappings={filamentMappings}
-                  onMappingChange={onMappingChange}
-                  disabled={isProcessing}
-                />
-              </div>
-            )}
-
-          {/* Build Plate Selection */}
-          <div className="config-section">
-            <BuildPlateSelector
-              selectedPlate={selectedBuildPlate}
-              onPlateSelect={onBuildPlateSelect}
-              disabled={isProcessing}
-            />
-          </div>
-
-          {/* Configuration Summary */}
-          {amsStatus && activeFilamentRequirements && (
-            <div className="config-section">
-              <ConfigurationSummary
-                filamentRequirements={activeFilamentRequirements}
-                amsStatus={amsStatus}
-                filamentMappings={filamentMappings}
-                selectedBuildPlate={selectedBuildPlate}
-                currentFileId={currentFileId}
-                selectedPlateIndex={selectedPlateIndex}
-                plates={plates}
-                onPlatesUpdate={onPlatesUpdate}
-              />
-            </div>
-          )}
-        </>
-      )}
+      {/* Always use integrated PlateSelector for consistent UI experience */}
+      <div className="config-section">
+        <PlateSelector
+          plates={plates}
+          selectedPlateIndex={selectedPlateIndex}
+          onPlateSelect={onPlateSelect}
+          disabled={isProcessing}
+          fileId={currentFileId}
+          filamentRequirements={filamentRequirements}
+          plateFilamentRequirements={plateFilamentRequirements}
+          isFilamentRequirementsFiltered={isFilamentRequirementsFiltered}
+          amsStatus={amsStatus}
+          filamentMappings={filamentMappings}
+          onMappingChange={onMappingChange}
+          selectedBuildPlate={selectedBuildPlate}
+          onBuildPlateSelect={onBuildPlateSelect}
+          onPlatesUpdate={onPlatesUpdate}
+        />
+      </div>
     </div>
   );
 }

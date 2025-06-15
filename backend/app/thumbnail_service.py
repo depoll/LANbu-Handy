@@ -83,6 +83,24 @@ class ThumbnailService:
         # Ensure thumbnail directory exists
         thumbnail_path.parent.mkdir(parents=True, exist_ok=True)
 
+        # For 3MF files, first check if there's a co-located preview PNG
+        # (generated during STL->3MF conversion)
+        if model_path.suffix.lower() == ".3mf":
+            colocated_preview = model_path.with_suffix(".png")
+            if colocated_preview.exists():
+                logger.info(f"Found co-located preview image: {colocated_preview}")
+                try:
+                    # Copy the co-located preview to the expected thumbnail location
+                    import shutil
+
+                    shutil.copy2(colocated_preview, thumbnail_path)
+                    logger.info(
+                        f"Using co-located preview as thumbnail: {thumbnail_path}"
+                    )
+                    return thumbnail_path
+                except Exception as e:
+                    logger.warning(f"Failed to use co-located preview: {e}")
+
         # Try to extract embedded thumbnail from 3MF first
         if prefer_embedded and model_path.suffix.lower() == ".3mf":
             logger.info(
@@ -278,13 +296,34 @@ class ThumbnailService:
         height: int,
     ) -> Optional[Path]:
         """
-        Simple 3D rendering using matplotlib (most likely to be available).
+        Render 3D model using our STL preview service for STL files,
+        fallback to simple matplotlib rendering for other files.
         """
         try:
+            # For STL files, use our dedicated STL preview service
+            if model_path.suffix.lower() == ".stl":
+                logger.info("Using STLPreviewService for STL file rendering")
+                try:
+                    from .stl_preview_service import STLPreviewService
+
+                    preview_service = STLPreviewService()
+                    result_path = preview_service.generate_preview(
+                        model_path, thumbnail_path, (width, height), dpi=100
+                    )
+
+                    if result_path and result_path.exists():
+                        logger.info(f"STL preview generated: {result_path}")
+                        return result_path
+
+                except Exception as e:
+                    logger.warning(f"STLPreviewService failed: {e}")
+                    # Fall through to generic matplotlib rendering
+
+            # For non-STL files or STL fallback, use generic matplotlib rendering
             import matplotlib.pyplot as plt
             import numpy as np
 
-            logger.info("Attempting matplotlib 3D rendering")
+            logger.info("Attempting generic matplotlib 3D rendering")
 
             # Create a simple 3D placeholder since full mesh parsing is complex
             # This could be enhanced later with proper STL/3MF parsing
