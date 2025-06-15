@@ -48,18 +48,68 @@ class BambuStudioCLIWrapper:
         self.temp_dir = Path(tempfile.gettempdir()) / "lanbu-handy"
         self.temp_dir.mkdir(exist_ok=True)
 
-    def _run_command(self, args: List[str], timeout: Optional[int] = None) -> CLIResult:
+        # Check if we need to use virtual display wrapper for graphics operations
+        self.use_display_wrapper = self._should_use_display_wrapper()
+
+    def _should_use_display_wrapper(self) -> bool:
+        """
+        Determine if we should use the virtual display wrapper.
+
+        Returns True if we're in a containerized environment and the
+        wrapper is available.
+        """
+        # Skip display wrapper check during testing
+        if os.environ.get("PYTEST_CURRENT_TEST"):
+            return False
+
+        # Check if bambu-studio-with-display wrapper exists
+        try:
+            result = subprocess.run(
+                ["which", "bambu-studio-with-display"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            return result.returncode == 0
+        except Exception:
+            return False
+
+    def _get_cli_command_for_operation(
+        self, requires_display: bool = False
+    ) -> List[str]:
+        """
+        Get the appropriate CLI command for the operation.
+
+        Args:
+            requires_display: Whether the operation requires display/graphics support
+
+        Returns:
+            List of command components to use
+        """
+        if requires_display and self.use_display_wrapper:
+            return ["bambu-studio-with-display", self.cli_command]
+        else:
+            return [self.cli_command]
+
+    def _run_command(
+        self,
+        args: List[str],
+        timeout: Optional[int] = None,
+        requires_display: bool = False,
+    ) -> CLIResult:
         """
         Execute a CLI command with the given arguments.
 
         Args:
             args: List of command arguments
             timeout: Optional timeout in seconds
+            requires_display: Whether the operation requires display/graphics support
 
         Returns:
             CLIResult object containing execution results
         """
-        command = [self.cli_command] + args
+        cli_command = self._get_cli_command_for_operation(requires_display)
+        command = cli_command + args
         logger.debug(f"Executing CLI command: {' '.join(command)}")
 
         try:
@@ -202,6 +252,56 @@ class BambuStudioCLIWrapper:
         # 5 minute timeout for slicing
         return self._run_command(args, timeout=300)
 
+    def export_png(
+        self,
+        input_path: Union[str, Path],
+        output_dir: Union[str, Path],
+        plate_number: int = 0,
+        camera_view: int = 0,
+    ) -> CLIResult:
+        """
+        Export PNG thumbnail for a 3D model using Bambu Studio CLI.
+
+        Args:
+            input_path: Path to the input model file (.stl, .3mf)
+            output_dir: Directory where the PNG should be saved
+            plate_number: Plate to export (0 for all plates, i for plate i)
+            camera_view: Camera view angle (0-Iso, 1-Top_Front, 2-Left, 3-Right, etc.)
+
+        Returns:
+            CLIResult with PNG export results
+        """
+        input_path = Path(input_path)
+        output_dir = Path(output_dir)
+
+        # Validate input file exists
+        if not input_path.exists():
+            return CLIResult(
+                exit_code=-1,
+                stdout="",
+                stderr=f"Input file does not exist: {input_path}",
+                success=False,
+            )
+
+        # Ensure output directory exists
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        # Build command arguments for PNG export
+        args = [str(input_path)]
+
+        # Add PNG export option
+        args.extend(["--export-png", str(plate_number)])
+
+        # Add output directory
+        args.extend(["--outputdir", str(output_dir)])
+
+        # Add camera view if specified
+        if camera_view != 0:
+            args.extend(["--camera-view", str(camera_view)])
+
+        # PNG export requires display support
+        return self._run_command(args, timeout=120, requires_display=True)
+
     def check_availability(self) -> CLIResult:
         """
         Check if the Bambu Studio CLI is available and functional.
@@ -311,3 +411,25 @@ def slice_model(
     """
     wrapper = BambuStudioCLIWrapper()
     return wrapper.slice_model(input_path, output_dir, options)
+
+
+def export_png(
+    input_path: Union[str, Path],
+    output_dir: Union[str, Path],
+    plate_number: int = 0,
+    camera_view: int = 0,
+) -> CLIResult:
+    """
+    Export PNG thumbnail for a 3D model using Bambu Studio CLI.
+
+    Args:
+        input_path: Path to the input model file
+        output_dir: Directory for PNG output
+        plate_number: Plate to export (0 for all plates, i for plate i)
+        camera_view: Camera view angle for the PNG
+
+    Returns:
+        CLIResult with PNG export results
+    """
+    wrapper = BambuStudioCLIWrapper()
+    return wrapper.export_png(input_path, output_dir, plate_number, camera_view)

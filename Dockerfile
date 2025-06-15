@@ -27,12 +27,14 @@ FROM ghcr.io/depoll/lanbu-handy/bambu-studio-cli:latest
 WORKDIR /app
 
 # Install pip and upgrade it (Python 3.10 already available in base image)
+# Also create a symlink for easier CLI access with virtual display
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         python3-pip \
         python3-dev \
     && python3 -m pip install --upgrade pip \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && ln -sf /usr/local/bin/bambu-studio-with-display /usr/local/bin/bambu-studio-cli-wrapper
 
 # Create non-root user for security
 RUN groupadd -r lanbu && \
