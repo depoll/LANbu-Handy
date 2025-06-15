@@ -1148,44 +1148,219 @@ function PlateSelector({
       )}
 
       {selectedPlateIndex === null && (
-        <div className="all-plates-summary">
-          <div className="summary-details">
-            <h5>All Plates Summary</h5>
-            <div className="detail-grid">
-              <div className="detail-item">
-                <span className="detail-label">Total Objects:</span>
-                <span className="detail-value">
-                  {plates.reduce((sum, plate) => sum + plate.object_count, 0)}
-                </span>
+        <div className="all-plates-configuration">
+          <div className="all-plates-details">
+            <div className="all-plates-details-header">
+              <h5>All Plates Configuration</h5>
+              <p>Configure settings that will apply to all plates</p>
+            </div>
+
+            <div className="all-plates-details-grid">
+              {/* Summary Section */}
+              <div className="detail-section">
+                <h6>Summary</h6>
+                <div className="detail-items">
+                  <div className="detail-item">
+                    <span className="detail-label">Total Objects:</span>
+                    <span className="detail-value">
+                      {plates.reduce(
+                        (sum, plate) => sum + plate.object_count,
+                        0
+                      )}
+                    </span>
+                  </div>
+                  <div className="detail-item">
+                    <span className="detail-label">Total Est. Time:</span>
+                    <span className="detail-value">
+                      {formatTime(
+                        plates.reduce(
+                          (sum, plate) => sum + (plate.prediction_seconds || 0),
+                          0
+                        )
+                      )}
+                    </span>
+                  </div>
+                  <div className="detail-item">
+                    <span className="detail-label">Total Est. Weight:</span>
+                    <span className="detail-value">
+                      {formatWeight(
+                        plates.reduce(
+                          (sum, plate) => sum + (plate.weight_grams || 0),
+                          0
+                        )
+                      )}
+                    </span>
+                  </div>
+                  <div className="detail-item">
+                    <span className="detail-label">Plates with Support:</span>
+                    <span className="detail-value">
+                      {plates.filter(plate => plate.has_support).length} of{' '}
+                      {plates.length}
+                    </span>
+                  </div>
+                </div>
               </div>
-              <div className="detail-item">
-                <span className="detail-label">Total Est. Time:</span>
-                <span className="detail-value">
-                  {formatTime(
-                    plates.reduce(
-                      (sum, plate) => sum + (plate.prediction_seconds || 0),
-                      0
-                    )
-                  )}
-                </span>
-              </div>
-              <div className="detail-item">
-                <span className="detail-label">Total Est. Weight:</span>
-                <span className="detail-value">
-                  {formatWeight(
-                    plates.reduce(
-                      (sum, plate) => sum + (plate.weight_grams || 0),
-                      0
-                    )
-                  )}
-                </span>
-              </div>
-              <div className="detail-item">
-                <span className="detail-label">Plates with Support:</span>
-                <span className="detail-value">
-                  {plates.filter(plate => plate.has_support).length} of{' '}
-                  {plates.length}
-                </span>
+
+              {/* Filament Requirements */}
+              {filamentRequirements &&
+                filamentRequirements.filament_count > 0 && (
+                  <div className="detail-section">
+                    <h6>Required Filaments</h6>
+                    <div className="filament-requirements-compact">
+                      {filamentRequirements.filament_types.map(
+                        (type, index) => {
+                          const mapping = filamentMappings?.find(
+                            m => m.filament_index === index
+                          );
+                          const mappedSlot =
+                            mapping && amsStatus?.ams_units
+                              ? amsStatus.ams_units
+                                  .find(u => u.unit_id === mapping.ams_unit_id)
+                                  ?.filaments.find(
+                                    f => f.slot_id === mapping.ams_slot_id
+                                  )
+                              : null;
+
+                          return (
+                            <FilamentPillWithDropdown
+                              key={index}
+                              index={index}
+                              type={type}
+                              requiredColor={
+                                filamentRequirements.filament_colors[index] ||
+                                '#ddd'
+                              }
+                              mapping={mapping}
+                              mappedSlot={mappedSlot}
+                              amsStatus={amsStatus}
+                              filamentMappings={filamentMappings}
+                              onMappingChange={onMappingChange}
+                              disabled={disabled || !amsStatus}
+                            />
+                          );
+                        }
+                      )}
+                    </div>
+                  </div>
+                )}
+
+              {/* Build Plate Selection */}
+              {onBuildPlateSelect && (
+                <div className="detail-section">
+                  <h6>Build Plate</h6>
+                  <div className="build-plate-selector">
+                    {[
+                      {
+                        id: 'textured_pei_plate',
+                        name: 'Textured PEI',
+                        icon: '⬛',
+                        color: '#2c2c2c',
+                      },
+                      {
+                        id: 'cool_plate',
+                        name: 'Cool Plate',
+                        icon: '🔷',
+                        color: '#4a90e2',
+                      },
+                      {
+                        id: 'eng_plate',
+                        name: 'Engineering',
+                        icon: '🔶',
+                        color: '#f5a623',
+                      },
+                      {
+                        id: 'hot_plate',
+                        name: 'Hot Plate',
+                        icon: '🔴',
+                        color: '#e74c3c',
+                      },
+                    ].map(plate => (
+                      <div
+                        key={plate.id}
+                        className={`build-plate-option ${(selectedBuildPlate || 'textured_pei_plate') === plate.id ? 'selected' : ''}`}
+                        onClick={() =>
+                          !disabled && onBuildPlateSelect(plate.id)
+                        }
+                        style={{
+                          cursor: disabled ? 'not-allowed' : 'pointer',
+                        }}
+                      >
+                        <div className="plate-visual">
+                          <div
+                            className="plate-icon"
+                            style={{ backgroundColor: plate.color }}
+                          >
+                            {plate.icon}
+                          </div>
+                        </div>
+                        <div className="plate-name">{plate.name}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Configuration Status */}
+              <div className="detail-section">
+                <h6>Configuration Status</h6>
+                <div className="config-status">
+                  {(() => {
+                    const hasFilamentReqs =
+                      filamentRequirements &&
+                      filamentRequirements.filament_count > 0;
+                    const allMapped =
+                      hasFilamentReqs &&
+                      filamentMappings.length ===
+                        filamentRequirements.filament_count;
+                    const hasBuildPlate =
+                      selectedBuildPlate || 'textured_pei_plate';
+
+                    return (
+                      <div className="status-items">
+                        <div className="status-item">
+                          <span
+                            className={`status-indicator ${hasFilamentReqs ? 'complete' : 'pending'}`}
+                          >
+                            {hasFilamentReqs ? '✓' : '○'}
+                          </span>
+                          <span>Filament requirements</span>
+                        </div>
+                        <div className="status-item">
+                          <span
+                            className={`status-indicator ${allMapped ? 'complete' : 'pending'}`}
+                          >
+                            {allMapped ? '✓' : '○'}
+                          </span>
+                          <span>AMS mapping</span>
+                        </div>
+                        <div className="status-item">
+                          <span
+                            className={`status-indicator ${hasBuildPlate ? 'complete' : 'pending'}`}
+                          >
+                            {hasBuildPlate ? '✓' : '○'}
+                          </span>
+                          <span>Build plate</span>
+                        </div>
+                        <div className="status-item">
+                          <span
+                            className={`status-indicator ${isSlicing ? 'calculating' : isConfigurationComplete() && !isSlicing ? 'complete' : 'pending'}`}
+                          >
+                            {isSlicing
+                              ? '🔄'
+                              : isConfigurationComplete() && !isSlicing
+                                ? '✓'
+                                : '○'}
+                          </span>
+                          <span>
+                            {isSlicing
+                              ? 'Calculating estimates...'
+                              : 'Print estimates'}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
               </div>
             </div>
           </div>
