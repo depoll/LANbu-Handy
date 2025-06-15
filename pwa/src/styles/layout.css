@@ -55,28 +55,16 @@ header p {
 
 .header-printer-selector .current-printer-display .printer-name,
 .header-printer-selector .current-printer-display .printer-ip {
-  color: #1b5e20;
-}
-
-:root.theme-dark
-  .header-printer-selector
-  .current-printer-display
-  .printer-name,
-:root.theme-dark .header-printer-selector .current-printer-display .printer-ip {
-  color: var(--color-text-primary);
-}
-
-.header-printer-selector .printer-ip {
-  opacity: 0.8;
+  color: var(--color-success-dark);
 }
 
 .header-printer-selector .no-printer-text {
-  color: #ffcdd2;
+  color: var(--color-danger-light);
 }
 
 .header-printer-selector .runtime-badge {
   background: rgba(255, 255, 255, 0.9);
-  color: #1b5e20;
+  color: var(--color-success-dark);
   border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
@@ -94,7 +82,7 @@ header p {
 
 .header-printer-selector .expand-button {
   background: rgba(255, 255, 255, 0.9);
-  color: #1b5e20;
+  color: var(--color-success-dark);
   border: 1px solid rgba(255, 255, 255, 0.3);
   font-weight: 500;
 }

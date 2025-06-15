@@ -4,10 +4,10 @@
 .ams-status-display {
   background: var(--color-bg-primary);
   border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 8px var(--color-shadow);
   padding: 1.5rem;
   margin: 1rem 0;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--color-border-primary);
 }
 
 .status-header {
@@ -15,19 +15,19 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: 1rem;
-  border-bottom: 1px solid #e0e0e0;
+  border-bottom: 1px solid var(--color-border-primary);
   padding-bottom: 0.5rem;
 }
 
 .status-header h3 {
-  color: #388e3c;
+  color: var(--color-primary);
   margin: 0;
   font-size: 1.2rem;
 }
 
 .refresh-button {
-  background: #4caf50;
-  color: white;
+  background: var(--color-primary-light);
+  color: var(--color-text-inverse);
   border: none;
   padding: 0.5rem 1rem;
   border-radius: 4px;
@@ -37,27 +37,27 @@
 }
 
 .refresh-button:hover:not(:disabled) {
-  background: #388e3c;
+  background: var(--color-primary);
 }
 
 .refresh-button:disabled {
-  background: #cccccc;
-  color: #3e3e3e;
+  background: var(--color-border-secondary);
+  color: var(--color-text-muted);
   cursor: not-allowed;
 }
 
 :root.theme-dark .refresh-button:disabled {
-  background: #4a4a4a;
+  background: var(--color-bg-tertiary);
   color: var(--color-text-secondary);
 }
 
 .ams-content .status-message {
-  color: #155724;
-  background: #d4edda;
+  color: var(--color-success-text);
+  background: var(--color-success-bg);
   padding: 0.5rem;
   border-radius: 4px;
   margin-bottom: 1rem;
-  border: 1px solid #c3e6cb;
+  border: 1px solid var(--color-success-border);
 }
 
 .ams-units {
@@ -67,10 +67,10 @@
 }
 
 .ams-unit {
-  border: 1px solid #ddd;
+  border: 1px solid var(--color-border-secondary);
   border-radius: 6px;
   padding: 1rem;
-  background: #fafafa;
+  background: var(--color-bg-secondary);
 }
 
 .ams-unit h4 {
@@ -95,7 +95,7 @@
 
 .filament-slot:hover {
   border-color: var(--color-border-primary);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 8px var(--color-shadow);
 }
 
 .slot-header {
@@ -114,8 +114,8 @@
 }
 
 .filament-type {
-  background: #e8f5e9;
-  color: #2e7d32;
+  background: var(--color-primary-accent);
+  color: var(--color-primary);
   padding: 0.25rem 0.75rem;
   border-radius: 16px;
   font-size: 0.75rem;
@@ -134,10 +134,10 @@
   width: 32px;
   height: 32px;
   border-radius: 8px;
-  border: 2px solid rgba(0, 0, 0, 0.1);
+  border: 2px solid var(--color-border-primary);
   display: inline-block;
   flex-shrink: 0;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 4px var(--color-shadow);
 }
 
 .color-labels {
@@ -175,9 +175,9 @@
   color: var(--color-text-secondary);
   margin-top: 0.5rem;
   padding: 0.25rem 0.5rem;
-  background: var(--color-bg-secondary, #f8f9fa);
+  background: var(--color-bg-secondary);
   border-radius: 4px;
-  border: 1px solid var(--color-border-tertiary, #e9ecef);
+  border: 1px solid var(--color-border-secondary);
 }
 
 .empty-slot-info {
@@ -205,19 +205,19 @@
 }
 
 .error {
-  color: #721c24;
-  background: #f8d7da;
-  border: 1px solid #f5c6cb;
+  color: var(--color-error-text);
+  background: var(--color-error-bg);
+  border: 1px solid var(--color-error-border);
   border-radius: 4px;
 }
 
 .ams-error .error-message {
-  color: #721c24;
+  color: var(--color-error-text);
   margin-bottom: 0.5rem;
 }
 
 .ams-error .error-details {
-  color: #856404;
+  color: var(--color-warning-text);
   font-size: 0.9rem;
 }
 
@@ -225,20 +225,20 @@
 .filament-requirements-display {
   background: var(--color-bg-primary);
   border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 8px var(--color-shadow);
   padding: 1.5rem;
   margin: 1rem 0;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--color-border-primary);
 }
 
 .requirements-header {
-  border-bottom: 1px solid #e0e0e0;
+  border-bottom: 1px solid var(--color-border-primary);
   margin-bottom: 1rem;
   padding-bottom: 0.5rem;
 }
 
 .requirements-header h3 {
-  color: #388e3c;
+  color: var(--color-primary);
   margin: 0 0 0.5rem 0;
   font-size: 1.2rem;
 }
@@ -255,8 +255,8 @@
 }
 
 .multicolor-badge {
-  background: #ff9800;
-  color: white;
+  background: var(--color-warning);
+  color: var(--color-text-inverse);
   padding: 0.25rem 0.5rem;
   border-radius: 12px;
   font-size: 0.8rem;
@@ -276,8 +276,8 @@
 }
 
 .filament-requirement {
-  background: #f8f9fa;
-  border: 1px solid #e9ecef;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-secondary);
   border-radius: 6px;
   padding: 1rem;
   display: flex;
@@ -287,7 +287,7 @@
 
 .requirement-index {
   font-weight: 600;
-  color: #495057;
+  color: var(--color-text-secondary);
   min-width: 100px;
 }
 
@@ -299,8 +299,8 @@
 }
 
 .requirement-type {
-  background: #e8f5e9;
-  color: #2e7d32;
+  background: var(--color-primary-accent);
+  color: var(--color-primary);
   padding: 0.25rem 0.75rem;
   border-radius: 12px;
   font-size: 0.9rem;
@@ -317,11 +317,11 @@
   width: 24px;
   height: 24px;
   border-radius: 4px;
-  border: 2px solid #ddd;
+  border: 2px solid var(--color-border-secondary);
 }
 
 .color-name {
-  color: #495057;
+  color: var(--color-text-secondary);
   font-weight: 500;
 }
 
@@ -340,8 +340,8 @@
 }
 
 .secondary-button {
-  background: #6c757d;
-  color: white;
+  background: var(--color-text-muted);
+  color: var(--color-text-inverse);
   border: none;
   padding: 0.75rem 1.5rem;
   border-radius: 6px;
@@ -352,17 +352,17 @@
 }
 
 .secondary-button:hover:not(:disabled) {
-  background: #5a6268;
+  background: var(--color-border-primary);
 }
 
 .secondary-button:disabled {
-  background: #cccccc;
-  color: #3e3e3e;
+  background: var(--color-border-secondary);
+  color: var(--color-text-muted);
   cursor: not-allowed;
 }
 
 :root.theme-dark .secondary-button:disabled {
-  background: #4a4a4a;
+  background: var(--color-bg-tertiary);
   color: var(--color-text-secondary);
 }
 

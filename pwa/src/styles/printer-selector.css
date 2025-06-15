@@ -65,7 +65,7 @@
 }
 
 .runtime-badge {
-  background: #17a2b8;
+  background: var(--color-info);
   color: white;
   padding: 0.125rem 0.5rem;
   border-radius: 12px;
@@ -75,7 +75,7 @@
 }
 
 .persistent-badge {
-  background: #4caf50;
+  background: var(--color-success);
   color: white;
   padding: 0.125rem 0.5rem;
   border-radius: 12px;
@@ -85,7 +85,7 @@
 }
 
 .serial-badge {
-  background: #ff9800;
+  background: var(--color-warning);
   color: white;
   padding: 0.125rem 0.5rem;
   border-radius: 12px;
@@ -95,16 +95,12 @@
 }
 
 .no-printer-text {
-  color: #dc3545;
+  color: var(--color-danger);
   font-weight: 500;
 }
 
-:root.theme-dark .no-printer-text {
-  color: #f8d7da;
-}
-
 .expand-button {
-  background: #6c757d;
+  background: var(--color-text-secondary);
   color: white;
   border: none;
   padding: 0.5rem 1rem;
@@ -118,22 +114,17 @@
 }
 
 .expand-button:hover:not(:disabled) {
-  background: #5a6268;
+  background: var(--color-text-secondary-hover);
 }
 
 .expand-button:disabled {
-  background: #cccccc;
-  color: #3e3e3e;
+  background: var(--color-disabled);
+  color: var(--color-disabled-text);
   cursor: not-allowed;
 }
 
-:root.theme-dark .expand-button:disabled {
-  background: #4a4a4a;
-  color: var(--color-text-secondary);
-}
-
 .list-button {
-  background: #17a2b8;
+  background: var(--color-info);
   color: white;
   border: none;
   padding: 0.5rem 1rem;
@@ -147,18 +138,13 @@
 }
 
 .list-button:hover:not(:disabled) {
-  background: #138496;
+  background: var(--color-info-dark);
 }
 
 .list-button:disabled {
-  background: #cccccc;
-  color: #3e3e3e;
+  background: var(--color-disabled);
+  color: var(--color-disabled-text);
   cursor: not-allowed;
-}
-
-:root.theme-dark .list-button:disabled {
-  background: #4a4a4a;
-  color: var(--color-text-secondary);
 }
 
 .printer-list-panel {
@@ -185,29 +171,16 @@
 }
 
 .printer-item.active {
-  background: #e8f5e8;
-  border-color: #28a745;
+  background: var(--color-bg-success-light);
+  border-color: var(--color-success);
 }
 
 .printer-item:hover {
-  background: #e9ecef;
+  background: var(--color-bg-secondary);
 }
 
 .printer-item.active:hover {
-  background: #d4edda;
-}
-
-:root.theme-dark .printer-item.active {
-  background: #1a4d1a;
-  border-color: #28a745;
-}
-
-:root.theme-dark .printer-item:hover {
-  background: var(--color-bg-tertiary);
-}
-
-:root.theme-dark .printer-item.active:hover {
-  background: #236f23;
+  background: var(--color-bg-success-light);
 }
 
 .printer-info-section {
@@ -230,7 +203,7 @@
 }
 
 .switch-button {
-  background: #388e3c;
+  background: var(--color-success);
   color: white;
   border: none;
   padding: 0.5rem 1rem;
@@ -241,22 +214,17 @@
 }
 
 .switch-button:hover:not(:disabled) {
-  background: #2e7d32;
+  background: var(--color-success-dark);
 }
 
 .switch-button:disabled {
-  background: #cccccc;
-  color: #3e3e3e;
+  background: var(--color-disabled);
+  color: var(--color-disabled-text);
   cursor: not-allowed;
 }
 
-:root.theme-dark .switch-button:disabled {
-  background: #4a4a4a;
-  color: var(--color-text-secondary);
-}
-
 .delete-button {
-  background: #dc3545;
+  background: var(--color-danger);
   color: white;
   border: none;
   padding: 0.5rem 1rem;
@@ -267,22 +235,17 @@
 }
 
 .delete-button:hover:not(:disabled) {
-  background: #c82333;
+  background: var(--color-danger-dark);
 }
 
 .delete-button:disabled {
-  background: #cccccc;
-  color: #3e3e3e;
+  background: var(--color-disabled);
+  color: var(--color-disabled-text);
   cursor: not-allowed;
 }
 
-:root.theme-dark .delete-button:disabled {
-  background: #4a4a4a;
-  color: var(--color-text-secondary);
-}
-
 .active-badge {
-  background: #28a745;
+  background: var(--color-success);
   color: white;
   padding: 0.2rem 0.5rem;
   border-radius: 12px;
@@ -291,7 +254,7 @@
 }
 
 .env-badge {
-  background: #6f42c1;
+  background: var(--color-purple);
   color: white;
   padding: 0.2rem 0.5rem;
   border-radius: 12px;
@@ -319,13 +282,13 @@
 
 .panel-header h3 {
   margin: 0 0 0.5rem 0;
-  color: #343a40;
+  color: var(--color-text-primary);
   font-size: 1.1rem;
 }
 
 .panel-header p {
   margin: 0;
-  color: #6c757d;
+  color: var(--color-text-secondary);
   font-size: 0.9rem;
 }
 
@@ -347,18 +310,18 @@
 
 .section-header h4 {
   margin: 0;
-  color: #495057;
+  color: var(--color-text-primary);
   font-size: 1rem;
 }
 
 .section-header p {
   margin: 0;
-  color: #6c757d;
+  color: var(--color-text-secondary);
   font-size: 0.85rem;
 }
 
 .discover-button {
-  background: #28a745;
+  background: var(--color-success);
   color: white;
   border: none;
   padding: 0.5rem 1rem;
@@ -369,18 +332,13 @@
 }
 
 .discover-button:hover:not(:disabled) {
-  background: #218838;
+  background: var(--color-success-dark);
 }
 
 .discover-button:disabled {
-  background: #cccccc;
-  color: #3e3e3e;
+  background: var(--color-disabled);
+  color: var(--color-disabled-text);
   cursor: not-allowed;
-}
-
-:root.theme-dark .discover-button:disabled {
-  background: #4a4a4a;
-  color: var(--color-text-secondary);
 }
 
 .discovered-printers {
@@ -395,14 +353,14 @@
   align-items: center;
   justify-content: space-between;
   padding: 1rem;
-  background: white;
-  border: 1px solid #dee2e6;
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border-secondary);
   border-radius: 6px;
   transition: border-color 0.3s ease;
 }
 
 .discovered-printer:hover {
-  border-color: #4caf50;
+  border-color: var(--color-primary);
 }
 
 .printer-details {
@@ -434,7 +392,7 @@
 }
 
 .select-printer-button {
-  background: #4caf50;
+  background: var(--color-primary);
   color: white;
   border: none;
   padding: 0.5rem 1rem;
@@ -445,26 +403,21 @@
 }
 
 .select-printer-button:hover:not(:disabled) {
-  background: #388e3c;
+  background: var(--color-primary-dark);
 }
 
 .select-printer-button:disabled {
-  background: #cccccc;
-  color: #3e3e3e;
+  background: var(--color-disabled);
+  color: var(--color-disabled-text);
   cursor: not-allowed;
-}
-
-:root.theme-dark .select-printer-button:disabled {
-  background: #4a4a4a;
-  color: var(--color-text-secondary);
 }
 
 .discovery-error {
   margin-top: 1rem;
   padding: 0.75rem;
-  background: #f8d7da;
-  color: #721c24;
-  border: 1px solid #f5c6cb;
+  background: var(--color-bg-danger-light);
+  color: var(--color-danger-dark);
+  border: 1px solid var(--color-danger-light);
   border-radius: 4px;
   font-size: 0.9rem;
 }
@@ -483,18 +436,18 @@
 
 .form-row label {
   font-weight: 500;
-  color: #495057;
+  color: var(--color-text-primary);
   font-size: 0.9rem;
 }
 
 .field-hint {
   font-weight: 300;
-  color: #6c757d;
+  color: var(--color-text-secondary);
   font-size: 0.8rem;
 }
 
 .field-help {
-  color: #6c757d;
+  color: var(--color-text-secondary);
   font-size: 0.8rem;
   margin-top: 0.25rem;
   line-height: 1.4;
@@ -505,9 +458,11 @@
 .name-input,
 .serial-number-input {
   padding: 0.75rem;
-  border: 1px solid #ced4da;
+  border: 1px solid var(--color-border-primary);
   border-radius: 4px;
   font-size: 0.9rem;
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
   transition: border-color 0.3s ease;
 }
 
@@ -516,15 +471,15 @@
 .name-input:focus,
 .serial-number-input:focus {
   outline: none;
-  border-color: #4caf50;
-  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px var(--shadow-primary);
 }
 
 .ip-input:disabled,
 .access-code-input:disabled,
 .name-input:disabled,
 .serial-number-input:disabled {
-  background: #f8f9fa;
+  background: var(--color-bg-secondary);
   cursor: not-allowed;
 }
 
@@ -539,7 +494,7 @@
 }
 
 .clear-saved-ip-button {
-  background: #dc3545;
+  background: var(--color-danger);
   color: white;
   border: none;
   border-radius: 50%;
@@ -555,22 +510,22 @@
 }
 
 .clear-saved-ip-button:hover:not(:disabled) {
-  background: #c82333;
+  background: var(--color-danger-dark);
 }
 
 .clear-saved-ip-button:disabled {
-  background: #6c757d;
+  background: var(--color-text-secondary);
   cursor: not-allowed;
 }
 
 .saved-ip-indicator {
-  color: #28a745;
+  color: var(--color-success);
   font-size: 0.8rem;
   font-weight: normal;
 }
 
 .set-manual-button {
-  background: #4caf50;
+  background: var(--color-primary);
   color: white;
   border: none;
   padding: 0.75rem 1.5rem;
@@ -583,18 +538,13 @@
 }
 
 .set-manual-button:hover:not(:disabled) {
-  background: #388e3c;
+  background: var(--color-primary-dark);
 }
 
 .set-manual-button:disabled {
-  background: #cccccc;
-  color: #3e3e3e;
+  background: var(--color-disabled);
+  color: var(--color-disabled-text);
   cursor: not-allowed;
-}
-
-:root.theme-dark .set-manual-button:disabled {
-  background: #4a4a4a;
-  color: var(--color-text-secondary);
 }
 
 .status-message {
@@ -606,9 +556,9 @@
 }
 
 .status-message:not(:empty) {
-  background: #d1ecf1;
-  color: #0c5460;
-  border: 1px solid #bee5eb;
+  background: var(--color-bg-info);
+  color: var(--color-info-dark);
+  border: 1px solid var(--color-info-light);
 }
 
 /* Mobile responsiveness for printer selector */

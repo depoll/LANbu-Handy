@@ -4,9 +4,9 @@
 .configuration-section {
   margin: 1.5rem 0;
   padding: 1.5rem;
-  background: #f8f9fa;
+  background: var(--color-bg-secondary);
   border-radius: 8px;
-  border: 1px solid #e9ecef;
+  border: 1px solid var(--color-border-secondary);
 }
 
 .configuration-header {
@@ -15,7 +15,7 @@
 
 .configuration-header h3 {
   margin: 0 0 0.5rem 0;
-  color: #343a40;
+  color: var(--color-text-primary);
 }
 
 .configuration-header p {
@@ -35,12 +35,12 @@
 
 .build-plate-selector .selector-header h4 {
   margin: 0 0 0.5rem 0;
-  color: #495057;
+  color: var(--color-text-secondary);
 }
 
 .build-plate-selector .selector-header p {
   margin: 0 0 1rem 0;
-  color: #6c757d;
+  color: var(--color-text-muted);
   font-size: 0.9rem;
 }
 
@@ -52,22 +52,24 @@
 
 .plate-selection label {
   font-weight: 500;
-  color: #495057;
+  color: var(--color-text-primary);
   min-width: 100px;
 }
 
 .build-plate-select {
   flex: 1;
   padding: 0.5rem;
-  border: 1px solid #ced4da;
+  border: 1px solid var(--color-border-primary);
   border-radius: 4px;
   font-size: 0.9rem;
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
 }
 
 .build-plate-select:focus {
   outline: none;
-  border-color: #4caf50;
-  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px var(--shadow-primary);
 }
 
 /* Filament Mapping Config Styles */
@@ -81,7 +83,7 @@
 
 .mapping-header h4 {
   margin: 0 0 0.5rem 0;
-  color: #495057;
+  color: var(--color-text-primary);
 }
 
 .mapping-title-row {
@@ -92,7 +94,7 @@
 }
 
 .reapply-matching-button {
-  background: #17a2b8;
+  background: var(--color-info);
   color: white;
   border: none;
   padding: 0.5rem 1rem;
@@ -104,19 +106,19 @@
 }
 
 .reapply-matching-button:hover:not(:disabled) {
-  background: #138496;
+  background: var(--color-info-dark);
 }
 
 .reapply-matching-button:disabled {
-  background: #6c757d;
+  background: var(--color-text-secondary);
   cursor: not-allowed;
   opacity: 0.6;
 }
 
 .matching-error {
-  background: #f8d7da;
-  color: #721c24;
-  border: 1px solid #f5c6cb;
+  background: var(--color-bg-danger-light);
+  color: var(--color-danger-dark);
+  border: 1px solid var(--color-danger-light);
   border-radius: 4px;
   padding: 0.75rem;
   margin-top: 0.5rem;
@@ -124,9 +126,9 @@
 }
 
 .matching-status {
-  background: #d1ecf1;
-  color: #0c5460;
-  border: 1px solid #bee5eb;
+  background: var(--color-bg-info);
+  color: var(--color-info-dark);
+  border: 1px solid var(--color-info-light);
   border-radius: 4px;
   padding: 0.75rem;
   margin-top: 0.5rem;
@@ -135,7 +137,7 @@
 }
 
 .auto-match-note {
-  color: #17a2b8;
+  color: var(--color-info);
   font-style: italic;
   font-size: 0.85rem;
 }
@@ -154,7 +156,7 @@
 
 .mapping-header p {
   margin: 0 0 1rem 0;
-  color: #6c757d;
+  color: var(--color-text-secondary);
   font-size: 0.9rem;
 }
 
@@ -169,24 +171,24 @@
   align-items: center;
   gap: 1rem;
   padding: 1rem;
-  background: white;
+  background: var(--color-bg-primary);
   border-radius: 6px;
-  border: 1px solid #e9ecef;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--color-border-secondary);
+  box-shadow: 0 1px 3px var(--shadow-light);
   margin-bottom: 1rem;
 }
 
 .required-filament {
   flex: 0 0 200px;
-  background: #f8f9fa;
+  background: var(--color-bg-secondary);
   border-radius: 4px;
   padding: 0.75rem;
-  border: 1px solid #e9ecef;
+  border: 1px solid var(--color-border-secondary);
 }
 
 .filament-label {
   font-weight: 600;
-  color: #343a40;
+  color: var(--color-text-primary);
   margin-bottom: 0.5rem;
   font-size: 0.9rem;
 }
@@ -198,14 +200,14 @@
 }
 
 .filament-type {
-  background: #e8f5e9;
-  color: #2e7d32;
+  background: var(--color-primary-accent);
+  color: var(--color-primary);
   padding: 0.4rem 0.75rem;
   border-radius: 16px;
   font-size: 0.85rem;
   font-weight: 600;
   text-align: center;
-  border: 1px solid #c8e6c9;
+  border: 1px solid var(--color-primary-light);
 }
 
 .filament-color .color-info {
@@ -213,33 +215,33 @@
   align-items: center;
   gap: 0.75rem;
   padding: 0.5rem;
-  background: white;
+  background: var(--color-bg-primary);
   border-radius: 6px;
-  border: 1px solid #dee2e6;
+  border: 1px solid var(--color-border-secondary);
 }
 
 .filament-color .color-swatch {
   width: 24px;
   height: 24px;
   border-radius: 4px;
-  border: 2px solid #ddd;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border: 2px solid var(--color-border-secondary);
+  box-shadow: 0 1px 3px var(--color-shadow);
 }
 
 .color-label {
   font-family: monospace;
   font-size: 0.85rem;
   font-weight: 500;
-  color: #495057;
+  color: var(--color-text-secondary);
 }
 
 .color-name {
-  color: #495057;
+  color: var(--color-text-secondary);
   font-weight: 500;
 }
 
 .mapping-arrow {
-  color: #4caf50;
+  color: var(--color-success);
   font-size: 1.2rem;
   font-weight: bold;
   display: flex;
@@ -256,7 +258,7 @@
 .ams-slot-selection label {
   display: block;
   font-weight: 500;
-  color: #495057;
+  color: var(--color-text-secondary);
   margin-bottom: 0.5rem;
   font-size: 0.9rem;
 }
@@ -273,15 +275,15 @@
 
 .ams-slot-select:focus {
   outline: none;
-  border-color: #4caf50;
-  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
+  border-color: var(--color-primary-light);
+  box-shadow: 0 0 0 2px var(--color-primary-accent);
 }
 
 /* Slice and Print Controls */
 .slice-print-controls {
   margin-top: 1.5rem;
   padding-top: 1.5rem;
-  border-top: 1px solid #dee2e6;
+  border-top: 1px solid var(--color-border-secondary);
 }
 
 .print-ready-section {
@@ -289,8 +291,8 @@
 }
 
 .slice-success {
-  background: #d4edda;
-  color: #155724;
+  background: var(--color-bg-success-light);
+  color: var(--color-success-dark);
   padding: 0.75rem;
   border-radius: 4px;
   margin-bottom: 1rem;
@@ -307,8 +309,8 @@
 .configuration-summary {
   margin: 1.5rem 0;
   padding: 1rem;
-  background: #f8f9fa;
-  border: 1px solid #dee2e6;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-secondary);
   border-radius: 6px;
 }
 
@@ -318,12 +320,12 @@
   align-items: center;
   margin-bottom: 1rem;
   padding-bottom: 0.75rem;
-  border-bottom: 1px solid #dee2e6;
+  border-bottom: 1px solid var(--color-border-secondary);
 }
 
 .summary-header h4 {
   margin: 0;
-  color: #495057;
+  color: var(--color-text-primary);
   font-size: 1.1rem;
 }
 
@@ -333,19 +335,19 @@
 }
 
 .status-complete {
-  color: #155724;
-  background: #d4edda;
+  color: var(--color-success-dark);
+  background: var(--color-bg-success-light);
   padding: 0.25rem 0.75rem;
   border-radius: 12px;
-  border: 1px solid #c3e6cb;
+  border: 1px solid var(--color-success-light);
 }
 
 .status-incomplete {
-  color: #856404;
-  background: #fff3cd;
+  color: var(--color-warning-dark);
+  background: var(--color-bg-warning-light);
   padding: 0.25rem 0.75rem;
   border-radius: 12px;
-  border: 1px solid #ffeaa7;
+  border: 1px solid var(--color-warning-light);
 }
 
 .summary-content {
@@ -362,7 +364,7 @@
 
 .section-label {
   font-weight: 600;
-  color: #495057;
+  color: var(--color-text-primary);
   font-size: 0.95rem;
 }
 
@@ -372,12 +374,12 @@
 }
 
 .build-plate-value {
-  background: #e8f5e9;
-  color: #2e7d32;
+  background: var(--color-bg-success-light);
+  color: var(--color-success-dark);
   padding: 0.5rem;
   border-radius: 4px;
   font-weight: 500;
-  border: 1px solid #c8e6c9;
+  border: 1px solid var(--color-success-light);
 }
 
 .filament-mappings-summary {
@@ -391,8 +393,8 @@
   align-items: center;
   gap: 1rem;
   padding: 0.75rem;
-  background: white;
-  border: 1px solid #dee2e6;
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border-secondary);
   border-radius: 4px;
 }
 
@@ -405,7 +407,7 @@
 }
 
 .filament-number {
-  background: #6c757d;
+  background: var(--color-text-secondary);
   color: white;
   padding: 0.25rem 0.5rem;
   border-radius: 12px;
@@ -417,8 +419,8 @@
 
 .required-type,
 .ams-type {
-  background: #e8f5e9;
-  color: #2e7d32;
+  background: var(--color-primary-accent);
+  color: var(--color-primary);
   padding: 0.25rem 0.5rem;
   border-radius: 12px;
   font-size: 0.8rem;
@@ -426,8 +428,8 @@
 }
 
 .ams-slot {
-  background: #f3e5f5;
-  color: #7b1fa2;
+  background: var(--color-info-bg);
+  color: var(--color-info-text);
   padding: 0.25rem 0.5rem;
   border-radius: 12px;
   font-size: 0.8rem;
@@ -438,18 +440,18 @@
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  border: 2px solid #ddd;
+  border: 2px solid var(--color-border-secondary);
   flex-shrink: 0;
 }
 
 .not-assigned {
-  color: #dc3545;
+  color: var(--color-error);
   font-style: italic;
   font-size: 0.9rem;
 }
 
 .mapping-arrow {
-  color: #6c757d;
+  color: var(--color-text-secondary);
   font-weight: bold;
 }
 
@@ -460,8 +462,8 @@
   justify-content: center;
   gap: 0.75rem;
   padding: 1rem;
-  background: #e8f5e9;
-  border: 1px solid #a5d6a7;
+  background: var(--color-bg-success-light);
+  border: 1px solid var(--color-success-light);
   border-radius: 6px;
   margin-bottom: 1rem;
 }
@@ -469,8 +471,8 @@
 .loading-spinner {
   width: 20px;
   height: 20px;
-  border: 2px solid #e8f5e9;
-  border-top: 2px solid #388e3c;
+  border: 2px solid var(--color-bg-success-light);
+  border-top: 2px solid var(--color-success);
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
@@ -485,7 +487,7 @@
 }
 
 .loading-text {
-  color: #388e3c;
+  color: var(--color-success);
   font-weight: 500;
   font-size: 0.95rem;
 }

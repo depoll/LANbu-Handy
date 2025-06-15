@@ -14,9 +14,9 @@
 }
 
 .toast {
-  background: white;
+  background: var(--color-bg-primary);
   border-radius: 8px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 16px var(--color-shadow-strong);
   border-left: 4px solid;
   overflow: hidden;
   animation: toast-slide-in 0.3s ease-out;
@@ -25,19 +25,19 @@
 }
 
 .toast-success {
-  border-left-color: #28a745;
+  border-left-color: var(--color-success);
 }
 
 .toast-error {
-  border-left-color: #dc3545;
+  border-left-color: var(--color-error);
 }
 
 .toast-warning {
-  border-left-color: #ffc107;
+  border-left-color: var(--color-warning);
 }
 
 .toast-info {
-  border-left-color: #17a2b8;
+  border-left-color: var(--color-info);
 }
 
 .toast-content {
@@ -61,14 +61,14 @@
 
 .toast-title {
   font-weight: 600;
-  color: #343a40;
+  color: var(--color-text-primary);
   font-size: 0.95rem;
   margin-bottom: 0.25rem;
   line-height: 1.3;
 }
 
 .toast-message {
-  color: #495057;
+  color: var(--color-text-secondary);
   font-size: 0.9rem;
   line-height: 1.4;
   word-wrap: break-word;
@@ -79,7 +79,7 @@
   border: none;
   font-size: 1.5rem;
   line-height: 1;
-  color: #6c757d;
+  color: var(--color-text-muted);
   cursor: pointer;
   padding: 0;
   margin: -0.25rem -0.25rem -0.25rem 0;
@@ -94,8 +94,8 @@
 }
 
 .toast-close:hover {
-  background: rgba(0, 0, 0, 0.1);
-  color: #343a40;
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
 }
 
 .toast-progress {
@@ -104,7 +104,7 @@
   left: 0;
   right: 0;
   height: 3px;
-  background: rgba(0, 0, 0, 0.1);
+  background: var(--color-bg-tertiary);
   overflow: hidden;
 }
 
@@ -116,19 +116,19 @@
 }
 
 .toast-success .toast-progress-bar {
-  background: #28a745;
+  background: var(--color-success);
 }
 
 .toast-error .toast-progress-bar {
-  background: #dc3545;
+  background: var(--color-error);
 }
 
 .toast-warning .toast-progress-bar {
-  background: #ffc107;
+  background: var(--color-warning);
 }
 
 .toast-info .toast-progress-bar {
-  background: #17a2b8;
+  background: var(--color-info);
 }
 
 @keyframes toast-slide-in {
@@ -165,19 +165,19 @@
 
 .progress-bar-label {
   font-weight: 500;
-  color: #495057;
+  color: var(--color-text-secondary);
   font-size: 0.9rem;
 }
 
 .progress-bar-percentage {
   font-weight: 600;
-  color: #495057;
+  color: var(--color-text-secondary);
   font-size: 0.85rem;
   font-family: monospace;
 }
 
 .progress-bar {
-  background: #e9ecef;
+  background: var(--color-bg-tertiary);
   border-radius: 50px;
   overflow: hidden;
   position: relative;
@@ -203,19 +203,35 @@
 }
 
 .progress-bar-primary .progress-bar-fill {
-  background: linear-gradient(90deg, #4caf50 0%, #388e3c 100%);
+  background: linear-gradient(
+    90deg,
+    var(--color-primary-light) 0%,
+    var(--color-primary) 100%
+  );
 }
 
 .progress-bar-success .progress-bar-fill {
-  background: linear-gradient(90deg, #28a745 0%, #218838 100%);
+  background: linear-gradient(
+    90deg,
+    var(--color-success) 0%,
+    var(--color-primary-hover) 100%
+  );
 }
 
 .progress-bar-warning .progress-bar-fill {
-  background: linear-gradient(90deg, #ffc107 0%, #e0a800 100%);
+  background: linear-gradient(
+    90deg,
+    var(--color-warning) 0%,
+    var(--color-warning) 100%
+  );
 }
 
 .progress-bar-error .progress-bar-fill {
-  background: linear-gradient(90deg, #dc3545 0%, #c82333 100%);
+  background: linear-gradient(
+    90deg,
+    var(--color-error) 0%,
+    var(--color-error) 100%
+  );
 }
 
 .progress-bar-indeterminate {
@@ -237,8 +253,8 @@
 
 /* Operation Progress Styles */
 .operation-progress {
-  background: white;
-  border: 1px solid #e9ecef;
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border-secondary);
   border-radius: 8px;
   padding: 1.5rem;
   margin: 1rem 0;
@@ -250,18 +266,18 @@
   align-items: center;
   margin-bottom: 1rem;
   padding-bottom: 0.75rem;
-  border-bottom: 1px solid #e9ecef;
+  border-bottom: 1px solid var(--color-border-secondary);
 }
 
 .operation-progress-title {
   margin: 0;
-  color: #343a40;
+  color: var(--color-text-primary);
   font-size: 1.1rem;
   font-weight: 600;
 }
 
 .operation-progress-summary {
-  color: #6c757d;
+  color: var(--color-text-muted);
   font-size: 0.9rem;
   font-weight: 500;
 }
@@ -284,24 +300,24 @@
 }
 
 .operation-step-pending {
-  background: #f8f9fa;
-  border-color: #dee2e6;
+  background: var(--color-bg-secondary);
+  border-color: var(--color-border-secondary);
 }
 
 .operation-step-running {
-  background: #e8f5e9;
-  border-color: #a5d6a7;
-  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.1);
+  background: var(--color-primary-accent);
+  border-color: var(--color-primary-light);
+  box-shadow: 0 0 0 2px var(--color-primary-accent);
 }
 
 .operation-step-completed {
-  background: #d4edda;
-  border-color: #c3e6cb;
+  background: var(--color-success-bg);
+  border-color: var(--color-success-border);
 }
 
 .operation-step-error {
-  background: #f8d7da;
-  border-color: #f5c6cb;
+  background: var(--color-error-bg);
+  border-color: var(--color-error-border);
 }
 
 .operation-step-header {
@@ -318,29 +334,29 @@
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: white;
+  background: var(--color-bg-primary);
   border: 2px solid;
   flex-shrink: 0;
 }
 
 .operation-step-pending .operation-step-indicator {
-  border-color: #dee2e6;
-  color: #6c757d;
+  border-color: var(--color-border-secondary);
+  color: var(--color-text-muted);
 }
 
 .operation-step-running .operation-step-indicator {
-  border-color: #4caf50;
-  color: #388e3c;
+  border-color: var(--color-primary-light);
+  color: var(--color-primary);
 }
 
 .operation-step-completed .operation-step-indicator {
-  border-color: #28a745;
-  color: #155724;
+  border-color: var(--color-success);
+  color: var(--color-success-text);
 }
 
 .operation-step-error .operation-step-indicator {
-  border-color: #dc3545;
-  color: #721c24;
+  border-color: var(--color-error);
+  color: var(--color-error-text);
 }
 
 .operation-step-icon {
@@ -352,8 +368,8 @@
   position: absolute;
   bottom: -8px;
   right: -8px;
-  background: #343a40;
-  color: white;
+  background: var(--color-text-primary);
+  color: var(--color-text-inverse);
   border-radius: 50%;
   width: 18px;
   height: 18px;
@@ -362,7 +378,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 2px solid white;
+  border: 2px solid var(--color-bg-primary);
 }
 
 .operation-step-content {
@@ -372,19 +388,19 @@
 
 .operation-step-label {
   font-weight: 600;
-  color: #343a40;
+  color: var(--color-text-primary);
   font-size: 0.95rem;
   margin-bottom: 0.25rem;
 }
 
 .operation-step-message {
-  color: #495057;
+  color: var(--color-text-secondary);
   font-size: 0.9rem;
   margin-bottom: 0.25rem;
 }
 
 .operation-step-details {
-  color: #6c757d;
+  color: var(--color-text-muted);
   font-size: 0.85rem;
   font-style: italic;
 }
@@ -458,13 +474,13 @@
 
 /* Slice Progress Tracker Styles */
 .slice-progress-tracker {
-  background: rgba(233, 236, 239, 0.98);
+  background: var(--color-bg-primary);
   backdrop-filter: blur(10px);
-  border: 1px solid #ced4da;
+  border: 1px solid var(--color-border-primary);
   border-radius: 12px;
   padding: 1.5rem;
   margin: 1rem 0;
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 6px 16px var(--color-shadow-strong);
 }
 
 .slice-progress-tracker .progress-header {
@@ -476,14 +492,14 @@
 
 .slice-progress-tracker .progress-header h5 {
   margin: 0;
-  color: #495057;
+  color: var(--color-text-secondary);
   font-size: 1.1rem;
   font-weight: 600;
 }
 
 .slice-progress-tracker .progress-stats {
   font-size: 0.9rem;
-  color: #6c757d;
+  color: var(--color-text-muted);
   font-weight: 500;
 }
 
@@ -497,7 +513,7 @@
 .slice-progress-tracker .progress-bar {
   flex: 1;
   height: 12px;
-  background: #e9ecef;
+  background: var(--color-bg-tertiary);
   border-radius: 6px;
   overflow: hidden;
   position: relative;
@@ -505,7 +521,11 @@
 
 .slice-progress-tracker .progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, #007bff 0%, #0056b3 100%);
+  background: linear-gradient(
+    90deg,
+    var(--color-info) 0%,
+    var(--color-primary) 100%
+  );
   border-radius: 6px;
   transition: width 0.5s ease;
   position: relative;
@@ -538,13 +558,13 @@
 
 .slice-progress-tracker .progress-percentage {
   font-weight: 600;
-  color: #495057;
+  color: var(--color-text-secondary);
   min-width: 3rem;
   text-align: right;
 }
 
 .slice-progress-tracker .progress-phase {
-  color: #6c757d;
+  color: var(--color-text-muted);
   font-size: 0.9rem;
   margin-bottom: 1rem;
   font-style: italic;
@@ -553,12 +573,12 @@
 .slice-progress-tracker .plates-status {
   margin-top: 1.5rem;
   padding-top: 1rem;
-  border-top: 1px solid #e9ecef;
+  border-top: 1px solid var(--color-border-secondary);
 }
 
 .slice-progress-tracker .plates-status h6 {
   margin: 0 0 0.75rem 0;
-  color: #495057;
+  color: var(--color-text-secondary);
   font-size: 0.9rem;
   font-weight: 600;
 }
@@ -574,9 +594,9 @@
   align-items: center;
   gap: 0.75rem;
   padding: 0.5rem;
-  background: white;
+  background: var(--color-bg-primary);
   border-radius: 6px;
-  border: 1px solid #e9ecef;
+  border: 1px solid var(--color-border-secondary);
 }
 
 .slice-progress-tracker .plate-icon {
@@ -590,17 +610,17 @@
 .slice-progress-tracker .plate-name {
   font-size: 0.85rem;
   font-weight: 500;
-  color: #495057;
+  color: var(--color-text-secondary);
   margin-bottom: 0.25rem;
 }
 
 .slice-progress-tracker .plate-objects {
   font-size: 0.75rem;
-  color: #6c757d;
+  color: var(--color-text-muted);
 }
 
 .slice-progress-tracker .support-indicator {
-  color: #ffc107;
+  color: var(--color-warning);
   font-weight: 500;
 }
 
@@ -611,12 +631,12 @@
 .slice-progress-tracker .progress-footer {
   margin-top: 1rem;
   padding-top: 1rem;
-  border-top: 1px solid #e9ecef;
+  border-top: 1px solid var(--color-border-secondary);
   text-align: center;
 }
 
 .slice-progress-tracker .progress-footer small {
-  color: #6c757d;
+  color: var(--color-text-muted);
   line-height: 1.4;
 }
 
@@ -648,12 +668,12 @@
 
 /* Sequential Plate Slice Tracker Styles */
 .sequential-plate-slice-tracker {
-  background: #f8f9fa;
-  border: 1px solid #e9ecef;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-secondary);
   border-radius: 12px;
   padding: 1.5rem;
   margin: 1rem 0;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 2px 4px var(--color-shadow);
 }
 
 .sequential-plate-slice-tracker .progress-header {
@@ -665,14 +685,14 @@
 
 .sequential-plate-slice-tracker .progress-header h5 {
   margin: 0;
-  color: #495057;
+  color: var(--color-text-secondary);
   font-size: 1.1rem;
   font-weight: 600;
 }
 
 .sequential-plate-slice-tracker .progress-stats {
   font-size: 0.9rem;
-  color: #6c757d;
+  color: var(--color-text-muted);
   font-weight: 500;
 }
 
@@ -686,7 +706,7 @@
 .sequential-plate-slice-tracker .progress-bar {
   flex: 1;
   height: 12px;
-  background: #e9ecef;
+  background: var(--color-bg-tertiary);
   border-radius: 6px;
   overflow: hidden;
   position: relative;
@@ -694,14 +714,18 @@
 
 .sequential-plate-slice-tracker .progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, #28a745 0%, #20c997 100%);
+  background: linear-gradient(
+    90deg,
+    var(--color-success) 0%,
+    var(--color-primary-light) 100%
+  );
   border-radius: 6px;
   transition: width 0.5s ease;
 }
 
 .sequential-plate-slice-tracker .progress-percentage {
   font-weight: 600;
-  color: #495057;
+  color: var(--color-text-secondary);
   min-width: 3rem;
   text-align: right;
 }
@@ -714,8 +738,8 @@
 }
 
 .sequential-plate-slice-tracker .plate-progress-card {
-  background: white;
-  border: 2px solid #e9ecef;
+  background: var(--color-bg-primary);
+  border: 2px solid var(--color-border-secondary);
   border-radius: 8px;
   padding: 1rem;
   transition: all 0.3s ease;
@@ -723,19 +747,19 @@
 }
 
 .sequential-plate-slice-tracker .plate-progress-card.pending {
-  border-color: #e9ecef;
+  border-color: var(--color-border-secondary);
   opacity: 0.7;
 }
 
 .sequential-plate-slice-tracker .plate-progress-card.processing {
-  border-color: #007bff;
+  border-color: var(--color-info);
   background: linear-gradient(
     45deg,
-    #ffffff 25%,
+    var(--color-bg-primary) 25%,
     transparent 25%,
     transparent 50%,
-    #ffffff 50%,
-    #ffffff 75%,
+    var(--color-bg-primary) 50%,
+    var(--color-bg-primary) 75%,
     transparent 75%,
     transparent
   );
@@ -744,8 +768,8 @@
 }
 
 .sequential-plate-slice-tracker .plate-progress-card.completed {
-  border-color: #28a745;
-  background: #f8fff9;
+  border-color: var(--color-success);
+  background: var(--color-success-bg);
 }
 
 @keyframes progress-stripe {
@@ -764,7 +788,7 @@
   margin: 0 auto 0.75rem;
   border-radius: 6px;
   overflow: hidden;
-  background: #f8f9fa;
+  background: var(--color-bg-secondary);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -790,15 +814,15 @@
 }
 
 .sequential-plate-slice-tracker .plate-progress-card.completed .plate-overlay {
-  background: #28a745;
+  background: var(--color-success);
 }
 
 .sequential-plate-slice-tracker .plate-progress-card.processing .plate-overlay {
-  background: #007bff;
+  background: var(--color-info);
 }
 
 .sequential-plate-slice-tracker .plate-progress-card.pending .plate-overlay {
-  background: #6c757d;
+  background: var(--color-text-muted);
 }
 
 .sequential-plate-slice-tracker .status-icon {
@@ -813,18 +837,18 @@
 .sequential-plate-slice-tracker .plate-name {
   font-size: 0.85rem;
   font-weight: 600;
-  color: #495057;
+  color: var(--color-text-secondary);
   margin-bottom: 0.25rem;
 }
 
 .sequential-plate-slice-tracker .plate-details {
   font-size: 0.75rem;
-  color: #6c757d;
+  color: var(--color-text-muted);
   margin-bottom: 0.5rem;
 }
 
 .sequential-plate-slice-tracker .support-indicator {
-  color: #ffc107;
+  color: var(--color-warning);
   font-weight: 500;
 }
 
@@ -837,16 +861,16 @@
 
 .sequential-plate-slice-tracker .estimate {
   font-size: 0.7rem;
-  background: #e9ecef;
+  background: var(--color-bg-tertiary);
   padding: 0.2rem 0.4rem;
   border-radius: 4px;
-  color: #495057;
+  color: var(--color-text-secondary);
   font-weight: 500;
 }
 
 .sequential-plate-slice-tracker .plate-status {
   font-size: 0.75rem;
-  color: #007bff;
+  color: var(--color-info);
   font-weight: 500;
   font-style: italic;
 }
@@ -854,12 +878,12 @@
 .sequential-plate-slice-tracker .progress-footer {
   margin-top: 1rem;
   padding-top: 1rem;
-  border-top: 1px solid #e9ecef;
+  border-top: 1px solid var(--color-border-secondary);
   text-align: center;
 }
 
 .sequential-plate-slice-tracker .progress-footer small {
-  color: #6c757d;
+  color: var(--color-text-muted);
   line-height: 1.4;
 }
 
@@ -893,12 +917,12 @@
 
 /* Streaming Slice Tracker Styles */
 .streaming-slice-tracker {
-  background: #f8f9fa;
-  border: 1px solid #e9ecef;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-secondary);
   border-radius: 12px;
   padding: 1.5rem;
   margin: 1rem 0;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 2px 4px var(--color-shadow);
 }
 
 .streaming-slice-tracker .progress-header {
@@ -910,14 +934,14 @@
 
 .streaming-slice-tracker .progress-header h5 {
   margin: 0;
-  color: #495057;
+  color: var(--color-text-secondary);
   font-size: 1.1rem;
   font-weight: 600;
 }
 
 .streaming-slice-tracker .progress-stats {
   font-size: 0.9rem;
-  color: #6c757d;
+  color: var(--color-text-muted);
   font-weight: 500;
 }
 
@@ -931,7 +955,7 @@
 .streaming-slice-tracker .progress-bar {
   flex: 1;
   height: 12px;
-  background: #e9ecef;
+  background: var(--color-bg-tertiary);
   border-radius: 6px;
   overflow: hidden;
   position: relative;
@@ -939,7 +963,11 @@
 
 .streaming-slice-tracker .progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, #007bff 0%, #0056b3 100%);
+  background: linear-gradient(
+    90deg,
+    var(--color-info) 0%,
+    var(--color-primary) 100%
+  );
   border-radius: 6px;
   transition: width 0.5s ease;
   position: relative;
@@ -963,21 +991,21 @@
 
 .streaming-slice-tracker .progress-percentage {
   font-weight: 600;
-  color: #495057;
+  color: var(--color-text-secondary);
   min-width: 3rem;
   text-align: right;
 }
 
 .streaming-slice-tracker .current-phase {
-  color: #6c757d;
+  color: var(--color-text-muted);
   font-size: 0.9rem;
   margin-bottom: 1.5rem;
   font-style: italic;
   text-align: center;
   padding: 0.5rem;
-  background: rgba(0, 123, 255, 0.1);
+  background: var(--color-info-bg);
   border-radius: 6px;
-  border-left: 3px solid #007bff;
+  border-left: 3px solid var(--color-info);
 }
 
 .streaming-slice-tracker .plates-progress-grid {
@@ -988,8 +1016,8 @@
 }
 
 .streaming-slice-tracker .plate-progress-card {
-  background: white;
-  border: 2px solid #e9ecef;
+  background: var(--color-bg-primary);
+  border: 2px solid var(--color-border-secondary);
   border-radius: 8px;
   padding: 1rem;
   transition: all 0.3s ease;
@@ -997,19 +1025,19 @@
 }
 
 .streaming-slice-tracker .plate-progress-card.pending {
-  border-color: #e9ecef;
+  border-color: var(--color-border-secondary);
   opacity: 0.7;
 }
 
 .streaming-slice-tracker .plate-progress-card.processing {
-  border-color: #007bff;
-  background: #f8ffff;
-  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.1);
+  border-color: var(--color-info);
+  background: var(--color-info-bg);
+  box-shadow: 0 0 0 2px var(--color-info-bg);
 }
 
 .streaming-slice-tracker .plate-progress-card.completed {
-  border-color: #28a745;
-  background: #f8fff9;
+  border-color: var(--color-success);
+  background: var(--color-success-bg);
 }
 
 .streaming-slice-tracker .plate-thumbnail {
@@ -1019,7 +1047,7 @@
   margin: 0 auto 0.75rem;
   border-radius: 6px;
   overflow: hidden;
-  background: #f8f9fa;
+  background: var(--color-bg-secondary);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1045,15 +1073,15 @@
 }
 
 .streaming-slice-tracker .plate-progress-card.completed .plate-overlay {
-  background: #28a745;
+  background: var(--color-success);
 }
 
 .streaming-slice-tracker .plate-progress-card.processing .plate-overlay {
-  background: #007bff;
+  background: var(--color-info);
 }
 
 .streaming-slice-tracker .plate-progress-card.pending .plate-overlay {
-  background: #6c757d;
+  background: var(--color-text-muted);
 }
 
 .streaming-slice-tracker .status-icon {
@@ -1068,18 +1096,18 @@
 .streaming-slice-tracker .plate-name {
   font-size: 0.85rem;
   font-weight: 600;
-  color: #495057;
+  color: var(--color-text-secondary);
   margin-bottom: 0.25rem;
 }
 
 .streaming-slice-tracker .plate-details {
   font-size: 0.75rem;
-  color: #6c757d;
+  color: var(--color-text-muted);
   margin-bottom: 0.5rem;
 }
 
 .streaming-slice-tracker .support-indicator {
-  color: #ffc107;
+  color: var(--color-warning);
   font-weight: 500;
 }
 
@@ -1089,7 +1117,7 @@
 
 .streaming-slice-tracker .progress-bar-mini {
   height: 6px;
-  background: #e9ecef;
+  background: var(--color-bg-tertiary);
   border-radius: 3px;
   overflow: hidden;
   margin-bottom: 0.25rem;
@@ -1097,14 +1125,18 @@
 
 .streaming-slice-tracker .progress-fill-mini {
   height: 100%;
-  background: linear-gradient(90deg, #007bff 0%, #0056b3 100%);
+  background: linear-gradient(
+    90deg,
+    var(--color-info) 0%,
+    var(--color-primary) 100%
+  );
   border-radius: 3px;
   transition: width 0.3s ease;
 }
 
 .streaming-slice-tracker .progress-text {
   font-size: 0.7rem;
-  color: #007bff;
+  color: var(--color-info);
   font-weight: 500;
 }
 
@@ -1114,13 +1146,13 @@
 
 .streaming-slice-tracker .completion-text {
   font-size: 0.75rem;
-  color: #28a745;
+  color: var(--color-success);
   font-weight: 500;
 }
 
 .streaming-slice-tracker .plate-status {
   font-size: 0.75rem;
-  color: #6c757d;
+  color: var(--color-text-muted);
   font-style: italic;
   margin-top: 0.5rem;
 }
@@ -1128,12 +1160,12 @@
 .streaming-slice-tracker .progress-footer {
   margin-top: 1rem;
   padding-top: 1rem;
-  border-top: 1px solid #e9ecef;
+  border-top: 1px solid var(--color-border-secondary);
   text-align: center;
 }
 
 .streaming-slice-tracker .progress-footer small {
-  color: #6c757d;
+  color: var(--color-text-muted);
   line-height: 1.4;
 }
 

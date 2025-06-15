@@ -15,31 +15,31 @@
   align-items: center;
   margin-bottom: 1rem;
   padding-bottom: 0.75rem;
-  border-bottom: 1px solid #e9ecef;
+  border-bottom: 1px solid var(--color-border-secondary);
 }
 
 .model-preview-header h3 {
   margin: 0;
-  color: #343a40;
+  color: var(--color-text-primary);
   font-size: 1.1rem;
   font-weight: 600;
 }
 
 .model-preview .loading-text {
-  color: #6c757d;
+  color: var(--color-text-secondary);
   font-size: 0.9rem;
   font-style: italic;
 }
 
 .model-preview .error-text {
-  color: #dc3545;
+  color: var(--color-danger);
   font-size: 0.9rem;
   font-weight: 500;
 }
 
 .model-preview-container {
   position: relative;
-  background: #f8f9fa;
+  background: var(--color-bg-secondary);
   border-radius: 6px;
   overflow: hidden;
   min-height: 300px;
@@ -55,10 +55,10 @@
 .preview-note {
   margin-top: 1rem;
   padding: 0.75rem;
-  background: #fff3cd;
-  border: 1px solid #ffeaa7;
+  background: var(--color-bg-warning-light);
+  border: 1px solid var(--color-warning-light);
   border-radius: 4px;
-  color: #856404;
+  color: var(--color-warning-dark);
   font-size: 0.85rem;
   text-align: center;
 }
@@ -77,8 +77,8 @@
   transform: translate(-50%, -50%);
   width: 40px;
   height: 40px;
-  border: 3px solid #e9ecef;
-  border-top: 3px solid #4caf50;
+  border: 3px solid var(--color-border-secondary);
+  border-top: 3px solid var(--color-primary);
   border-radius: 50%;
   animation: spin 1s linear infinite;
   z-index: 1;
