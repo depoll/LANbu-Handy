@@ -155,7 +155,7 @@ FROM ubuntu:22.04 AS runtime
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install minimal runtime dependencies
+# Install minimal runtime dependencies with virtual display support (Wayland)
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     libglib2.0-0 \
@@ -165,10 +165,66 @@ RUN apt-get update && \
     libgtk-3-0 \
     libegl1 \
     software-properties-common \
+    weston \
+    wayland-protocols \
+    libosmesa6 \
+    libosmesa6-dev \
+    mesa-common-dev \
+    libglew2.2 \
+    libglew-dev \
+    libglu1-mesa \
+    libglu1-mesa-dev \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Copy the built binary
 COPY --from=builder /usr/local/bin/BambuStudio.AppImage /usr/local/bin/BambuStudio.AppImage
+
+# Create virtual display startup script
+RUN echo '#!/bin/bash\n\
+# Start virtual Wayland compositor if not already running\n\
+if [ -z "$WAYLAND_DISPLAY" ]; then\n\
+    export WAYLAND_DISPLAY=wayland-0\n\
+fi\n\
+\n\
+# Set up XDG runtime directory\n\
+export XDG_RUNTIME_DIR=/tmp/runtime\n\
+mkdir -p $XDG_RUNTIME_DIR\n\
+chmod 700 $XDG_RUNTIME_DIR\n\
+\n\
+# Set up OpenGL environment for headless rendering\n\
+export MESA_GL_VERSION_OVERRIDE=3.3\n\
+export MESA_GLSL_VERSION_OVERRIDE=330\n\
+export LIBGL_ALWAYS_SOFTWARE=1\n\
+export GALLIUM_DRIVER=llvmpipe\n\
+\n\
+# Start Weston (Wayland compositor) in headless mode if not already running\n\
+if ! pgrep -x "weston" > /dev/null; then\n\
+    weston --backend=headless-backend.so --width=1024 --height=768 --idle-time=0 > /dev/null 2>&1 &\n\
+    WESTON_PID=$!\n\
+    export WESTON_PID\n\
+    sleep 3\n\
+fi\n\
+\n\
+# Function to cleanup Weston on exit\n\
+cleanup() {\n\
+    if [ ! -z "$WESTON_PID" ]; then\n\
+        kill $WESTON_PID 2>/dev/null || true\n\
+    fi\n\
+}\n\
+trap cleanup EXIT\n\
+\n\
+# Execute the original command\n\
+exec "$@"\n\
+' > /usr/local/bin/bambu-studio-with-display \
+    && chmod +x /usr/local/bin/bambu-studio-with-display
+
+# Set environment variables for virtual display
+ENV WAYLAND_DISPLAY=wayland-0
+ENV XDG_RUNTIME_DIR=/tmp/runtime
+ENV MESA_GL_VERSION_OVERRIDE=3.3
+ENV MESA_GLSL_VERSION_OVERRIDE=330
+ENV LIBGL_ALWAYS_SOFTWARE=1
+ENV GALLIUM_DRIVER=llvmpipe
 
 # Make AppImage executable and extract it for containerized use
 RUN chmod +x /usr/local/bin/BambuStudio.AppImage && \
@@ -178,9 +234,9 @@ RUN chmod +x /usr/local/bin/BambuStudio.AppImage && \
     ln -s /opt/BambuStudio/AppRun /usr/local/bin/bambu-studio-cli
 
 # Test the installation
-RUN bambu-studio-cli --help
+RUN bambu-studio-with-display bambu-studio-cli --help
 
-CMD ["bambu-studio-cli", "--help"]
+CMD ["bambu-studio-with-display", "bambu-studio-cli", "--help"]
 
 # Build Instructions:
 # docker build -f docker/Dockerfile -t bambu-studio-cli:latest .
