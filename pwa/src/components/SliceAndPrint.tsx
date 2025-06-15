@@ -283,7 +283,8 @@ function SliceAndPrint() {
     setCurrentFileId(data.fileId);
     setFilamentRequirements(data.filamentRequirements);
     setPlates(data.plates);
-    setHasMultiplePlates(data.hasMultiplePlates);
+    // Always treat models as multi-plate for consistent UI experience
+    setHasMultiplePlates(data.plates.length > 0);
     setModelSubmitted(true);
     setModelUrl(data.modelUrl); // Store the model URL for later use
 

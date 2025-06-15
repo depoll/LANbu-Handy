@@ -317,7 +317,8 @@ function PlateSelector({
       setCompletedPlates(new Set());
       setFadingPlates(new Set());
 
-      // Start the slice progress session - always slice all plates for configuration estimates
+      // Start the slice progress session - always slice all plates for estimates
+      // The selectedPlateIndex is used for UI display only, backend always processes all plates
       const request: StartProgressSliceRequest = {
         file_id: fileId,
         filament_mappings: filamentMappings,
@@ -500,6 +501,22 @@ function PlateSelector({
               }
 
               onPlatesUpdate(updatedPlates);
+
+              // Check if single-plate model got valid estimates
+              if (plates.length === 1) {
+                const hasValidEstimates = updatedPlates.some(
+                  plate =>
+                    (plate.prediction_seconds &&
+                      plate.prediction_seconds > 0) ||
+                    (plate.weight_grams && plate.weight_grams > 0)
+                );
+                if (!hasValidEstimates) {
+                  console.log(
+                    'No valid estimates found for single-plate model due to slicing issues'
+                  );
+                  // Don't show estimates when slicing fails - better to show nothing than incorrect estimates
+                }
+              }
             }
 
             // Close the event source
@@ -512,6 +529,18 @@ function PlateSelector({
             setIsSlicing(false);
           } else if (eventData.type === 'error') {
             setCurrentPhase(`Error: ${eventData.data.error}`);
+
+            // Log backend parameter errors for debugging
+            const errorMessage = eventData.data.error || '';
+            if (
+              (errorMessage.includes('filament_flush_temp') ||
+                errorMessage.includes('Param values in 3mf/config error')) &&
+              plates.length === 1
+            ) {
+              console.log(
+                'Backend parameter error detected for single-plate model - estimates will not be available'
+              );
+            }
 
             if (eventSourceRef.current) {
               eventSourceRef.current.close();
@@ -527,9 +556,17 @@ function PlateSelector({
       };
 
       eventSource.onerror = error => {
+        console.error('EventSource error:', error);
         setCurrentPhase('Connection error occurred');
         setIsStreaming(false);
         setIsSlicing(false);
+
+        // Log EventSource errors for debugging
+        if (plates.length === 1) {
+          console.log(
+            'EventSource error occurred for single-plate model - estimates may not be available'
+          );
+        }
 
         if (eventSourceRef.current) {
           eventSourceRef.current.close();
@@ -537,8 +574,10 @@ function PlateSelector({
         }
       };
     } catch (error) {
+      console.error('Failed to start streaming slice:', error);
       setIsStreaming(false);
       setIsSlicing(false);
+      setCurrentPhase('Failed to start slicing');
     }
   }, [fileId, isStreaming, filamentMappings, selectedBuildPlate]);
 
@@ -598,8 +637,8 @@ function PlateSelector({
     };
   }, []);
 
-  if (!plates || plates.length <= 1) {
-    return null; // Don't show selector for single plate models
+  if (!plates || plates.length === 0) {
+    return null; // Only hide if no plates at all
   }
 
   const formatTime = (seconds?: number, plateIndex?: number): string => {
@@ -634,7 +673,7 @@ function PlateSelector({
       }
     }
 
-    return 'After slice';
+    return '—';
   };
 
   const formatWeight = (grams?: number, plateIndex?: number): string => {
@@ -660,7 +699,7 @@ function PlateSelector({
       }
     }
 
-    return 'After slice';
+    return '—';
   };
 
   const getContrastColor = (hexColor: string): string => {
