@@ -264,6 +264,11 @@ function FilamentMappingConfig({
     if (amsStatus?.success && amsStatus.ams_units) {
       amsStatus.ams_units.forEach(unit => {
         unit.filaments.forEach(filament => {
+          // Skip empty slots
+          if (filament.filament_type === 'Empty') {
+            return;
+          }
+
           slots.push({
             unit_id: unit.unit_id,
             slot_id: filament.slot_id,
@@ -347,6 +352,15 @@ function FilamentMappingConfig({
     setHasTriggeredAutoMatch(false);
     setMatchingError(null);
   }, [filamentRequirements]);
+
+  // Reset auto-match trigger when filament mappings are cleared (e.g., plate selection)
+  useEffect(() => {
+    if (filamentMappings.length === 0 && hasTriggeredAutoMatch) {
+      console.log('Filament mappings cleared - resetting auto-match trigger');
+      setHasTriggeredAutoMatch(false);
+      setMatchingError(null);
+    }
+  }, [filamentMappings.length, hasTriggeredAutoMatch]);
 
   // Debug AMS status changes
   useEffect(() => {

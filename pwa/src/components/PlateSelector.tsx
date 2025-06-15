@@ -192,35 +192,39 @@ function FilamentPillWithDropdown({
             </div>
           )}
           {amsStatus?.ams_units?.map(unit =>
-            unit.filaments.map(filament => {
-              const isSelected =
-                mapping?.ams_unit_id === unit.unit_id &&
-                mapping?.ams_slot_id === filament.slot_id;
+            unit.filaments
+              .filter(filament => filament.filament_type !== 'Empty')
+              .map(filament => {
+                const isSelected =
+                  mapping?.ams_unit_id === unit.unit_id &&
+                  mapping?.ams_slot_id === filament.slot_id;
 
-              return (
-                <div
-                  key={`${unit.unit_id}-${filament.slot_id}`}
-                  className={`dropdown-option ${isSelected ? 'selected' : ''}`}
-                  onClick={() =>
-                    handleMappingSelect(unit.unit_id, filament.slot_id)
-                  }
-                >
+                return (
                   <div
-                    className="option-color-swatch"
-                    style={{ backgroundColor: filament.color }}
-                  />
-                  <div className="option-details">
-                    <span className="option-label">
-                      AMS {unit.unit_id}-{filament.slot_id}
-                    </span>
-                    <span className="option-type">
-                      {filament.filament_type}
-                    </span>
+                    key={`${unit.unit_id}-${filament.slot_id}`}
+                    className={`dropdown-option ${isSelected ? 'selected' : ''}`}
+                    onClick={() =>
+                      handleMappingSelect(unit.unit_id, filament.slot_id)
+                    }
+                  >
+                    <div
+                      className="option-color-swatch"
+                      style={{ backgroundColor: filament.color }}
+                    />
+                    <div className="option-details">
+                      <span className="option-label">
+                        AMS {unit.unit_id}-{filament.slot_id}
+                      </span>
+                      <span className="option-type">
+                        {filament.filament_type}
+                      </span>
+                    </div>
+                    {isSelected && (
+                      <span className="selected-indicator">✓</span>
+                    )}
                   </div>
-                  {isSelected && <span className="selected-indicator">✓</span>}
-                </div>
-              );
-            })
+                );
+              })
           )}
         </div>
       )}
