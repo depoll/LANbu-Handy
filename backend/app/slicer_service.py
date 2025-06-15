@@ -47,15 +47,15 @@ class BambuStudioCLIWrapper:
         self.cli_command = cli_command
         self.temp_dir = Path(tempfile.gettempdir()) / "lanbu-handy"
         self.temp_dir.mkdir(exist_ok=True)
-        
+
         # Check if we need to use virtual display wrapper for graphics operations
         self.use_display_wrapper = self._should_use_display_wrapper()
 
     def _should_use_display_wrapper(self) -> bool:
         """
         Determine if we should use the virtual display wrapper.
-        
-        Returns True if we're in a containerized environment and the 
+
+        Returns True if we're in a containerized environment and the
         wrapper is available.
         """
         # Check if bambu-studio-with-display wrapper exists
@@ -64,19 +64,21 @@ class BambuStudioCLIWrapper:
                 ["which", "bambu-studio-with-display"],
                 capture_output=True,
                 text=True,
-                timeout=5
+                timeout=5,
             )
             return result.returncode == 0
         except Exception:
             return False
 
-    def _get_cli_command_for_operation(self, requires_display: bool = False) -> List[str]:
+    def _get_cli_command_for_operation(
+        self, requires_display: bool = False
+    ) -> List[str]:
         """
         Get the appropriate CLI command for the operation.
-        
+
         Args:
             requires_display: Whether the operation requires display/graphics support
-            
+
         Returns:
             List of command components to use
         """
@@ -85,7 +87,12 @@ class BambuStudioCLIWrapper:
         else:
             return [self.cli_command]
 
-    def _run_command(self, args: List[str], timeout: Optional[int] = None, requires_display: bool = False) -> CLIResult:
+    def _run_command(
+        self,
+        args: List[str],
+        timeout: Optional[int] = None,
+        requires_display: bool = False,
+    ) -> CLIResult:
         """
         Execute a CLI command with the given arguments.
 
@@ -283,7 +290,7 @@ class BambuStudioCLIWrapper:
 
         # Add output directory
         args.extend(["--outputdir", str(output_dir)])
-        
+
         # Add camera view if specified
         if camera_view != 0:
             args.extend(["--camera-view", str(camera_view)])

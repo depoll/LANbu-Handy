@@ -110,30 +110,33 @@ class ThumbnailService:
         # Create temporary output directory for CLI
         cli_output_dir = self.temp_dir / "cli_output"
         cli_output_dir.mkdir(exist_ok=True)
-        
+
         try:
             # Use the new PNG export functionality
             result = self.cli_wrapper.export_png(
                 input_path=model_path,
                 output_dir=cli_output_dir,
                 plate_number=0,  # Export first/all plates
-                camera_view=0,   # Isometric view
+                camera_view=0,  # Isometric view
             )
-            
+
             if result.success:
                 # Look for generated PNG files
                 png_files = list(cli_output_dir.glob("*.png"))
-                
+
                 if png_files:
                     # Copy the first PNG file to our desired location
                     import shutil
+
                     shutil.copy2(png_files[0], thumbnail_path)
-                    
+
                     # Cleanup temporary files
                     for png_file in png_files:
                         png_file.unlink()
-                    
-                    logger.info(f"Successfully generated CLI thumbnail: {thumbnail_path}")
+
+                    logger.info(
+                        f"Successfully generated CLI thumbnail: {thumbnail_path}"
+                    )
                     return CLIResult(
                         exit_code=0,
                         stdout=f"Thumbnail generated at {thumbnail_path}",
@@ -151,7 +154,7 @@ class ThumbnailService:
             else:
                 logger.warning(f"CLI PNG export failed: {result.stderr}")
                 return result
-                
+
         except Exception as e:
             logger.error(f"Exception during CLI thumbnail generation: {e}")
             return CLIResult(
@@ -165,6 +168,7 @@ class ThumbnailService:
             try:
                 if cli_output_dir.exists():
                     import shutil
+
                     shutil.rmtree(cli_output_dir)
             except Exception as e:
                 logger.warning(f"Failed to cleanup temporary CLI output directory: {e}")
