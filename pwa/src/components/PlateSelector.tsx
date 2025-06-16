@@ -251,7 +251,6 @@ function PlateSelector({
 }: PlateSelectorProps) {
   const [isSlicing, setIsSlicing] = useState(false);
   const [lastSliceConfig, setLastSliceConfig] = useState<string>('');
-  const [hasSliced, setHasSliced] = useState(false);
   const [, setSessionId] = useState<string | null>(null);
   const [plateProgress, setPlateProgress] = useState<
     Map<number, SliceProgress>
@@ -274,6 +273,7 @@ function PlateSelector({
   const [failedThumbnails, setFailedThumbnails] = useState<Set<string>>(
     new Set()
   );
+  const autoSliceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Check if configuration is complete
   const isConfigurationComplete = useCallback((): boolean => {
@@ -282,15 +282,13 @@ function PlateSelector({
       return false;
     }
 
-    // Must have a build plate selected
-    if (!selectedBuildPlate) {
-      return false;
-    }
+    // Build plate defaults to textured_pei_plate if not set
+    const effectiveBuildPlate = selectedBuildPlate || 'textured_pei_plate';
 
-    // Configuration is complete when we have a file and build plate
+    // Configuration is complete when we have a file, plates, and build plate
     // Filament mapping is optional - by default slicer uses settings from the 3MF file
     // Only when filament mappings are configured do we override with AMS-specific settings
-    return true;
+    return !!fileId && plates.length > 0 && !!effectiveBuildPlate;
   }, [fileId, plates, selectedBuildPlate]);
 
   // Generate config hash to detect changes
@@ -300,7 +298,7 @@ function PlateSelector({
       mappings: [...filamentMappings].sort(
         (a, b) => a.filament_index - b.filament_index
       ),
-      buildPlate: selectedBuildPlate,
+      buildPlate: selectedBuildPlate || 'textured_pei_plate',
       plateIndex: selectedPlateIndex,
     });
   }, [fileId, filamentMappings, selectedBuildPlate, selectedPlateIndex]);
@@ -606,16 +604,20 @@ function PlateSelector({
 
   // Trigger sequential slicing when configuration is complete
   const triggerSequentialSlicing = useCallback(() => {
-    if (!fileId || isSlicing) return;
+    if (!fileId || isSlicing) {
+      return;
+    }
 
     // Only slice if configuration is complete
-    if (!isConfigurationComplete()) return;
+    if (!isConfigurationComplete()) {
+      return;
+    }
 
     setIsSlicing(true);
     startStreamingSlice();
   }, [fileId, isSlicing, isConfigurationComplete, startStreamingSlice]);
 
-  // Auto-slice when configuration changes (simplified logic)
+  // Auto-slice when configuration changes
   useEffect(() => {
     // Only proceed if configuration is truly complete
     if (!isConfigurationComplete()) {
@@ -629,25 +631,23 @@ function PlateSelector({
 
     const configHash = generateConfigHash();
 
-    if (configHash !== lastSliceConfig && configHash !== '""' && !hasSliced) {
-      // Ignore empty configs and don't re-slice
+    if (configHash !== lastSliceConfig && configHash !== '""') {
+      // Ignore empty configs but allow re-slicing when config changes
       setLastSliceConfig(configHash);
 
-      // Use immediate execution with a ref to prevent race conditions
-      const timer = setTimeout(() => {
-        setHasSliced(true); // Mark that we've sliced for this config
-        triggerSequentialSlicing();
-      }, 500); // Very short delay
-
-      return () => {
-        clearTimeout(timer);
-      };
+      // Only schedule if no timer is already running
+      if (!autoSliceTimerRef.current) {
+        // Schedule new auto-slice
+        autoSliceTimerRef.current = setTimeout(() => {
+          autoSliceTimerRef.current = null;
+          triggerSequentialSlicing();
+        }, 100); // Short delay to batch rapid config changes
+      }
     }
   }, [
     fileId,
     selectedBuildPlate,
     selectedPlateIndex,
-    hasSliced,
     sliceError,
     generateConfigHash,
     isConfigurationComplete,
@@ -656,19 +656,22 @@ function PlateSelector({
     triggerSequentialSlicing,
   ]); // Include sliceError to prevent re-triggering
 
-  // Reset hasSliced and error when file changes
+  // Reset error when file changes
   useEffect(() => {
-    setHasSliced(false);
     setSliceError(null);
     setFailedThumbnails(new Set()); // Reset failed thumbnails for new file
   }, [fileId]);
 
-  // Cleanup event source on unmount
+  // Cleanup event source and timer on unmount
   useEffect(() => {
     return () => {
       if (eventSourceRef.current) {
         eventSourceRef.current.close();
         eventSourceRef.current = null;
+      }
+      if (autoSliceTimerRef.current) {
+        clearTimeout(autoSliceTimerRef.current);
+        autoSliceTimerRef.current = null;
       }
     };
   }, []);
