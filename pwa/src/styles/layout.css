@@ -48,11 +48,6 @@ header p {
   border-bottom: 1px solid rgba(255, 255, 255, 0.2);
 }
 
-.header-printer-selector .printer-name,
-.header-printer-selector .printer-ip {
-  color: white;
-}
-
 .header-printer-selector .current-printer-display .printer-name,
 .header-printer-selector .current-printer-display .printer-ip {
   color: var(--color-success-dark);
