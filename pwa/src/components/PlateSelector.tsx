@@ -291,14 +291,7 @@ function PlateSelector({
     // Filament mapping is optional - by default slicer uses settings from the 3MF file
     // Only when filament mappings are configured do we override with AMS-specific settings
     return true;
-  }, [
-    fileId,
-    plates,
-    selectedBuildPlate,
-    plateFilamentRequirements,
-    filamentRequirements,
-    filamentMappings,
-  ]);
+  }, [fileId, plates, selectedBuildPlate]);
 
   // Generate config hash to detect changes
   const generateConfigHash = useCallback(() => {
@@ -353,7 +346,7 @@ function PlateSelector({
         await startResponse.json();
       if (!startResult.success) {
         setSliceError(
-          `Slice initialization failed: ${startResult.error || 'Unknown error'}`
+          `Slice initialization failed: ${startResult.error_details || 'Unknown error'}`
         );
         setIsStreaming(false);
         setIsSlicing(false);
@@ -600,7 +593,16 @@ function PlateSelector({
       setIsSlicing(false);
       setCurrentPhase('Failed to start slicing');
     }
-  }, [fileId, isStreaming, filamentMappings, selectedBuildPlate]);
+  }, [
+    fileId,
+    isStreaming,
+    filamentMappings,
+    selectedBuildPlate,
+    allProcessingPlates.size,
+    onPlatesUpdate,
+    plateProgress,
+    plates,
+  ]);
 
   // Trigger sequential slicing when configuration is complete
   const triggerSequentialSlicing = useCallback(() => {
@@ -641,7 +643,18 @@ function PlateSelector({
         clearTimeout(timer);
       };
     }
-  }, [fileId, selectedBuildPlate, selectedPlateIndex, hasSliced, sliceError]); // Include sliceError to prevent re-triggering
+  }, [
+    fileId,
+    selectedBuildPlate,
+    selectedPlateIndex,
+    hasSliced,
+    sliceError,
+    generateConfigHash,
+    isConfigurationComplete,
+    isSlicing,
+    lastSliceConfig,
+    triggerSequentialSlicing,
+  ]); // Include sliceError to prevent re-triggering
 
   // Reset hasSliced and error when file changes
   useEffect(() => {

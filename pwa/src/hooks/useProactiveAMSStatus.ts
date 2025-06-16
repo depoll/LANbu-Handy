@@ -27,6 +27,14 @@ export function useProactiveAMSStatus({
     onStatusUpdateRef.current = onStatusUpdate;
   }, [onStatusUpdate]);
 
+  // Stop interval helper function
+  const stopInterval = useCallback(() => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+  }, []);
+
   const fetchAMSStatus = useCallback(async () => {
     // Don't fetch if no printer ID or if it's the default fallback
     if (!printerId || printerId === 'default') {
@@ -77,15 +85,7 @@ export function useProactiveAMSStatus({
         setLoading(false);
       }
     }
-  }, [printerId]);
-
-  // Stop interval helper function
-  const stopInterval = useCallback(() => {
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
-  }, []);
+  }, [printerId, stopInterval]);
 
   // Start interval helper function
   const startInterval = useCallback(() => {

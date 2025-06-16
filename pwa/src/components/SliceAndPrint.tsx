@@ -294,7 +294,6 @@ function SliceAndPrint() {
           selectedBuildPlate={selectedBuildPlate}
           onBuildPlateSelect={setSelectedBuildPlate}
           plates={plates}
-          hasMultiplePlates={hasMultiplePlates}
           selectedPlateIndex={selectedPlateIndex}
           onPlateSelect={handlePlateSelection}
           isProcessing={isProcessing}
