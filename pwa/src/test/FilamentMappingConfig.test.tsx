@@ -1,10 +1,4 @@
-import {
-  render,
-  screen,
-  fireEvent,
-  waitFor,
-  act,
-} from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import FilamentMappingConfig from '../components/FilamentMappingConfig';
 import type {
@@ -77,7 +71,7 @@ describe('FilamentMappingConfig Component', () => {
     // Check that the component renders
     expect(screen.getByText('Filament Mapping')).toBeInTheDocument();
     expect(
-      screen.getByText('Map each model filament to an available AMS slot')
+      screen.getByText(/Map each model filament to an available AMS slot/)
     ).toBeInTheDocument();
 
     // Check that filament requirements are displayed

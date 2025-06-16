@@ -1,8 +1,4 @@
-import FilamentRequirementsDisplay from './FilamentRequirementsDisplay';
-import FilamentMappingConfig from './FilamentMappingConfig';
-import BuildPlateSelector from './BuildPlateSelector';
 import PlateSelector from './PlateSelector';
-import ConfigurationSummary from './ConfigurationSummary';
 import {
   FilamentRequirement,
   AMSStatusResponse,
@@ -20,7 +16,6 @@ interface ConfigurationTabProps {
   selectedBuildPlate: string;
   onBuildPlateSelect: (plate: string) => void;
   plates: PlateInfo[];
-  hasMultiplePlates: boolean;
   selectedPlateIndex: number | null;
   onPlateSelect: (plateIndex: number | null) => void;
   isProcessing: boolean;
@@ -38,16 +33,12 @@ export function ConfigurationTab({
   selectedBuildPlate,
   onBuildPlateSelect,
   plates,
-  hasMultiplePlates,
   selectedPlateIndex,
   onPlateSelect,
   isProcessing,
   currentFileId,
   onPlatesUpdate,
 }: ConfigurationTabProps) {
-  const activeFilamentRequirements =
-    plateFilamentRequirements || filamentRequirements;
-
   if (!currentFileId) {
     return (
       <div className="configuration-tab">

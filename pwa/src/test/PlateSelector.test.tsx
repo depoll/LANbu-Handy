@@ -141,16 +141,17 @@ describe('PlateSelector Component', () => {
       />
     );
 
-    expect(screen.getByText('All Plates Summary')).toBeInTheDocument();
+    expect(screen.getByText('All Plates Configuration')).toBeInTheDocument();
 
-    // Find the summary details
-    const summarySection = screen.getByText('All Plates Summary').parentElement;
-
-    // Check summary details
-    expect(summarySection).toHaveTextContent('Total Objects:6'); // 2+1+3
-    expect(summarySection).toHaveTextContent('Total Est. Time:4h 26m'); // 5239+5272+5460=15971s
-    expect(summarySection).toHaveTextContent('Total Est. Weight:74.2g'); // 24.63+24.42+25.1
-    expect(summarySection).toHaveTextContent('Plates with Support:1 of 3');
+    // Check that summary details are displayed
+    expect(screen.getByText('Total Objects:')).toBeInTheDocument();
+    expect(screen.getByText('6')).toBeInTheDocument(); // 2+1+3 = 6
+    expect(screen.getByText('Total Est. Time:')).toBeInTheDocument();
+    expect(screen.getByText('4h 26m')).toBeInTheDocument(); // 5239+5272+5460=15971s
+    expect(screen.getByText('Total Est. Weight:')).toBeInTheDocument();
+    expect(screen.getByText('74.2g')).toBeInTheDocument(); // 24.63+24.42+25.1
+    expect(screen.getByText('Plates with Support:')).toBeInTheDocument();
+    expect(screen.getByText('1 of 3')).toBeInTheDocument();
   });
 
   it('calls onPlateSelect when plate card is clicked', () => {
@@ -258,8 +259,8 @@ describe('PlateSelector Component', () => {
     // Check for "0 obj"
     expect(screen.getByText('0 obj')).toBeInTheDocument();
 
-    // Check that "After slice" is shown for missing time/weight data
-    const afterSliceElements = screen.getAllByText('After slice');
-    expect(afterSliceElements.length).toBeGreaterThan(0);
+    // Check that "—" is shown for missing time/weight data
+    const emDashElements = screen.getAllByText('—');
+    expect(emDashElements.length).toBeGreaterThan(0);
   });
 });

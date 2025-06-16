@@ -40,7 +40,6 @@ export function ModelTab({
   isInitialSlicing = false,
 }: ModelTabProps) {
   const [modelUrl, setModelUrl] = useState('');
-  const [inputMode, setInputMode] = useState<'url' | 'file'>('url');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [currentWorkflowStep, setCurrentWorkflowStep] = useState<string>('');

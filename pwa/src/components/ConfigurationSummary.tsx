@@ -35,7 +35,7 @@ function ConfigurationSummary({
     printTime?: string;
     filamentWeight?: string;
   } | null>(null);
-  const [lastSliceConfig, setLastSliceConfig] = useState<string>('');
+  const [lastSliceConfig] = useState<string>('');
 
   // Check if configuration is complete
   const isConfigurationComplete = useCallback((): boolean => {

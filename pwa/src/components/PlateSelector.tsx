@@ -725,16 +725,6 @@ function PlateSelector({
     return '—';
   };
 
-  const getContrastColor = (hexColor: string): string => {
-    // Simple contrast calculation for text color
-    const hex = hexColor.replace('#', '');
-    const r = parseInt(hex.substr(0, 2), 16);
-    const g = parseInt(hex.substr(2, 2), 16);
-    const b = parseInt(hex.substr(4, 2), 16);
-    const brightness = (r * 299 + g * 587 + b * 114) / 1000;
-    return brightness > 128 ? '#000000' : '#FFFFFF';
-  };
-
   const getPlateName = (plate: PlateInfo): string => {
     // Use the name from the 3MF file if available
     if (plate.name) {

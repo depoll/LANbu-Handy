@@ -12,8 +12,6 @@ import {
   AMSStatusResponse,
   FilamentMapping,
   PlateInfo,
-  SliceRequest,
-  SliceResponse,
 } from '../types/api';
 import { OperationStep } from './OperationProgress';
 
@@ -50,7 +48,7 @@ function SliceAndPrint() {
   const [statusMessages, setStatusMessages] = useState<string[]>([]);
   const [operationSteps] = useState<OperationStep[]>([]);
   const [showOperationProgress] = useState(false);
-  const [isInitialSlicing, setIsInitialSlicing] = useState(false);
+  const [isInitialSlicing] = useState(false);
 
   // Model URL for quick slice and print
   const [modelUrl, setModelUrl] = useState('');
@@ -205,71 +203,6 @@ function SliceAndPrint() {
         `🎯 Selected Plate ${plateIndex} - loading specific requirements...`
       );
       await fetchPlateFilamentRequirements(plateIndex);
-    }
-  };
-
-  const performInitialSlice = async (fileId: string) => {
-    try {
-      setIsInitialSlicing(true);
-      addStatusMessage('🔄 Getting initial time and filament estimates...');
-
-      // Use the default slice endpoint for initial estimates with timeout
-      const request: SliceRequest = { file_id: fileId };
-
-      // Add abort controller for timeout
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
-
-      const response = await fetch('/api/slice/defaults', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(request),
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        console.warn('Initial slice failed:', response.statusText);
-        addStatusMessage(
-          '⚠ Could not get initial estimates - will calculate after configuration'
-        );
-        return;
-      }
-
-      const result: SliceResponse = await response.json();
-
-      if (result.success && result.updated_plates) {
-        setPlates(result.updated_plates);
-        addStatusMessage(
-          '✅ Initial estimates ready - showing time and filament usage'
-        );
-        showInfo(
-          'Initial estimates calculated successfully',
-          'Estimates Ready'
-        );
-      } else {
-        console.warn('Initial slice failed:', result.message);
-        addStatusMessage(
-          '⚠ Could not get initial estimates - will calculate after configuration'
-        );
-      }
-    } catch (error) {
-      if (error instanceof Error && error.name === 'AbortError') {
-        console.warn('Initial slice timed out');
-        addStatusMessage(
-          '⚠ Initial slice timed out - will calculate after configuration'
-        );
-      } else {
-        console.warn('Initial slice error:', error);
-        addStatusMessage(
-          '⚠ Could not get initial estimates - will calculate after configuration'
-        );
-      }
-    } finally {
-      setIsInitialSlicing(false);
     }
   };
 

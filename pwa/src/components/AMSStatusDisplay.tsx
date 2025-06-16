@@ -27,7 +27,7 @@ function isTransparentColor(hex: string): boolean {
   if (!hex) return false;
 
   // Remove # if present
-  let cleanHex = hex.replace('#', '');
+  const cleanHex = hex.replace('#', '');
 
   // Handle 8-character hex (RGBA) - check for fully transparent
   if (cleanHex.length === 8) {
