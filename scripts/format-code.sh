@@ -13,8 +13,8 @@ echo "🎨 Formatting LANbu Handy codebase..."
 # Format Python code
 if [ -d "backend" ]; then
     echo "🐍 Formatting Python code (Black + isort)..."
-    python -m black backend/
-    python -m isort --profile black backend/
+    python3 -m black backend/
+    python3 -m isort --profile black backend/
     echo "✅ Python formatting complete"
 fi
 

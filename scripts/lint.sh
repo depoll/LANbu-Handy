@@ -19,7 +19,7 @@ if [ -d "backend" ]; then
     echo ""
     echo "🐍 Running Backend Linting (flake8)..."
     cd backend
-    if python -m flake8 app/ tests/; then
+    if python3 -m flake8 app/ tests/; then
         echo "✅ Backend linting passed"
     else
         echo "❌ Backend linting failed"

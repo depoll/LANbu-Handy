@@ -768,9 +768,10 @@ async def get_model_thumbnail(file_id: str, width: int = 300, height: int = 300)
         thumbnail_path = thumbnail_service.generate_thumbnail(
             model_file_path, width=width, height=height, prefer_embedded=True
         )
+        size_info = thumbnail_path.stat().st_size if thumbnail_path.exists() else "N/A"
         logger.info(
             f"Thumbnail result: {thumbnail_path}, exists: {thumbnail_path.exists()}, "
-            f"size: {thumbnail_path.stat().st_size if thumbnail_path.exists() else 'N/A'}"
+            f"size: {size_info}"
         )
 
         # Determine media type based on file extension
