@@ -240,6 +240,10 @@ function AMSStatusDisplay({
   const [error, setError] = useState<string | null>(null);
 
   const fetchAMSStatus = async () => {
+    console.log(
+      'AMSStatusDisplay - fetchAMSStatus called with printerId:',
+      printerId
+    );
     if (!printerId) return;
 
     setLoading(true);
@@ -274,6 +278,10 @@ function AMSStatusDisplay({
   };
 
   useEffect(() => {
+    console.log(
+      'AMSStatusDisplay - useEffect triggered, printerId:',
+      printerId
+    );
     fetchAMSStatus();
   }, [printerId]); // eslint-disable-line react-hooks/exhaustive-deps
 

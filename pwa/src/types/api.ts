@@ -22,6 +22,15 @@ export interface AMSStatusResponse {
   error_details?: string;
 }
 
+export interface PrinterStatusResponse {
+  success: boolean;
+  message: string;
+  printer_model?: string;
+  printer_name?: string;
+  ams_units?: AMSUnit[];
+  error_details?: string;
+}
+
 // Model Filament Requirements and Plate Types
 export interface PlateInfo {
   index: number;

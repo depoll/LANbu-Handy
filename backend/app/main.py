@@ -294,6 +294,15 @@ class AMSStatusResponse(BaseModel):
     error_details: Optional[str] = None
 
 
+class PrinterStatusResponse(BaseModel):
+    success: bool
+    message: str
+    printer_model: Optional[str] = None
+    printer_name: Optional[str] = None
+    ams_units: Optional[List[AMSUnitResponse]] = None
+    error_details: Optional[str] = None
+
+
 class FilamentMapping(BaseModel):
     filament_index: int  # Index in the model's filament requirements
     ams_unit_id: int
@@ -2068,6 +2077,107 @@ async def get_ams_status(printer_id: str):
         raise
     except Exception as e:
         msg = f"Internal server error during AMS status query: {str(e)}"
+        raise HTTPException(status_code=500, detail=msg)
+
+
+@app.get("/api/printer/{printer_id}/status", response_model=PrinterStatusResponse)
+async def get_printer_status(printer_id: str):
+    """
+    Query the printer's full status including model information.
+
+    Retrieves the current status of the printer including model type, name,
+    and AMS information from the specified printer via MQTT.
+
+    Args:
+        printer_id: The name or identifier of the printer to query
+
+    Returns:
+        PrinterStatusResponse: Printer status with model, name, and AMS information
+
+    Raises:
+        HTTPException: If printer is not found, not configured, or query fails
+    """
+    try:
+        # Check if any printers are configured
+        if not config.is_printer_configured():
+            raise HTTPException(
+                status_code=400,
+                detail="No printers configured. " "Please configure a printer first.",
+            )
+
+        # Find the printer by ID/name
+        printer_config = None
+        if printer_id.lower() == "default":
+            # Use the first/default printer
+            printer_config = config.get_default_printer()
+        else:
+            # Look for printer by name
+            printer_config = config.get_printer_by_name(printer_id)
+
+        if not printer_config:
+            # List available printers for helpful error message
+            available_printers = [p.name for p in config.get_printers()]
+            raise HTTPException(
+                status_code=404,
+                detail=f"Printer '{printer_id}' not found. "
+                f"Available printers: {available_printers}",
+            )
+
+        # Query printer status
+        try:
+            status_result = printer_service.query_printer_status(printer_config)
+
+            if status_result.success:
+                # Convert internal data structures to API response format
+                ams_units_response = []
+                if status_result.ams_units:
+                    for ams_unit in status_result.ams_units:
+                        filaments_response = []
+                        for filament in ams_unit.filaments:
+                            filament_response = AMSFilamentResponse(
+                                slot_id=filament.slot_id,
+                                filament_type=filament.filament_type,
+                                color=filament.color,
+                                material_id=filament.material_id,
+                            )
+                            filaments_response.append(filament_response)
+
+                        unit_response = AMSUnitResponse(
+                            unit_id=ams_unit.unit_id, filaments=filaments_response
+                        )
+                        ams_units_response.append(unit_response)
+
+                return PrinterStatusResponse(
+                    success=True,
+                    message=status_result.message,
+                    printer_model=status_result.printer_model,
+                    printer_name=status_result.printer_name,
+                    ams_units=ams_units_response,
+                )
+            else:
+                # Query failed
+                return PrinterStatusResponse(
+                    success=False,
+                    message=status_result.message,
+                    error_details=status_result.error_details,
+                )
+
+        except PrinterMQTTError as e:
+            return PrinterStatusResponse(
+                success=False, message="MQTT communication error", error_details=str(e)
+            )
+        except PrinterCommunicationError as e:
+            return PrinterStatusResponse(
+                success=False,
+                message="Printer communication error",
+                error_details=str(e),
+            )
+
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
+    except Exception as e:
+        msg = f"Internal server error during printer status query: {str(e)}"
         raise HTTPException(status_code=500, detail=msg)
 
 

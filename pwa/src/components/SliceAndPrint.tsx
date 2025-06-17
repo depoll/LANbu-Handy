@@ -60,6 +60,8 @@ function SliceAndPrint() {
     loading: printerLoading,
   } = useCurrentPrinter();
 
+  console.log('SliceAndPrint - currentPrinterId:', currentPrinterId);
+
   // Toast notifications
   const { showSuccess, showError, showWarning, showInfo } = useToast();
 
@@ -309,7 +311,8 @@ function SliceAndPrint() {
       badge: getTabBadge('status'),
       content: (
         <StatusTab
-          printerId={currentPrinterId || 'default'}
+          key={currentPrinterId || 'no-printer'}
+          printerId={currentPrinterId || ''}
           onAMSStatusUpdate={handleAMSStatusUpdate}
           operationSteps={operationSteps}
           showOperationProgress={showOperationProgress}

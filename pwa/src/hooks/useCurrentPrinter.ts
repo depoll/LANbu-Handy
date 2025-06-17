@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { PrinterConfigResponse } from '../types/api';
+import { printerEvents } from '../utils/printerEvents';
 
 export function useCurrentPrinter() {
   const [currentPrinter, setCurrentPrinter] =
@@ -21,6 +22,8 @@ export function useCurrentPrinter() {
       }
 
       const config: PrinterConfigResponse = await response.json();
+      console.log('useCurrentPrinter - Config received:', config);
+      console.log('useCurrentPrinter - Active printer:', config.active_printer);
       setCurrentPrinter(config);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
@@ -34,16 +37,28 @@ export function useCurrentPrinter() {
   // Fetch current printer on mount and provide refetch capability
   useEffect(() => {
     fetchCurrentPrinter();
+
+    // Subscribe to printer change events
+    const unsubscribe = printerEvents.subscribe(() => {
+      fetchCurrentPrinter();
+    });
+
+    return unsubscribe;
   }, [fetchCurrentPrinter]);
 
   const refreshCurrentPrinter = useCallback(() => {
     fetchCurrentPrinter();
   }, [fetchCurrentPrinter]);
 
+  const currentPrinterId = currentPrinter?.active_printer?.name || null;
+  const currentPrinterName = currentPrinter?.active_printer?.name || null;
+
+  console.log('useCurrentPrinter - Returning printer ID:', currentPrinterId);
+
   return {
     currentPrinter,
-    currentPrinterId: currentPrinter?.printers?.[0]?.name || null,
-    currentPrinterName: currentPrinter?.printers?.[0]?.name || null,
+    currentPrinterId,
+    currentPrinterName,
     loading,
     error,
     refreshCurrentPrinter,
