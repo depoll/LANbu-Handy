@@ -45,6 +45,17 @@ describe('PrinterSelector IP Persistence', () => {
             }),
         });
       }
+      if (url.includes('/api/printer/') && url.includes('/status')) {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              success: true,
+              printer_model: 'X1C',
+              printer_name: 'Test Printer',
+            }),
+        });
+      }
       return Promise.reject(new Error('Unknown endpoint'));
     });
   });
@@ -62,9 +73,19 @@ describe('PrinterSelector IP Persistence', () => {
 
     render(<PrinterSelector />);
 
-    // Expand the printer selector to see the input fields
-    const configureButton = screen.getByRole('button', { name: /configure/i });
-    fireEvent.click(configureButton);
+    // Click Select Printer to open dropdown
+    const dropdownButton = screen.getByText('Select Printer');
+    fireEvent.click(dropdownButton);
+
+    // Click Manage Printers
+    const manageButton = screen.getByText('Manage Printers');
+    fireEvent.click(manageButton);
+
+    // Click Add New Printer
+    await waitFor(() => {
+      const addButton = screen.getByText('Add New Printer');
+      fireEvent.click(addButton);
+    });
 
     // Wait for component to load and check if manual IP input is pre-filled
     await waitFor(() => {
@@ -88,9 +109,19 @@ describe('PrinterSelector IP Persistence', () => {
 
     render(<PrinterSelector />);
 
-    // Expand the printer selector
-    const configureButton = screen.getByRole('button', { name: /configure/i });
-    fireEvent.click(configureButton);
+    // Click Select Printer to open dropdown
+    const dropdownButton = screen.getByText('Select Printer');
+    fireEvent.click(dropdownButton);
+
+    // Click Manage Printers
+    const manageButton = screen.getByText('Manage Printers');
+    fireEvent.click(manageButton);
+
+    // Click Add New Printer
+    await waitFor(() => {
+      const addButton = screen.getByText('Add New Printer');
+      fireEvent.click(addButton);
+    });
 
     // Check for saved IP indicator
     await waitFor(() => {
@@ -111,9 +142,19 @@ describe('PrinterSelector IP Persistence', () => {
 
     render(<PrinterSelector />);
 
-    // Expand the printer selector
-    const configureButton = screen.getByRole('button', { name: /configure/i });
-    fireEvent.click(configureButton);
+    // Click Select Printer to open dropdown
+    const dropdownButton = screen.getByText('Select Printer');
+    fireEvent.click(dropdownButton);
+
+    // Click Manage Printers
+    const manageButton = screen.getByText('Manage Printers');
+    fireEvent.click(manageButton);
+
+    // Click Add New Printer
+    await waitFor(() => {
+      const addButton = screen.getByText('Add New Printer');
+      fireEvent.click(addButton);
+    });
 
     // Check for clear button
     await waitFor(() => {
@@ -137,9 +178,19 @@ describe('PrinterSelector IP Persistence', () => {
 
     render(<PrinterSelector />);
 
-    // Expand the printer selector
-    const configureButton = screen.getByRole('button', { name: /configure/i });
-    fireEvent.click(configureButton);
+    // Click Select Printer to open dropdown
+    const dropdownButton = screen.getByText('Select Printer');
+    fireEvent.click(dropdownButton);
+
+    // Click Manage Printers
+    const manageButton = screen.getByText('Manage Printers');
+    fireEvent.click(manageButton);
+
+    // Click Add New Printer
+    await waitFor(() => {
+      const addButton = screen.getByText('Add New Printer');
+      fireEvent.click(addButton);
+    });
 
     // Click clear button
     await waitFor(() => {
@@ -164,9 +215,19 @@ describe('PrinterSelector IP Persistence', () => {
   it('should save IP to localStorage when printer is successfully set', async () => {
     render(<PrinterSelector />);
 
-    // Expand the printer selector
-    const configureButton = screen.getByRole('button', { name: /configure/i });
-    fireEvent.click(configureButton);
+    // Click Select Printer to open dropdown
+    const dropdownButton = screen.getByText('Select Printer');
+    fireEvent.click(dropdownButton);
+
+    // Click Manage Printers
+    const manageButton = screen.getByText('Manage Printers');
+    fireEvent.click(manageButton);
+
+    // Click Add New Printer
+    await waitFor(() => {
+      const addButton = screen.getByText('Add New Printer');
+      fireEvent.click(addButton);
+    });
 
     // Fill in manual IP
     const manualIpInput = screen.getByPlaceholderText(
@@ -215,9 +276,19 @@ describe('PrinterSelector IP Persistence', () => {
   it('should not show saved indicator or clear button when no IP is saved', async () => {
     render(<PrinterSelector />);
 
-    // Expand the printer selector
-    const configureButton = screen.getByRole('button', { name: /configure/i });
-    fireEvent.click(configureButton);
+    // Click Select Printer to open dropdown
+    const dropdownButton = screen.getByText('Select Printer');
+    fireEvent.click(dropdownButton);
+
+    // Click Manage Printers
+    const manageButton = screen.getByText('Manage Printers');
+    fireEvent.click(manageButton);
+
+    // Click Add New Printer
+    await waitFor(() => {
+      const addButton = screen.getByText('Add New Printer');
+      fireEvent.click(addButton);
+    });
 
     // Wait for component to render
     await waitFor(() => {

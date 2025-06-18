@@ -79,6 +79,17 @@ describe('PrinterSelector Multiple Printers Management', () => {
             }),
         });
       }
+      if (url.includes('/api/printer/') && url.includes('/status')) {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              success: true,
+              printer_model: 'X1C',
+              printer_name: 'Test Printer',
+            }),
+        });
+      }
       return Promise.reject(new Error('Unexpected URL'));
     });
 
@@ -90,7 +101,24 @@ describe('PrinterSelector Multiple Printers Management', () => {
     });
 
     // Should show list button when multiple printers available
-    expect(screen.getByText(/List \(2\)/)).toBeInTheDocument();
+    expect(screen.getByText('Switch Printer')).toBeInTheDocument();
+
+    // Click to open dropdown and verify both printers are shown
+    fireEvent.click(screen.getByText('Switch Printer'));
+
+    await waitFor(() => {
+      // Both printers should be in the dropdown
+      expect(
+        screen.getByText('Test Printer 1', {
+          selector: '.dropdown-printer-name',
+        })
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText('Test Printer 2', {
+          selector: '.dropdown-printer-name',
+        })
+      ).toBeInTheDocument();
+    });
   });
 
   it('should not show list button when only one printer is available', async () => {
@@ -125,6 +153,17 @@ describe('PrinterSelector Multiple Printers Management', () => {
             }),
         });
       }
+      if (url.includes('/api/printer/') && url.includes('/status')) {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              success: true,
+              printer_model: 'X1C',
+              printer_name: 'Test Printer',
+            }),
+        });
+      }
       return Promise.reject(new Error('Unexpected URL'));
     });
 
@@ -135,8 +174,8 @@ describe('PrinterSelector Multiple Printers Management', () => {
       expect(screen.getByText('Test Printer 1')).toBeInTheDocument();
     });
 
-    // Should not show list button when only one printer
-    expect(screen.queryByText(/List \(/)).not.toBeInTheDocument();
+    // Should still show Switch Printer button even with one printer
+    expect(screen.getByText('Switch Printer')).toBeInTheDocument();
   });
 
   it('should display printer list when list button is clicked', async () => {
@@ -179,6 +218,17 @@ describe('PrinterSelector Multiple Printers Management', () => {
             }),
         });
       }
+      if (url.includes('/api/printer/') && url.includes('/status')) {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              success: true,
+              printer_model: 'X1C',
+              printer_name: 'Test Printer',
+            }),
+        });
+      }
       return Promise.reject(new Error('Unexpected URL'));
     });
 
@@ -189,14 +239,27 @@ describe('PrinterSelector Multiple Printers Management', () => {
       expect(screen.getByText('Test Printer 1')).toBeInTheDocument();
     });
 
-    // Click the list button
-    const listButton = screen.getByText(/List \(2\)/);
-    fireEvent.click(listButton);
+    // Click the Switch Printer button to open dropdown
+    const dropdownButton = screen.getByText('Switch Printer');
+    fireEvent.click(dropdownButton);
 
-    // Should show the printer list panel
-    expect(screen.getByText('All Printers (2)')).toBeInTheDocument();
-    expect(screen.getByText('Test Printer 2')).toBeInTheDocument();
-    expect(screen.getByText('192.168.1.101')).toBeInTheDocument();
+    // Should show both printers in the dropdown
+    await waitFor(() => {
+      // Both printers should be visible
+      expect(
+        screen.getByText('Test Printer 1', {
+          selector: '.dropdown-printer-name',
+        })
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText('Test Printer 2', {
+          selector: '.dropdown-printer-name',
+        })
+      ).toBeInTheDocument();
+      // IP addresses should be visible
+      expect(screen.getByText('192.168.1.100')).toBeInTheDocument();
+      expect(screen.getByText('192.168.1.101')).toBeInTheDocument();
+    });
   });
 
   it('should show correct badges for different printer types', async () => {
@@ -238,6 +301,17 @@ describe('PrinterSelector Multiple Printers Management', () => {
             }),
         });
       }
+      if (url.includes('/api/printer/') && url.includes('/status')) {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              success: true,
+              printer_model: 'X1C',
+              printer_name: 'Test Printer',
+            }),
+        });
+      }
       return Promise.reject(new Error('Unexpected URL'));
     });
 
@@ -248,8 +322,8 @@ describe('PrinterSelector Multiple Printers Management', () => {
       expect(screen.getByText('Active Persistent Printer')).toBeInTheDocument();
     });
 
-    const listButton = screen.getByText(/List \(2\)/);
-    fireEvent.click(listButton);
+    const dropdownButton = screen.getByText('Switch Printer');
+    fireEvent.click(dropdownButton);
 
     // Check for correct badges
     expect(screen.getByText('Active')).toBeInTheDocument(); // Active printer badge
@@ -315,6 +389,17 @@ describe('PrinterSelector Multiple Printers Management', () => {
             }),
         });
       }
+      if (url.includes('/api/printer/') && url.includes('/status')) {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              success: true,
+              printer_model: 'X1C',
+              printer_name: 'Test Printer',
+            }),
+        });
+      }
       return Promise.reject(new Error('Unexpected URL'));
     });
 
@@ -325,8 +410,8 @@ describe('PrinterSelector Multiple Printers Management', () => {
       expect(screen.getByText('Test Printer 1')).toBeInTheDocument();
     });
 
-    const listButton = screen.getByText(/List \(2\)/);
-    fireEvent.click(listButton);
+    const dropdownButton = screen.getByText('Switch Printer');
+    fireEvent.click(dropdownButton);
 
     // Find and click the switch button for the second printer
     const switchButtons = screen.getAllByText(/🔄 Switch/);
@@ -392,6 +477,17 @@ describe('PrinterSelector Multiple Printers Management', () => {
             }),
         });
       }
+      if (url.includes('/api/printer/') && url.includes('/status')) {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              success: true,
+              printer_model: 'X1C',
+              printer_name: 'Test Printer',
+            }),
+        });
+      }
       return Promise.reject(new Error('Unexpected URL'));
     });
 
@@ -402,8 +498,8 @@ describe('PrinterSelector Multiple Printers Management', () => {
       expect(screen.getByText('Environment Printer')).toBeInTheDocument();
     });
 
-    const listButton = screen.getByText(/List \(2\)/);
-    fireEvent.click(listButton);
+    const dropdownButton = screen.getByText('Switch Printer');
+    fireEvent.click(dropdownButton);
 
     // Find and click the delete button (only persistent printers should have it)
     const deleteButtons = screen.getAllByText(/🗑️ Delete/);
