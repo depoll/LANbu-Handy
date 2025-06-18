@@ -1,12 +1,42 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  MockedFunction,
+} from 'vitest';
 import { renderHook, waitFor, act } from '@testing-library/react';
 import { useProactiveAMSStatus } from '../hooks/useProactiveAMSStatus';
 
+// Define mock types for the test
+interface MockAMSSlot {
+  id: number;
+  material: string | null;
+  color: string | null;
+  loaded: boolean;
+}
+
+interface MockAMSUnit {
+  id: number;
+  humidity: number;
+  temperature: number;
+  slots: MockAMSSlot[];
+}
+
+interface MockAMSStatus {
+  success: boolean;
+  unitCount?: number;
+  units?: MockAMSUnit[];
+  error?: string;
+}
+
 // Mock fetch
-global.fetch = vi.fn();
+global.fetch = vi.fn() as MockedFunction<typeof fetch>;
 
 describe('useProactiveAMSStatus Hook', () => {
-  const mockAMSStatus = {
+  const mockAMSStatus: MockAMSStatus = {
     success: true,
     unitCount: 1,
     units: [
@@ -27,7 +57,7 @@ describe('useProactiveAMSStatus Hook', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers({ shouldAdvanceTime: true });
-    (global.fetch as any).mockReset();
+    (global.fetch as ReturnType<typeof vi.fn>).mockReset();
   });
 
   afterEach(() => {
@@ -45,10 +75,10 @@ describe('useProactiveAMSStatus Hook', () => {
   });
 
   it('fetches AMS status on mount', async () => {
-    (global.fetch as any).mockResolvedValueOnce({
+    (global.fetch as MockedFunction<typeof fetch>).mockResolvedValueOnce({
       ok: true,
       json: async () => mockAMSStatus,
-    });
+    } as Response);
 
     const { result } = renderHook(() =>
       useProactiveAMSStatus({ printerId: 'test-printer' })
@@ -69,10 +99,10 @@ describe('useProactiveAMSStatus Hook', () => {
   it('calls onStatusUpdate when status is fetched', async () => {
     const mockOnStatusUpdate = vi.fn();
 
-    (global.fetch as any).mockResolvedValueOnce({
+    (global.fetch as MockedFunction<typeof fetch>).mockResolvedValueOnce({
       ok: true,
       json: async () => mockAMSStatus,
-    });
+    } as Response);
 
     renderHook(() =>
       useProactiveAMSStatus({
@@ -100,7 +130,7 @@ describe('useProactiveAMSStatus Hook', () => {
   });
 
   it('polls for updates at specified interval', async () => {
-    (global.fetch as any)
+    (global.fetch as MockedFunction<typeof fetch>)
       .mockResolvedValueOnce({
         ok: true,
         json: async () => mockAMSStatus,
@@ -111,12 +141,12 @@ describe('useProactiveAMSStatus Hook', () => {
           ...mockAMSStatus,
           units: [
             {
-              ...mockAMSStatus.units[0],
+              ...mockAMSStatus.units![0],
               humidity: 50, // Changed humidity
             },
           ],
         }),
-      });
+      } as Response);
 
     const { result } = renderHook(() =>
       useProactiveAMSStatus({
@@ -140,13 +170,17 @@ describe('useProactiveAMSStatus Hook', () => {
       expect(global.fetch).toHaveBeenCalledTimes(2);
     });
 
-    expect(result.current.amsStatus?.units[0].humidity).toBe(50);
+    expect(
+      (result.current.amsStatus as MockAMSStatus)?.units?.[0].humidity
+    ).toBe(50);
   });
 
   it('handles fetch errors gracefully', async () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    (global.fetch as any).mockRejectedValueOnce(new Error('Network error'));
+    (global.fetch as MockedFunction<typeof fetch>).mockRejectedValueOnce(
+      new Error('Network error')
+    );
 
     const { result } = renderHook(() =>
       useProactiveAMSStatus({ printerId: 'test-printer' })
@@ -163,13 +197,13 @@ describe('useProactiveAMSStatus Hook', () => {
   });
 
   it('handles API error responses', async () => {
-    (global.fetch as any).mockResolvedValueOnce({
+    (global.fetch as MockedFunction<typeof fetch>).mockResolvedValueOnce({
       ok: true,
       json: async () => ({
         success: false,
         error: 'AMS not connected',
       }),
-    });
+    } as Response);
 
     const { result } = renderHook(() =>
       useProactiveAMSStatus({ printerId: 'test-printer' })
@@ -189,10 +223,10 @@ describe('useProactiveAMSStatus Hook', () => {
   it('cleans up polling on unmount', async () => {
     const clearIntervalSpy = vi.spyOn(global, 'clearInterval');
 
-    (global.fetch as any).mockResolvedValueOnce({
+    (global.fetch as MockedFunction<typeof fetch>).mockResolvedValueOnce({
       ok: true,
       json: async () => mockAMSStatus,
-    });
+    } as Response);
 
     const { unmount } = renderHook(() =>
       useProactiveAMSStatus({ printerId: 'test-printer' })
@@ -210,7 +244,7 @@ describe('useProactiveAMSStatus Hook', () => {
   });
 
   it('resets state when printerId changes', async () => {
-    (global.fetch as any)
+    (global.fetch as MockedFunction<typeof fetch>)
       .mockResolvedValueOnce({
         ok: true,
         json: async () => mockAMSStatus,
@@ -221,7 +255,7 @@ describe('useProactiveAMSStatus Hook', () => {
           ...mockAMSStatus,
           unitCount: 2,
         }),
-      });
+      } as Response);
 
     const { result, rerender } = renderHook(
       ({ printerId }) => useProactiveAMSStatus({ printerId }),
@@ -229,13 +263,13 @@ describe('useProactiveAMSStatus Hook', () => {
     );
 
     await waitFor(() => {
-      expect(result.current.amsStatus?.unitCount).toBe(1);
+      expect((result.current.amsStatus as MockAMSStatus)?.unitCount).toBe(1);
     });
 
     rerender({ printerId: 'printer-2' });
 
     await waitFor(() => {
-      expect(result.current.amsStatus?.unitCount).toBe(2);
+      expect((result.current.amsStatus as MockAMSStatus)?.unitCount).toBe(2);
     });
 
     expect(global.fetch).toHaveBeenCalledWith(
@@ -247,7 +281,7 @@ describe('useProactiveAMSStatus Hook', () => {
   });
 
   it('provides manual refresh capability', async () => {
-    (global.fetch as any)
+    (global.fetch as MockedFunction<typeof fetch>)
       .mockResolvedValueOnce({
         ok: true,
         json: async () => mockAMSStatus,
@@ -258,19 +292,21 @@ describe('useProactiveAMSStatus Hook', () => {
           ...mockAMSStatus,
           units: [
             {
-              ...mockAMSStatus.units[0],
+              ...mockAMSStatus.units![0],
               temperature: 25.0, // Changed temperature
             },
           ],
         }),
-      });
+      } as Response);
 
     const { result } = renderHook(() =>
       useProactiveAMSStatus({ printerId: 'test-printer' })
     );
 
     await waitFor(() => {
-      expect(result.current.amsStatus?.units[0].temperature).toBe(23.5);
+      expect(
+        (result.current.amsStatus as MockAMSStatus)?.units?.[0].temperature
+      ).toBe(23.5);
     });
 
     // Manual refresh
@@ -279,7 +315,9 @@ describe('useProactiveAMSStatus Hook', () => {
     });
 
     await waitFor(() => {
-      expect(result.current.amsStatus?.units[0].temperature).toBe(25.0);
+      expect(
+        (result.current.amsStatus as MockAMSStatus)?.units?.[0].temperature
+      ).toBe(25.0);
     });
 
     expect(global.fetch).toHaveBeenCalledTimes(2);

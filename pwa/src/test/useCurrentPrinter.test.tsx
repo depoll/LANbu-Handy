@@ -42,11 +42,11 @@ describe('useCurrentPrinter Hook', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockLocalStorage.getItem.mockReturnValue(null);
-    (global.fetch as any).mockReset();
+    (global.fetch as ReturnType<typeof vi.fn>).mockReset();
   });
 
   it('initializes with no printer selected', async () => {
-    (global.fetch as any).mockResolvedValueOnce({
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: true,
       json: async () => mockConfigResponse,
     });
@@ -71,7 +71,7 @@ describe('useCurrentPrinter Hook', () => {
       active_printer: mockConfigResponse.printers[0],
     };
 
-    (global.fetch as any).mockResolvedValueOnce({
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: true,
       json: async () => responseWithPrinter,
     });
@@ -86,7 +86,7 @@ describe('useCurrentPrinter Hook', () => {
   });
 
   it('provides refresh capability', async () => {
-    (global.fetch as any).mockResolvedValueOnce({
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: true,
       json: async () => mockConfigResponse,
     });
@@ -98,10 +98,10 @@ describe('useCurrentPrinter Hook', () => {
     });
 
     // Clear mock calls
-    (global.fetch as any).mockClear();
+    (global.fetch as ReturnType<typeof vi.fn>).mockClear();
 
     // Mock updated response
-    (global.fetch as any).mockResolvedValueOnce({
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: true,
       json: async () => mockConfigResponse,
     });
@@ -117,7 +117,9 @@ describe('useCurrentPrinter Hook', () => {
   it('handles errors gracefully', async () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    (global.fetch as any).mockRejectedValueOnce(new Error('Network error'));
+    (global.fetch as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+      new Error('Network error')
+    );
 
     const { result } = renderHook(() => useCurrentPrinter());
 

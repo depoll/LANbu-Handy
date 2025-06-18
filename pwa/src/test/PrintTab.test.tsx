@@ -14,10 +14,16 @@ const renderWithToast = (component: React.ReactElement) => {
 
 // Mock the child components
 vi.mock('../components/OperationProgress', () => ({
-  default: ({ title, steps }: { title: string; steps: any[] }) => (
+  default: ({
+    title,
+    steps,
+  }: {
+    title: string;
+    steps: Array<{ title: string; status: string }>;
+  }) => (
     <div data-testid="operation-progress">
       <div>{title}</div>
-      {steps.map((step: any, index: number) => (
+      {steps.map((step: { title: string; status: string }, index: number) => (
         <div key={index}>
           {step.title}: {step.status}
         </div>
@@ -74,7 +80,7 @@ describe('PrintTab Component', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    (global.fetch as any).mockReset();
+    (global.fetch as vi.MockedFunction<typeof fetch>).mockReset();
   });
 
   it('renders with initial state', () => {
@@ -114,7 +120,7 @@ describe('PrintTab Component', () => {
       updated_plates: mockPlates,
     };
 
-    (global.fetch as any).mockResolvedValueOnce({
+    (global.fetch as vi.MockedFunction<typeof fetch>).mockResolvedValueOnce({
       ok: true,
       json: async () => mockSliceResponse,
     });
@@ -142,7 +148,7 @@ describe('PrintTab Component', () => {
   });
 
   it('handles quick slice and print action', async () => {
-    (global.fetch as any).mockResolvedValueOnce({
+    (global.fetch as vi.MockedFunction<typeof fetch>).mockResolvedValueOnce({
       ok: true,
       json: async () => ({
         success: true,
@@ -172,7 +178,7 @@ describe('PrintTab Component', () => {
       message: 'Slicing completed',
     };
 
-    (global.fetch as any).mockResolvedValueOnce({
+    (global.fetch as vi.MockedFunction<typeof fetch>).mockResolvedValueOnce({
       ok: true,
       json: async () => mockSliceResponse,
     });
@@ -189,7 +195,7 @@ describe('PrintTab Component', () => {
   });
 
   it('handles slice errors gracefully', async () => {
-    (global.fetch as any).mockResolvedValueOnce({
+    (global.fetch as vi.MockedFunction<typeof fetch>).mockResolvedValueOnce({
       ok: false,
       text: async () => 'Slice failed',
     });
@@ -220,7 +226,7 @@ describe('PrintTab Component', () => {
       message: 'Slicing completed',
     };
 
-    (global.fetch as any).mockResolvedValueOnce({
+    (global.fetch as vi.MockedFunction<typeof fetch>).mockResolvedValueOnce({
       ok: true,
       json: async () => mockSliceResponse,
     });
@@ -235,7 +241,7 @@ describe('PrintTab Component', () => {
     });
 
     // Mock print response
-    (global.fetch as any).mockResolvedValueOnce({
+    (global.fetch as vi.MockedFunction<typeof fetch>).mockResolvedValueOnce({
       ok: true,
       json: async () => ({
         success: true,
@@ -266,7 +272,7 @@ describe('PrintTab Component', () => {
       updated_plates: updatedPlates,
     };
 
-    (global.fetch as any).mockResolvedValueOnce({
+    (global.fetch as vi.MockedFunction<typeof fetch>).mockResolvedValueOnce({
       ok: true,
       json: async () => mockSliceResponse,
     });
@@ -287,7 +293,7 @@ describe('PrintTab Component', () => {
       message: 'Slicing completed',
     };
 
-    (global.fetch as any).mockResolvedValueOnce({
+    (global.fetch as vi.MockedFunction<typeof fetch>).mockResolvedValueOnce({
       ok: true,
       json: async () => mockSliceResponse,
     });

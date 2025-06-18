@@ -9,12 +9,14 @@ global.fetch = vi.fn();
 describe('PrinterInfoDisplay Component', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    (global.fetch as any).mockReset();
+    (global.fetch as ReturnType<typeof vi.fn>).mockReset();
   });
 
   it('renders loading state', async () => {
     // Mock a pending promise to keep loading state
-    (global.fetch as any).mockImplementation(() => new Promise(() => {}));
+    (global.fetch as ReturnType<typeof vi.fn>).mockImplementation(
+      () => new Promise(() => {})
+    );
 
     render(<PrinterInfoDisplay printerId="My X1 Carbon" />);
 
@@ -29,7 +31,9 @@ describe('PrinterInfoDisplay Component', () => {
   });
 
   it('renders error state', async () => {
-    (global.fetch as any).mockRejectedValueOnce(new Error('Network error'));
+    (global.fetch as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+      new Error('Network error')
+    );
 
     render(<PrinterInfoDisplay printerId="My X1 Carbon" />);
 
@@ -63,7 +67,7 @@ describe('PrinterInfoDisplay Component', () => {
       ],
     };
 
-    (global.fetch as any).mockResolvedValueOnce({
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: true,
       json: async () => mockResponse,
     });
@@ -85,7 +89,7 @@ describe('PrinterInfoDisplay Component', () => {
       // printer_name missing
     };
 
-    (global.fetch as any).mockResolvedValueOnce({
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: true,
       json: async () => mockResponse,
     });
@@ -107,13 +111,13 @@ describe('PrinterInfoDisplay Component', () => {
     };
 
     // Mock the status endpoint with no metadata
-    (global.fetch as any).mockResolvedValueOnce({
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: true,
       json: async () => mockResponse,
     });
 
     // Mock the config endpoint as fallback
-    (global.fetch as any).mockResolvedValueOnce({
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: true,
       json: async () => ({
         printers: [
@@ -144,7 +148,7 @@ describe('PrinterInfoDisplay Component', () => {
       printer_name: 'Bambu Lab X1 Carbon',
     };
 
-    (global.fetch as any).mockResolvedValueOnce({
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: true,
       json: async () => mockResponse,
     });
@@ -163,13 +167,13 @@ describe('PrinterInfoDisplay Component', () => {
     };
 
     // Mock status endpoint
-    (global.fetch as any).mockResolvedValueOnce({
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: true,
       json: async () => mockResponse,
     });
 
     // Mock config endpoint for IP
-    (global.fetch as any).mockResolvedValueOnce({
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: true,
       json: async () => ({
         printers: [
@@ -199,7 +203,7 @@ describe('PrinterInfoDisplay Component', () => {
       printer_name: 'Bambu Lab X1 Carbon',
     };
 
-    (global.fetch as any).mockResolvedValueOnce({
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: true,
       json: async () => mockResponse,
     });
@@ -225,7 +229,7 @@ describe('PrinterInfoDisplay Component', () => {
       printer_name: longName, // Use the long name as printer_name
     };
 
-    (global.fetch as any).mockResolvedValueOnce({
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: true,
       json: async () => mockResponse,
     });
@@ -245,7 +249,7 @@ describe('PrinterInfoDisplay Component', () => {
       // printer_name missing
     };
 
-    (global.fetch as any).mockResolvedValueOnce({
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: true,
       json: async () => mockResponse,
     });
@@ -265,13 +269,13 @@ describe('PrinterInfoDisplay Component', () => {
     };
 
     // Mock the status endpoint
-    (global.fetch as any).mockResolvedValueOnce({
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: true,
       json: async () => mockResponse,
     });
 
     // Mock the config endpoint fallback with no matching printer
-    (global.fetch as any).mockResolvedValueOnce({
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: true,
       json: async () => ({
         printers: [],
@@ -288,7 +292,9 @@ describe('PrinterInfoDisplay Component', () => {
 
   it('shows shimmer effect while loading', () => {
     // Mock a pending promise to keep loading state
-    (global.fetch as any).mockImplementation(() => new Promise(() => {}));
+    (global.fetch as ReturnType<typeof vi.fn>).mockImplementation(
+      () => new Promise(() => {})
+    );
 
     render(<PrinterInfoDisplay printerId="My Printer" />);
 
@@ -300,7 +306,9 @@ describe('PrinterInfoDisplay Component', () => {
   });
 
   it('maintains layout structure even with errors', async () => {
-    (global.fetch as any).mockRejectedValueOnce(new Error('Network error'));
+    (global.fetch as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+      new Error('Network error')
+    );
 
     const { container } = render(<PrinterInfoDisplay printerId="My Printer" />);
 

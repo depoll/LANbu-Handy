@@ -53,7 +53,7 @@ describe('SequentialPlateSliceTracker Component', () => {
   it('renders when slicing is active', async () => {
     // Mock successful response - need to return immediately to avoid infinite loop
     let callCount = 0;
-    (global.fetch as any).mockImplementation(() => {
+    (global.fetch as ReturnType<typeof vi.fn>).mockImplementation(() => {
       callCount++;
       if (callCount > 1) {
         // Prevent infinite calls
@@ -101,7 +101,7 @@ describe('SequentialPlateSliceTracker Component', () => {
       })),
     };
 
-    (global.fetch as any).mockImplementation(() =>
+    (global.fetch as ReturnType<typeof vi.fn>).mockImplementation(() =>
       Promise.resolve({
         ok: true,
         json: async () => mockResponse,
@@ -113,7 +113,7 @@ describe('SequentialPlateSliceTracker Component', () => {
     );
 
     // Reset mock to check calls
-    (global.fetch as any).mockClear();
+    (global.fetch as ReturnType<typeof vi.fn>).mockClear();
 
     // Trigger slicing
     await act(async () => {
@@ -146,7 +146,7 @@ describe('SequentialPlateSliceTracker Component', () => {
       updated_plates: updatedPlates,
     };
 
-    (global.fetch as any).mockImplementation(() =>
+    (global.fetch as ReturnType<typeof vi.fn>).mockImplementation(() =>
       Promise.resolve({
         ok: true,
         json: async () => mockResponse,
@@ -197,7 +197,7 @@ describe('SequentialPlateSliceTracker Component', () => {
       ],
     };
 
-    (global.fetch as any).mockImplementation(() =>
+    (global.fetch as ReturnType<typeof vi.fn>).mockImplementation(() =>
       Promise.resolve({
         ok: true,
         json: async () => mockResponse,
@@ -228,7 +228,7 @@ describe('SequentialPlateSliceTracker Component', () => {
   it('handles errors during slice operation', async () => {
     const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
-    (global.fetch as any).mockImplementation(() =>
+    (global.fetch as ReturnType<typeof vi.fn>).mockImplementation(() =>
       Promise.reject(new Error('Network error'))
     );
 
@@ -256,7 +256,7 @@ describe('SequentialPlateSliceTracker Component', () => {
   it('handles API error responses', async () => {
     const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
-    (global.fetch as any).mockImplementation(() =>
+    (global.fetch as ReturnType<typeof vi.fn>).mockImplementation(() =>
       Promise.resolve({
         ok: false,
         statusText: 'Bad Request',
@@ -285,7 +285,7 @@ describe('SequentialPlateSliceTracker Component', () => {
   });
 
   it('displays plate names', async () => {
-    (global.fetch as any).mockImplementation(() =>
+    (global.fetch as ReturnType<typeof vi.fn>).mockImplementation(() =>
       Promise.resolve({
         ok: true,
         json: async () => ({
@@ -313,7 +313,7 @@ describe('SequentialPlateSliceTracker Component', () => {
   });
 
   it('shows visual progress for plates', async () => {
-    (global.fetch as any).mockImplementation(() =>
+    (global.fetch as ReturnType<typeof vi.fn>).mockImplementation(() =>
       Promise.resolve({
         ok: true,
         json: async () => ({
@@ -350,7 +350,7 @@ describe('SequentialPlateSliceTracker Component', () => {
       selectedPlateIndex: 1,
     };
 
-    (global.fetch as any).mockImplementation(() =>
+    (global.fetch as ReturnType<typeof vi.fn>).mockImplementation(() =>
       Promise.resolve({
         ok: true,
         json: async () => ({
@@ -382,7 +382,7 @@ describe('SequentialPlateSliceTracker Component', () => {
       selectedPlateIndex: null,
     };
 
-    (global.fetch as any).mockImplementation(() =>
+    (global.fetch as ReturnType<typeof vi.fn>).mockImplementation(() =>
       Promise.resolve({
         ok: true,
         json: async () => ({
@@ -408,7 +408,7 @@ describe('SequentialPlateSliceTracker Component', () => {
 
   it('does not call callbacks when unmounted', async () => {
     // Mock implementation that delays to simulate async operation
-    (global.fetch as any).mockImplementation(
+    (global.fetch as ReturnType<typeof vi.fn>).mockImplementation(
       () =>
         new Promise(resolve => {
           setTimeout(() => {
@@ -450,7 +450,7 @@ describe('SequentialPlateSliceTracker Component', () => {
   it('simulates visual progress over time', async () => {
     vi.useFakeTimers();
 
-    (global.fetch as any).mockImplementation(() =>
+    (global.fetch as ReturnType<typeof vi.fn>).mockImplementation(() =>
       Promise.resolve({
         ok: true,
         json: async () => ({

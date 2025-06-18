@@ -1,18 +1,18 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, MockedFunction } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 
 // Mock fetch
 global.fetch = vi.fn();
 
 // We need to import the hook dynamically to ensure cache is cleared
-let usePrinterMetadata: any;
+let usePrinterMetadata: typeof import('../hooks/usePrinterMetadata').usePrinterMetadata;
 
 describe('usePrinterMetadata Hook', () => {
   const mockPrinterId = '192.168.1.100';
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    (global.fetch as any).mockReset();
+    (global.fetch as MockedFunction<typeof fetch>).mockReset();
     // Clear the metadata cache before each test
     vi.resetModules();
     // Re-import the hook to clear the cache
@@ -38,10 +38,10 @@ describe('usePrinterMetadata Hook', () => {
       firmware_version: '1.5.0',
     };
 
-    (global.fetch as any).mockResolvedValueOnce({
+    (global.fetch as MockedFunction<typeof fetch>).mockResolvedValueOnce({
       ok: true,
       json: async () => mockResponse,
-    });
+    } as Response);
 
     const { result } = renderHook(() => usePrinterMetadata(mockPrinterId));
 
@@ -63,7 +63,9 @@ describe('usePrinterMetadata Hook', () => {
   });
 
   it('handles fetch errors', async () => {
-    (global.fetch as any).mockRejectedValueOnce(new Error('Network error'));
+    (global.fetch as MockedFunction<typeof fetch>).mockRejectedValueOnce(
+      new Error('Network error')
+    );
 
     const { result } = renderHook(() => usePrinterMetadata(mockPrinterId));
 
@@ -81,10 +83,10 @@ describe('usePrinterMetadata Hook', () => {
       error: 'Printer offline',
     };
 
-    (global.fetch as any).mockResolvedValueOnce({
+    (global.fetch as MockedFunction<typeof fetch>).mockResolvedValueOnce({
       ok: true,
       json: async () => mockResponse,
-    });
+    } as Response);
 
     const { result } = renderHook(() => usePrinterMetadata(mockPrinterId));
 
@@ -97,11 +99,11 @@ describe('usePrinterMetadata Hook', () => {
   });
 
   it('handles HTTP error responses', async () => {
-    (global.fetch as any).mockResolvedValueOnce({
+    (global.fetch as MockedFunction<typeof fetch>).mockResolvedValueOnce({
       ok: false,
       status: 404,
       statusText: 'Not Found',
-    });
+    } as Response);
 
     const { result } = renderHook(() => usePrinterMetadata(mockPrinterId));
 
@@ -130,15 +132,15 @@ describe('usePrinterMetadata Hook', () => {
       printer_name: 'P1P',
     };
 
-    (global.fetch as any)
+    (global.fetch as MockedFunction<typeof fetch>)
       .mockResolvedValueOnce({
         ok: true,
         json: async () => mockResponse1,
-      })
+      } as Response)
       .mockResolvedValueOnce({
         ok: true,
         json: async () => mockResponse2,
-      });
+      } as Response);
 
     const { result, rerender } = renderHook(
       props => usePrinterMetadata(props.printerId),
@@ -179,15 +181,15 @@ describe('usePrinterMetadata Hook', () => {
       printer_name: 'P1P Printer',
     };
 
-    (global.fetch as any)
+    (global.fetch as MockedFunction<typeof fetch>)
       .mockResolvedValueOnce({
         ok: true,
         json: async () => mockResponse1,
-      })
+      } as Response)
       .mockResolvedValueOnce({
         ok: true,
         json: async () => mockResponse2,
-      });
+      } as Response);
 
     const { result, rerender } = renderHook(
       props => usePrinterMetadata(props.printerId),
@@ -229,10 +231,10 @@ describe('usePrinterMetadata Hook', () => {
       printer_name: 'A1',
     };
 
-    (global.fetch as any).mockResolvedValueOnce({
+    (global.fetch as MockedFunction<typeof fetch>).mockResolvedValueOnce({
       ok: true,
       json: async () => mockResponse,
-    });
+    } as Response);
 
     const { result, rerender } = renderHook(
       props => usePrinterMetadata(props.printerId),
@@ -260,10 +262,10 @@ describe('usePrinterMetadata Hook', () => {
       // No printer metadata fields
     };
 
-    (global.fetch as any).mockResolvedValueOnce({
+    (global.fetch as MockedFunction<typeof fetch>).mockResolvedValueOnce({
       ok: true,
       json: async () => mockResponse,
-    });
+    } as Response);
 
     const { result } = renderHook(() => usePrinterMetadata(mockPrinterId));
 
