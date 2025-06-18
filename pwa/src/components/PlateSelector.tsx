@@ -273,7 +273,7 @@ function PlateSelector({
   const [failedThumbnails, setFailedThumbnails] = useState<Set<string>>(
     new Set()
   );
-  const autoSliceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const autoSliceTimerRef = useRef<number | null>(null);
 
   // Check if configuration is complete
   const isConfigurationComplete = useCallback((): boolean => {

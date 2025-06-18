@@ -148,8 +148,10 @@ function PrinterStats({ printerId }: PrinterStatsProps) {
               {getStateIcon(stats.printer_state)}
             </span>
             <span className="state-text">
-              {stats.printer_state?.charAt(0).toUpperCase() +
-                stats.printer_state?.slice(1) || 'Unknown'}
+              {stats.printer_state
+                ? stats.printer_state.charAt(0).toUpperCase() +
+                  stats.printer_state.slice(1)
+                : 'Unknown'}
             </span>
           </div>
         </div>
@@ -162,12 +164,13 @@ function PrinterStats({ printerId }: PrinterStatsProps) {
               <span className="temp-label">Nozzle:</span>
               <span className="temp-value">
                 {stats.nozzle_temp}°C
-                {stats.nozzle_target > 0 && (
-                  <span className="temp-target">
-                    {' '}
-                    / {stats.nozzle_target}°C
-                  </span>
-                )}
+                {stats.nozzle_target !== undefined &&
+                  stats.nozzle_target > 0 && (
+                    <span className="temp-target">
+                      {' '}
+                      / {stats.nozzle_target}°C
+                    </span>
+                  )}
               </span>
             </div>
 
@@ -175,7 +178,7 @@ function PrinterStats({ printerId }: PrinterStatsProps) {
               <span className="temp-label">Bed:</span>
               <span className="temp-value">
                 {stats.bed_temp}°C
-                {stats.bed_target > 0 && (
+                {stats.bed_target !== undefined && stats.bed_target > 0 && (
                   <span className="temp-target"> / {stats.bed_target}°C</span>
                 )}
               </span>
