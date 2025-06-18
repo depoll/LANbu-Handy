@@ -1,0 +1,272 @@
+/* LANbu Handy PWA - Printer Statistics Styles */
+
+.printer-stats {
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border-secondary);
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 1rem;
+}
+
+.printer-stats.loading {
+  opacity: 0.8;
+}
+
+.stats-header {
+  background: var(--color-bg-secondary);
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--color-border-secondary);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.stats-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.last-update {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.stats-content {
+  padding: 1rem;
+}
+
+.loading-message {
+  text-align: center;
+  color: var(--color-text-secondary);
+  padding: 1rem 0;
+  font-style: italic;
+}
+
+/* State Section */
+.state-section {
+  margin-bottom: 1.5rem;
+  text-align: center;
+}
+
+.state-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.state-icon {
+  font-size: 1.3rem;
+}
+
+.state-indicator.idle {
+  background: var(--color-success-bg);
+  color: var(--color-success-dark);
+  border: 1px solid var(--color-success);
+}
+
+.state-indicator.printing {
+  background: var(--color-info-bg);
+  color: var(--color-info-dark);
+  border: 1px solid var(--color-info);
+}
+
+.state-indicator.paused {
+  background: var(--color-warning-bg);
+  color: var(--color-warning-dark);
+  border: 1px solid var(--color-warning);
+}
+
+.state-indicator.error {
+  background: var(--color-error-bg);
+  color: var(--color-error-dark);
+  border: 1px solid var(--color-error);
+}
+
+.state-indicator.maintenance {
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border-secondary);
+}
+
+.state-indicator.unknown {
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border-secondary);
+}
+
+/* Temperature Section */
+.temp-section {
+  margin-bottom: 1.5rem;
+}
+
+.temp-section h4 {
+  margin: 0 0 0.75rem 0;
+  font-size: 0.9rem;
+  color: var(--color-text-secondary);
+  font-weight: 600;
+}
+
+.temp-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.75rem;
+}
+
+.temp-item {
+  background: var(--color-bg-secondary);
+  padding: 0.75rem;
+  border-radius: 6px;
+  border: 1px solid var(--color-border-tertiary);
+}
+
+.temp-label {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  margin-bottom: 0.25rem;
+}
+
+.temp-value {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.temp-target {
+  color: var(--color-text-secondary);
+  font-weight: 400;
+}
+
+/* Job Section */
+.job-section {
+  margin-bottom: 1.5rem;
+}
+
+.job-section h4 {
+  margin: 0 0 0.75rem 0;
+  font-size: 0.9rem;
+  color: var(--color-text-secondary);
+  font-weight: 600;
+}
+
+.job-info {
+  background: var(--color-bg-secondary);
+  padding: 1rem;
+  border-radius: 6px;
+  border: 1px solid var(--color-border-tertiary);
+}
+
+.job-name {
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin-bottom: 0.75rem;
+}
+
+.job-progress {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.progress-bar {
+  flex: 1;
+  height: 8px;
+  background: var(--color-bg-tertiary);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--color-primary);
+  transition: width 0.3s ease;
+}
+
+.progress-text {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  min-width: 3rem;
+  text-align: right;
+}
+
+.job-times {
+  display: flex;
+  gap: 1rem;
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+}
+
+/* Lifetime Section */
+.lifetime-section h4 {
+  margin: 0 0 0.75rem 0;
+  font-size: 0.9rem;
+  color: var(--color-text-secondary);
+  font-weight: 600;
+}
+
+.lifetime-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.75rem;
+}
+
+.lifetime-item {
+  background: var(--color-bg-secondary);
+  padding: 0.75rem;
+  border-radius: 6px;
+  border: 1px solid var(--color-border-tertiary);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.lifetime-label {
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+}
+
+.lifetime-value {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .stats-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+  }
+  
+  .stats-header h3 {
+    font-size: 0.95rem;
+  }
+  
+  .stats-content {
+    padding: 0.8rem;
+  }
+  
+  .state-indicator {
+    padding: 0.6rem 1.2rem;
+    font-size: 1rem;
+  }
+  
+  .temp-grid,
+  .lifetime-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .job-times {
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+}
