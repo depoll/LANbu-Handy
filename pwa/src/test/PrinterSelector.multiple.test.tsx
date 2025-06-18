@@ -32,6 +32,32 @@ global.fetch = mockFetch;
 const mockConfirm = vi.fn();
 global.confirm = mockConfirm;
 
+// Helper function to handle common API endpoints
+const handleCommonEndpoints = (url: string) => {
+  if (url.includes('/api/printer/') && url.includes('/status')) {
+    return Promise.resolve({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          success: true,
+          printer_model: 'X1C',
+          printer_name: 'Test Printer',
+        }),
+    });
+  }
+  if (url.includes('/api/printer/') && url.includes('/metadata')) {
+    return Promise.resolve({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          printer_model: 'X1C',
+          printer_name: 'Test Printer',
+        }),
+    });
+  }
+  return null;
+};
+
 describe('PrinterSelector Multiple Printers Management', () => {
   beforeEach(() => {
     localStorageMock.clear();
@@ -79,18 +105,9 @@ describe('PrinterSelector Multiple Printers Management', () => {
             }),
         });
       }
-      if (url.includes('/api/printer/') && url.includes('/status')) {
-        return Promise.resolve({
-          ok: true,
-          json: () =>
-            Promise.resolve({
-              success: true,
-              printer_model: 'X1C',
-              printer_name: 'Test Printer',
-            }),
-        });
-      }
-      return Promise.reject(new Error('Unexpected URL'));
+      const commonResponse = handleCommonEndpoints(url);
+      if (commonResponse) return commonResponse;
+      return Promise.resolve({ ok: false });
     });
 
     render(<PrinterSelector />);
@@ -153,18 +170,9 @@ describe('PrinterSelector Multiple Printers Management', () => {
             }),
         });
       }
-      if (url.includes('/api/printer/') && url.includes('/status')) {
-        return Promise.resolve({
-          ok: true,
-          json: () =>
-            Promise.resolve({
-              success: true,
-              printer_model: 'X1C',
-              printer_name: 'Test Printer',
-            }),
-        });
-      }
-      return Promise.reject(new Error('Unexpected URL'));
+      const commonResponse = handleCommonEndpoints(url);
+      if (commonResponse) return commonResponse;
+      return Promise.resolve({ ok: false });
     });
 
     render(<PrinterSelector />);
@@ -218,18 +226,9 @@ describe('PrinterSelector Multiple Printers Management', () => {
             }),
         });
       }
-      if (url.includes('/api/printer/') && url.includes('/status')) {
-        return Promise.resolve({
-          ok: true,
-          json: () =>
-            Promise.resolve({
-              success: true,
-              printer_model: 'X1C',
-              printer_name: 'Test Printer',
-            }),
-        });
-      }
-      return Promise.reject(new Error('Unexpected URL'));
+      const commonResponse = handleCommonEndpoints(url);
+      if (commonResponse) return commonResponse;
+      return Promise.resolve({ ok: false });
     });
 
     render(<PrinterSelector />);
@@ -301,18 +300,9 @@ describe('PrinterSelector Multiple Printers Management', () => {
             }),
         });
       }
-      if (url.includes('/api/printer/') && url.includes('/status')) {
-        return Promise.resolve({
-          ok: true,
-          json: () =>
-            Promise.resolve({
-              success: true,
-              printer_model: 'X1C',
-              printer_name: 'Test Printer',
-            }),
-        });
-      }
-      return Promise.reject(new Error('Unexpected URL'));
+      const commonResponse = handleCommonEndpoints(url);
+      if (commonResponse) return commonResponse;
+      return Promise.resolve({ ok: false });
     });
 
     render(<PrinterSelector />);
@@ -372,7 +362,7 @@ describe('PrinterSelector Multiple Printers Management', () => {
             }),
         });
       } else if (
-        url === '/api/printer/configure' &&
+        url === '/api/printer/set-active' &&
         options?.method === 'POST'
       ) {
         return Promise.resolve({
@@ -391,18 +381,9 @@ describe('PrinterSelector Multiple Printers Management', () => {
             }),
         });
       }
-      if (url.includes('/api/printer/') && url.includes('/status')) {
-        return Promise.resolve({
-          ok: true,
-          json: () =>
-            Promise.resolve({
-              success: true,
-              printer_model: 'X1C',
-              printer_name: 'Test Printer',
-            }),
-        });
-      }
-      return Promise.reject(new Error('Unexpected URL'));
+      const commonResponse = handleCommonEndpoints(url);
+      if (commonResponse) return commonResponse;
+      return Promise.resolve({ ok: false });
     });
 
     render(<PrinterSelector />);
@@ -434,9 +415,9 @@ describe('PrinterSelector Multiple Printers Management', () => {
 
     fireEvent.click(switchButtons[0]);
 
-    // Should call the printer configure API to switch
+    // Should call the printer set-active API to switch
     await waitFor(() => {
-      expect(mockFetch).toHaveBeenCalledWith('/api/printer/configure', {
+      expect(mockFetch).toHaveBeenCalledWith('/api/printer/set-active', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: expect.stringContaining('"ip":"192.168.1.101"'),
@@ -492,18 +473,9 @@ describe('PrinterSelector Multiple Printers Management', () => {
             }),
         });
       }
-      if (url.includes('/api/printer/') && url.includes('/status')) {
-        return Promise.resolve({
-          ok: true,
-          json: () =>
-            Promise.resolve({
-              success: true,
-              printer_model: 'X1C',
-              printer_name: 'Test Printer',
-            }),
-        });
-      }
-      return Promise.reject(new Error('Unexpected URL'));
+      const commonResponse = handleCommonEndpoints(url);
+      if (commonResponse) return commonResponse;
+      return Promise.resolve({ ok: false });
     });
 
     render(<PrinterSelector />);
