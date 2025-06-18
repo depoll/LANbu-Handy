@@ -88,7 +88,7 @@ function PrinterInfoDisplay({
             const config = await configResponse.json();
             // Note: printerId is the printer name, not IP
             const currentPrinter = config.printers?.find(
-              (p: any) => p.name === printerId
+              (p: { name: string }) => p.name === printerId
             );
             if (currentPrinter) {
               setPrinterMetadata({

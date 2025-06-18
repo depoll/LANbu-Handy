@@ -12,7 +12,15 @@ interface PrinterStatusResponse {
   message: string;
   printer_model?: string;
   printer_name?: string;
-  ams_units?: any[];
+  ams_units?: Array<{
+    unit_id: number;
+    filaments: Array<{
+      slot_id: number;
+      filament_type: string;
+      color: string;
+      material_id?: string;
+    }>;
+  }>;
   error_details?: string;
 }
 
