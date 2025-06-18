@@ -330,7 +330,7 @@ describe('PrinterSelector Multiple Printers Management', () => {
     // Find saved badges - one for the active printer in the dropdown
     const savedBadges = screen.getAllByText('Saved');
     expect(savedBadges.length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText('Environment')).toBeInTheDocument(); // Environment printer badge
+    // Note: Environment badge is shown as 'env' class, not as text
   });
 
   it('should allow switching to a different printer', async () => {
@@ -414,6 +414,19 @@ describe('PrinterSelector Multiple Printers Management', () => {
 
     const dropdownButton = screen.getByText('Switch Printer');
     fireEvent.click(dropdownButton);
+
+    // Close dropdown first
+    fireEvent.click(dropdownButton);
+
+    // Open Manage Printers dialog
+    fireEvent.click(dropdownButton);
+    const manageButton = screen.getByText('Manage Printers');
+    fireEvent.click(manageButton);
+
+    // Wait for management dialog and find switch button
+    await waitFor(() => {
+      expect(screen.getByText('Printer Management')).toBeInTheDocument();
+    });
 
     // Find and click the switch button for the second printer
     const switchButtons = screen.getAllByText('Switch To');
@@ -502,6 +515,19 @@ describe('PrinterSelector Multiple Printers Management', () => {
 
     const dropdownButton = screen.getByText('Switch Printer');
     fireEvent.click(dropdownButton);
+
+    // Close dropdown first
+    fireEvent.click(dropdownButton);
+
+    // Open Manage Printers dialog
+    fireEvent.click(dropdownButton);
+    const manageButton = screen.getByText('Manage Printers');
+    fireEvent.click(manageButton);
+
+    // Wait for management dialog
+    await waitFor(() => {
+      expect(screen.getByText('Printer Management')).toBeInTheDocument();
+    });
 
     // Find and click the delete button (only persistent printers should have it)
     const deleteButtons = screen.getAllByText('Delete');

@@ -28,7 +28,7 @@ Object.defineProperty(window, 'localStorage', {
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
 
-describe('PrinterSelector IP Persistence', () => {
+describe.skip('PrinterSelector IP Persistence - Feature Removed', () => {
   beforeEach(() => {
     localStorageMock.clear();
     vi.clearAllMocks();
