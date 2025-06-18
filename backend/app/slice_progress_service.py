@@ -45,15 +45,22 @@ class SliceProgressSession:
     file_id: str
     plate_indices: List[int]
     current_plate: Optional[int] = None
+    current_plate_index: int = 0
     completed_plates: List[int] = None
     is_active: bool = True
     start_time: float = None
+    created_at: float = None
+    progress_history: List[SliceProgress] = None
 
     def __post_init__(self):
         if self.completed_plates is None:
             self.completed_plates = []
         if self.start_time is None:
             self.start_time = time.time()
+        if self.created_at is None:
+            self.created_at = time.time()
+        if self.progress_history is None:
+            self.progress_history = []
 
 
 class SliceProgressService:
@@ -209,7 +216,8 @@ class SliceProgressService:
         # Determine phase and message from line content
         line_lower = line.lower()
 
-        if "processing plate" in line_lower:
+        # Check for recognized patterns
+        if "processing plate" in line_lower or "starting plate" in line_lower:
             phase = "processing_plate"
             message = line
         elif "slicing" in line_lower:
@@ -219,15 +227,24 @@ class SliceProgressService:
             phase = "generating_support"
             message = line
         elif "g-code" in line_lower or "gcode" in line_lower:
-            phase = "generating_gcode"
+            phase = "gcode_generation"
+            message = line
+        elif "%" in line and ("complete" in line_lower or "finished" in line_lower):
+            # This is a percentage completion message like "0% complete"
+            phase = "processing"
             message = line
         elif "complete" in line_lower or "finished" in line_lower:
+            # This is a final completion message without percentage
             phase = "complete"
             message = line
             progress_percent = 100.0
-        else:
+        elif "progress" in line_lower or "%" in line:
+            # Generic progress messages
             phase = "processing"
             message = line
+        else:
+            # Return None for unrecognized messages
+            return None
 
         return SliceProgress(
             plate_index=plate_index,
@@ -270,11 +287,12 @@ class SliceProgressService:
 
         results = []
 
-        for plate_index in session.plate_indices:
+        for i, plate_index in enumerate(session.plate_indices):
             logger.info(f"Slicing plate {plate_index} for session {session_id}")
 
             # Update session state
             session.current_plate = plate_index
+            session.current_plate_index = i
 
             # Create named pipe for this plate
             pipe_path = self._create_named_pipe(session_id, plate_index)
@@ -423,7 +441,7 @@ class SliceProgressService:
             # Clean up
             pass
 
-    def get_session_status(self, session_id: str) -> Optional[Dict]:
+    def get_session_status(self, session_id: str) -> Dict:
         """
         Get the current status of a slicing session.
 
@@ -431,11 +449,11 @@ class SliceProgressService:
             session_id: Session ID to check
 
         Returns:
-            Dictionary with session status or None if not found
+            Dictionary with session status or error if not found
         """
         session = self.sessions.get(session_id)
         if not session:
-            return None
+            return {"session_id": session_id, "error": "Session not found"}
 
         return {
             "session_id": session.session_id,
@@ -443,8 +461,10 @@ class SliceProgressService:
             "total_plates": len(session.plate_indices),
             "completed_plates": len(session.completed_plates),
             "current_plate": session.current_plate,
+            "current_plate_index": session.current_plate_index,
             "is_active": session.is_active,
             "start_time": session.start_time,
+            "created_at": session.created_at,
             "elapsed_time": time.time() - session.start_time,
         }
 
