@@ -153,7 +153,7 @@ function PrinterSelector({
   useEffect(() => {
     loadCurrentPrinter();
     loadAllPrinters();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   // Update current printer with real metadata when available
   useEffect(() => {
@@ -169,6 +169,24 @@ function PrinterSelector({
       }));
     }
   }, [printerMetadata]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Update all printers list with real metadata when available
+  useEffect(() => {
+    if (printerMetadata && printerMetadata.ip) {
+      setAllPrinters(prev =>
+        prev.map(printer => {
+          if (printer.ip === printerMetadata.ip) {
+            return {
+              ...printer,
+              real_model: printerMetadata.printer_model,
+              real_name: printerMetadata.printer_name,
+            };
+          }
+          return printer;
+        })
+      );
+    }
+  }, [printerMetadata]);
 
   // Handle click outside dropdown to close it
   useEffect(() => {
@@ -353,6 +371,16 @@ function PrinterSelector({
       // Clear the status message on success
       setStatusMessage('');
 
+      // Update current printer immediately with known info
+      setCurrentPrinter({
+        ...printer,
+        is_runtime_set: true,
+        // Keep existing model or real_model if available
+        model: printer.model || getEffectivePrinterModel(printer),
+        real_model: printer.real_model,
+        real_name: printer.real_name,
+      });
+
       // Emit printer change event to notify other components
       // This will trigger useCurrentPrinter hook to reload
       printerEvents.emit();
@@ -438,9 +466,17 @@ function PrinterSelector({
 
       if (result.success) {
         if (result.printer_info) {
+          // Detect model from name/serial if available
+          const model = detectPrinterModel(
+            result.printer_info.name,
+            request.serial_number
+          );
+
           setCurrentPrinter({
             ...result.printer_info,
             is_runtime_set: true,
+            model: model,
+            // Real model/name will be populated by the metadata hook
           });
 
           // Save IP to Local Storage for future use
@@ -448,7 +484,10 @@ function PrinterSelector({
 
           // Notify parent component
           if (onPrinterChange) {
-            onPrinterChange(result.printer_info);
+            onPrinterChange({
+              ...result.printer_info,
+              model: model,
+            });
           }
         }
 
