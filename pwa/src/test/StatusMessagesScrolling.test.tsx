@@ -70,13 +70,13 @@ describe('Status Messages Scrolling', () => {
     });
 
     // When there are status messages (from no printer warning), container exists
-    const statusMessagesContainer = document.querySelector('.status-messages');
-    expect(statusMessagesContainer).toBeInTheDocument();
-
-    // Verify it has the correct class
-    if (statusMessagesContainer) {
+    await waitFor(() => {
+      const statusMessagesContainer =
+        document.querySelector('.status-messages');
+      expect(statusMessagesContainer).toBeInTheDocument();
+      // Verify it has the correct class
       expect(statusMessagesContainer).toHaveClass('status-messages');
-    }
+    });
   });
 
   it('status messages container exists and can display multiple messages', async () => {

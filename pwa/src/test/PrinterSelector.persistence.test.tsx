@@ -236,9 +236,7 @@ describe('PrinterSelector IP Persistence', () => {
     fireEvent.change(manualIpInput, { target: { value: '192.168.1.100' } });
 
     // Fill in serial number to avoid confirm dialog
-    const serialNumberInput = screen.getByPlaceholderText(
-      '01S00C123456789 (required)'
-    );
+    const serialNumberInput = screen.getByPlaceholderText('01S00C123456789');
     fireEvent.change(serialNumberInput, {
       target: { value: '01S00C123456789' },
     });

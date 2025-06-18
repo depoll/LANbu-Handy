@@ -56,8 +56,11 @@ describe('PrinterSelector Badge Visibility', () => {
                   has_access_code: false,
                   is_runtime_set: true,
                   is_persistent: false,
+                  source: 'runtime',
                 },
               ],
+              printer_configured: true,
+              printer_count: 1,
             }),
         });
       }
@@ -113,10 +116,13 @@ describe('PrinterSelector Badge Visibility', () => {
                   name: 'Test Printer',
                   ip: '192.168.1.100',
                   has_access_code: false,
-                  is_runtime_set: true,
-                  is_persistent: false,
+                  is_runtime_set: false,
+                  is_persistent: true,
+                  source: 'persistent',
                 },
               ],
+              printer_configured: true,
+              printer_count: 1,
             }),
         });
       }
@@ -173,9 +179,12 @@ describe('PrinterSelector Badge Visibility', () => {
                   ip: '192.168.1.100',
                   has_access_code: false,
                   is_runtime_set: true,
-                  is_persistent: false,
+                  is_persistent: true,
+                  source: 'runtime',
                 },
               ],
+              printer_configured: true,
+              printer_count: 1,
             }),
         });
       }
@@ -231,10 +240,13 @@ describe('PrinterSelector Badge Visibility', () => {
                   name: 'Test Printer',
                   ip: '192.168.1.100',
                   has_access_code: false,
-                  is_runtime_set: true,
+                  is_runtime_set: false,
                   is_persistent: false,
+                  source: 'environment',
                 },
               ],
+              printer_configured: true,
+              printer_count: 1,
             }),
         });
       }
@@ -292,9 +304,12 @@ describe('PrinterSelector Badge Visibility', () => {
                   ip: '192.168.1.100',
                   has_access_code: false,
                   is_runtime_set: true,
-                  is_persistent: false,
+                  is_persistent: true,
+                  source: 'runtime',
                 },
               ],
+              printer_configured: true,
+              printer_count: 1,
             }),
         });
       }
