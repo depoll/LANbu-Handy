@@ -47,7 +47,12 @@ export function useProactiveAMSStatus({
       setLoading(true);
       setError(null);
 
-      const response = await fetch(`/api/printer/${printerId}/ams-status`);
+      // Note: printerId is the printer name, not IP address
+      // Properly encode the printer name for the URL
+      const encodedPrinterId = encodeURIComponent(printerId);
+      const response = await fetch(
+        `/api/printer/${encodedPrinterId}/ams-status`
+      );
 
       if (!response.ok) {
         // Don't treat 404 as a critical error - just log and stop polling

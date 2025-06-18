@@ -60,8 +60,6 @@ function SliceAndPrint() {
     loading: printerLoading,
   } = useCurrentPrinter();
 
-  console.log('SliceAndPrint - currentPrinterId:', currentPrinterId);
-
   // Toast notifications
   const { showSuccess, showError, showWarning, showInfo } = useToast();
 

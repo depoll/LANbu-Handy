@@ -22,8 +22,6 @@ export function useCurrentPrinter() {
       }
 
       const config: PrinterConfigResponse = await response.json();
-      console.log('useCurrentPrinter - Config received:', config);
-      console.log('useCurrentPrinter - Active printer:', config.active_printer);
       setCurrentPrinter(config);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
@@ -50,10 +48,10 @@ export function useCurrentPrinter() {
     fetchCurrentPrinter();
   }, [fetchCurrentPrinter]);
 
-  const currentPrinterId = currentPrinter?.active_printer?.name || null;
+  // IMPORTANT: printerId should be the canonical_id for URL safety
+  // The backend API expects canonical IDs for all /api/printer/{printer_id} endpoints
+  const currentPrinterId = currentPrinter?.active_printer?.canonical_id || null;
   const currentPrinterName = currentPrinter?.active_printer?.name || null;
-
-  console.log('useCurrentPrinter - Returning printer ID:', currentPrinterId);
 
   return {
     currentPrinter,

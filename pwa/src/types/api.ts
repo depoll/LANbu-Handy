@@ -122,6 +122,7 @@ export interface PrinterConfigResponse {
   printer_configured: boolean;
   printers: {
     name: string;
+    canonical_id: string;
     ip: string;
     has_access_code: boolean;
     has_serial_number: boolean;
@@ -132,6 +133,7 @@ export interface PrinterConfigResponse {
   persistent_printer_count?: number;
   active_printer?: {
     name: string;
+    canonical_id: string;
     ip: string;
     has_access_code: boolean;
     has_serial_number: boolean;

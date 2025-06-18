@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { AMSStatusResponse } from '../types/api';
 
 interface AMSStatusDisplayProps {
-  printerId: string;
+  printerId: string; // This should be the printer name, not IP address
   onStatusUpdate?: (status: AMSStatusResponse) => void;
 }
 
@@ -250,7 +250,12 @@ function AMSStatusDisplay({
     setError(null);
 
     try {
-      const response = await fetch(`/api/printer/${printerId}/ams-status`);
+      // Note: printerId is the printer name, not IP address
+      // URL encode the printer ID to handle special characters like apostrophes
+      const encodedPrinterId = encodeURIComponent(printerId);
+      const response = await fetch(
+        `/api/printer/${encodedPrinterId}/ams-status`
+      );
 
       // Check if response exists and is valid
       if (!response) {

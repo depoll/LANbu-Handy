@@ -1,5 +1,6 @@
 import AMSStatusDisplay from './AMSStatusDisplay';
 import OperationProgress, { OperationStep } from './OperationProgress';
+import PrinterInfoDisplay from './PrinterInfoDisplay';
 import { AMSStatusResponse } from '../types/api';
 
 interface StatusTabProps {
@@ -24,6 +25,11 @@ export function StatusTab({
         <p>
           Monitor your printer status, AMS filaments, and operation progress
         </p>
+      </div>
+
+      {/* Printer Information Display */}
+      <div className="status-section">
+        <PrinterInfoDisplay printerId={printerId} />
       </div>
 
       {/* AMS Status Display - Always available */}

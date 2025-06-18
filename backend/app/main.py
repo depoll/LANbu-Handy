@@ -12,7 +12,17 @@ import time
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from app.config import PrinterConfig, get_config
+# Configure logging to show INFO level messages
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+
+# Import and apply async MQTT patch before other imports
+from app.mqtt_async_patch_v3 import add_async_support_to_printer_service
+
+add_async_support_to_printer_service()
+
+from app.config import get_config
 from app.filament_matching_service import FilamentMatchingService
 from app.job_orchestration import (
     download_model_step,
@@ -25,6 +35,7 @@ from app.model_service import (
     ModelService,
     ModelValidationError,
 )
+from app.printer_config import PrinterConfig
 from app.printer_service import (
     PrinterCommunicationError,
     PrinterMQTTError,
@@ -99,6 +110,8 @@ async def startup_event():
 async def shutdown_event():
     """Clean up resources on shutdown."""
     logger.info("LANbu Handy backend shutting down...")
+
+    # MQTT cleanup now handled automatically by async cancellation
 
     # Clean up old repaired 3MF files
     try:
@@ -184,6 +197,7 @@ async def get_app_config():
         printers_info.append(
             {
                 "name": printer.name,
+                "canonical_id": printer.canonical_id,
                 "ip": printer.ip,
                 # Don't expose access codes in API for security
                 "has_access_code": bool(printer.access_code),
@@ -200,6 +214,7 @@ async def get_app_config():
         is_persistent = active_printer.ip in persistent_ips
         active_printer_info = {
             "name": active_printer.name,
+            "canonical_id": active_printer.canonical_id,
             "ip": active_printer.ip,
             "has_access_code": bool(active_printer.access_code),
             "has_serial_number": bool(active_printer.serial_number),
@@ -1986,6 +2001,9 @@ async def get_ams_status(printer_id: str):
     """
     Query the printer's AMS status.
 
+    Args:
+        printer_id: The name of the printer to query (NOT the IP address)
+
     Retrieves the current status of all AMS units and their loaded filaments
     from the specified printer via MQTT.
 
@@ -1998,6 +2016,9 @@ async def get_ams_status(printer_id: str):
     Raises:
         HTTPException: If printer is not found, not configured, or query fails
     """
+    logger.info(
+        f"AMS status request for printer: '{printer_id}' (raw: {repr(printer_id)})"
+    )
     try:
         # Check if any printers are configured
         if not config.is_printer_configured():
@@ -2012,12 +2033,15 @@ async def get_ams_status(printer_id: str):
             # Use the first/default printer
             printer_config = config.get_default_printer()
         else:
-            # Look for printer by name
-            printer_config = config.get_printer_by_name(printer_id)
+            # Look for printer by canonical ID or name
+            printer_config = config.get_printer_by_id(printer_id)
 
         if not printer_config:
             # List available printers for helpful error message
             available_printers = [p.name for p in config.get_printers()]
+            logger.warning(
+                f"Printer '{printer_id}' not found. Available printers: {available_printers}"
+            )
             raise HTTPException(
                 status_code=404,
                 detail=f"Printer '{printer_id}' not found. "
@@ -2026,7 +2050,8 @@ async def get_ams_status(printer_id: str):
 
         # Query AMS status
         try:
-            ams_result = printer_service.query_ams_status(printer_config)
+            # Use async MQTT query that supports cancellation
+            ams_result = await printer_service.query_ams_status_async(printer_config)
 
             if ams_result.success:
                 # Convert internal data structures to API response format
@@ -2080,6 +2105,123 @@ async def get_ams_status(printer_id: str):
         raise HTTPException(status_code=500, detail=msg)
 
 
+@app.get("/api/printer/{printer_id}/status-debug")
+async def get_printer_status_debug(printer_id: str):
+    """
+    Get raw printer status data for debugging.
+
+    This endpoint returns the raw MQTT response without processing.
+    """
+    try:
+        # Check if any printers are configured
+        if not config.is_printer_configured():
+            raise HTTPException(
+                status_code=400,
+                detail="No printers configured. Please configure a printer first.",
+            )
+
+        # Find the printer by ID/name
+        printer_config = None
+        if printer_id.lower() == "default":
+            printer_config = config.get_default_printer()
+        else:
+            printer_config = config.get_printer_by_name(printer_id)
+
+        if not printer_config:
+            available_printers = [p.name for p in config.get_printers()]
+            raise HTTPException(
+                status_code=404,
+                detail=f"Printer '{printer_id}' not found. "
+                f"Available printers: {available_printers}",
+            )
+
+        # Create a custom printer service that captures raw data
+        from app.printer_service import mqtt, ssl
+
+        raw_responses = []
+
+        def capture_raw_message(client, userdata, msg):
+            nonlocal raw_responses
+            try:
+                payload = msg.payload.decode("utf-8")
+                data = json.loads(payload)
+                raw_responses.append(
+                    {"topic": msg.topic, "data": data, "timestamp": time.time()}
+                )
+            except Exception as e:
+                logger.error(f"Error capturing raw message: {e}")
+
+        # Create MQTT client with custom handler
+        client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+
+        if printer_config.access_code:
+            client.username_pw_set("bblp", printer_config.access_code)
+
+        ssl_context = ssl.create_default_context()
+        ssl_context.check_hostname = False
+        ssl_context.verify_mode = ssl.CERT_NONE
+        client.tls_set_context(ssl_context)
+
+        client.on_message = capture_raw_message
+
+        # Connect and subscribe
+        client.connect(printer_config.ip, 8883, 60)
+        client.loop_start()
+
+        # Subscribe to response topic
+        response_topic = f"device/{printer_config.serial_number}/report"
+        client.subscribe(response_topic, qos=1)
+
+        # Send status query
+        device_topic = f"device/{printer_config.serial_number}/request"
+        # Try info command first to get printer details
+        info_query = {"info": {"sequence_id": "0"}}
+        client.publish(device_topic, json.dumps(info_query), qos=1)
+
+        # Wait a bit for info response
+        time.sleep(2)
+
+        # Then send pushall for full status
+        status_query = {"pushing": {"sequence_id": "1", "command": "pushall"}}
+        client.publish(device_topic, json.dumps(status_query), qos=1)
+
+        # Wait for responses
+        import time
+
+        start_time = time.time()
+        while len(raw_responses) < 2 and time.time() - start_time < 10:
+            time.sleep(0.1)
+
+        client.loop_stop()
+        client.disconnect()
+
+        if raw_responses:
+            # Look for info response
+            info_response = None
+            status_response = None
+
+            for resp in raw_responses:
+                if "info" in resp["data"]:
+                    info_response = resp["data"]["info"]
+                if "print" in resp["data"]:
+                    status_response = resp["data"]
+
+            return {
+                "success": True,
+                "info_response": info_response,
+                "status_response": status_response,
+                "all_responses": raw_responses,
+            }
+        else:
+            return {"success": False, "error": "No response received from printer"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Debug endpoint error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/api/printer/{printer_id}/status", response_model=PrinterStatusResponse)
 async def get_printer_status(printer_id: str):
     """
@@ -2089,7 +2231,8 @@ async def get_printer_status(printer_id: str):
     and AMS information from the specified printer via MQTT.
 
     Args:
-        printer_id: The name or identifier of the printer to query
+        printer_id: The name of the printer to query (NOT the IP address)
+                   Examples: "My X1C", "Basement Printer", "default"
 
     Returns:
         PrinterStatusResponse: Printer status with model, name, and AMS information
@@ -2111,12 +2254,15 @@ async def get_printer_status(printer_id: str):
             # Use the first/default printer
             printer_config = config.get_default_printer()
         else:
-            # Look for printer by name
-            printer_config = config.get_printer_by_name(printer_id)
+            # Look for printer by canonical ID or name
+            printer_config = config.get_printer_by_id(printer_id)
 
         if not printer_config:
             # List available printers for helpful error message
             available_printers = [p.name for p in config.get_printers()]
+            logger.warning(
+                f"Printer '{printer_id}' not found. Available printers: {available_printers}"
+            )
             raise HTTPException(
                 status_code=404,
                 detail=f"Printer '{printer_id}' not found. "
@@ -2289,7 +2435,19 @@ async def set_active_printer(request: SetActivePrinterRequest):
     Raises:
         HTTPException: If the printer configuration is invalid
     """
+    logger.info(f"Setting active printer: {request.name} ({request.ip})")
     try:
+        # Get the current active printer before switching
+        current_active = config.get_active_printer()
+
+        # IMPORTANT: Cancel any active MQTT operations for the OLD printer before switching
+        # This prevents hanging issues when switching between printers
+        if current_active and current_active.ip != request.ip:
+            logger.debug(
+                f"Cancelling active MQTT operations for old printer: {current_active.ip}"
+            )
+            printer_service.cancel_printer_operations(current_active.ip)
+
         # Validate IP address or hostname format
         ip = validate_ip_or_hostname(request.ip)
 
@@ -2302,6 +2460,7 @@ async def set_active_printer(request: SetActivePrinterRequest):
         )
 
         # Check if this printer already exists in persistent storage
+        logger.debug("Checking if printer exists in storage...")
         try:
             existing_printer = config.get_printer_by_ip(ip)
         except Exception as e:
@@ -2327,6 +2486,7 @@ async def set_active_printer(request: SetActivePrinterRequest):
                 logger.warning(f"Unexpected error auto-saving printer: {e}")
 
         # Set the active printer (this will use the persistent version if it exists)
+        logger.debug("Setting printer as active...")
         try:
             active_printer = config.set_active_printer(
                 ip=ip,
@@ -2334,8 +2494,10 @@ async def set_active_printer(request: SetActivePrinterRequest):
                 name=request.name or f"Printer at {ip}",
                 serial_number=request.serial_number,
             )
+            logger.debug(f"Successfully set active printer: {active_printer.name}")
         except ValueError as e:
             # Handle configuration errors
+            logger.error(f"Failed to set active printer: {e}")
             raise HTTPException(status_code=400, detail=str(e))
 
         # Optional: Test connection to validate the printer
@@ -2344,7 +2506,8 @@ async def set_active_printer(request: SetActivePrinterRequest):
         # if not connection_test:
         #     logger.warning(f"Could not connect to printer at {ip}")
 
-        return SetActivePrinterResponse(
+        logger.debug("Preparing response...")
+        response = SetActivePrinterResponse(
             success=True,
             message=f"Active printer set to {active_printer.ip}",
             printer_info={
@@ -2354,6 +2517,8 @@ async def set_active_printer(request: SetActivePrinterRequest):
                 "has_serial_number": bool(active_printer.serial_number),
             },
         )
+        logger.info(f"Successfully set active printer to {active_printer.name}")
+        return response
 
     except HTTPException:
         # Re-raise HTTP exceptions as-is

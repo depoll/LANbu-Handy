@@ -7,36 +7,11 @@ Handles reading environment variables and application configuration.
 import json
 import logging
 import os
-from dataclasses import dataclass
 from typing import List, Optional
 
+from app.printer_config import PrinterConfig
+
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class PrinterConfig:
-    """Configuration for a single Bambu printer."""
-
-    name: str
-    ip: str
-    access_code: str
-    serial_number: str = ""
-
-    def __post_init__(self):
-        """Validate printer configuration after initialization."""
-        if not self.name or not self.name.strip():
-            raise ValueError("Printer name cannot be empty")
-        if not self.ip or not self.ip.strip():
-            raise ValueError("Printer IP cannot be empty")
-        # Access code can be empty for LAN-only mode
-        # if not self.access_code or not self.access_code.strip():
-        #     raise ValueError("Printer access code cannot be empty")
-
-        # Strip whitespace
-        self.name = self.name.strip()
-        self.ip = self.ip.strip()
-        self.access_code = self.access_code.strip() if self.access_code else ""
-        self.serial_number = self.serial_number.strip() if self.serial_number else ""
 
 
 class Config:
@@ -46,7 +21,15 @@ class Config:
         """Initialize configuration by reading environment variables and
         persistent storage."""
         self.printers: List[PrinterConfig] = self._load_printers()
-        self.runtime_active_printer: Optional[PrinterConfig] = None
+        # Auto-select the first printer as active if available
+        self.runtime_active_printer: Optional[PrinterConfig] = (
+            self.printers[0] if self.printers else None
+        )
+        if self.runtime_active_printer:
+            logger.info(
+                f"Auto-selected printer '{self.runtime_active_printer.name}' "
+                f"({self.runtime_active_printer.ip}) as active printer"
+            )
 
     def _load_printers(self) -> List[PrinterConfig]:
         """Load Bambu printer configurations from all sources.
@@ -62,6 +45,7 @@ class Config:
 
         # First, try to load from persistent storage
         try:
+            # Import here to avoid circular dependency
             from app.printer_storage import get_printer_storage
 
             printer_storage = get_printer_storage()
@@ -72,6 +56,8 @@ class Config:
                     f"Loaded {len(persistent_printers)} printers "
                     f"from persistent storage"
                 )
+        except ImportError as e:
+            logger.warning(f"Failed to import printer storage: {e}")
         except Exception as e:
             logger.warning(f"Failed to load printers from persistent storage: {e}")
 
@@ -196,6 +182,25 @@ class Config:
                 return printer
         return None
 
+    def get_printer_by_id(self, printer_id: str) -> Optional[PrinterConfig]:
+        """Get a printer configuration by canonical ID or name.
+
+        First tries to match by canonical ID, then falls back to name matching.
+
+        Args:
+            printer_id: The canonical ID or name to search for
+
+        Returns:
+            PrinterConfig: The printer configuration if found, None otherwise
+        """
+        # First try canonical ID
+        for printer in self.printers:
+            if printer.canonical_id == printer_id:
+                return printer
+
+        # Fall back to name for backwards compatibility
+        return self.get_printer_by_name(printer_id)
+
     def get_default_printer(self) -> Optional[PrinterConfig]:
         """Get the default (first) printer configuration.
 
@@ -233,12 +238,30 @@ class Config:
         if name is None:
             name = "Active Printer"
 
-        printer_config = PrinterConfig(
-            name=name,
-            ip=ip.strip(),
-            access_code=access_code.strip(),
-            serial_number=serial_number.strip(),
-        )
+        # Check if this printer already exists and use its stored credentials
+        existing_printer = self.get_printer_by_ip(ip.strip())
+        if existing_printer:
+            # Use existing printer's credentials if not provided
+            printer_config = PrinterConfig(
+                name=name if name != "Active Printer" else existing_printer.name,
+                ip=existing_printer.ip,
+                access_code=(
+                    access_code.strip() if access_code else existing_printer.access_code
+                ),
+                serial_number=(
+                    serial_number.strip()
+                    if serial_number
+                    else existing_printer.serial_number
+                ),
+            )
+        else:
+            # Create new printer config
+            printer_config = PrinterConfig(
+                name=name,
+                ip=ip.strip(),
+                access_code=access_code.strip(),
+                serial_number=serial_number.strip(),
+            )
 
         self.runtime_active_printer = printer_config
         logger.info(f"Set active printer: {printer_config.name} at {printer_config.ip}")

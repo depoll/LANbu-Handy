@@ -8,14 +8,16 @@ including G-code file uploads and basic error handling.
 import ftplib
 import json
 import logging
+import socket
 import ssl
+import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional
 
 import paho.mqtt.client as mqtt
-from app.config import PrinterConfig
+from app.printer_config import PrinterConfig
 
 logger = logging.getLogger(__name__)
 
@@ -122,6 +124,9 @@ class PrinterService:
     DEFAULT_MQTT_TIMEOUT = 30
     DEFAULT_MQTT_KEEPALIVE = 60
 
+    # Socket timeout for MQTT connections
+    MQTT_SOCKET_TIMEOUT = 10  # seconds
+
     def __init__(self, timeout: int = DEFAULT_FTP_TIMEOUT):
         """Initialize the printer service.
 
@@ -129,6 +134,73 @@ class PrinterService:
             timeout: FTP connection timeout in seconds
         """
         self.timeout = timeout
+        # NOTE: Active MQTT connection tracking moved to mqtt_async_patch.py
+        # to support proper async cancellation
+
+    #     def _cleanup_mqtt_client(self, client):
+    #         """Safely cleanup an MQTT client."""
+    #         if client is None:
+    #             return
+
+    #         try:
+    #             # Stop the network loop first
+    #             client.loop_stop()
+    #             # Then disconnect
+    #             client.disconnect()
+    #             # Remove from active clients list
+    #             with self._mqtt_lock:
+    #                 if client in self._active_mqtt_clients:
+    #                     self._active_mqtt_clients.remove(client)
+    #             logger.debug("MQTT client cleaned up successfully")
+    #         except Exception as e:
+    #             logger.debug(f"Error during MQTT cleanup: {e}")
+
+    #     def cleanup_all_mqtt_connections(self):
+    #         """Clean up all active MQTT connections.
+
+    #         This should be called when switching printers to ensure
+    #         no lingering connections cause issues.
+    #         """
+    #         with self._mqtt_lock:
+    #             clients_to_cleanup = self._active_mqtt_clients.copy()
+
+    #         for client in clients_to_cleanup:
+    #             self._cleanup_mqtt_client(client)
+
+    #         logger.info(f"Cleaned up {len(clients_to_cleanup)} MQTT connections")
+
+    def _create_mqtt_client(self, printer_config: PrinterConfig) -> mqtt.Client:
+        """Create and configure an MQTT client for the printer.
+
+        Args:
+            printer_config: Configuration for the target printer
+
+        Returns:
+            mqtt.Client: Configured MQTT client
+        """
+        # Connection limiting now handled by async cancellation in mqtt_async_patch.py
+
+        # Create MQTT client with unique client ID to avoid conflicts
+        client_id = f"lanbu_{printer_config.name}_{int(time.time() * 1000)}"
+        client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id=client_id)
+
+        # Set socket timeout to prevent hanging
+        client._sock_timeout = self.MQTT_SOCKET_TIMEOUT
+
+        # Set authentication if access code is provided
+        if printer_config.access_code:
+            # Bambu Lab printers typically use "bblp" as username and
+            # access code as password
+            client.username_pw_set("bblp", printer_config.access_code)
+
+        # Configure TLS for secure MQTT (port 8883)
+        # Create SSL context that allows self-signed certificates
+        ssl_context = ssl.create_default_context()
+        ssl_context.check_hostname = False
+        ssl_context.verify_mode = ssl.CERT_NONE
+        client.tls_set_context(ssl_context)
+
+        return client
 
     def upload_gcode(
         self,
@@ -318,10 +390,11 @@ class PrinterService:
         connection_error = None
         publish_error = None
         connection_successful = False
+        client = None
 
         try:
             # Create MQTT client
-            client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+            client = self._create_mqtt_client(printer_config)
 
             def on_connect(client, userdata, flags, reason_code, properties):
                 nonlocal connection_successful, connection_error
@@ -351,31 +424,23 @@ class PrinterService:
             client.on_connect = on_connect
             client.on_publish = on_publish
             client.on_disconnect = on_disconnect
-            # Set authentication if access code is provided
-            if printer_config.access_code:
-                # Bambu Lab printers typically use "bblp" as username and
-                # access code as password
-                client.username_pw_set("bblp", printer_config.access_code)
-
-            # Configure TLS for secure MQTT (port 8883)
-            # Create SSL context that allows self-signed certificates
-            ssl_context = ssl.create_default_context()
-            ssl_context.check_hostname = False
-            ssl_context.verify_mode = ssl.CERT_NONE
-            client.tls_set_context(ssl_context)
 
             # Connect to MQTT broker
             logger.debug(
                 f"Connecting to MQTT broker at "
                 f"{printer_config.ip}:{self.DEFAULT_MQTT_PORT}"
             )
-            client.connect(
+
+            # Use connect_async to avoid blocking
+            client.connect_async(
                 printer_config.ip, self.DEFAULT_MQTT_PORT, self.DEFAULT_MQTT_KEEPALIVE
             )
 
-            # Wait for connection
-            start_time = time.time()
+            # Start the network loop
             client.loop_start()
+
+            # Wait for connection with timeout
+            start_time = time.time()
 
             while not connection_successful and connection_error is None:
                 if time.time() - start_time > timeout:
@@ -450,16 +515,13 @@ class PrinterService:
             raise PrinterMQTTError(error_msg)
 
         finally:
-            # Always disconnect the MQTT client if it was created
-            try:
-                if "client" in locals():
+            # Cleanup now handled by async wrapper
+            if client:
+                try:
                     client.loop_stop()
                     client.disconnect()
-                    logger.debug(
-                        f"MQTT client disconnected from " f"{printer_config.ip}"
-                    )
-            except Exception as e:
-                logger.debug(f"Error during MQTT cleanup: {e}")
+                except Exception as e:
+                    logger.debug(f"Error during MQTT cleanup: {e}")
 
     def query_ams_status(
         self, printer_config: PrinterConfig, timeout: Optional[int] = None
@@ -471,8 +533,7 @@ class PrinterService:
 
         Args:
             printer_config: Configuration for the target printer
-            timeout: MQTT operation timeout in seconds (defaults to
-                DEFAULT_MQTT_TIMEOUT)
+            timeout: MQTT operation timeout in seconds (defaults to 10 seconds)
 
         Returns:
             AMSStatusResult: Result with AMS units and filament information
@@ -481,8 +542,9 @@ class PrinterService:
             PrinterMQTTError: If MQTT operation fails
         """
         if timeout is None:
-            timeout = self.DEFAULT_MQTT_TIMEOUT
+            timeout = 10  # Use shorter timeout for AMS queries
 
+        client = None
         try:
             # Variables to track operation state
             connection_successful = False
@@ -490,9 +552,18 @@ class PrinterService:
             publish_error = None
             response_data = None
             response_received = False
+            printer_model_detected = None
+            no_ams_detected = False
+            messages_received = 0
+
+            # Use threading events for thread-safe communication
+            response_event = threading.Event()
+            no_ams_event = threading.Event()
+
+            # Connection limiting now handled by async cancellation in mqtt_async_patch.py
 
             # Create MQTT client
-            client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+            client = self._create_mqtt_client(printer_config)
 
             def on_connect(client, userdata, flags, reason_code, properties):
                 nonlocal connection_successful, connection_error
@@ -520,21 +591,80 @@ class PrinterService:
                     logger.error(connection_error)
 
             def on_message(client, userdata, msg):
-                nonlocal response_data, response_received
+                nonlocal response_data, response_received, printer_model_detected, no_ams_detected, messages_received, response_event, no_ams_event
                 try:
                     # Parse the JSON response
                     payload = msg.payload.decode("utf-8")
-                    logger.debug(f"Received MQTT message: {payload}")
+                    logger.debug(
+                        f"Received MQTT message on topic {msg.topic}: {payload}"
+                    )
 
                     response_json = json.loads(payload)
-                    response_json = response_json.get("print", {})
+                    messages_received += 1
+
+                    # Log the raw response for debugging
+                    logger.info(
+                        f"Raw MQTT response for AMS query (message #{messages_received}): {json.dumps(response_json, indent=2)}"
+                    )
+
+                    # Check for AMS presence indicators
+                    print_data = response_json.get("print", {})
+
+                    # Check ams_exist_bits field - "0" means no AMS
+                    # This field can be in print.ams_exist_bits or print.ams.ams_exist_bits
+                    ams_exist_bits = print_data.get("ams_exist_bits", "")
+                    if not ams_exist_bits and "ams" in print_data:
+                        ams_data = print_data.get("ams", {})
+                        if isinstance(ams_data, dict):
+                            ams_exist_bits = ams_data.get("ams_exist_bits", "")
+
+                    logger.debug(f"Checking ams_exist_bits: '{ams_exist_bits}'")
+
+                    if ams_exist_bits == "0":
+                        no_ams_detected = True
+                        response_received = True
+                        no_ams_event.set()  # Signal the event
+                        response_event.set()  # Also set response event
+                        logger.info(
+                            f"Detected no AMS present (ams_exist_bits='0') for printer {printer_config.name}"
+                        )
+
+                    # Check if AMS data exists but is empty
+                    if "ams" in response_json or "ams" in print_data:
+                        ams_data = response_json.get("ams", print_data.get("ams", {}))
+                        # Check if ams field exists but has empty ams array
+                        if isinstance(ams_data, dict):
+                            ams_list = ams_data.get("ams", [])
+                            if isinstance(ams_list, list) and len(ams_list) == 0:
+                                no_ams_detected = True
+                                response_received = True
+                                no_ams_event.set()  # Signal the event
+                                response_event.set()  # Also set response event
+                                logger.info(
+                                    f"Detected no AMS present (empty ams array)"
+                                )
 
                     # Check if this message contains AMS data
-                    # Bambu Lab printers typically send AMS data in "ams" field
+                    # Bambu Lab printers send data in different structures:
+                    # - Sometimes directly as {"ams": {...}}
+                    # - Sometimes inside print as {"print": {"ams": {...}}}
                     if "ams" in response_json:
                         response_data = response_json
                         response_received = True
-                        logger.debug("AMS status data received")
+                        response_event.set()  # Signal the event
+                        logger.debug("AMS status data received (top level)")
+                    elif "print" in response_json and "ams" in response_json.get(
+                        "print", {}
+                    ):
+                        response_data = response_json.get("print", {})
+                        response_received = True
+                        response_event.set()  # Signal the event
+                        logger.debug("AMS status data received (inside print)")
+                    else:
+                        # Don't set response_received, keep waiting for AMS data
+                        logger.debug(
+                            "Received MQTT message without AMS data, continuing to wait"
+                        )
 
                 except json.JSONDecodeError as e:
                     logger.warning(f"Failed to parse MQTT message: {e}")
@@ -560,25 +690,14 @@ class PrinterService:
             client.on_publish = on_publish
             client.on_disconnect = on_disconnect
 
-            # Set authentication if access code is provided
-            if printer_config.access_code:
-                # Bambu Lab printers typically use "bblp" as username and
-                # access code as password
-                client.username_pw_set("bblp", printer_config.access_code)
-
-            # Configure TLS for secure MQTT (port 8883)
-            # Create SSL context that allows self-signed certificates
-            ssl_context = ssl.create_default_context()
-            ssl_context.check_hostname = False
-            ssl_context.verify_mode = ssl.CERT_NONE
-            client.tls_set_context(ssl_context)
-
             # Connect to MQTT broker
             logger.debug(
                 f"Connecting to MQTT broker at "
                 f"{printer_config.ip}:{self.DEFAULT_MQTT_PORT}"
             )
-            client.connect(
+
+            # Use connect_async to avoid blocking
+            client.connect_async(
                 printer_config.ip, self.DEFAULT_MQTT_PORT, self.DEFAULT_MQTT_KEEPALIVE
             )
 
@@ -630,19 +749,62 @@ class PrinterService:
                 raise PrinterMQTTError(publish_error)
 
             # Wait for response with AMS data
+            # Use shorter timeout for non-AMS printers
+            effective_timeout = timeout
             start_time = time.time()
-            while not response_received and time.time() - start_time < timeout:
-                time.sleep(0.1)
+            last_message_count = 0
+            logger.info(
+                f"Waiting for AMS response from {printer_config.name} (timeout: {timeout}s)"
+            )
 
-            if not response_received:
-                logger.warning(
-                    f"No AMS status response received from printer "
-                    f"{printer_config.name} within {timeout} seconds"
+            while time.time() - start_time < effective_timeout:
+                # Wait for either response or no AMS detection with a short timeout
+                if response_event.wait(0.1) or no_ams_event.wait(0.1):
+                    break
+
+                # If we've received several messages but no AMS data, it might be a non-AMS printer
+                if messages_received > last_message_count:
+                    last_message_count = messages_received
+                    if messages_received >= 5 and not no_ams_detected:
+                        logger.info(
+                            f"Received {messages_received} messages without AMS data. "
+                            f"This printer might not have AMS support."
+                        )
+                        # Reduce timeout to avoid long waits
+                        elapsed_time = time.time() - start_time
+                        remaining_time = effective_timeout - elapsed_time
+                        if remaining_time > 5:
+                            # Set effective timeout to 5 seconds from now
+                            effective_timeout = elapsed_time + 5
+
+            logger.info(
+                f"AMS query loop exited: response_received={response_received}, no_ams_detected={no_ams_detected}, elapsed={time.time() - start_time:.1f}s"
+            )
+
+            if no_ams_detected:
+                # No AMS was detected from the response
+                logger.info(
+                    f"Printer {printer_config.name} does not have AMS installed or enabled"
                 )
                 return AMSStatusResult(
-                    success=False,
-                    message="No AMS status response received",
-                    error_details=f"Timeout after {timeout} seconds",
+                    success=True,
+                    message=f"No AMS detected on printer {printer_config.name}",
+                    ams_units=[],
+                )
+
+            if not response_received:
+                elapsed_time = time.time() - start_time
+                logger.warning(
+                    f"No AMS status response received from printer "
+                    f"{printer_config.name} within {elapsed_time:.1f} seconds. "
+                    f"Received {messages_received} messages without AMS data. "
+                    f"This printer might not have AMS support."
+                )
+                return AMSStatusResult(
+                    success=True,  # Changed to True - missing AMS is not an error
+                    message="No AMS data received - printer may not have AMS",
+                    ams_units=[],  # Return empty list instead of error
+                    error_details=f"No AMS data after {elapsed_time:.1f} seconds ({messages_received} messages received)",
                 )
 
             # Parse the AMS data from the response
@@ -670,16 +832,13 @@ class PrinterService:
             raise PrinterMQTTError(error_msg)
 
         finally:
-            # Always disconnect the MQTT client if it was created
-            try:
-                if "client" in locals():
+            # Cleanup now handled by async wrapper
+            if client:
+                try:
                     client.loop_stop()
                     client.disconnect()
-                    logger.debug(
-                        f"MQTT client disconnected from " f"{printer_config.ip}"
-                    )
-            except Exception as e:
-                logger.debug(f"Error during MQTT cleanup: {e}")
+                except Exception as e:
+                    logger.debug(f"Error during MQTT cleanup: {e}")
 
     def _parse_ams_data(self, response_data: dict) -> List[AMSUnit]:
         """Parse AMS data from MQTT response.
@@ -763,6 +922,7 @@ class PrinterService:
         if timeout is None:
             timeout = self.DEFAULT_MQTT_TIMEOUT
 
+        client = None
         try:
             # Variables to track operation state
             connection_successful = False
@@ -772,7 +932,7 @@ class PrinterService:
             response_received = False
 
             # Create MQTT client
-            client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+            client = self._create_mqtt_client(printer_config)
 
             def on_connect(client, userdata, flags, reason_code, properties):
                 nonlocal connection_successful, connection_error
@@ -808,6 +968,11 @@ class PrinterService:
 
                     response_json = json.loads(payload)
 
+                    # Log the raw response for debugging
+                    logger.info(
+                        f"Raw MQTT response from printer: {json.dumps(response_json, indent=2)}"
+                    )
+
                     # Bambu Lab printers send various status messages
                     # We're looking for the print status which contains model info
                     if "print" in response_json:
@@ -839,25 +1004,14 @@ class PrinterService:
             client.on_publish = on_publish
             client.on_disconnect = on_disconnect
 
-            # Set authentication if access code is provided
-            if printer_config.access_code:
-                # Bambu Lab printers typically use "bblp" as username and
-                # access code as password
-                client.username_pw_set("bblp", printer_config.access_code)
-
-            # Configure TLS for secure MQTT (port 8883)
-            # Create SSL context that allows self-signed certificates
-            ssl_context = ssl.create_default_context()
-            ssl_context.check_hostname = False
-            ssl_context.verify_mode = ssl.CERT_NONE
-            client.tls_set_context(ssl_context)
-
             # Connect to MQTT broker
             logger.debug(
                 f"Connecting to MQTT broker at "
                 f"{printer_config.ip}:{self.DEFAULT_MQTT_PORT}"
             )
-            client.connect(
+
+            # Use connect_async to avoid blocking
+            client.connect_async(
                 printer_config.ip, self.DEFAULT_MQTT_PORT, self.DEFAULT_MQTT_KEEPALIVE
             )
 
@@ -958,16 +1112,13 @@ class PrinterService:
             raise PrinterMQTTError(error_msg)
 
         finally:
-            # Always disconnect the MQTT client if it was created
-            try:
-                if "client" in locals():
+            # Cleanup now handled by async wrapper
+            if client:
+                try:
                     client.loop_stop()
                     client.disconnect()
-                    logger.debug(
-                        f"MQTT client disconnected from " f"{printer_config.ip}"
-                    )
-            except Exception as e:
-                logger.debug(f"Error during MQTT cleanup: {e}")
+                except Exception as e:
+                    logger.debug(f"Error during MQTT cleanup: {e}")
 
     def _parse_printer_status_data(
         self, response_data: dict
@@ -990,20 +1141,77 @@ class PrinterService:
             # Extract printer model information from various possible fields
             # Bambu Lab printers expose model info in different ways per firmware
 
-            # Try multiple potential fields for printer model
-            model_candidates = [
-                print_data.get("printer_type"),
-                print_data.get("machine_type"),
-                print_data.get("printer_model"),
-                print_data.get("hw_type"),
-                print_data.get("model"),
-            ]
+            # First, try to get model from serial number (most reliable)
+            # According to Bambu Lab wiki, the serial number format is:
+            # 00M[XX][ABC...]
+            # Where XX is the model code
+            serial_number = print_data.get("upgrade_state", {}).get("sn", "")
+            if not serial_number:
+                # Also check in other possible locations
+                serial_number = print_data.get("sn", "") or response_data.get("sn", "")
 
-            # Use the first non-None, non-empty model found
-            for candidate in model_candidates:
-                if candidate and str(candidate).strip():
-                    printer_model = str(candidate).strip()
-                    break
+            if serial_number and len(serial_number) >= 5:
+                # Extract model code from positions 3-4 (0-indexed)
+                model_code = serial_number[3:5]
+
+                # Map model codes according to Bambu Lab wiki
+                serial_model_map = {
+                    "09": "X1C",  # X1 Carbon
+                    "07": "X1",  # X1
+                    "08": "X1E",  # X1E
+                    "03": "P1P",  # P1P
+                    "04": "P1S",  # P1S
+                    "01": "A1 mini",  # A1 mini
+                    "02": "A1",  # A1
+                }
+
+                if model_code in serial_model_map:
+                    printer_model = serial_model_map[model_code]
+                    logger.info(
+                        f"Detected printer model '{printer_model}' from serial number: {serial_number}"
+                    )
+
+            # According to OpenBambuAPI, check module field as fallback
+            if printer_model == "Unknown":
+                module = print_data.get("module", "")
+                if module:
+                    # Module field contains model info like "BL-P001" for X1C
+                    model_map = {
+                        "BL-P001": "X1C",
+                        "BL-P002": "X1",
+                        "BL-P003": "P1P",
+                        "BL-P004": "P1S",
+                        "BL-A001": "A1",
+                        "BL-A002": "A1 mini",
+                    }
+                    printer_model = model_map.get(module, module)
+
+            # Also check nozzle type as a hint
+            if printer_model == "Unknown":
+                nozzle_info = (
+                    print_data.get("device", {}).get("nozzle", {}).get("info", [])
+                )
+                if nozzle_info and len(nozzle_info) > 0:
+                    nozzle_type = nozzle_info[0].get("type", "")
+                    if nozzle_type.startswith("HX"):
+                        # HX nozzles are typically X1 series
+                        printer_model = "X1 Series"
+
+            # Try multiple potential fields for printer model as fallback
+            if printer_model == "Unknown":
+                model_candidates = [
+                    print_data.get("printer_type"),
+                    print_data.get("machine_type"),
+                    print_data.get("printer_model"),
+                    print_data.get("hw_type"),
+                    print_data.get("model"),
+                ]
+
+                # Use the first non-None, non-empty model found
+                for candidate in model_candidates:
+                    if candidate and str(candidate).strip():
+                        printer_model = str(candidate).strip()
+                        break
 
             # If no model found in print data, check top level
             if printer_model == "Unknown":

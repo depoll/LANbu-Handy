@@ -11,7 +11,7 @@ import os
 from pathlib import Path
 from typing import List, Optional
 
-from app.config import PrinterConfig
+from app.printer_config import PrinterConfig
 
 logger = logging.getLogger(__name__)
 
@@ -154,6 +154,9 @@ class PrinterStorage:
                         access_code=printer_data.get("access_code", ""),
                         serial_number=printer_data.get("serial_number", ""),
                     )
+                    # Set canonical_id if it was saved (for custom IDs)
+                    if "canonical_id" in printer_data:
+                        printer.canonical_id = printer_data["canonical_id"]
                     printers.append(printer)
                 except (KeyError, ValueError) as e:
                     logger.warning(f"Skipping invalid printer config: {e}")
@@ -188,14 +191,20 @@ class PrinterStorage:
             # Convert printers to serializable format
             printer_data = []
             for printer in printers:
-                printer_data.append(
-                    {
-                        "name": printer.name,
-                        "ip": printer.ip,
-                        "access_code": printer.access_code,
-                        "serial_number": printer.serial_number,
-                    }
-                )
+                printer_dict = {
+                    "name": printer.name,
+                    "ip": printer.ip,
+                    "access_code": printer.access_code,
+                    "serial_number": printer.serial_number,
+                }
+                # Only save canonical_id if it's explicitly set and different from generated
+                if hasattr(printer, "canonical_id") and printer.canonical_id:
+                    from .printer_config import generate_canonical_id
+
+                    # Save canonical_id only if it differs from auto-generated one
+                    if printer.canonical_id != generate_canonical_id(printer.name):
+                        printer_dict["canonical_id"] = printer.canonical_id
+                printer_data.append(printer_dict)
 
             # Create the data structure
             data = {"version": "1.0", "printers": printer_data}

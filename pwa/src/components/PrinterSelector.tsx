@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { usePrinterIPPersistence } from '../hooks/usePrinterIPPersistence';
+import { usePrinterMetadata } from '../hooks/usePrinterMetadata';
 import { printerEvents } from '../utils/printerEvents';
 import {
   AddPrinterRequest,
@@ -31,7 +32,32 @@ type PrinterModel = 'X1C' | 'X1' | 'P1P' | 'P1S' | 'A1' | 'A1-mini' | 'Unknown';
 // Legacy function: Name-based printer model detection
 // This is now used as a fallback when real model data from MQTT isn't available
 // The preferred approach is to use getEffectivePrinterModel() which uses real data
-const detectPrinterModel = (printerName: string): PrinterModel => {
+const detectPrinterModel = (
+  printerName: string,
+  serialNumber?: string
+): PrinterModel => {
+  // First try to detect from serial number (most reliable)
+  if (serialNumber && serialNumber.length >= 5) {
+    // Extract model code from positions 3-4 (0-indexed)
+    const modelCode = serialNumber.substring(3, 5);
+
+    // Map model codes according to Bambu Lab wiki
+    const serialModelMap: Record<string, PrinterModel> = {
+      '09': 'X1C', // X1 Carbon
+      '07': 'X1', // X1
+      '08': 'X1', // X1E (mapped to X1 for UI)
+      '03': 'P1P', // P1P
+      '04': 'P1S', // P1S
+      '01': 'A1-mini', // A1 mini
+      '02': 'A1', // A1
+    };
+
+    if (modelCode in serialModelMap) {
+      return serialModelMap[modelCode];
+    }
+  }
+
+  // Fall back to name-based detection
   const name = printerName.toLowerCase();
   if (name.includes('x1c') || name.includes('x1-carbon')) return 'X1C';
   if (name.includes('x1') && !name.includes('x1c')) return 'X1';
@@ -118,11 +144,31 @@ function PrinterSelector({
   // Initialize printer IP persistence hook
   const { saveIP } = usePrinterIPPersistence();
 
+  // Fetch real printer metadata
+  const { metadata: printerMetadata } = usePrinterMetadata(
+    currentPrinter?.ip || null
+  );
+
   // Load current printer configuration on component mount
   useEffect(() => {
     loadCurrentPrinter();
     loadAllPrinters();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Update current printer with real metadata when available
+  useEffect(() => {
+    if (
+      printerMetadata &&
+      currentPrinter &&
+      printerMetadata.ip === currentPrinter.ip
+    ) {
+      setCurrentPrinter(prev => ({
+        ...prev!,
+        real_model: printerMetadata.printer_model,
+        real_name: printerMetadata.printer_name,
+      }));
+    }
+  }, [printerMetadata]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Handle click outside dropdown to close it
   useEffect(() => {
@@ -304,14 +350,15 @@ function PrinterSelector({
 
       await setActivePrinter(request);
 
-      // Reload current printer configuration
-      await loadCurrentPrinter();
-
       // Clear the status message on success
       setStatusMessage('');
 
       // Emit printer change event to notify other components
+      // This will trigger useCurrentPrinter hook to reload
       printerEvents.emit();
+
+      // Don't reload current printer here - let the event handle it
+      // to avoid race conditions
     } catch (error) {
       setStatusMessage(`❌ Failed to switch to printer: ${error}`);
     } finally {
