@@ -197,7 +197,8 @@ class PrinterStorage:
                     "access_code": printer.access_code,
                     "serial_number": printer.serial_number,
                 }
-                # Only save canonical_id if it's explicitly set and different from generated
+                # Only save canonical_id if it's explicitly set and different
+                # from generated
                 if hasattr(printer, "canonical_id") and printer.canonical_id:
                     from .printer_config import generate_canonical_id
 

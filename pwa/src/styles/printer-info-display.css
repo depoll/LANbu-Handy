@@ -212,35 +212,35 @@
   .info-header {
     padding: 0.6rem 0.8rem;
   }
-  
+
   .info-header h3 {
     font-size: 0.95rem;
   }
-  
+
   .info-content {
     padding: 0.8rem;
   }
-  
+
   .info-grid {
     gap: 0.6rem;
   }
-  
+
   .info-item {
     flex-direction: column;
     align-items: flex-start;
     gap: 0.3rem;
     padding: 0.6rem 0;
   }
-  
+
   .info-label {
     min-width: auto;
     font-size: 0.85rem;
   }
-  
+
   .info-value {
     width: 100%;
   }
-  
+
   .info-value.ip {
     font-size: 0.8rem;
   }

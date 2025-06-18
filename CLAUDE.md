@@ -198,3 +198,4 @@ BAMBU_PRINTERS='[{"name":"X1C","ip":"192.168.1.100","access_code":"12345678"}]'
 - When possible, use the playwright mcp server rather than command line commands to test things in the browser. Use chromium with playwright.
 - You can find the Bambu MQTT API documented here: https://github.com/Doridian/OpenBambuAPI/blob/main/mqtt.md
 - You can find the mappings from bambu serial numbers to models here: https://wiki.bambulab.com/en/general/find-sn
+- don't commit with no-verify. Fix any failing precommits.

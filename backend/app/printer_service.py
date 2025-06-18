@@ -8,7 +8,6 @@ including G-code file uploads and basic error handling.
 import ftplib
 import json
 import logging
-import socket
 import ssl
 import threading
 import time
@@ -552,7 +551,6 @@ class PrinterService:
             publish_error = None
             response_data = None
             response_received = False
-            printer_model_detected = None
             no_ams_detected = False
             messages_received = 0
 
@@ -560,7 +558,8 @@ class PrinterService:
             response_event = threading.Event()
             no_ams_event = threading.Event()
 
-            # Connection limiting now handled by async cancellation in mqtt_async_patch.py
+            # Connection limiting now handled by async cancellation in
+            # mqtt_async_patch.py
 
             # Create MQTT client
             client = self._create_mqtt_client(printer_config)
@@ -591,7 +590,8 @@ class PrinterService:
                     logger.error(connection_error)
 
             def on_message(client, userdata, msg):
-                nonlocal response_data, response_received, printer_model_detected, no_ams_detected, messages_received, response_event, no_ams_event
+                nonlocal response_data, response_received
+                nonlocal no_ams_detected, messages_received
                 try:
                     # Parse the JSON response
                     payload = msg.payload.decode("utf-8")
@@ -604,14 +604,17 @@ class PrinterService:
 
                     # Log the raw response for debugging
                     logger.info(
-                        f"Raw MQTT response for AMS query (message #{messages_received}): {json.dumps(response_json, indent=2)}"
+                        f"Raw MQTT response for AMS query "
+                        f"(message #{messages_received}): "
+                        f"{json.dumps(response_json, indent=2)}"
                     )
 
                     # Check for AMS presence indicators
                     print_data = response_json.get("print", {})
 
                     # Check ams_exist_bits field - "0" means no AMS
-                    # This field can be in print.ams_exist_bits or print.ams.ams_exist_bits
+                    # This field can be in print.ams_exist_bits or
+                    # print.ams.ams_exist_bits
                     ams_exist_bits = print_data.get("ams_exist_bits", "")
                     if not ams_exist_bits and "ams" in print_data:
                         ams_data = print_data.get("ams", {})
@@ -626,7 +629,8 @@ class PrinterService:
                         no_ams_event.set()  # Signal the event
                         response_event.set()  # Also set response event
                         logger.info(
-                            f"Detected no AMS present (ams_exist_bits='0') for printer {printer_config.name}"
+                            f"Detected no AMS present (ams_exist_bits='0') "
+                            f"for printer {printer_config.name}"
                         )
 
                     # Check if AMS data exists but is empty
@@ -640,9 +644,7 @@ class PrinterService:
                                 response_received = True
                                 no_ams_event.set()  # Signal the event
                                 response_event.set()  # Also set response event
-                                logger.info(
-                                    f"Detected no AMS present (empty ams array)"
-                                )
+                                logger.info("Detected no AMS present (empty ams array)")
 
                     # Check if this message contains AMS data
                     # Bambu Lab printers send data in different structures:
@@ -663,7 +665,8 @@ class PrinterService:
                     else:
                         # Don't set response_received, keep waiting for AMS data
                         logger.debug(
-                            "Received MQTT message without AMS data, continuing to wait"
+                            "Received MQTT message without AMS data, "
+                            "continuing to wait"
                         )
 
                 except json.JSONDecodeError as e:
@@ -754,7 +757,8 @@ class PrinterService:
             start_time = time.time()
             last_message_count = 0
             logger.info(
-                f"Waiting for AMS response from {printer_config.name} (timeout: {timeout}s)"
+                f"Waiting for AMS response from {printer_config.name} "
+                f"(timeout: {timeout}s)"
             )
 
             while time.time() - start_time < effective_timeout:
@@ -762,13 +766,14 @@ class PrinterService:
                 if response_event.wait(0.1) or no_ams_event.wait(0.1):
                     break
 
-                # If we've received several messages but no AMS data, it might be a non-AMS printer
+                # If we've received several messages but no AMS data, it might
+                # be a non-AMS printer
                 if messages_received > last_message_count:
                     last_message_count = messages_received
                     if messages_received >= 5 and not no_ams_detected:
                         logger.info(
-                            f"Received {messages_received} messages without AMS data. "
-                            f"This printer might not have AMS support."
+                            f"Received {messages_received} messages without "
+                            "AMS data. This printer might not have AMS support."
                         )
                         # Reduce timeout to avoid long waits
                         elapsed_time = time.time() - start_time
@@ -778,17 +783,20 @@ class PrinterService:
                             effective_timeout = elapsed_time + 5
 
             logger.info(
-                f"AMS query loop exited: response_received={response_received}, no_ams_detected={no_ams_detected}, elapsed={time.time() - start_time:.1f}s"
+                f"AMS query loop exited: response_received={response_received}, "
+                f"no_ams_detected={no_ams_detected}, "
+                f"elapsed={time.time() - start_time:.1f}s"
             )
 
             if no_ams_detected:
                 # No AMS was detected from the response
                 logger.info(
-                    f"Printer {printer_config.name} does not have AMS installed or enabled"
+                    f"Printer {printer_config.name} does not have AMS "
+                    "installed or enabled"
                 )
                 return AMSStatusResult(
                     success=True,
-                    message=f"No AMS detected on printer {printer_config.name}",
+                    message=(f"No AMS detected on printer {printer_config.name}"),
                     ams_units=[],
                 )
 
@@ -798,13 +806,16 @@ class PrinterService:
                     f"No AMS status response received from printer "
                     f"{printer_config.name} within {elapsed_time:.1f} seconds. "
                     f"Received {messages_received} messages without AMS data. "
-                    f"This printer might not have AMS support."
+                    "This printer might not have AMS support."
                 )
                 return AMSStatusResult(
                     success=True,  # Changed to True - missing AMS is not an error
-                    message="No AMS data received - printer may not have AMS",
+                    message=("No AMS data received - printer may not have AMS"),
                     ams_units=[],  # Return empty list instead of error
-                    error_details=f"No AMS data after {elapsed_time:.1f} seconds ({messages_received} messages received)",
+                    error_details=(
+                        f"No AMS data after {elapsed_time:.1f} seconds "
+                        f"({messages_received} messages received)"
+                    ),
                 )
 
             # Parse the AMS data from the response
@@ -970,7 +981,8 @@ class PrinterService:
 
                     # Log the raw response for debugging
                     logger.info(
-                        f"Raw MQTT response from printer: {json.dumps(response_json, indent=2)}"
+                        f"Raw MQTT response from printer: "
+                        f"{json.dumps(response_json, indent=2)}"
                     )
 
                     # Bambu Lab printers send various status messages
@@ -1168,7 +1180,8 @@ class PrinterService:
                 if model_code in serial_model_map:
                     printer_model = serial_model_map[model_code]
                     logger.info(
-                        f"Detected printer model '{printer_model}' from serial number: {serial_number}"
+                        f"Detected printer model '{printer_model}' from "
+                        f"serial number: {serial_number}"
                     )
 
             # According to OpenBambuAPI, check module field as fallback

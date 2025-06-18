@@ -46,7 +46,7 @@ function PrinterStats({ printerId }: PrinterStatsProps) {
           total_print_time: 156780, // seconds
           print_count: 42,
         };
-        
+
         setStats(mockStats);
         setLastUpdate(new Date());
       } catch (error) {
@@ -59,42 +59,54 @@ function PrinterStats({ printerId }: PrinterStatsProps) {
     fetchStats();
     // Refresh stats every 30 seconds
     const interval = setInterval(fetchStats, 30000);
-    
+
     return () => clearInterval(interval);
   }, [printerId]);
 
   const formatTime = (seconds: number): string => {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
-    
+
     if (hours > 24) {
       const days = Math.floor(hours / 24);
       const remainingHours = hours % 24;
       return `${days}d ${remainingHours}h`;
     }
-    
+
     return `${hours}h ${minutes}m`;
   };
 
   const getStateIcon = (state?: string): string => {
     switch (state) {
-      case 'printing': return '🖨️';
-      case 'idle': return '✅';
-      case 'paused': return '⏸️';
-      case 'error': return '❌';
-      case 'maintenance': return '🔧';
-      default: return '❓';
+      case 'printing':
+        return '🖨️';
+      case 'idle':
+        return '✅';
+      case 'paused':
+        return '⏸️';
+      case 'error':
+        return '❌';
+      case 'maintenance':
+        return '🔧';
+      default:
+        return '❓';
     }
   };
 
   const getStateClass = (state?: string): string => {
     switch (state) {
-      case 'printing': return 'printing';
-      case 'idle': return 'idle';
-      case 'paused': return 'paused';
-      case 'error': return 'error';
-      case 'maintenance': return 'maintenance';
-      default: return 'unknown';
+      case 'printing':
+        return 'printing';
+      case 'idle':
+        return 'idle';
+      case 'paused':
+        return 'paused';
+      case 'error':
+        return 'error';
+      case 'maintenance':
+        return 'maintenance';
+      default:
+        return 'unknown';
     }
   };
 
@@ -125,14 +137,19 @@ function PrinterStats({ printerId }: PrinterStatsProps) {
           </span>
         )}
       </div>
-      
+
       <div className="stats-content">
         {/* Printer State */}
         <div className="state-section">
-          <div className={`state-indicator ${getStateClass(stats.printer_state)}`}>
-            <span className="state-icon">{getStateIcon(stats.printer_state)}</span>
+          <div
+            className={`state-indicator ${getStateClass(stats.printer_state)}`}
+          >
+            <span className="state-icon">
+              {getStateIcon(stats.printer_state)}
+            </span>
             <span className="state-text">
-              {stats.printer_state?.charAt(0).toUpperCase() + stats.printer_state?.slice(1) || 'Unknown'}
+              {stats.printer_state?.charAt(0).toUpperCase() +
+                stats.printer_state?.slice(1) || 'Unknown'}
             </span>
           </div>
         </div>
@@ -146,11 +163,14 @@ function PrinterStats({ printerId }: PrinterStatsProps) {
               <span className="temp-value">
                 {stats.nozzle_temp}°C
                 {stats.nozzle_target > 0 && (
-                  <span className="temp-target"> / {stats.nozzle_target}°C</span>
+                  <span className="temp-target">
+                    {' '}
+                    / {stats.nozzle_target}°C
+                  </span>
                 )}
               </span>
             </div>
-            
+
             <div className="temp-item">
               <span className="temp-label">Bed:</span>
               <span className="temp-value">
@@ -160,7 +180,7 @@ function PrinterStats({ printerId }: PrinterStatsProps) {
                 )}
               </span>
             </div>
-            
+
             {stats.chamber_temp !== undefined && (
               <div className="temp-item">
                 <span className="temp-label">Chamber:</span>
@@ -179,20 +199,26 @@ function PrinterStats({ printerId }: PrinterStatsProps) {
               {stats.current_job.progress !== undefined && (
                 <div className="job-progress">
                   <div className="progress-bar">
-                    <div 
+                    <div
                       className="progress-fill"
                       style={{ width: `${stats.current_job.progress}%` }}
                     />
                   </div>
-                  <span className="progress-text">{stats.current_job.progress}%</span>
+                  <span className="progress-text">
+                    {stats.current_job.progress}%
+                  </span>
                 </div>
               )}
               <div className="job-times">
                 {stats.current_job.time_elapsed !== undefined && (
-                  <span>Elapsed: {formatTime(stats.current_job.time_elapsed)}</span>
+                  <span>
+                    Elapsed: {formatTime(stats.current_job.time_elapsed)}
+                  </span>
                 )}
                 {stats.current_job.time_remaining !== undefined && (
-                  <span>Remaining: {formatTime(stats.current_job.time_remaining)}</span>
+                  <span>
+                    Remaining: {formatTime(stats.current_job.time_remaining)}
+                  </span>
                 )}
               </div>
             </div>
@@ -209,11 +235,13 @@ function PrinterStats({ printerId }: PrinterStatsProps) {
                 <span className="lifetime-value">{stats.print_count}</span>
               </div>
             )}
-            
+
             {stats.total_print_time !== undefined && (
               <div className="lifetime-item">
                 <span className="lifetime-label">Total Print Time:</span>
-                <span className="lifetime-value">{formatTime(stats.total_print_time)}</span>
+                <span className="lifetime-value">
+                  {formatTime(stats.total_print_time)}
+                </span>
               </div>
             )}
           </div>

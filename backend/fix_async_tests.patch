@@ -1,0 +1,184 @@
+--- a/backend/tests/test_main.py
++++ b/backend/tests/test_main.py
+@@ -1,4 +1,5 @@
+ """Unit tests for the LANbu Handy backend API."""
++import asyncio
+
+ import tempfile
+ from pathlib import Path
+@@ -900,14 +901,16 @@ class TestAMSStatusEndpoint:
+     """Test cases for the AMS status endpoint."""
+
+     @patch("app.main.config")
+-    def test_ams_status_successful(self, mock_config):
++    @pytest.mark.asyncio
++    async def test_ams_status_successful(self, mock_config):
+         """Test successful AMS status query."""
+         from app.config import PrinterConfig
+         from app.printer_service import AMSFilament, AMSStatusResult, AMSUnit
+
+         # Mock configuration object
+         mock_config.is_printer_configured.return_value = True
+         test_printer = PrinterConfig(
+-            name="test-printer", ip="192.168.1.100", access_code="12345678"
++            name="test-printer", ip="192.168.1.100", access_code="12345678",
++            serial_number="00M00TEST000000"
+         )
+         mock_config.get_printer_by_name.return_value = test_printer
+@@ -920,13 +923,15 @@ class TestAMSStatusEndpoint:
+         ams_unit = AMSUnit(unit_id=0, filaments=[filament1, filament2])
+
+         # Mock the printer service query
+-        with patch("app.main.printer_service.query_ams_status") as mock_query:
++        with patch("app.main.printer_service.query_ams_status_async") as mock_query:
+             mock_query.return_value = AMSStatusResult(
+                 success=True,
+                 message="AMS status retrieved successfully",
+                 ams_units=[ams_unit],
+             )
+
++            # Make it an async mock
++            mock_query.return_value = asyncio.coroutine(lambda: mock_query.return_value)()
++
+             response = client.get("/api/printer/test-printer/ams-status")
+
+         assert response.status_code == 200
+@@ -945,7 +950,8 @@ class TestAMSStatusEndpoint:
+         assert filament_data["material_id"] == "BAMBU_PLA_RED"
+
+     @patch("app.main.config")
+-    def test_ams_status_printer_not_found(self, mock_config):
++    @pytest.mark.asyncio
++    async def test_ams_status_printer_not_found(self, mock_config):
+         """Test AMS status query with printer not found."""
+         # Mock configuration object
+         mock_config.is_printer_configured.return_value = True
+@@ -958,14 +964,16 @@ class TestAMSStatusEndpoint:
+         assert "not found" in response.json()["detail"].lower()
+
+     @patch("app.main.config")
+-    def test_ams_status_default_printer(self, mock_config):
++    @pytest.mark.asyncio
++    async def test_ams_status_default_printer(self, mock_config):
+         """Test AMS status query with default printer."""
+         from app.config import PrinterConfig
+         from app.printer_service import AMSStatusResult
+
+         # Mock configuration object
+         mock_config.is_printer_configured.return_value = True
+         test_printer = PrinterConfig(
+-            name="default-printer", ip="192.168.1.100", access_code="12345678"
++            name="default-printer", ip="192.168.1.100", access_code="12345678",
++            serial_number="00M00TEST000001"
+         )
+         mock_config.get_default_printer.return_value = test_printer
+
+@@ -973,12 +981,14 @@ class TestAMSStatusEndpoint:
+         mock_config.get_printer_by_name.return_value = None
+
+         # Mock the printer service query
+-        with patch("app.main.printer_service.query_ams_status") as mock_query:
++        with patch("app.main.printer_service.query_ams_status_async") as mock_query:
+             mock_query.return_value = AMSStatusResult(
+                 success=True,
+                 message="No AMS detected",
+                 ams_units=[],
+             )
++            # Make it an async mock
++            mock_query.return_value = asyncio.coroutine(lambda: mock_query.return_value)()
+
+             # Query with empty printer ID (should use default)
+             response = client.get("/api/printer//ams-status")
+@@ -990,16 +1000,18 @@ class TestAMSStatusEndpoint:
+         assert data["success"] is True
+
+     @patch("app.main.config")
+-    def test_ams_status_query_failure(self, mock_config):
++    @pytest.mark.asyncio
++    async def test_ams_status_query_failure(self, mock_config):
+         """Test AMS status query failure."""
+         from app.config import PrinterConfig
+         from app.printer_service import AMSStatusResult
+
+         # Mock configuration object
+         mock_config.is_printer_configured.return_value = True
+         test_printer = PrinterConfig(
+-            name="test-printer", ip="192.168.1.100", access_code="12345678"
++            name="test-printer", ip="192.168.1.100", access_code="12345678",
++            serial_number="00M00TEST000002"
+         )
+         mock_config.get_printer_by_name.return_value = test_printer
+
+         # Mock the printer service query to return failure
+-        with patch("app.main.printer_service.query_ams_status") as mock_query:
++        with patch("app.main.printer_service.query_ams_status_async") as mock_query:
+@@ -1007,6 +1019,8 @@ class TestAMSStatusEndpoint:
+                 success=False,
+                 message="Failed to connect to printer",
+             )
++            # Make it an async mock
++            mock_query.return_value = asyncio.coroutine(lambda: mock_query.return_value)()
+
+             response = client.get("/api/printer/test-printer/ams-status")
+
+@@ -1016,7 +1030,8 @@ class TestAMSStatusEndpoint:
+         assert data["success"] is False
+
+     @patch("app.main.config")
+-    def test_ams_status_mqtt_exception(self, mock_config):
++    @pytest.mark.asyncio
++    async def test_ams_status_mqtt_exception(self, mock_config):
+         """Test AMS status query with MQTT exception."""
+         from app.config import PrinterConfig
+         from app.printer_service import PrinterMQTTError
+@@ -1024,11 +1039,15 @@ class TestAMSStatusEndpoint:
+         # Mock configuration object
+         mock_config.is_printer_configured.return_value = True
+         test_printer = PrinterConfig(
+-            name="test-printer", ip="192.168.1.100", access_code="12345678"
++            name="test-printer", ip="192.168.1.100", access_code="12345678",
++            serial_number="00M00TEST000003"
+         )
+         mock_config.get_printer_by_name.return_value = test_printer
+
+         # Mock the printer service query to raise exception
+-        with patch("app.main.printer_service.query_ams_status") as mock_query:
+-            mock_query.side_effect = PrinterMQTTError("Connection timeout")
++        with patch("app.main.printer_service.query_ams_status_async") as mock_query:
++            # Create an async function that raises the exception
++            async def raise_error(*args, **kwargs):
++                raise PrinterMQTTError("Connection timeout")
++
++            mock_query.side_effect = raise_error
+
+             response = client.get("/api/printer/test-printer/ams-status")
+--- a/backend/tests/test_printer_service.py
++++ b/backend/tests/test_printer_service.py
+@@ -1,5 +1,6 @@
+ """Unit tests for printer service functionality."""
+
++import asyncio
+ import json
+ from pathlib import Path
+ from unittest.mock import MagicMock, Mock, patch
+@@ -366,7 +367,8 @@ class TestStartPrint:
+
+ class TestAMSQuery:
+     """Test cases for AMS query functionality."""
+
+-    def test_query_ams_status_successful(self):
++    @pytest.mark.asyncio
++    async def test_query_ams_status_successful(self):
+         """Test successful AMS status query."""
+         from app.printer_config import PrinterConfig
+         from app.printer_service import PrinterService
+@@ -489,7 +491,8 @@ class TestAMSQuery:
+         assert ams_unit.filaments[0].color == "#FF0000FF"
+         assert ams_unit.filaments[0].material_id is None
+
+-    def test_query_ams_status_timeout(self):
++    @pytest.mark.asyncio
++    async def test_query_ams_status_timeout(self):
+         """Test AMS status query timeout."""
+         from app.printer_config import PrinterConfig
+         from app.printer_service import PrinterService

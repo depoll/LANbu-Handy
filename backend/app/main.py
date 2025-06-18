@@ -18,34 +18,40 @@ logging.basicConfig(
 )
 
 # Import and apply async MQTT patch before other imports
-from app.mqtt_async_patch_v3 import add_async_support_to_printer_service
+from app.mqtt_async_patch_v3 import add_async_support_to_printer_service  # noqa: E402
 
 add_async_support_to_printer_service()
 
-from app.config import get_config
-from app.filament_matching_service import FilamentMatchingService
-from app.job_orchestration import (
+from app.config import get_config  # noqa: E402
+from app.filament_matching_service import FilamentMatchingService  # noqa: E402
+from app.job_orchestration import (  # noqa: E402
     download_model_step,
     slice_model_step,
     start_print_step,
     upload_gcode_step,
 )
-from app.model_service import (
+from app.model_service import (  # noqa: E402
     ModelDownloadError,
     ModelService,
     ModelValidationError,
 )
-from app.printer_config import PrinterConfig
-from app.printer_service import (
+from app.printer_config import PrinterConfig  # noqa: E402
+from app.printer_service import (  # noqa: E402
     PrinterCommunicationError,
     PrinterMQTTError,
     PrinterService,
 )
-from app.slice_progress_service import slice_progress_service
-from app.slicer_service import slice_model
-from app.threemf_repair_service import ThreeMFRepairError, ThreeMFRepairService
-from app.thumbnail_service import ThumbnailGenerationError, ThumbnailService
-from app.utils import (
+from app.slice_progress_service import slice_progress_service  # noqa: E402
+from app.slicer_service import slice_model  # noqa: E402
+from app.threemf_repair_service import (  # noqa: E402
+    ThreeMFRepairError,
+    ThreeMFRepairService,
+)
+from app.thumbnail_service import (  # noqa: E402
+    ThumbnailGenerationError,
+    ThumbnailService,
+)
+from app.utils import (  # noqa: E402
     build_slicing_options_from_config,
     find_gcode_file,
     get_default_slicing_options,
@@ -53,10 +59,10 @@ from app.utils import (
     handle_model_errors,
     validate_ip_or_hostname,
 )
-from fastapi import FastAPI, File, HTTPException, UploadFile
-from fastapi.responses import FileResponse, StreamingResponse
-from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from fastapi import FastAPI, File, HTTPException, UploadFile  # noqa: E402
+from fastapi.responses import FileResponse, StreamingResponse  # noqa: E402
+from fastapi.staticfiles import StaticFiles  # noqa: E402
+from pydantic import BaseModel  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -2040,12 +2046,15 @@ async def get_ams_status(printer_id: str):
             # List available printers for helpful error message
             available_printers = [p.name for p in config.get_printers()]
             logger.warning(
-                f"Printer '{printer_id}' not found. Available printers: {available_printers}"
+                f"Printer '{printer_id}' not found. "
+                f"Available printers: {available_printers}"
             )
             raise HTTPException(
                 status_code=404,
-                detail=f"Printer '{printer_id}' not found. "
-                f"Available printers: {available_printers}",
+                detail=(
+                    f"Printer '{printer_id}' not found. Available printers: "
+                    f"{available_printers}"
+                ),
             )
 
         # Query AMS status
@@ -2131,8 +2140,10 @@ async def get_printer_status_debug(printer_id: str):
             available_printers = [p.name for p in config.get_printers()]
             raise HTTPException(
                 status_code=404,
-                detail=f"Printer '{printer_id}' not found. "
-                f"Available printers: {available_printers}",
+                detail=(
+                    f"Printer '{printer_id}' not found. Available printers: "
+                    f"{available_printers}"
+                ),
             )
 
         # Create a custom printer service that captures raw data
@@ -2141,7 +2152,6 @@ async def get_printer_status_debug(printer_id: str):
         raw_responses = []
 
         def capture_raw_message(client, userdata, msg):
-            nonlocal raw_responses
             try:
                 payload = msg.payload.decode("utf-8")
                 data = json.loads(payload)
@@ -2261,12 +2271,15 @@ async def get_printer_status(printer_id: str):
             # List available printers for helpful error message
             available_printers = [p.name for p in config.get_printers()]
             logger.warning(
-                f"Printer '{printer_id}' not found. Available printers: {available_printers}"
+                f"Printer '{printer_id}' not found. "
+                f"Available printers: {available_printers}"
             )
             raise HTTPException(
                 status_code=404,
-                detail=f"Printer '{printer_id}' not found. "
-                f"Available printers: {available_printers}",
+                detail=(
+                    f"Printer '{printer_id}' not found. Available printers: "
+                    f"{available_printers}"
+                ),
             )
 
         # Query printer status
@@ -2440,11 +2453,13 @@ async def set_active_printer(request: SetActivePrinterRequest):
         # Get the current active printer before switching
         current_active = config.get_active_printer()
 
-        # IMPORTANT: Cancel any active MQTT operations for the OLD printer before switching
-        # This prevents hanging issues when switching between printers
+        # IMPORTANT: Cancel any active MQTT operations for the OLD printer
+        # before switching. This prevents hanging issues when switching
+        # between printers
         if current_active and current_active.ip != request.ip:
             logger.debug(
-                f"Cancelling active MQTT operations for old printer: {current_active.ip}"
+                f"Cancelling active MQTT operations for old printer: "
+                f"{current_active.ip}"
             )
             printer_service.cancel_printer_operations(current_active.ip)
 

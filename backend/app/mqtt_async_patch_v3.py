@@ -50,7 +50,8 @@ def cancel_printer_mqtt_operations(printer_ip: str):
             # Clear the futures for this printer
             _active_futures[printer_ip].clear()
             logger.info(
-                f"Cancelled {len(futures)} active MQTT operations for printer {printer_ip}"
+                f"Cancelled {len(futures)} active MQTT operations for "
+                f"printer {printer_ip}"
             )
         else:
             logger.debug(
@@ -63,7 +64,8 @@ def cancel_printer_mqtt_operations(printer_ip: str):
 
 
 async def ensure_connection_delay(printer_ip: str):
-    """Ensure minimum delay since last disconnect to allow printer MQTT broker to reset."""
+    """Ensure minimum delay since last disconnect to allow printer MQTT broker
+    to reset."""
     with _disconnect_lock:
         last_disconnect = _last_disconnect_time.get(printer_ip, 0)
 
@@ -133,7 +135,8 @@ async def run_mqtt_query_async(
         # Check if this was due to a cancellation
         if "cancelled" in str(e).lower():
             raise PrinterMQTTError("Operation cancelled")
-        # For other exceptions, check if it's a connection issue that might benefit from retry
+        # For other exceptions, check if it's a connection issue that might
+        # benefit from retry
         error_str = str(e).lower()
         if any(
             x in error_str for x in ["connection", "refused", "reset", "broken pipe"]
@@ -175,7 +178,8 @@ def add_async_support_to_printer_service():
             # If it's a cancellation or timeout, try to clean up the connection
             if "cancelled" in str(e).lower() or "timeout" in str(e).lower():
                 logger.debug(
-                    f"MQTT operation failed for {printer_config.ip}, marking for cleanup"
+                    f"MQTT operation failed for {printer_config.ip}, "
+                    f"marking for cleanup"
                 )
                 with _disconnect_lock:
                     _last_disconnect_time[printer_config.ip] = time.time()

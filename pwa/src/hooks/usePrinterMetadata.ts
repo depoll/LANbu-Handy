@@ -45,27 +45,33 @@ export function usePrinterMetadata(printerId: string | null) {
         // Properly encode the printer name for the URL
         const encodedPrinterId = encodeURIComponent(printerId);
         const response = await fetch(`/api/printer/${encodedPrinterId}/status`);
-        
+
         if (!response.ok) {
-          throw new Error(`Failed to fetch printer status: ${response.statusText}`);
+          throw new Error(
+            `Failed to fetch printer status: ${response.statusText}`
+          );
         }
 
         const data: PrinterStatusResponse = await response.json();
-        
+
         if (data.success && (data.printer_model || data.printer_name)) {
           const newMetadata: PrinterMetadata = {
             printer_model: data.printer_model,
             printer_name: data.printer_name,
             ip: printerId,
           };
-          
+
           // Update cache
           metadataCache.set(printerId, newMetadata);
           setMetadata(newMetadata);
         }
       } catch (err) {
         console.error('Error fetching printer metadata:', err);
-        setError(err instanceof Error ? err.message : 'Failed to fetch printer metadata');
+        setError(
+          err instanceof Error
+            ? err.message
+            : 'Failed to fetch printer metadata'
+        );
       } finally {
         setIsLoading(false);
       }
