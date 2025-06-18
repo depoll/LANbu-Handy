@@ -35,23 +35,25 @@ global.confirm = mockConfirm;
 // Helper function to handle common API endpoints
 const handleCommonEndpoints = (url: string) => {
   if (url.includes('/api/printer/') && url.includes('/status')) {
+    // Extract printer ID from URL (which is the IP address in this component)
+    const match = url.match(/\/api\/printer\/([^/]+)\/status/);
+    const printerId = match ? decodeURIComponent(match[1]) : '';
+
+    // Map IP addresses to printer names
+    const printerMap: Record<string, string> = {
+      '192.168.1.100': 'Test Printer 1',
+      '192.168.1.101': 'Test Printer 2',
+      '192.168.1.102': 'Test Printer 3',
+    };
+
     return Promise.resolve({
       ok: true,
       json: () =>
         Promise.resolve({
           success: true,
+          message: 'Success',
           printer_model: 'X1C',
-          printer_name: 'Test Printer',
-        }),
-    });
-  }
-  if (url.includes('/api/printer/') && url.includes('/metadata')) {
-    return Promise.resolve({
-      ok: true,
-      json: () =>
-        Promise.resolve({
-          printer_model: 'X1C',
-          printer_name: 'Test Printer',
+          printer_name: printerMap[printerId] || 'Test Printer',
         }),
     });
   }

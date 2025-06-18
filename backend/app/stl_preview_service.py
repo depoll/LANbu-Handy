@@ -7,7 +7,7 @@ This provides a headless alternative to Bambu Studio CLI for thumbnail generatio
 
 import logging
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Union
 
 # Try to import matplotlib with proper error handling
 try:
@@ -49,8 +49,8 @@ class STLPreviewService:
 
     def generate_preview(
         self,
-        stl_file_path: Path,
-        output_path: Optional[Path] = None,
+        stl_file_path: Union[Path, str],
+        output_path: Optional[Union[Path, str]] = None,
         image_size: tuple = (800, 600),
         dpi: int = 100,
     ) -> Path:
@@ -76,11 +76,16 @@ class STLPreviewService:
                 "STL preview generation requires matplotlib and dependencies"
             )
 
+        # Convert to Path if string
+        stl_file_path = Path(stl_file_path)
+
         if not stl_file_path.exists():
             raise FileNotFoundError(f"STL file not found: {stl_file_path}")
 
         if output_path is None:
             output_path = stl_file_path.with_suffix(".png")
+        else:
+            output_path = Path(output_path)
 
         try:
             # Load the STL mesh

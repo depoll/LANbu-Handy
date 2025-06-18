@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   PlateInfo,
   ConfiguredSliceRequest,
@@ -32,6 +32,16 @@ export function SequentialPlateSliceTracker({
     new Set()
   );
   const [isSlicingActive, setIsSlicingActive] = useState(false);
+  const isMountedRef = useRef(true);
+  const isSlicingActiveRef = useRef(false);
+
+  // Track unmount
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+      isSlicingActiveRef.current = false;
+    };
+  }, []);
 
   // Determine which plates will be sliced
   const platesToSlice =
@@ -40,8 +50,9 @@ export function SequentialPlateSliceTracker({
       : plates;
 
   const startSequentialSlicing = useCallback(async () => {
-    if (isSlicingActive) return;
+    if (isSlicingActiveRef.current) return;
 
+    isSlicingActiveRef.current = true;
     setIsSlicingActive(true);
     setCompletedPlates(new Set());
     setCurrentPlateIndex(0);
@@ -69,15 +80,24 @@ export function SequentialPlateSliceTracker({
 
       const result: SliceResponse = await response.json();
 
+      // Check if component is still mounted before updating state
+      if (!isMountedRef.current) return;
+
       if (result.success && result.updated_plates) {
+        // Calculate the plate indices once to avoid recreating array
+        const plateIndices =
+          selectedPlateIndex !== null
+            ? [selectedPlateIndex]
+            : plates.map(p => p.index);
+
         // Update plates with new estimates
         if (onPlatesUpdate) {
           onPlatesUpdate(result.updated_plates as PlateInfo[]);
         }
 
         // Mark all plates as complete
-        setCompletedPlates(new Set(platesToSlice.map(p => p.index)));
-        setCurrentPlateIndex(platesToSlice.length);
+        setCompletedPlates(new Set(plateIndices));
+        setCurrentPlateIndex(plateIndices.length);
 
         if (onSliceComplete) {
           onSliceComplete();
@@ -86,15 +106,17 @@ export function SequentialPlateSliceTracker({
     } catch (error) {
       console.warn('Sequential slice error:', error);
     } finally {
-      setIsSlicingActive(false);
+      if (isMountedRef.current) {
+        setIsSlicingActive(false);
+        isSlicingActiveRef.current = false;
+      }
     }
   }, [
-    isSlicingActive,
     currentFileId,
     filamentMappings,
     selectedBuildPlate,
     selectedPlateIndex,
-    platesToSlice,
+    plates,
     onPlatesUpdate,
     onSliceComplete,
   ]);
@@ -103,25 +125,24 @@ export function SequentialPlateSliceTracker({
   useEffect(() => {
     if (
       isSlicing &&
-      !isSlicingActive &&
+      !isSlicingActiveRef.current &&
       currentFileId &&
-      platesToSlice.length > 0
+      plates.length > 0
     ) {
       startSequentialSlicing();
     }
-  }, [
-    isSlicing,
-    isSlicingActive,
-    currentFileId,
-    platesToSlice.length,
-    startSequentialSlicing,
-  ]);
+  }, [isSlicing, currentFileId, plates.length, startSequentialSlicing]);
 
   // Simulate plate-by-plate progress for visual feedback
   useEffect(() => {
     if (!isSlicingActive || platesToSlice.length === 0) return;
 
     const interval = setInterval(() => {
+      if (!isMountedRef.current) {
+        clearInterval(interval);
+        return;
+      }
+
       setCurrentPlateIndex(prev => {
         const next = prev + 1;
         if (next <= platesToSlice.length) {
