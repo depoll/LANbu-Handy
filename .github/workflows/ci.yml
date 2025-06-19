@@ -145,7 +145,6 @@ jobs:
           cache-from: |
             type=registry,ref=ghcr.io/${{ steps.repo.outputs.name }}:build-cache-${{ steps.cache.outputs.branch }}-${{ matrix.arch }}
             type=registry,ref=ghcr.io/${{ steps.repo.outputs.name }}:build-cache-main-${{ matrix.arch }}
-          cache-to: type=registry,ref=ghcr.io/${{ steps.repo.outputs.name }}:build-cache-${{ steps.cache.outputs.branch }}-${{ matrix.arch }},mode=max
 
   build-docker-images:
     runs-on: ${{ matrix.runner }}
