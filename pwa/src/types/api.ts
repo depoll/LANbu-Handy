@@ -61,8 +61,9 @@ export interface ModelSubmissionResponse {
 // Filament Mapping and Configuration Types
 export interface FilamentMapping {
   filament_index: number; // Index in the model's filament requirements
-  ams_unit_id: number;
-  ams_slot_id: number;
+  ams_unit_id?: number; // Optional for external spool
+  ams_slot_id?: number; // Optional for external spool
+  use_external_spool?: boolean; // True when using external spool instead of AMS
 }
 
 export interface SliceRequest {
@@ -195,8 +196,9 @@ export interface FilamentMatchRequest {
 
 export interface FilamentMatchResult {
   requirement_index: number;
-  ams_unit_id: number;
-  ams_slot_id: number;
+  ams_unit_id?: number; // Optional for external spool
+  ams_slot_id?: number; // Optional for external spool
+  use_external_spool?: boolean; // True when recommending external spool
   match_quality: string; // "perfect", "type_only", "fallback", "none"
   confidence: number;
 }

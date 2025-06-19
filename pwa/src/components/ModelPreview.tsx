@@ -644,7 +644,12 @@ function getModelColor(
       m => m.filament_index === filamentIndex
     );
     if (mapping) {
-      // For now, use a simple color mapping based on AMS slot
+      // For external spool, use a generic gray color
+      if (mapping.use_external_spool) {
+        return 0x808080; // Gray for external spool
+      }
+      
+      // For AMS mapping, use a simple color mapping based on AMS slot
       // This could be enhanced to query actual AMS colors
       const colors = [
         0xff6b6b, // Red
@@ -656,7 +661,10 @@ function getModelColor(
         0xffa8a8, // Pink
         0x81ecec, // Cyan
       ];
-      return colors[mapping.ams_slot_id % colors.length];
+      
+      if (mapping.ams_slot_id !== undefined) {
+        return colors[mapping.ams_slot_id % colors.length];
+      }
     }
   }
 

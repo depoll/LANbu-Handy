@@ -18,13 +18,14 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class FilamentMatch:
-    """Represents a suggested mapping between model requirement and AMS filament."""
+    """Represents a suggested mapping between model requirement and filament source."""
 
     requirement_index: int  # Index in the model's filament requirements
-    ams_unit_id: int
-    ams_slot_id: int
-    match_quality: str  # "perfect", "type_only", "fallback", "none"
-    confidence: float  # 0.0 to 1.0
+    ams_unit_id: Optional[int] = None  # Optional for external spool
+    ams_slot_id: Optional[int] = None  # Optional for external spool
+    use_external_spool: bool = False  # True when recommending external spool
+    match_quality: str = "none"  # "perfect", "type_only", "fallback", "none"
+    confidence: float = 0.0  # 0.0 to 1.0
     ams_filament: Optional[AMSFilament] = None
 
 
@@ -77,10 +78,10 @@ class FilamentMatchingService:
         Returns:
             FilamentMatchingResult with suggested mappings
         """
-        if not ams_status.success or not ams_status.ams_units:
+        if not ams_status.success:
             return FilamentMatchingResult(
                 success=False,
-                message="AMS status not available or no AMS units found",
+                message="AMS status not available",
                 matches=[],
                 error_details="Cannot match filaments without valid AMS status",
             )
@@ -93,21 +94,50 @@ class FilamentMatchingService:
                 error_details="Model has no filament requirements to match",
             )
 
+        # Handle case where no AMS units are available (use external spool for all)
+        if not ams_status.ams_units or len(ams_status.ams_units) == 0:
+            logger.info("No AMS units available - suggesting external spool for all requirements")
+            external_matches = []
+            for req_index in range(requirements.filament_count):
+                external_match = FilamentMatch(
+                    requirement_index=req_index,
+                    use_external_spool=True,
+                    match_quality="fallback",
+                    confidence=0.5,  # Moderate confidence when AMS not available
+                )
+                external_matches.append(external_match)
+            
+            return FilamentMatchingResult(
+                success=True,
+                message=f"No AMS units available - using external spool for all {requirements.filament_count} requirements",
+                matches=external_matches,
+            )
+
         # Get all available AMS filaments
         available_filaments = self._get_all_ams_filaments(ams_status.ams_units)
 
+        # If no AMS filaments are available, suggest external spool for all requirements
         if not available_filaments:
+            logger.info("No AMS filaments available - suggesting external spool for all requirements")
+            external_matches = []
+            for req_index in range(requirements.filament_count):
+                external_match = FilamentMatch(
+                    requirement_index=req_index,
+                    use_external_spool=True,
+                    match_quality="fallback",
+                    confidence=0.5,  # Moderate confidence when AMS not available
+                )
+                external_matches.append(external_match)
+            
             return FilamentMatchingResult(
-                success=False,
-                message="No filaments found in AMS units",
-                matches=[],
-                error_details="AMS units contain no loaded filaments",
+                success=True,
+                message=f"No AMS filaments available - using external spool for all {requirements.filament_count} requirements",
+                matches=external_matches,
             )
 
         # Perform the matching
         matches = []
         used_slots = set()  # Track used AMS slots to avoid double assignment
-        unmatched_requirements = []
 
         for req_index in range(requirements.filament_count):
             req_type = (
@@ -129,28 +159,38 @@ class FilamentMatchingService:
                 # Update the requirement index for this match
                 best_match.requirement_index = req_index
                 matches.append(best_match)
-                used_slots.add((best_match.ams_unit_id, best_match.ams_slot_id))
+                if not best_match.use_external_spool:
+                    used_slots.add((best_match.ams_unit_id, best_match.ams_slot_id))
             else:
-                unmatched_requirements.append(req_index)
+                # If no AMS match found, offer external spool as fallback
+                external_match = FilamentMatch(
+                    requirement_index=req_index,
+                    use_external_spool=True,
+                    match_quality="fallback",
+                    confidence=0.3,  # Lower confidence for external spool fallback
+                )
+                matches.append(external_match)
+                logger.info(f"Using external spool fallback for requirement {req_index}")
 
-        success = len(matches) > 0
-        message = (
-            f"Matched {len(matches)} of {requirements.filament_count} "
-            "required filaments"
-        )
-
-        if unmatched_requirements:
-            message += (
-                f". {len(unmatched_requirements)} requirements could not be matched."
+        # Since we now always provide either AMS or external spool matches, 
+        # all requirements should be matched
+        success = len(matches) == requirements.filament_count
+        ams_matches = sum(1 for m in matches if not m.use_external_spool)
+        external_matches = sum(1 for m in matches if m.use_external_spool)
+        
+        if external_matches > 0:
+            message = (
+                f"Matched {ams_matches} requirements to AMS, "
+                f"{external_matches} to external spool"
             )
+        else:
+            message = f"Matched all {ams_matches} requirements to AMS"
 
         return FilamentMatchingResult(
             success=success,
             message=message,
             matches=matches,
-            unmatched_requirements=(
-                unmatched_requirements if unmatched_requirements else None
-            ),
+            unmatched_requirements=None,  # Always None since we provide external spool fallback
         )
 
     def _get_all_ams_filaments(

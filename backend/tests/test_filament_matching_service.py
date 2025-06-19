@@ -262,7 +262,7 @@ class TestErrorHandling:
         assert len(result.matches) == 0
 
     def test_empty_ams_units(self, service):
-        """Test handling of empty AMS units."""
+        """Test handling of empty AMS units - should use external spool."""
         empty_status = AMSStatusResult(
             success=True, message="AMS status retrieved", ams_units=[]
         )
@@ -273,11 +273,13 @@ class TestErrorHandling:
 
         result = service.match_filaments(requirements, empty_status)
 
-        assert result.success is False
-        assert "no AMS units found" in result.message
+        assert result.success is True  # Should succeed with external spool
+        assert "No AMS units available" in result.message
+        assert len(result.matches) == 1
+        assert result.matches[0].use_external_spool is True
 
     def test_no_loaded_filaments(self, service):
-        """Test handling of AMS units with no loaded filaments."""
+        """Test handling of AMS units with no loaded filaments - should use external spool."""
         empty_unit = AMSUnit(unit_id=0, filaments=[])
         empty_status = AMSStatusResult(
             success=True, message="AMS status retrieved", ams_units=[empty_unit]
@@ -289,8 +291,10 @@ class TestErrorHandling:
 
         result = service.match_filaments(requirements, empty_status)
 
-        assert result.success is False
-        assert "No filaments found in AMS units" in result.message
+        assert result.success is True  # Should succeed with external spool
+        assert "external spool" in result.message.lower()
+        assert len(result.matches) == 1
+        assert result.matches[0].use_external_spool is True
 
     def test_no_requirements(self, service, simple_ams_status):
         """Test handling of empty filament requirements."""
@@ -304,7 +308,7 @@ class TestErrorHandling:
         assert "No filament requirements specified" in result.message
 
     def test_unmatched_requirements(self, service, simple_ams_status):
-        """Test handling when some requirements can't be matched."""
+        """Test handling when some requirements can't be matched - should use external spool for unmatched."""
         requirements = FilamentRequirement(
             filament_count=3,
             filament_types=["PLA", "TPU", "WOOD"],  # TPU and WOOD not available
@@ -313,10 +317,23 @@ class TestErrorHandling:
 
         result = service.match_filaments(requirements, simple_ams_status)
 
-        assert result.success is True  # At least one match found
-        assert len(result.matches) == 1  # Only PLA should match
-        assert result.unmatched_requirements is not None
-        assert len(result.unmatched_requirements) == 2
+        assert result.success is True  # All requirements matched (AMS + external)
+        assert len(result.matches) == 3  # All requirements have matches
+        
+        # First should be AMS match (PLA)
+        pla_match = next(m for m in result.matches if m.requirement_index == 0)
+        assert pla_match.use_external_spool is False
+        assert pla_match.ams_unit_id == 0
+        assert pla_match.ams_slot_id == 0
+        
+        # TPU and WOOD should use external spool
+        tpu_match = next(m for m in result.matches if m.requirement_index == 1)
+        wood_match = next(m for m in result.matches if m.requirement_index == 2)
+        assert tpu_match.use_external_spool is True
+        assert wood_match.use_external_spool is True
+        
+        # No unmatched requirements since external spool is fallback
+        assert result.unmatched_requirements is None
 
 
 class TestAdvancedScenarios:

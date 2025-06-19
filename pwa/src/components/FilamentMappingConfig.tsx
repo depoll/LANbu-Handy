@@ -15,18 +15,19 @@ interface FilamentMappingConfigProps {
   disabled?: boolean;
 }
 
-interface AMSSlotOption {
-  unit_id: number;
-  slot_id: number;
+interface FilamentSlotOption {
+  unit_id?: number; // Optional for external spool
+  slot_id?: number; // Optional for external spool
   filament_type: string;
   color: string;
   label: string;
   value: string;
+  is_external_spool?: boolean; // True for external spool option
 }
 
 interface CustomDropdownProps {
   value: string;
-  options: AMSSlotOption[];
+  options: FilamentSlotOption[];
   onChange: (value: string) => void;
   disabled?: boolean;
   placeholder?: string;
@@ -101,7 +102,9 @@ function CustomDropdown({
             </div>
             <div className="selected-details">
               <span className="selected-label">
-                Unit {selectedOption.unit_id}, Slot {selectedOption.slot_id}
+                {selectedOption.is_external_spool
+                  ? 'External Spool'
+                  : `Unit ${selectedOption.unit_id}, Slot ${selectedOption.slot_id}`}
               </span>
               <span className="selected-type">
                 {selectedOption.filament_type}
@@ -147,7 +150,9 @@ function CustomDropdown({
               <div className="option-details">
                 <div className="option-header">
                   <span className="option-label">
-                    Unit {option.unit_id}, Slot {option.slot_id}
+                    {option.is_external_spool
+                      ? 'External Spool'
+                      : `Unit ${option.unit_id}, Slot ${option.slot_id}`}
                   </span>
                   {option.value === value && (
                     <span className="selected-indicator">✓</span>
@@ -179,25 +184,26 @@ function FilamentMappingConfig({
 
   // Function to call backend filament matching service
   const reapplyFilamentMatching = useCallback(async () => {
-    if (!amsStatus || !amsStatus.success || !filamentRequirements) {
-      const errorMsg =
-        'Cannot apply matching: AMS status not available or no filament requirements';
-      console.warn('Filament matching precondition failed:', {
-        hasAmsStatus: !!amsStatus,
-        amsSuccess: amsStatus?.success,
-        hasFilamentRequirements: !!filamentRequirements,
-        filamentCount: filamentRequirements?.filament_count,
-      });
+    if (!filamentRequirements) {
+      const errorMsg = 'Cannot apply matching: No filament requirements';
+      console.warn('Filament matching precondition failed: No filament requirements');
       setMatchingError(errorMsg);
       return;
     }
 
+    // Create a default empty AMS status if not available (for external spool fallback)
+    const effectiveAmsStatus = amsStatus?.success ? amsStatus : {
+      success: true,
+      message: 'No AMS available - using external spool',
+      ams_units: [],
+    };
+
     console.log('Starting filament matching...', {
       filamentRequirements,
-      amsStatus: {
-        success: amsStatus.success,
-        unitCount: amsStatus.ams_units?.length,
-        totalSlots: amsStatus.ams_units?.reduce(
+      effectiveAmsStatus: {
+        success: effectiveAmsStatus.success,
+        unitCount: effectiveAmsStatus.ams_units?.length,
+        totalSlots: effectiveAmsStatus.ams_units?.reduce(
           (sum, unit) => sum + unit.filaments.length,
           0
         ),
@@ -210,7 +216,7 @@ function FilamentMappingConfig({
     try {
       const request: FilamentMatchRequest = {
         filament_requirements: filamentRequirements,
-        ams_status: amsStatus,
+        ams_status: effectiveAmsStatus,
       };
 
       const response = await fetch('/api/filament/match', {
@@ -235,6 +241,7 @@ function FilamentMappingConfig({
           filament_index: match.requirement_index,
           ams_unit_id: match.ams_unit_id,
           ams_slot_id: match.ams_slot_id,
+          use_external_spool: match.use_external_spool,
         }));
 
         console.log('Applying new filament mappings:', newMappings);
@@ -257,9 +264,18 @@ function FilamentMappingConfig({
     }
   }, [amsStatus, filamentRequirements, onMappingChange]);
 
-  // Build list of available AMS slots
-  const getAvailableSlots = (): AMSSlotOption[] => {
-    const slots: AMSSlotOption[] = [];
+  // Build list of available filament sources (AMS slots + external spool)
+  const getAvailableSlots = (): FilamentSlotOption[] => {
+    const slots: FilamentSlotOption[] = [];
+
+    // Always add external spool option as the first choice
+    slots.push({
+      filament_type: 'External Spool',
+      color: '#808080', // Gray color for external spool
+      label: 'External Spool (Manual Loading)',
+      value: 'external-spool',
+      is_external_spool: true,
+    });
 
     if (amsStatus?.success && amsStatus.ams_units) {
       amsStatus.ams_units.forEach(unit => {
@@ -276,6 +292,7 @@ function FilamentMappingConfig({
             color: filament.color,
             label: `Unit ${unit.unit_id}, Slot ${filament.slot_id}: ${filament.filament_type} (${filament.color})`,
             value: `${unit.unit_id}-${filament.slot_id}`,
+            is_external_spool: false,
           });
         });
       });
@@ -291,7 +308,13 @@ function FilamentMappingConfig({
     const mapping = filamentMappings.find(
       m => m.filament_index === filamentIndex
     );
-    return mapping ? `${mapping.ams_unit_id}-${mapping.ams_slot_id}` : '';
+    if (!mapping) return '';
+    
+    if (mapping.use_external_spool) {
+      return 'external-spool';
+    }
+    
+    return `${mapping.ams_unit_id}-${mapping.ams_slot_id}`;
   };
 
   // Handle mapping change for a specific filament
@@ -303,12 +326,22 @@ function FilamentMappingConfig({
 
     // Add new mapping if a slot is selected
     if (slotValue) {
-      const [unitId, slotId] = slotValue.split('-').map(Number);
-      newMappings.push({
-        filament_index: filamentIndex,
-        ams_unit_id: unitId,
-        ams_slot_id: slotId,
-      });
+      if (slotValue === 'external-spool') {
+        // External spool mapping
+        newMappings.push({
+          filament_index: filamentIndex,
+          use_external_spool: true,
+        });
+      } else {
+        // AMS slot mapping
+        const [unitId, slotId] = slotValue.split('-').map(Number);
+        newMappings.push({
+          filament_index: filamentIndex,
+          ams_unit_id: unitId,
+          ams_slot_id: slotId,
+          use_external_spool: false,
+        });
+      }
     }
 
     onMappingChange(newMappings);
@@ -316,10 +349,11 @@ function FilamentMappingConfig({
 
   // Auto-populate mappings when conditions are met (first load or AMS status loads)
   useEffect(() => {
+    const hasAmsSlots = availableSlots.some(slot => !slot.is_external_spool);
     const shouldAutoMatch =
       filamentMappings.length === 0 &&
       filamentRequirements.filament_count > 0 &&
-      availableSlots.length > 0 &&
+      hasAmsSlots && // Only auto-match if AMS slots are available
       amsStatus?.success &&
       !isMatching &&
       !hasTriggeredAutoMatch;
@@ -382,18 +416,15 @@ function FilamentMappingConfig({
     filamentMappings.length,
   ]);
 
-  if (
-    !amsStatus?.success ||
-    !amsStatus.ams_units ||
-    availableSlots.length === 0
-  ) {
+  // Since external spool is always available, we should never have zero available slots
+  // Only show warning if we somehow have no slots (which should not happen now)
+  if (availableSlots.length === 0) {
     return (
       <div className="filament-mapping-config">
         <div className="mapping-header">
           <h4>Filament Mapping</h4>
           <p>
-            No AMS slots available for mapping. Please ensure your AMS is
-            connected and has filaments loaded.
+            No filament sources available. This is unexpected - please contact support.
           </p>
         </div>
       </div>
@@ -407,7 +438,7 @@ function FilamentMappingConfig({
           <h4>Filament Mapping</h4>
           <button
             onClick={reapplyFilamentMatching}
-            disabled={disabled || isMatching || !amsStatus?.success}
+            disabled={disabled || isMatching}
             className="reapply-matching-button"
             title="Reapply automatic filament matching using the backend matching algorithm"
           >
@@ -415,12 +446,12 @@ function FilamentMappingConfig({
           </button>
         </div>
         <p>
-          Map each model filament to an available AMS slot.
+          Map each model filament to an available AMS slot or use the external spool.
           {filamentMappings.length === 0 && !isMatching && (
             <span className="auto-match-note">
               {' '}
               Auto-matching will suggest optimal slots based on type and color
-              compatibility when AMS status loads.
+              compatibility when AMS status loads. You can always choose external spool for manual loading.
             </span>
           )}
         </p>

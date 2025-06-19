@@ -326,8 +326,9 @@ class PrinterStatusResponse(BaseModel):
 
 class FilamentMapping(BaseModel):
     filament_index: int  # Index in the model's filament requirements
-    ams_unit_id: int
-    ams_slot_id: int
+    ams_unit_id: Optional[int] = None  # Optional for external spool
+    ams_slot_id: Optional[int] = None  # Optional for external spool
+    use_external_spool: Optional[bool] = False  # True when using external spool instead of AMS
 
 
 class ConfiguredSliceRequest(BaseModel):
@@ -389,8 +390,9 @@ class FilamentMatchRequest(BaseModel):
 
 class FilamentMatchResult(BaseModel):
     requirement_index: int
-    ams_unit_id: int
-    ams_slot_id: int
+    ams_unit_id: Optional[int] = None  # Optional for external spool
+    ams_slot_id: Optional[int] = None  # Optional for external spool
+    use_external_spool: Optional[bool] = False  # True when recommending external spool
     match_quality: str  # "perfect", "type_only", "fallback", "none"
     confidence: float
 
@@ -2408,6 +2410,7 @@ async def match_filaments(request: FilamentMatchRequest):
                     requirement_index=match.requirement_index,
                     ams_unit_id=match.ams_unit_id,
                     ams_slot_id=match.ams_slot_id,
+                    use_external_spool=match.use_external_spool,
                     match_quality=match.match_quality,
                     confidence=match.confidence,
                 )
