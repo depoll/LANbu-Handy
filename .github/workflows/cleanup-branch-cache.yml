@@ -1,0 +1,98 @@
+# Cleanup Registry Cache for Deleted Branches
+#
+# This workflow cleans up Docker registry cache images when branches are deleted.
+# It removes both main application cache and CLI build cache for the deleted branch.
+
+name: Cleanup Branch Cache
+
+on:
+  delete:
+    # Triggers when a branch or tag is deleted
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  cleanup-cache:
+    runs-on: ubuntu-latest
+    if: github.event.ref_type == 'branch'
+
+    steps:
+      - name: Set lowercase repository name
+        id: repo
+        run: |
+          echo "name=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get deleted branch name
+        id: branch
+        run: |
+          # The deleted branch name is in github.event.ref
+          BRANCH_NAME="${{ github.event.ref }}"
+          # Replace forward slashes with hyphens for valid Docker tag names
+          SANITIZED_BRANCH=$(echo "$BRANCH_NAME" | sed 's/\//-/g')
+          echo "name=$SANITIZED_BRANCH" >> $GITHUB_OUTPUT
+          echo "Deleted branch: $BRANCH_NAME"
+          echo "Sanitized branch for cache cleanup: $SANITIZED_BRANCH"
+
+      - name: Clean up main application cache images
+        run: |
+          REPO="ghcr.io/${{ steps.repo.outputs.name }}"
+          BRANCH="${{ steps.branch.outputs.name }}"
+
+          echo "Cleaning up cache images for branch: $BRANCH"
+
+          # List of architectures to clean up
+          ARCHITECTURES=("amd64" "arm64")
+
+          for ARCH in "${ARCHITECTURES[@]}"; do
+            CACHE_TAG="build-cache-${BRANCH}-${ARCH}"
+            echo "Attempting to delete: ${REPO}:${CACHE_TAG}"
+            
+            # Try to delete the cache image
+            if docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+              -e DOCKER_CONFIG=/tmp \
+              ghcr.io/regclient/regctl:latest \
+              image delete "${REPO}:${CACHE_TAG}" 2>/dev/null; then
+              echo "✅ Deleted cache image: ${REPO}:${CACHE_TAG}"
+            else
+              echo "ℹ️ Cache image not found or already deleted: ${REPO}:${CACHE_TAG}"
+            fi
+          done
+
+      - name: Clean up CLI build cache images
+        run: |
+          REPO="ghcr.io/${{ steps.repo.outputs.name }}/bambu-studio-cli"
+          BRANCH="${{ steps.branch.outputs.name }}"
+
+          echo "Cleaning up CLI cache images for branch: $BRANCH"
+
+          # List of architectures to clean up
+          ARCHITECTURES=("amd64" "arm64")
+
+          for ARCH in "${ARCHITECTURES[@]}"; do
+            CACHE_TAG="build-cache-${BRANCH}-${ARCH}"
+            echo "Attempting to delete: ${REPO}:${CACHE_TAG}"
+            
+            # Try to delete the cache image
+            if docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+              -e DOCKER_CONFIG=/tmp \
+              ghcr.io/regclient/regctl:latest \
+              image delete "${REPO}:${CACHE_TAG}" 2>/dev/null; then
+              echo "✅ Deleted CLI cache image: ${REPO}:${CACHE_TAG}"
+            else
+              echo "ℹ️ CLI cache image not found or already deleted: ${REPO}:${CACHE_TAG}"
+            fi
+          done
+
+      - name: Summary
+        run: |
+          echo "🧹 Cleanup completed for branch: ${{ steps.branch.outputs.name }}"
+          echo "Removed cache images for both main application and CLI builds"
