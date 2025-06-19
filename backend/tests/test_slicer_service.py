@@ -408,7 +408,7 @@ class TestConvenienceFunctions:
         assert result.stdout == "sliced"
         mock_wrapper_class.assert_called_once()
         mock_wrapper.slice_model.assert_called_once_with(
-            "input.stl", "/output", {"profile": "default"}
+            "input.stl", "/output", {"profile": "default"}, None
         )
 
 

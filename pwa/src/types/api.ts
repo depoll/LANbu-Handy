@@ -22,9 +22,19 @@ export interface AMSStatusResponse {
   error_details?: string;
 }
 
+export interface PrinterStatusResponse {
+  success: boolean;
+  message: string;
+  printer_model?: string;
+  printer_name?: string;
+  ams_units?: AMSUnit[];
+  error_details?: string;
+}
+
 // Model Filament Requirements and Plate Types
 export interface PlateInfo {
   index: number;
+  name?: string;
   prediction_seconds?: number;
   weight_grams?: number;
   has_support: boolean;
@@ -55,6 +65,10 @@ export interface FilamentMapping {
   ams_slot_id: number;
 }
 
+export interface SliceRequest {
+  file_id: string;
+}
+
 export interface ConfiguredSliceRequest {
   file_id: string;
   filament_mappings: FilamentMapping[];
@@ -62,11 +76,26 @@ export interface ConfiguredSliceRequest {
   selected_plate_index?: number | null; // null means all plates
 }
 
+export interface StartProgressSliceRequest {
+  file_id: string;
+  filament_mappings: FilamentMapping[];
+  build_plate_type: string;
+  selected_plate_index?: number | null; // null means all plates
+}
+
+export interface StartProgressSliceResponse {
+  success: boolean;
+  message: string;
+  session_id?: string;
+  error_details?: string;
+}
+
 export interface SliceResponse {
   success: boolean;
   message: string;
   gcode_path?: string;
   error_details?: string;
+  updated_plates?: PlateInfo[];
 }
 
 // Printer Configuration Types
@@ -93,6 +122,7 @@ export interface PrinterConfigResponse {
   printer_configured: boolean;
   printers: {
     name: string;
+    canonical_id: string;
     ip: string;
     has_access_code: boolean;
     has_serial_number: boolean;
@@ -103,6 +133,7 @@ export interface PrinterConfigResponse {
   persistent_printer_count?: number;
   active_printer?: {
     name: string;
+    canonical_id: string;
     ip: string;
     has_access_code: boolean;
     has_serial_number: boolean;

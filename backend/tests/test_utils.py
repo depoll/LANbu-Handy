@@ -40,12 +40,10 @@ class TestUtilityFunctions:
         """Test default slicing options."""
         options = get_default_slicing_options()
 
+        # Bambu Studio CLI doesn't support direct profile/layer-height/infill options
+        # It relies on settings embedded in 3MF files or external JSON settings files
         assert isinstance(options, dict)
-        assert options["profile"] == "pla"
-        assert options["layer-height"] == "0.2"
-        assert options["infill"] == "15"
-        assert options["support"] == "auto"
-        assert len(options) == 4
+        assert len(options) == 0  # Should return empty dict
 
     def test_find_gcode_file_success(self):
         """Test finding G-code file when it exists."""
@@ -100,11 +98,10 @@ class TestUtilityFunctions:
 
         options = build_slicing_options_from_config(filament_mappings, build_plate_type)
 
+        # Bambu Studio CLI doesn't support these options directly
+        # Function returns empty dict and relies on 3MF embedded settings
         assert isinstance(options, dict)
-        assert "build-plate" in options
-        assert options["build-plate"] == "textured_pei"
-        assert "filament-slot-0" in options
-        assert options["filament-slot-0"] == "1-2"
+        assert len(options) == 0
 
     def test_build_slicing_options_from_config_multiple_filaments(self):
         """Test building slicing options with multiple filament mappings."""
@@ -125,9 +122,9 @@ class TestUtilityFunctions:
 
         options = build_slicing_options_from_config(filament_mappings, build_plate_type)
 
-        assert options["build-plate"] == "smooth_pei"
-        assert options["filament-slot-0"] == "1-2"
-        assert options["filament-slot-1"] == "2-3"
+        # Bambu Studio CLI doesn't support these options directly
+        assert isinstance(options, dict)
+        assert len(options) == 0
 
     def test_build_slicing_options_from_config_empty_mappings(self):
         """Test building slicing options with empty filament mappings."""
@@ -136,7 +133,9 @@ class TestUtilityFunctions:
 
         options = build_slicing_options_from_config(filament_mappings, build_plate_type)
 
-        assert options["build-plate"] == "glass"
+        # Bambu Studio CLI doesn't support these options directly
+        assert isinstance(options, dict)
+        assert len(options) == 0
 
 
 class TestErrorHandling:

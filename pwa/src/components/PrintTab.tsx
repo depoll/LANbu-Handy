@@ -25,6 +25,7 @@ interface JobResponse {
     print: JobStep;
   };
   error_details?: string;
+  updated_plates?: PlateInfo[];
 }
 
 interface PrintTabProps {
@@ -40,6 +41,7 @@ interface PrintTabProps {
   isProcessing: boolean;
   onProcessingChange: (processing: boolean) => void;
   onStatusMessage: (message: string) => void;
+  onPlatesUpdate?: (plates: PlateInfo[]) => void;
 }
 
 export function PrintTab({
@@ -55,6 +57,7 @@ export function PrintTab({
   isProcessing,
   onProcessingChange,
   onStatusMessage,
+  onPlatesUpdate,
 }: PrintTabProps) {
   const [isSliced, setIsSliced] = useState(false);
   const [sliceResponse, setSliceResponse] = useState<SliceResponse | null>(
@@ -201,7 +204,17 @@ export function PrintTab({
       }
 
       const result: SliceResponse = await response.json();
+      console.log('Slice response received:', result);
       setSliceResponse(result);
+
+      // Update plates with estimates if received
+      if (result.updated_plates && onPlatesUpdate) {
+        console.log('Updating plates with estimates:', result.updated_plates);
+        onPlatesUpdate(result.updated_plates as PlateInfo[]);
+        onStatusMessage('📊 Updated plate time and weight estimates');
+      } else {
+        console.log('No updated plates in response or no callback');
+      }
 
       updateOperationStep(1, 'completed', 'G-code generated successfully');
 
@@ -295,6 +308,19 @@ export function PrintTab({
       }
 
       const result: JobResponse = await response.json();
+      console.log('Print job response received:', result);
+
+      // Update plates with estimates if received
+      if (result.updated_plates && onPlatesUpdate) {
+        console.log(
+          'Updating plates with estimates from print job:',
+          result.updated_plates
+        );
+        onPlatesUpdate(result.updated_plates);
+        onStatusMessage('📊 Updated plate time and weight estimates');
+      } else {
+        console.log('No updated plates in print job response or no callback');
+      }
 
       // Display main result
       if (result.success) {
@@ -367,6 +393,19 @@ export function PrintTab({
       }
 
       const result: JobResponse = await response.json();
+      console.log('Basic job response received:', result);
+
+      // Update plates with estimates if received
+      if (result.updated_plates && onPlatesUpdate) {
+        console.log(
+          'Updating plates with estimates from basic job:',
+          result.updated_plates
+        );
+        onPlatesUpdate(result.updated_plates);
+        onStatusMessage('📊 Updated plate time and weight estimates');
+      } else {
+        console.log('No updated plates in basic job response or no callback');
+      }
 
       // Display main result
       if (result.success) {

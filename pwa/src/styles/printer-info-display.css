@@ -1,0 +1,247 @@
+/* LANbu Handy PWA - Printer Info Display Styles */
+
+.printer-info-display {
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border-secondary);
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 1rem;
+}
+
+.printer-info-display.loading,
+.printer-info-display.error {
+  opacity: 0.8;
+}
+
+.info-header {
+  background: var(--color-bg-secondary);
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--color-border-secondary);
+}
+
+.info-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.info-content {
+  padding: 1rem;
+}
+
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 2rem 0;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  position: relative;
+}
+
+.spinner {
+  width: 100%;
+  height: 100%;
+  border: 3px solid var(--color-border-tertiary);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.loading-text {
+  color: var(--color-text-secondary);
+  font-size: 0.9rem;
+  font-style: italic;
+}
+
+/* Skeleton loading styles */
+.info-grid.skeleton .info-item {
+  opacity: 0.7;
+}
+
+.skeleton-line {
+  display: inline-block;
+  background: var(--color-bg-tertiary);
+  border-radius: 4px;
+  position: relative;
+  overflow: hidden;
+  min-width: 120px;
+  height: 1.2em;
+}
+
+.skeleton-line::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.4),
+    transparent
+  );
+  animation: skeleton-shimmer 1.5s infinite;
+}
+
+@keyframes skeleton-shimmer {
+  to {
+    left: 100%;
+  }
+}
+
+.error-message {
+  text-align: center;
+  color: var(--color-error);
+  padding: 1rem 0;
+}
+
+.info-grid {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.info-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--color-border-tertiary);
+}
+
+.info-item:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.info-label {
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  font-size: 0.9rem;
+  min-width: 100px;
+}
+
+.info-value {
+  color: var(--color-text-primary);
+  font-size: 0.9rem;
+  flex: 1;
+}
+
+.info-value.model {
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+.info-value.name {
+  font-weight: 500;
+}
+
+.info-value.ip {
+  font-family: monospace;
+  background: var(--color-bg-secondary);
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.85rem;
+}
+
+.info-value.features {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.feature-badge {
+  padding: 0.2rem 0.5rem;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-secondary);
+}
+
+.feature-badge.serial {
+  background: var(--color-warning-bg);
+  color: var(--color-warning-dark);
+  border-color: var(--color-warning);
+}
+
+.feature-badge.access {
+  background: var(--color-success-bg);
+  color: var(--color-success-dark);
+  border-color: var(--color-success);
+}
+
+.feature-badge.none {
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-muted);
+  border-color: var(--color-border-secondary);
+}
+
+.info-value.unknown {
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.info-note {
+  margin-top: 1rem;
+  padding: 0.75rem;
+  background: var(--color-bg-info);
+  border-radius: 6px;
+  border: 1px solid var(--color-info-light);
+}
+
+.info-note small {
+  color: var(--color-info-dark);
+  line-height: 1.4;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .info-header {
+    padding: 0.6rem 0.8rem;
+  }
+
+  .info-header h3 {
+    font-size: 0.95rem;
+  }
+
+  .info-content {
+    padding: 0.8rem;
+  }
+
+  .info-grid {
+    gap: 0.6rem;
+  }
+
+  .info-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.3rem;
+    padding: 0.6rem 0;
+  }
+
+  .info-label {
+    min-width: auto;
+    font-size: 0.85rem;
+  }
+
+  .info-value {
+    width: 100%;
+  }
+
+  .info-value.ip {
+    font-size: 0.8rem;
+  }
+}

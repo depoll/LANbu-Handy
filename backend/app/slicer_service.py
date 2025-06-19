@@ -207,6 +207,7 @@ class BambuStudioCLIWrapper:
         input_path: Union[str, Path],
         output_dir: Union[str, Path],
         options: Optional[Dict[str, str]] = None,
+        plate_index: Optional[int] = None,
     ) -> CLIResult:
         """
         Slice a 3D model using Bambu Studio CLI.
@@ -215,6 +216,7 @@ class BambuStudioCLIWrapper:
             input_path: Path to the input model file (.stl, .3mf)
             output_dir: Directory where the output G-code should be saved
             options: Optional dictionary of CLI options/parameters
+            plate_index: Optional plate number to slice (None means all plates)
 
         Returns:
             CLIResult with slicing results
@@ -238,8 +240,9 @@ class BambuStudioCLIWrapper:
         # Input file comes first as positional argument
         args = [str(input_path)]
 
-        # Add slice option (0 means all plates)
-        args.extend(["--slice", "0"])
+        # Add slice option (0 means all plates, specific number means that plate)
+        slice_value = str(plate_index) if plate_index is not None else "0"
+        args.extend(["--slice", slice_value])
 
         # Add output directory
         args.extend(["--outputdir", str(output_dir)])
@@ -397,6 +400,7 @@ def slice_model(
     input_path: Union[str, Path],
     output_dir: Union[str, Path],
     options: Optional[Dict[str, str]] = None,
+    plate_index: Optional[int] = None,
 ) -> CLIResult:
     """
     Slice a 3D model using Bambu Studio CLI.
@@ -405,12 +409,13 @@ def slice_model(
         input_path: Path to the input model file
         output_dir: Directory for output G-code
         options: Optional CLI options
+        plate_index: Optional plate number to slice (None means all plates)
 
     Returns:
         CLIResult with slicing results
     """
     wrapper = BambuStudioCLIWrapper()
-    return wrapper.slice_model(input_path, output_dir, options)
+    return wrapper.slice_model(input_path, output_dir, options, plate_index)
 
 
 def export_png(

@@ -52,6 +52,7 @@ vi.mock('three', () => {
       set: vi.fn(),
     })),
     PCFSoftShadowMap: {},
+    LoadingManager: vi.fn(),
   };
 });
 
@@ -110,6 +111,22 @@ Object.defineProperty(window, 'requestAnimationFrame', {
 Object.defineProperty(window, 'cancelAnimationFrame', {
   writable: true,
   value: vi.fn(),
+});
+
+// Mock canvas getContext method
+HTMLCanvasElement.prototype.getContext = vi.fn((contextType: string) => {
+  if (contextType === 'webgl' || contextType === 'experimental-webgl') {
+    // Return a mock WebGL context
+    return {
+      drawingBufferWidth: 300,
+      drawingBufferHeight: 300,
+      getExtension: vi.fn(),
+      getParameter: vi.fn(),
+      createShader: vi.fn(),
+      createProgram: vi.fn(),
+    };
+  }
+  return null;
 });
 
 describe('ModelPreview Component', () => {
