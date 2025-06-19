@@ -14,10 +14,8 @@ jobs:
       matrix:
         include:
           - platform: linux/amd64
-            arch: amd64
             runner: ubuntu-latest
           - platform: linux/arm64
-            arch: arm64
             runner: [self-hosted, arm64]
       fail-fast: false
 
@@ -61,13 +59,6 @@ jobs:
         id: repo
         run: |
           echo "name=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
-
-      - name: Sanitize branch name for cache
-        id: cache
-        run: |
-          # Replace forward slashes with hyphens for valid Docker tag names
-          SANITIZED_BRANCH=$(echo '${{ github.ref_name }}' | sed 's/\//-/g')
-          echo "branch=$SANITIZED_BRANCH" >> $GITHUB_OUTPUT
 
       - name: Run backend tests with pre-built CLI
         run: |
@@ -132,10 +123,8 @@ jobs:
           platforms: ${{ matrix.platform }}
           push: false
           tags: lanbu-handy:latest
-          cache-from: |
-            type=registry,ref=ghcr.io/${{ steps.repo.outputs.name }}:build-cache-${{ steps.cache.outputs.branch }}-${{ matrix.arch }}
-            type=registry,ref=ghcr.io/${{ steps.repo.outputs.name }}:build-cache-main-${{ matrix.arch }}
-          cache-to: type=registry,ref=ghcr.io/${{ steps.repo.outputs.name }}:build-cache-${{ steps.cache.outputs.branch }}-${{ matrix.arch }},mode=max
+          cache-from: type=gha,key=buildx-${{ matrix.platform }}
+          cache-to: type=gha,mode=max,key=buildx-${{ matrix.platform }}
 
   build-docker-images:
     runs-on: ${{ matrix.runner }}
