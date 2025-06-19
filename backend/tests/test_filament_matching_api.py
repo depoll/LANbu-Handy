@@ -170,9 +170,20 @@ class TestFilamentMatchingAPI:
         assert response.status_code == 200
         result = response.json()
 
-        assert result["success"] is True  # Should succeed even with partial matches
-        assert len(result["matches"]) == 2  # Should match PLA and PETG
-        assert result["unmatched_requirements"] == [1]  # TPU should be unmatched
+        assert result["success"] is True  # Should succeed even with partial matches  
+        assert len(result["matches"]) == 3  # All requirements matched (AMS + external)
+        
+        # Verify PLA and PETG matched to AMS, TPU to external spool
+        matches = result["matches"]
+        pla_match = next(m for m in matches if m["requirement_index"] == 0)
+        tpu_match = next(m for m in matches if m["requirement_index"] == 1) 
+        petg_match = next(m for m in matches if m["requirement_index"] == 2)
+        
+        assert pla_match["use_external_spool"] is False
+        assert tpu_match["use_external_spool"] is True
+        assert petg_match["use_external_spool"] is False
+        
+        assert result["unmatched_requirements"] is None  # No unmatched since external spool fallback
 
     def test_match_filaments_invalid_request(self):
         """Test filament matching with invalid request data."""
@@ -212,6 +223,7 @@ class TestFilamentMatchingAPI:
         assert response.status_code == 200
         result = response.json()
 
-        assert result["success"] is False
-        assert "AMS status not available or no AMS units found" in result["message"]
-        assert result["matches"] == []
+        assert result["success"] is True  # Should succeed with external spool
+        assert "No AMS units available" in result["message"]
+        assert len(result["matches"]) == 1
+        assert result["matches"][0]["use_external_spool"] is True

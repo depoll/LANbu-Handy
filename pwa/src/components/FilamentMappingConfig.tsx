@@ -374,7 +374,7 @@ function FilamentMappingConfig({
   }, [
     filamentMappings.length,
     filamentRequirements.filament_count,
-    availableSlots.length,
+    availableSlots, // Used inside the effect
     amsStatus?.success,
     isMatching,
     hasTriggeredAutoMatch,
