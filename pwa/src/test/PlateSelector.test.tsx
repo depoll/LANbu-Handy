@@ -28,19 +28,22 @@ describe('PlateSelector Component', () => {
     },
   ];
 
-  it('renders nothing for single plate models', () => {
+  it('renders for single plate models using multi-plate UI', () => {
     const singlePlate = [mockPlates[0]];
     const onPlateSelect = vi.fn();
 
-    const { container } = render(
+    const { container, getByText } = render(
       <PlateSelector
         plates={singlePlate}
         selectedPlateIndex={1}
         onPlateSelect={onPlateSelect}
+        fileId="test-file-id"
       />
     );
 
-    expect(container.firstChild).toBeNull();
+    expect(container.firstChild).not.toBeNull();
+    expect(getByText('Plate Selection')).toBeInTheDocument();
+    expect(getByText('All Plates')).toBeInTheDocument();
   });
 
   it('renders nothing for empty plates array', () => {
@@ -65,12 +68,13 @@ describe('PlateSelector Component', () => {
         plates={mockPlates}
         selectedPlateIndex={1}
         onPlateSelect={onPlateSelect}
+        fileId="test-file.3mf"
       />
     );
 
     expect(screen.getByText('Plate Selection')).toBeInTheDocument();
-    expect(screen.getByLabelText('Select Plate:')).toBeInTheDocument();
-    expect(screen.getByText('All Plates (3 plates)')).toBeInTheDocument();
+    expect(screen.getByText('All Plates')).toBeInTheDocument();
+    expect(screen.getByText('3 plates')).toBeInTheDocument();
   });
 
   it('shows correct plate options with details', () => {
@@ -81,19 +85,19 @@ describe('PlateSelector Component', () => {
         plates={mockPlates}
         selectedPlateIndex={1}
         onPlateSelect={onPlateSelect}
+        fileId="test-file.3mf"
       />
     );
 
-    // Check that plate options include details
-    expect(
-      screen.getByText(/Plate 1 \(2 objects, 1h 27m, 24\.6g\)/)
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(/Plate 2 \(1 object, 1h 27m, 24\.4g\)/)
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(/Plate 3 \(3 objects, 1h 31m, 25\.1g\)/)
-    ).toBeInTheDocument();
+    // Check that plate titles are shown
+    expect(screen.getByText('Plate 1')).toBeInTheDocument();
+    expect(screen.getByText('Plate 2')).toBeInTheDocument();
+    expect(screen.getByText('Plate 3')).toBeInTheDocument();
+
+    // Check that stats are shown (object counts, times, weights)
+    expect(screen.getByText('2 obj')).toBeInTheDocument();
+    expect(screen.getByText('1 obj')).toBeInTheDocument();
+    expect(screen.getByText('3 obj')).toBeInTheDocument();
   });
 
   it('displays selected plate details correctly', () => {
@@ -104,14 +108,25 @@ describe('PlateSelector Component', () => {
         plates={mockPlates}
         selectedPlateIndex={2}
         onPlateSelect={onPlateSelect}
+        fileId="test-file.3mf"
+        selectedBuildPlate="textured_pei_plate"
       />
     );
 
-    expect(screen.getByText('Plate 2 Details')).toBeInTheDocument();
-    expect(screen.getByText('1')).toBeInTheDocument(); // object count
-    expect(screen.getByText('1h 27m')).toBeInTheDocument(); // prediction time
-    expect(screen.getByText('24.4g')).toBeInTheDocument(); // weight
-    expect(screen.getByText('✓ Yes')).toBeInTheDocument(); // has support
+    expect(
+      screen.getByText('Plate 2 (Plate 2) Configuration')
+    ).toBeInTheDocument();
+
+    // Find the detail section
+    const detailSection = screen
+      .getByText('Plate Information')
+      .closest('.detail-section');
+
+    // Check details within the detail section
+    expect(detailSection).toHaveTextContent('Objects:1');
+    expect(detailSection).toHaveTextContent('Est. Time:1h 27m');
+    expect(detailSection).toHaveTextContent('Est. Weight:24.4g');
+    expect(detailSection).toHaveTextContent('Support:✓ Yes');
   });
 
   it('displays all plates summary when no specific plate selected', () => {
@@ -122,17 +137,24 @@ describe('PlateSelector Component', () => {
         plates={mockPlates}
         selectedPlateIndex={null}
         onPlateSelect={onPlateSelect}
+        fileId="test-file.3mf"
       />
     );
 
-    expect(screen.getByText('All Plates Summary')).toBeInTheDocument();
-    expect(screen.getByText('6')).toBeInTheDocument(); // total objects (2+1+3)
-    expect(screen.getByText('4h 26m')).toBeInTheDocument(); // total time (5239+5272+5460=15971s=4h26m)
-    expect(screen.getByText('74.2g')).toBeInTheDocument(); // total weight
-    expect(screen.getByText('1 of 3')).toBeInTheDocument(); // plates with support
+    expect(screen.getByText('All Plates Configuration')).toBeInTheDocument();
+
+    // Check that summary details are displayed
+    expect(screen.getByText('Total Objects:')).toBeInTheDocument();
+    expect(screen.getByText('6')).toBeInTheDocument(); // 2+1+3 = 6
+    expect(screen.getByText('Total Est. Time:')).toBeInTheDocument();
+    expect(screen.getByText('4h 26m')).toBeInTheDocument(); // 5239+5272+5460=15971s
+    expect(screen.getByText('Total Est. Weight:')).toBeInTheDocument();
+    expect(screen.getByText('74.2g')).toBeInTheDocument(); // 24.63+24.42+25.1
+    expect(screen.getByText('Plates with Support:')).toBeInTheDocument();
+    expect(screen.getByText('1 of 3')).toBeInTheDocument();
   });
 
-  it('calls onPlateSelect when selection changes', () => {
+  it('calls onPlateSelect when plate card is clicked', () => {
     const onPlateSelect = vi.fn();
 
     render(
@@ -140,16 +162,20 @@ describe('PlateSelector Component', () => {
         plates={mockPlates}
         selectedPlateIndex={1}
         onPlateSelect={onPlateSelect}
+        fileId="test-file.3mf"
       />
     );
 
-    const select = screen.getByLabelText('Select Plate:');
-    fireEvent.change(select, { target: { value: '2' } });
+    // Click on Plate 2 card
+    const plate2Card = screen
+      .getByText('Plate 2')
+      .closest('.plate-thumbnail-card');
+    fireEvent.click(plate2Card!);
 
     expect(onPlateSelect).toHaveBeenCalledWith(2);
   });
 
-  it('calls onPlateSelect with null when "all" is selected', () => {
+  it('calls onPlateSelect with null when "All Plates" card is clicked', () => {
     const onPlateSelect = vi.fn();
 
     render(
@@ -157,11 +183,15 @@ describe('PlateSelector Component', () => {
         plates={mockPlates}
         selectedPlateIndex={1}
         onPlateSelect={onPlateSelect}
+        fileId="test-file.3mf"
       />
     );
 
-    const select = screen.getByLabelText('Select Plate:');
-    fireEvent.change(select, { target: { value: 'all' } });
+    // Click on All Plates card
+    const allPlatesCard = screen
+      .getByText('All Plates')
+      .closest('.plate-thumbnail-card');
+    fireEvent.click(allPlatesCard!);
 
     expect(onPlateSelect).toHaveBeenCalledWith(null);
   });
@@ -175,11 +205,17 @@ describe('PlateSelector Component', () => {
         selectedPlateIndex={1}
         onPlateSelect={onPlateSelect}
         disabled={true}
+        fileId="test-file.3mf"
       />
     );
 
-    const select = screen.getByLabelText('Select Plate:');
-    expect(select).toBeDisabled();
+    // When disabled, clicking should not trigger onPlateSelect
+    const plate2Card = screen
+      .getByText('Plate 2')
+      .closest('.plate-thumbnail-card');
+    fireEvent.click(plate2Card!);
+
+    expect(onPlateSelect).not.toHaveBeenCalled();
   });
 
   it('handles plates with missing optional data gracefully', () => {
@@ -206,15 +242,25 @@ describe('PlateSelector Component', () => {
         plates={platesWithMissingData}
         selectedPlateIndex={1}
         onPlateSelect={onPlateSelect}
+        fileId="test-file.3mf"
+        selectedBuildPlate="textured_pei_plate"
       />
     );
 
-    // Should show "Unknown" for missing data
-    expect(
-      screen.getByText(/Plate 1 \(1 object, Unknown, Unknown\)/)
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(/Plate 2 \(0 objects, 0h 16m, 10\.5g\)/)
-    ).toBeInTheDocument();
+    // Should show plate titles
+    expect(screen.getByText('Plate 1')).toBeInTheDocument();
+    expect(screen.getByText('Plate 2')).toBeInTheDocument();
+
+    // Check that the component renders without crashing with missing data
+    // Since there are multiple "1 obj" elements, use getAllByText
+    const oneObjElements = screen.getAllByText('1 obj');
+    expect(oneObjElements.length).toBeGreaterThan(0);
+
+    // Check for "0 obj"
+    expect(screen.getByText('0 obj')).toBeInTheDocument();
+
+    // Check that "—" is shown for missing time/weight data
+    const emDashElements = screen.getAllByText('—');
+    expect(emDashElements.length).toBeGreaterThan(0);
   });
 });

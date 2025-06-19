@@ -1097,7 +1097,7 @@ class TestStartPrint:
         mock_mqtt_client_class.return_value = mock_client
 
         # Mock successful connection
-        mock_client.connect = Mock()
+        mock_client.connect_async = Mock()
 
         # Mock successful publish
         mock_msg_info = Mock()
@@ -1122,7 +1122,11 @@ class TestStartPrint:
         mock_client.username_pw_set.assert_called_once_with(
             "bblp", test_printer_config.access_code
         )
-        mock_client.connect.assert_called_once()
+        mock_client.connect_async.assert_called_once_with(
+            test_printer_config.ip,
+            printer_service.DEFAULT_MQTT_PORT,
+            printer_service.DEFAULT_MQTT_KEEPALIVE,
+        )
         mock_client.loop_start.assert_called_once()
         mock_client.publish.assert_called_once()
         mock_client.loop_stop.assert_called_once()
@@ -1307,7 +1311,11 @@ class TestAMSQuery:
         mock_client.username_pw_set.assert_called_once_with(
             "bblp", test_printer_config.access_code
         )
-        mock_client.connect.assert_called_once()
+        mock_client.connect_async.assert_called_once_with(
+            test_printer_config.ip,
+            printer_service.DEFAULT_MQTT_PORT,
+            printer_service.DEFAULT_MQTT_KEEPALIVE,
+        )
         mock_client.loop_start.assert_called_once()
         mock_client.subscribe.assert_called_once()
         mock_client.publish.assert_called_once()
@@ -1362,10 +1370,11 @@ class TestAMSQuery:
         # Execute with short timeout
         result = printer_service.query_ams_status(test_printer_config, timeout=1)
 
-        # Should return unsuccessful result due to timeout
-        assert result.success is False
-        assert "No AMS status response received" in result.message
-        assert "Timeout after 1 seconds" in result.error_details
+        # Should return successful result but with no AMS units (treated as no AMS)
+        assert result.success is True
+        assert "No AMS data received" in result.message
+        assert len(result.ams_units) == 0
+        assert "No AMS data after 1" in result.error_details
 
     def test_parse_ams_data_valid(self, printer_service):
         """Test parsing valid AMS data."""
@@ -1512,7 +1521,7 @@ class TestMQTTIntegration:
 
         # Set up method tracking
         mock_client.username_pw_set.side_effect = track_call("username_pw_set")
-        mock_client.connect.side_effect = track_call("connect")
+        mock_client.connect_async.side_effect = track_call("connect_async")
         mock_client.loop_start.side_effect = track_call("loop_start")
         mock_client.publish.side_effect = track_call("publish")
         mock_client.loop_stop.side_effect = track_call("loop_stop")
@@ -1528,7 +1537,7 @@ class TestMQTTIntegration:
         # Verify the correct sequence of MQTT operations
         expected_sequence = [
             "username_pw_set",
-            "connect",
+            "connect_async",
             "loop_start",
             "publish",
             "loop_stop",

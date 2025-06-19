@@ -1,5 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { usePrinterIPPersistence } from '../hooks/usePrinterIPPersistence';
+import { usePrinterMetadata } from '../hooks/usePrinterMetadata';
+import { printerEvents } from '../utils/printerEvents';
 import {
   AddPrinterRequest,
   AddPrinterResponse,
@@ -15,6 +17,9 @@ interface PrinterInfo {
   is_runtime_set?: boolean;
   is_persistent?: boolean;
   source?: string;
+  model?: string;
+  real_model?: string; // Actual model from printer via MQTT
+  real_name?: string; // Actual name from printer via MQTT
 }
 
 interface PrinterSelectorProps {
@@ -22,11 +27,100 @@ interface PrinterSelectorProps {
   className?: string;
 }
 
+type PrinterModel = 'X1C' | 'X1' | 'P1P' | 'P1S' | 'A1' | 'A1-mini' | 'Unknown';
+
+// Legacy function: Name-based printer model detection
+// This is now used as a fallback when real model data from MQTT isn't available
+// The preferred approach is to use getEffectivePrinterModel() which uses real data
+const detectPrinterModel = (
+  printerName: string,
+  serialNumber?: string
+): PrinterModel => {
+  // First try to detect from serial number (most reliable)
+  if (serialNumber && serialNumber.length >= 5) {
+    // Extract model code from positions 3-4 (0-indexed)
+    const modelCode = serialNumber.substring(3, 5);
+
+    // Map model codes according to Bambu Lab wiki
+    const serialModelMap: Record<string, PrinterModel> = {
+      '09': 'X1C', // X1 Carbon
+      '07': 'X1', // X1
+      '08': 'X1', // X1E (mapped to X1 for UI)
+      '03': 'P1P', // P1P
+      '04': 'P1S', // P1S
+      '01': 'A1-mini', // A1 mini
+      '02': 'A1', // A1
+    };
+
+    if (modelCode in serialModelMap) {
+      return serialModelMap[modelCode];
+    }
+  }
+
+  // Fall back to name-based detection
+  const name = printerName.toLowerCase();
+  if (name.includes('x1c') || name.includes('x1-carbon')) return 'X1C';
+  if (name.includes('x1') && !name.includes('x1c')) return 'X1';
+  if (name.includes('p1p')) return 'P1P';
+  if (name.includes('p1s')) return 'P1S';
+  if (name.includes('a1 mini') || name.includes('a1-mini')) return 'A1-mini';
+  if (name.includes('a1')) return 'A1';
+  return 'Unknown';
+};
+
+const getPrinterImage = (model: PrinterModel): string => {
+  const printerImages: Record<PrinterModel, string> = {
+    X1C: '🖨️', // We'll use emojis for now, but these could be actual images
+    X1: '🖨️',
+    P1P: '🖨️',
+    P1S: '🖨️',
+    A1: '🖨️',
+    'A1-mini': '🖨️',
+    Unknown: '❓',
+  };
+  return printerImages[model];
+};
+
+const getPrinterDisplayName = (model: PrinterModel): string => {
+  const displayNames: Record<PrinterModel, string> = {
+    X1C: 'X1 Carbon',
+    X1: 'X1',
+    P1P: 'P1P',
+    P1S: 'P1S',
+    A1: 'A1',
+    'A1-mini': 'A1 mini',
+    Unknown: 'Unknown Model',
+  };
+  return displayNames[model];
+};
+
+const getEffectivePrinterModel = (printer: PrinterInfo): PrinterModel => {
+  // Prefer real model from printer over detected model from name
+  if (printer.real_model) {
+    // Map common Bambu Lab model names to our PrinterModel type
+    const realModel = printer.real_model.toUpperCase();
+    if (realModel.includes('X1C') || realModel.includes('X1-CARBON'))
+      return 'X1C';
+    if (realModel.includes('X1') && !realModel.includes('X1C')) return 'X1';
+    if (realModel.includes('P1P')) return 'P1P';
+    if (realModel.includes('P1S')) return 'P1S';
+    if (realModel.includes('A1-MINI') || realModel.includes('A1 MINI'))
+      return 'A1-mini';
+    if (realModel.includes('A1')) return 'A1';
+  }
+  // Fall back to name-based detection
+  return (printer.model as PrinterModel) || 'Unknown';
+};
+
+const getEffectivePrinterName = (printer: PrinterInfo): string => {
+  // Prefer real name from printer over configured name
+  return printer.real_name || printer.name;
+};
+
 function PrinterSelector({
   onPrinterChange,
   className = '',
 }: PrinterSelectorProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
   const [manualIp, setManualIp] = useState('');
   const [manualAccessCode, setManualAccessCode] = useState('');
   const [manualName, setManualName] = useState('');
@@ -38,24 +132,110 @@ function PrinterSelector({
     null
   );
   const [allPrinters, setAllPrinters] = useState<PrinterInfo[]>([]);
-  const [isEditingMode, setIsEditingMode] = useState(false);
-  const [showPrinterList, setShowPrinterList] = useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [showManageDialog, setShowManageDialog] = useState(false);
+  const [managementMode, setManagementMode] = useState<'add' | 'edit' | 'list'>(
+    'list'
+  );
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
 
   // Initialize printer IP persistence hook
-  const { getSavedIP, saveIP, clearSavedIP, hasSavedIP } =
-    usePrinterIPPersistence();
+  const { saveIP } = usePrinterIPPersistence();
 
-  // Load current printer configuration and saved IP on component mount
+  // Fetch real printer metadata
+  const { metadata: printerMetadata } = usePrinterMetadata(
+    currentPrinter?.ip || null
+  );
+
+  // Load current printer configuration on component mount
   useEffect(() => {
     loadCurrentPrinter();
     loadAllPrinters();
+  }, []);
 
-    // Load saved IP and pre-fill manual input if no current printer is set
-    const savedIP = getSavedIP();
-    if (savedIP && savedIP.trim()) {
-      setManualIp(savedIP);
+  // Update current printer with real metadata when available
+  useEffect(() => {
+    if (
+      printerMetadata &&
+      currentPrinter &&
+      printerMetadata.ip === currentPrinter.ip
+    ) {
+      setCurrentPrinter(prev => ({
+        ...prev!,
+        real_model: printerMetadata.printer_model,
+        real_name: printerMetadata.printer_name,
+      }));
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [printerMetadata]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Update all printers list with real metadata when available
+  useEffect(() => {
+    if (printerMetadata && printerMetadata.ip) {
+      setAllPrinters(prev =>
+        prev.map(printer => {
+          if (printer.ip === printerMetadata.ip) {
+            return {
+              ...printer,
+              real_model: printerMetadata.printer_model,
+              real_name: printerMetadata.printer_name,
+            };
+          }
+          return printer;
+        })
+      );
+    }
+  }, [printerMetadata]);
+
+  // Handle click outside dropdown to close it
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  // Calculate dropdown position
+  const updateDropdownPosition = () => {
+    if (buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      const scrollTop =
+        window.pageYOffset || document.documentElement.scrollTop;
+      const scrollLeft =
+        window.pageXOffset || document.documentElement.scrollLeft;
+      const dropdownWidth = 320;
+      const isMobile = window.innerWidth <= 768;
+
+      if (isMobile) {
+        // On mobile, position full width with margins
+        setDropdownPosition({
+          top: rect.bottom + scrollTop + 8,
+          left: 16, // Will be overridden by CSS on mobile
+        });
+      } else {
+        // Calculate left position - prefer right-aligned but avoid going off screen
+        let left = rect.right + scrollLeft - dropdownWidth;
+        if (left < 10) {
+          left = rect.left + scrollLeft; // Align to left edge of button if no space
+        }
+
+        setDropdownPosition({
+          top: rect.bottom + scrollTop + 8,
+          left: Math.max(10, left), // Ensure minimum margin from screen edge
+        });
+      }
+    }
+  };
 
   const loadCurrentPrinter = async () => {
     try {
@@ -70,6 +250,7 @@ function PrinterSelector({
       if (response.ok) {
         const config: PrinterConfigResponse = await response.json();
         if (config.active_printer) {
+          const model = detectPrinterModel(config.active_printer.name);
           setCurrentPrinter({
             name: config.active_printer.name,
             ip: config.active_printer.ip,
@@ -77,10 +258,12 @@ function PrinterSelector({
             has_serial_number: config.active_printer.has_serial_number,
             is_runtime_set: config.active_printer.is_runtime_set,
             is_persistent: config.active_printer.is_persistent,
+            model: model,
           });
         } else if (config.printers && config.printers.length > 0) {
           // Use first configured printer as fallback
           const firstPrinter = config.printers[0];
+          const model = detectPrinterModel(firstPrinter.name);
           setCurrentPrinter({
             name: firstPrinter.name,
             ip: firstPrinter.ip,
@@ -88,6 +271,7 @@ function PrinterSelector({
             has_serial_number: firstPrinter.has_serial_number,
             is_runtime_set: false,
             is_persistent: firstPrinter.is_persistent,
+            model: model,
           });
         }
       }
@@ -117,42 +301,13 @@ function PrinterSelector({
               is_runtime_set: false,
               is_persistent: printer.is_persistent,
               source: printer.source,
+              model: detectPrinterModel(printer.name),
             }))
           );
         }
       }
     } catch (error) {
       console.error('Failed to load all printers:', error);
-    }
-  };
-
-  const handleEditPrinter = () => {
-    if (currentPrinter) {
-      // Populate form fields with current printer data
-      setManualIp(currentPrinter.ip);
-      setManualName(currentPrinter.name);
-      // Note: We can't populate access_code and serial_number as they're not returned by the API for security
-      setManualAccessCode('');
-      setManualSerialNumber('');
-      setIsEditingMode(true);
-      setIsExpanded(true);
-      setStatusMessage('');
-    }
-  };
-
-  const handleCancelEdit = () => {
-    // Clear form fields
-    setManualIp('');
-    setManualAccessCode('');
-    setManualName('');
-    setManualSerialNumber('');
-    setIsEditingMode(false);
-    setStatusMessage('');
-
-    // Load saved IP if available
-    const savedIP = getSavedIP();
-    if (savedIP && savedIP.trim()) {
-      setManualIp(savedIP);
     }
   };
 
@@ -189,7 +344,7 @@ function PrinterSelector({
       setManualAccessCode('');
       setManualName('');
       setManualSerialNumber('');
-      setIsEditingMode(false);
+      setManagementMode('list');
 
       // Reload all printers to update the list
       await loadAllPrinters();
@@ -201,6 +356,7 @@ function PrinterSelector({
   const handleSwitchToPrinter = async (printer: PrinterInfo) => {
     setIsSettingPrinter(true);
     setStatusMessage(`Switching to printer: ${printer.name}...`);
+    setIsDropdownOpen(false);
 
     try {
       const request: SetActivePrinterRequest = {
@@ -211,16 +367,26 @@ function PrinterSelector({
       };
 
       await setActivePrinter(request);
-      setStatusMessage(`✅ Switched to ${printer.name}`);
 
-      // Reload current printer configuration
-      await loadCurrentPrinter();
+      // Clear the status message on success
+      setStatusMessage('');
 
-      // Collapse the panel after switch
-      setTimeout(() => {
-        setIsExpanded(false);
-        setShowPrinterList(false);
-      }, 1500);
+      // Update current printer immediately with known info
+      setCurrentPrinter({
+        ...printer,
+        is_runtime_set: true,
+        // Keep existing model or real_model if available
+        model: printer.model || getEffectivePrinterModel(printer),
+        real_model: printer.real_model,
+        real_name: printer.real_name,
+      });
+
+      // Emit printer change event to notify other components
+      // This will trigger useCurrentPrinter hook to reload
+      printerEvents.emit();
+
+      // Don't reload current printer here - let the event handle it
+      // to avoid race conditions
     } catch (error) {
       setStatusMessage(`❌ Failed to switch to printer: ${error}`);
     } finally {
@@ -258,8 +424,6 @@ function PrinterSelector({
       const result = await response.json();
 
       if (result.success) {
-        setStatusMessage(`✅ Deleted printer: ${printer.name}`);
-
         // Reload all printers to update the list
         await loadAllPrinters();
 
@@ -301,12 +465,18 @@ function PrinterSelector({
       const result: AddPrinterResponse = await response.json();
 
       if (result.success) {
-        setStatusMessage(`✅ Printer saved permanently`);
-
         if (result.printer_info) {
+          // Detect model from name/serial if available
+          const model = detectPrinterModel(
+            result.printer_info.name,
+            request.serial_number
+          );
+
           setCurrentPrinter({
             ...result.printer_info,
             is_runtime_set: true,
+            model: model,
+            // Real model/name will be populated by the metadata hook
           });
 
           // Save IP to Local Storage for future use
@@ -314,14 +484,12 @@ function PrinterSelector({
 
           // Notify parent component
           if (onPrinterChange) {
-            onPrinterChange(result.printer_info);
+            onPrinterChange({
+              ...result.printer_info,
+              model: model,
+            });
           }
         }
-
-        // Collapse the selector after successful selection
-        setTimeout(() => {
-          setIsExpanded(false);
-        }, 1500);
 
         // Reload all printers to update the list
         await loadAllPrinters();
@@ -341,7 +509,7 @@ function PrinterSelector({
 
   const setActivePrinter = async (request: SetActivePrinterRequest) => {
     try {
-      const response = await fetch('/api/printer/configure', {
+      const response = await fetch('/api/printer/set-active', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -386,7 +554,7 @@ function PrinterSelector({
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !isSettingPrinter) {
       handleSetManualPrinter();
     }
@@ -394,300 +562,391 @@ function PrinterSelector({
 
   return (
     <div className={`printer-selector ${className}`}>
-      {/* Current Printer Display */}
-      <div className="current-printer-display">
-        <div className="printer-status">
-          {currentPrinter ? (
-            <div className="active-printer">
-              <span className="printer-indicator">🖨️</span>
-              <div className="printer-info">
-                <span className="printer-name">{currentPrinter.name}</span>
-                <span className="printer-ip">{currentPrinter.ip}</span>
-                <div className="printer-badges">
-                  {currentPrinter.is_runtime_set && (
-                    <span className="runtime-badge">Session</span>
-                  )}
-                  {currentPrinter.is_persistent && (
-                    <span className="persistent-badge">Saved</span>
-                  )}
-                  {currentPrinter.has_serial_number && (
-                    <span className="serial-badge">Serial</span>
-                  )}
+      {/* Redesigned Printer Display */}
+      <div className="printer-display-card">
+        <div className="printer-main-section">
+          <div className="printer-visual">
+            {currentPrinter ? (
+              <>
+                <div className="printer-image">
+                  {getPrinterImage(getEffectivePrinterModel(currentPrinter))}
                 </div>
-              </div>
-            </div>
-          ) : (
-            <div className="no-printer">
-              <span className="printer-indicator">⚠️</span>
-              <span className="no-printer-text">No printer selected</span>
-            </div>
-          )}
-
-          <button
-            onClick={() => setIsExpanded(!isExpanded)}
-            className="expand-button"
-            disabled={isSettingPrinter}
-          >
-            {isExpanded ? '▼' : '▶'} Configure
-          </button>
-
-          {allPrinters.length > 1 && (
-            <button
-              onClick={() => setShowPrinterList(!showPrinterList)}
-              className="list-button"
-              disabled={isSettingPrinter}
-              title="View all saved printers"
-            >
-              📋 List ({allPrinters.length})
-            </button>
-          )}
-
-          {currentPrinter && (
-            <button
-              onClick={handleEditPrinter}
-              className="edit-button"
-              disabled={isSettingPrinter}
-              title="Edit current printer configuration"
-            >
-              ✏️ Edit
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Printer List Panel */}
-      {showPrinterList && allPrinters.length > 0 && (
-        <div className="printer-list-panel">
-          <div className="panel-header">
-            <h3>All Printers ({allPrinters.length})</h3>
-            <p>
-              Click to switch between printers or delete persistent printers
-            </p>
-          </div>
-
-          <div className="printer-list">
-            {allPrinters.map((printer, index) => (
-              <div
-                key={`${printer.ip}-${index}`}
-                className={`printer-item ${currentPrinter?.ip === printer.ip ? 'active' : ''}`}
-              >
-                <div className="printer-info-section">
-                  <span className="printer-indicator">
-                    {currentPrinter?.ip === printer.ip ? '🟢' : '🖨️'}
-                  </span>
-                  <div className="printer-details">
-                    <span className="printer-name">{printer.name}</span>
-                    <span className="printer-ip">{printer.ip}</span>
-                    <div className="printer-badges">
-                      {currentPrinter?.ip === printer.ip && (
-                        <span className="active-badge">Active</span>
-                      )}
-                      {printer.is_persistent && (
-                        <span className="persistent-badge">Saved</span>
-                      )}
-                      {printer.source === 'environment' && (
-                        <span className="env-badge">Environment</span>
-                      )}
-                      {printer.has_serial_number && (
-                        <span className="serial-badge">Serial</span>
-                      )}
-                    </div>
+                <div className="printer-model-info">
+                  <div className="model-name">
+                    {getPrinterDisplayName(
+                      getEffectivePrinterModel(currentPrinter)
+                    )}
+                  </div>
+                  <div className="printer-name-display">
+                    {getEffectivePrinterName(currentPrinter)}
                   </div>
                 </div>
-
-                <div className="printer-actions">
-                  {currentPrinter?.ip !== printer.ip && (
-                    <button
-                      onClick={() => handleSwitchToPrinter(printer)}
-                      disabled={isSettingPrinter}
-                      className="switch-button"
-                      title="Switch to this printer"
-                    >
-                      🔄 Switch
-                    </button>
-                  )}
-
-                  {printer.is_persistent && (
-                    <button
-                      onClick={() => handleDeletePrinter(printer)}
-                      disabled={isSettingPrinter}
-                      className="delete-button"
-                      title="Delete this printer from persistent storage"
-                    >
-                      🗑️ Delete
-                    </button>
-                  )}
+              </>
+            ) : (
+              <>
+                <div className="printer-image placeholder">❓</div>
+                <div className="printer-model-info">
+                  <div className="model-name">No Printer</div>
+                  <div className="printer-name-display">
+                    Select a printer to continue
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
-
-          {allPrinters.length === 0 && (
-            <div className="no-printers-message">
-              <p>
-                No printers configured. Add a printer using the Configure panel
-                above.
-              </p>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Printer Selection Panel */}
-      {isExpanded && (
-        <div className="printer-selection-panel">
-          <div className="panel-header">
-            <h3>{isEditingMode ? 'Edit Printer' : 'Select Printer'}</h3>
-            <p>
-              {isEditingMode
-                ? 'Modify your printer configuration'
-                : "Enter your printer's IP address or hostname and serial number"}
-            </p>
-            {isEditingMode && (
-              <div className="editing-notice">
-                <p>
-                  <strong>Note:</strong> For security reasons, access code and
-                  serial number fields are not pre-filled. Please re-enter them
-                  if needed.
-                </p>
-              </div>
+              </>
             )}
           </div>
 
-          {/* Manual Entry Section */}
-          <div className="manual-entry-section">
-            <div className="section-header">
-              <h4>Printer Configuration</h4>
-              <p>Enter printer details</p>
-            </div>
+          <div className="printer-selector-dropdown" ref={dropdownRef}>
+            <button
+              ref={buttonRef}
+              onClick={() => {
+                if (!isDropdownOpen) {
+                  updateDropdownPosition();
+                }
+                setIsDropdownOpen(!isDropdownOpen);
+              }}
+              disabled={isSettingPrinter}
+              className="printer-selector-button"
+              aria-haspopup="listbox"
+              aria-expanded={isDropdownOpen}
+            >
+              <span className="selector-text">
+                {currentPrinter ? 'Switch Printer' : 'Select Printer'}
+              </span>
+              <span
+                className={`selector-arrow ${isDropdownOpen ? 'open' : ''}`}
+              >
+                ▼
+              </span>
+            </button>
 
-            <div className="manual-form">
-              <div className="form-row">
-                <label htmlFor="manual-ip">
-                  IP Address or Hostname *
-                  {hasSavedIP() && (
-                    <span className="saved-ip-indicator"> (saved)</span>
-                  )}
-                </label>
-                <div className="ip-input-group">
-                  <input
-                    id="manual-ip"
-                    type="text"
-                    value={manualIp}
-                    onChange={e => setManualIp(e.target.value)}
-                    onKeyPress={handleKeyPress}
-                    placeholder="192.168.1.100 or printer.local"
-                    disabled={isSettingPrinter}
-                    className="ip-input"
-                  />
-                  {hasSavedIP() && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        clearSavedIP();
-                        setManualIp('');
-                      }}
-                      disabled={isSettingPrinter}
-                      className="clear-saved-ip-button"
-                      title="Clear saved IP address or hostname"
-                    >
-                      ✕
-                    </button>
-                  )}
+            {isDropdownOpen && (
+              <div
+                className="rich-dropdown-menu"
+                style={{
+                  top: `${dropdownPosition.top}px`,
+                  left: `${dropdownPosition.left}px`,
+                }}
+              >
+                {allPrinters.length > 0 ? (
+                  <>
+                    <div className="dropdown-section">
+                      <div className="dropdown-section-title">
+                        Available Printers
+                      </div>
+                      {allPrinters.map(printer => (
+                        <div
+                          key={printer.ip}
+                          className={`rich-dropdown-item ${currentPrinter?.ip === printer.ip ? 'active' : ''}`}
+                          onClick={() => {
+                            if (printer.ip !== currentPrinter?.ip) {
+                              handleSwitchToPrinter(printer);
+                            }
+                          }}
+                        >
+                          <div className="dropdown-printer-image">
+                            {getPrinterImage(getEffectivePrinterModel(printer))}
+                          </div>
+                          <div className="dropdown-printer-info">
+                            <div className="dropdown-printer-name">
+                              {getEffectivePrinterName(printer)}
+                            </div>
+                            <div className="dropdown-printer-model">
+                              {getPrinterDisplayName(
+                                getEffectivePrinterModel(printer)
+                              )}
+                            </div>
+                            <div className="dropdown-printer-ip">
+                              {printer.ip}
+                            </div>
+                            <div className="dropdown-printer-badges">
+                              {currentPrinter?.ip === printer.ip && (
+                                <span className="badge active">Active</span>
+                              )}
+                              {printer.is_persistent && (
+                                <span className="badge saved">Saved</span>
+                              )}
+                              {printer.has_serial_number && (
+                                <span className="badge serial">Serial</span>
+                              )}
+                            </div>
+                          </div>
+                          {currentPrinter?.ip === printer.ip && (
+                            <div className="active-indicator">✓</div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    <div className="dropdown-divider"></div>
+                  </>
+                ) : (
+                  <div className="dropdown-section">
+                    <div className="no-printers-message">
+                      No printers configured
+                    </div>
+                  </div>
+                )}
+
+                <div className="dropdown-section">
+                  <button
+                    className="manage-printers-button"
+                    onClick={() => {
+                      setShowManageDialog(true);
+                      setManagementMode('list');
+                      setIsDropdownOpen(false);
+                    }}
+                  >
+                    <span className="manage-icon">⚙️</span>
+                    Manage Printers
+                  </button>
                 </div>
               </div>
+            )}
+          </div>
+        </div>
 
-              <div className="form-row">
-                <label htmlFor="manual-access-code">Access Code</label>
-                <input
-                  id="manual-access-code"
-                  type="text"
-                  value={manualAccessCode}
-                  onChange={e => setManualAccessCode(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  placeholder="Access code (optional)"
-                  disabled={isSettingPrinter}
-                  className="access-code-input"
-                />
-              </div>
+        {statusMessage && (
+          <div className="status-message-banner">{statusMessage}</div>
+        )}
+      </div>
 
-              <div className="form-row">
-                <label htmlFor="manual-name">Printer Name</label>
-                <input
-                  id="manual-name"
-                  type="text"
-                  value={manualName}
-                  onChange={e => setManualName(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  placeholder="My Printer (optional)"
-                  disabled={isSettingPrinter}
-                  className="name-input"
-                />
-              </div>
+      {/* Printer Management Dialog */}
+      {showManageDialog && (
+        <div
+          className="dialog-overlay"
+          onClick={() => setShowManageDialog(false)}
+        >
+          <div
+            className="printer-management-dialog"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="dialog-header">
+              <h2>Printer Management</h2>
+              <button
+                className="dialog-close-button"
+                onClick={() => setShowManageDialog(false)}
+              >
+                ✕
+              </button>
+            </div>
 
-              <div className="form-row">
-                <label htmlFor="manual-serial-number">
-                  Serial Number *
-                  <span className="field-hint">
-                    {' '}
-                    (required for MQTT/print features)
-                  </span>
-                </label>
-                <input
-                  id="manual-serial-number"
-                  type="text"
-                  value={manualSerialNumber}
-                  onChange={e => setManualSerialNumber(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  placeholder="01S00C123456789 (required)"
-                  disabled={isSettingPrinter}
-                  className="serial-number-input"
-                />
-                <small className="field-help">
-                  Serial number is required for MQTT communication (print
-                  commands, AMS status). Find it on your printer's display:
-                  Settings → Device → Serial Number.
-                </small>
-              </div>
+            <div className="dialog-content">
+              {managementMode === 'list' && (
+                <div className="printer-management-list">
+                  <div className="management-actions">
+                    <button
+                      className="add-printer-button"
+                      onClick={() => {
+                        setManagementMode('add');
+                        setManualIp('');
+                        setManualAccessCode('');
+                        setManualName('');
+                        setManualSerialNumber('');
+                      }}
+                    >
+                      <span>➕</span>
+                      Add New Printer
+                    </button>
+                  </div>
 
-              <div className="persistence-info">
-                <p className="info-text">
-                  <span className="info-icon">💾</span>
-                  All printers are automatically saved and will persist across
-                  container restarts.
-                </p>
-              </div>
+                  <div className="printers-grid">
+                    {allPrinters.length > 0 ? (
+                      allPrinters.map(printer => (
+                        <div
+                          key={printer.ip}
+                          className="printer-management-card"
+                        >
+                          <div className="card-header">
+                            <div className="printer-card-image">
+                              {getPrinterImage(
+                                (printer.model as PrinterModel) || 'Unknown'
+                              )}
+                            </div>
+                            <div className="printer-card-info">
+                              <div className="card-printer-name">
+                                {printer.name}
+                              </div>
+                              <div className="card-printer-model">
+                                {getPrinterDisplayName(
+                                  (printer.model as PrinterModel) || 'Unknown'
+                                )}
+                              </div>
+                              <div className="card-printer-ip">
+                                {printer.ip}
+                              </div>
+                            </div>
+                            {currentPrinter?.ip === printer.ip && (
+                              <div className="active-indicator-card">
+                                Active
+                              </div>
+                            )}
+                          </div>
 
-              <div className="form-buttons">
-                <button
-                  onClick={handleSetManualPrinter}
-                  disabled={isSettingPrinter || !manualIp.trim()}
-                  className="set-manual-button"
-                >
-                  {isSettingPrinter
-                    ? 'Saving...'
-                    : isEditingMode
-                      ? 'Update Printer'
-                      : 'Save Printer'}
-                </button>
+                          <div className="card-badges">
+                            {printer.is_persistent && (
+                              <span className="badge saved">Saved</span>
+                            )}
+                            {printer.has_serial_number && (
+                              <span className="badge serial">Serial</span>
+                            )}
+                            {printer.source === 'environment' && (
+                              <span className="badge env">Environment</span>
+                            )}
+                          </div>
 
-                {isEditingMode && (
-                  <button
-                    onClick={handleCancelEdit}
-                    disabled={isSettingPrinter}
-                    className="cancel-edit-button"
-                  >
-                    Cancel
-                  </button>
-                )}
-              </div>
+                          <div className="card-actions">
+                            {currentPrinter?.ip !== printer.ip && (
+                              <button
+                                className="card-action-button switch"
+                                onClick={() => handleSwitchToPrinter(printer)}
+                                disabled={isSettingPrinter}
+                              >
+                                Switch To
+                              </button>
+                            )}
+                            <button
+                              className="card-action-button edit"
+                              onClick={() => {
+                                setManagementMode('edit');
+                                setManualIp(printer.ip);
+                                setManualName(printer.name);
+                                setManualAccessCode('');
+                                setManualSerialNumber('');
+                              }}
+                              disabled={isSettingPrinter}
+                            >
+                              Edit
+                            </button>
+                            {printer.is_persistent && (
+                              <button
+                                className="card-action-button delete"
+                                onClick={() => handleDeletePrinter(printer)}
+                                disabled={isSettingPrinter}
+                              >
+                                Delete
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="no-printers-placeholder">
+                        <div className="placeholder-icon">🖨️</div>
+                        <div className="placeholder-text">
+                          No printers configured
+                        </div>
+                        <div className="placeholder-subtext">
+                          Add your first printer to get started
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {(managementMode === 'add' || managementMode === 'edit') && (
+                <div className="printer-form">
+                  <div className="form-header">
+                    <h3>
+                      {managementMode === 'add'
+                        ? 'Add New Printer'
+                        : 'Edit Printer'}
+                    </h3>
+                    <button
+                      className="back-button"
+                      onClick={() => setManagementMode('list')}
+                    >
+                      ← Back to List
+                    </button>
+                  </div>
+
+                  <div className="form-fields">
+                    <div className="form-field">
+                      <label htmlFor="dialog-ip">
+                        IP Address or Hostname *
+                      </label>
+                      <input
+                        id="dialog-ip"
+                        type="text"
+                        value={manualIp}
+                        onChange={e => setManualIp(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                        placeholder="192.168.1.100 or printer.local"
+                        disabled={isSettingPrinter}
+                        className="form-input"
+                      />
+                    </div>
+
+                    <div className="form-field">
+                      <label htmlFor="dialog-name">Printer Name</label>
+                      <input
+                        id="dialog-name"
+                        type="text"
+                        value={manualName}
+                        onChange={e => setManualName(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                        placeholder="My X1C Printer"
+                        disabled={isSettingPrinter}
+                        className="form-input"
+                      />
+                    </div>
+
+                    <div className="form-field">
+                      <label htmlFor="dialog-access-code">Access Code</label>
+                      <input
+                        id="dialog-access-code"
+                        type="text"
+                        value={manualAccessCode}
+                        onChange={e => setManualAccessCode(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                        placeholder="Access code (optional)"
+                        disabled={isSettingPrinter}
+                        className="form-input"
+                      />
+                    </div>
+
+                    <div className="form-field">
+                      <label htmlFor="dialog-serial">Serial Number *</label>
+                      <input
+                        id="dialog-serial"
+                        type="text"
+                        value={manualSerialNumber}
+                        onChange={e => setManualSerialNumber(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                        placeholder="01S00C123456789"
+                        disabled={isSettingPrinter}
+                        className="form-input"
+                      />
+                      <div className="form-help">
+                        Required for MQTT communication. Find it in Settings →
+                        Device → Serial Number.
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="form-actions">
+                    <button
+                      className="form-submit-button"
+                      onClick={handleSetManualPrinter}
+                      disabled={isSettingPrinter || !manualIp.trim()}
+                    >
+                      {isSettingPrinter
+                        ? 'Saving...'
+                        : managementMode === 'add'
+                          ? 'Add Printer'
+                          : 'Update Printer'}
+                    </button>
+                    <button
+                      className="form-cancel-button"
+                      onClick={() => setManagementMode('list')}
+                      disabled={isSettingPrinter}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
-
-          {/* Status Messages */}
-          {statusMessage && (
-            <div className="status-message">{statusMessage}</div>
-          )}
         </div>
       )}
     </div>

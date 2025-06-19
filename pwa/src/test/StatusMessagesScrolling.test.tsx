@@ -31,38 +31,52 @@ describe('Status Messages Scrolling', () => {
   });
 
   it('verifies status messages container has correct CSS class for mobile touch scrolling', async () => {
+    // Mock printer config to have a printer configured
+    const mockFetch = vi.fn() as vi.MockedFunction<typeof fetch>;
+    mockFetch.mockImplementation(url => {
+      if (typeof url === 'string' && url.includes('/api/config')) {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              printer_configured: true,
+              active_printer: {
+                name: 'Test Printer',
+                ip: '192.168.1.100',
+              },
+            }),
+        } as Response);
+      }
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({}),
+      } as Response);
+    });
+    global.fetch = mockFetch;
+
     render(
       <ToastProvider>
         <SliceAndPrint />
       </ToastProvider>
     );
 
-    // Enter a model URL and submit to generate status messages
-    const urlInput = screen.getByTestId('model-url-input');
-    const analyzeButton = screen.getByTestId('analyze-model-button');
+    // Navigate to the Status tab first
+    const statusTab = screen.getByRole('tab', { name: /Status/ });
+    fireEvent.click(statusTab);
 
-    fireEvent.change(urlInput, {
-      target: { value: 'https://example.com/model.stl' },
-    });
-    fireEvent.click(analyzeButton);
-
-    // Wait for status messages to appear
+    // Wait for the status tab to be displayed
     await waitFor(() => {
-      const statusDisplay = document.querySelector('.status-display');
-      expect(statusDisplay).toBeInTheDocument();
+      expect(screen.getByText('System Status')).toBeInTheDocument();
     });
 
-    // Find the status messages container
-    const statusMessagesContainer = document.querySelector('.status-messages');
-    expect(statusMessagesContainer).toBeInTheDocument();
-
-    // Verify the status messages container has the correct class applied
-    // This ensures our CSS fix for mobile touch scrolling will be applied
-    expect(statusMessagesContainer).toHaveClass('status-messages');
-
-    // Verify there are actual status messages that could potentially need scrolling
-    const statusMessages = document.querySelectorAll('.status-message');
-    expect(statusMessages.length).toBeGreaterThan(0);
+    // When there are status messages (from no printer warning), container exists
+    await waitFor(() => {
+      const statusMessagesContainer =
+        document.querySelector('.status-messages');
+      expect(statusMessagesContainer).toBeInTheDocument();
+      // Verify it has the correct class
+      expect(statusMessagesContainer).toHaveClass('status-messages');
+    });
   });
 
   it('status messages container exists and can display multiple messages', async () => {
@@ -72,33 +86,27 @@ describe('Status Messages Scrolling', () => {
       </ToastProvider>
     );
 
-    // Enter a model URL and submit to generate status messages
-    const urlInput = screen.getByTestId('model-url-input');
-    const analyzeButton = screen.getByTestId('analyze-model-button');
+    // Navigate to the Status tab first
+    const statusTab = screen.getByRole('tab', { name: /Status/ });
+    fireEvent.click(statusTab);
 
-    fireEvent.change(urlInput, {
-      target: { value: 'https://example.com/model.stl' },
-    });
-    fireEvent.click(analyzeButton);
-
-    // Wait for status messages to appear
+    // Wait for the status tab to be displayed
     await waitFor(() => {
-      const statusDisplay = document.querySelector('.status-display');
-      expect(statusDisplay).toBeInTheDocument();
+      expect(screen.getByText('System Status')).toBeInTheDocument();
     });
 
-    // Find the status messages container
-    const statusMessagesContainer = document.querySelector('.status-messages');
-    expect(statusMessagesContainer).toBeInTheDocument();
+    // Verify the status tab shows the correct structure
+    expect(screen.getByText('System Log')).toBeInTheDocument();
 
-    // Verify there are actual status messages that could potentially need scrolling
-    const statusMessages = document.querySelectorAll('.status-message');
-    expect(statusMessages.length).toBeGreaterThan(0);
+    // When no printer is configured, we get a warning message
+    await waitFor(() => {
+      const statusMessagesContainer =
+        document.querySelector('.status-messages');
+      expect(statusMessagesContainer).toBeInTheDocument();
 
-    // Verify status messages contain expected content
-    const messagesText = Array.from(statusMessages).map(msg => msg.textContent);
-    expect(messagesText.some(text => text?.includes('Submitting model'))).toBe(
-      true
-    );
+      // Should have the warning message about no printer
+      const messages = screen.getByText(/No printer configured/);
+      expect(messages).toBeInTheDocument();
+    });
   });
 });

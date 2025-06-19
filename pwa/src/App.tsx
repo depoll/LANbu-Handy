@@ -81,29 +81,6 @@ function App() {
         >
           <Header />
 
-          {/* Backend Status Display */}
-          <div className="status-bar">
-            {appStatus.status === 'initializing' && (
-              <div className="status-message status-loading">
-                Connecting to backend...
-              </div>
-            )}
-
-            {appStatus.status === 'ready' && appStatus.backendData && (
-              <div className="status-message status-success">
-                ✓ {appStatus.backendData.application_name} v
-                {appStatus.backendData.version} - Status:{' '}
-                {appStatus.backendData.status}
-              </div>
-            )}
-
-            {appStatus.status === 'error' && (
-              <div className="status-message status-error">
-                ⚠ {appStatus.message}
-              </div>
-            )}
-          </div>
-
           <main>
             <Hero />
             <SliceAndPrint />

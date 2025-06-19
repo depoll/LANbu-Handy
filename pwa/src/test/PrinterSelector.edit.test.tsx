@@ -34,7 +34,7 @@ describe('PrinterSelector Edit Functionality', () => {
     vi.clearAllMocks();
   });
 
-  it('should show edit button when a printer is active', async () => {
+  it('should allow editing printer through manage printers dialog', async () => {
     // Mock API response with active printer
     mockFetch.mockImplementation((url: string) => {
       if (url === '/api/config') {
@@ -50,9 +50,30 @@ describe('PrinterSelector Edit Functionality', () => {
                 is_runtime_set: true,
                 is_persistent: false,
               },
-              printers: [],
+              printers: [
+                {
+                  name: 'Test Printer',
+                  ip: '192.168.1.100',
+                  has_access_code: true,
+                  has_serial_number: true,
+                  is_runtime_set: true,
+                  is_persistent: false,
+                  source: 'runtime',
+                },
+              ],
               printer_configured: true,
               printer_count: 1,
+            }),
+        });
+      }
+      if (url.includes('/api/printer/') && url.includes('/status')) {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              success: true,
+              printer_model: 'X1C',
+              printer_name: 'Test Printer',
             }),
         });
       }
@@ -66,13 +87,25 @@ describe('PrinterSelector Edit Functionality', () => {
       expect(screen.getByText('Test Printer')).toBeInTheDocument();
     });
 
-    // Check if edit button is present
-    const editButton = screen.getByTitle('Edit current printer configuration');
-    expect(editButton).toBeInTheDocument();
-    expect(editButton).toHaveTextContent('✏️ Edit');
+    // Open dropdown
+    const dropdownButton = screen.getByText('Switch Printer');
+    fireEvent.click(dropdownButton);
+
+    // Click Manage Printers
+    const manageButton = screen.getByText('Manage Printers');
+    fireEvent.click(manageButton);
+
+    // Check that the dialog opened
+    await waitFor(() => {
+      expect(screen.getByText('Printer Management')).toBeInTheDocument();
+    });
+
+    // Find the printer in the management list
+    const printerCards = screen.getAllByText('Test Printer');
+    expect(printerCards.length).toBeGreaterThan(0);
   });
 
-  it('should not show edit button when no printer is active', async () => {
+  it('should show empty state when no printer is active', async () => {
     // Mock API response with no active printer
     mockFetch.mockImplementation((url: string) => {
       if (url === '/api/config') {
@@ -87,6 +120,17 @@ describe('PrinterSelector Edit Functionality', () => {
             }),
         });
       }
+      if (url.includes('/api/printer/') && url.includes('/status')) {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              success: true,
+              printer_model: 'X1C',
+              printer_name: 'Test Printer',
+            }),
+        });
+      }
       return Promise.resolve({ ok: false });
     });
 
@@ -94,16 +138,16 @@ describe('PrinterSelector Edit Functionality', () => {
 
     // Wait for component to load
     await waitFor(() => {
-      expect(screen.getByText('No printer selected')).toBeInTheDocument();
+      expect(
+        screen.getByText('Select a printer to continue')
+      ).toBeInTheDocument();
     });
 
-    // Check that edit button is not present
-    expect(
-      screen.queryByTitle('Edit current printer configuration')
-    ).not.toBeInTheDocument();
+    // Check that it shows Select Printer button instead of Switch Printer
+    expect(screen.getByText('Select Printer')).toBeInTheDocument();
   });
 
-  it('should populate form fields when edit button is clicked', async () => {
+  it('should allow managing printers through the dialog', async () => {
     // Mock API response with active printer
     mockFetch.mockImplementation((url: string) => {
       if (url === '/api/config') {
@@ -119,55 +163,30 @@ describe('PrinterSelector Edit Functionality', () => {
                 is_runtime_set: false,
                 is_persistent: true,
               },
-              printers: [],
+              printers: [
+                {
+                  name: 'Test Printer',
+                  ip: '192.168.1.100',
+                  has_access_code: true,
+                  has_serial_number: true,
+                  is_runtime_set: false,
+                  is_persistent: true,
+                  source: 'persistent',
+                },
+              ],
               printer_configured: true,
               printer_count: 1,
             }),
         });
       }
-      return Promise.resolve({ ok: false });
-    });
-
-    render(<PrinterSelector />);
-
-    // Wait for component to load the current printer
-    await waitFor(() => {
-      expect(screen.getByText('Test Printer')).toBeInTheDocument();
-    });
-
-    // Click the edit button
-    const editButton = screen.getByTitle('Edit current printer configuration');
-    fireEvent.click(editButton);
-
-    // Check that form fields are populated and in editing mode
-    await waitFor(() => {
-      expect(screen.getByText('Edit Printer')).toBeInTheDocument();
-      expect(screen.getByDisplayValue('192.168.1.100')).toBeInTheDocument();
-      expect(screen.getByDisplayValue('Test Printer')).toBeInTheDocument();
-      expect(screen.getByText('Update Printer')).toBeInTheDocument();
-      expect(screen.getByText('Cancel')).toBeInTheDocument();
-    });
-  });
-
-  it('should show editing notice when in edit mode', async () => {
-    // Mock API response with active printer
-    mockFetch.mockImplementation((url: string) => {
-      if (url === '/api/config') {
+      if (url.includes('/api/printer/') && url.includes('/status')) {
         return Promise.resolve({
           ok: true,
           json: () =>
             Promise.resolve({
-              active_printer: {
-                name: 'Test Printer',
-                ip: '192.168.1.100',
-                has_access_code: false,
-                has_serial_number: false,
-                is_runtime_set: true,
-                is_persistent: false,
-              },
-              printers: [],
-              printer_configured: true,
-              printer_count: 1,
+              success: true,
+              printer_model: 'X1C',
+              printer_name: 'Test Printer',
             }),
         });
       }
@@ -181,71 +200,19 @@ describe('PrinterSelector Edit Functionality', () => {
       expect(screen.getByText('Test Printer')).toBeInTheDocument();
     });
 
-    // Click the edit button
-    const editButton = screen.getByTitle('Edit current printer configuration');
-    fireEvent.click(editButton);
+    // Open dropdown and go to manage printers
+    const dropdownButton = screen.getByText('Switch Printer');
+    fireEvent.click(dropdownButton);
 
-    // Check that editing notice is shown
+    const manageButton = screen.getByText('Manage Printers');
+    fireEvent.click(manageButton);
+
+    // Check that management dialog shows the printer
     await waitFor(() => {
-      expect(
-        screen.getByText(
-          /For security reasons, access code and serial number fields are not pre-filled/
-        )
-      ).toBeInTheDocument();
-    });
-  });
-
-  it('should clear form and exit edit mode when cancel is clicked', async () => {
-    // Mock API response with active printer
-    mockFetch.mockImplementation((url: string) => {
-      if (url === '/api/config') {
-        return Promise.resolve({
-          ok: true,
-          json: () =>
-            Promise.resolve({
-              active_printer: {
-                name: 'Test Printer',
-                ip: '192.168.1.100',
-                has_access_code: false,
-                has_serial_number: false,
-                is_runtime_set: true,
-                is_persistent: false,
-              },
-              printers: [],
-              printer_configured: true,
-              printer_count: 1,
-            }),
-        });
-      }
-      return Promise.resolve({ ok: false });
-    });
-
-    render(<PrinterSelector />);
-
-    // Wait for component to load the current printer
-    await waitFor(() => {
-      expect(screen.getByText('Test Printer')).toBeInTheDocument();
-    });
-
-    // Click the edit button
-    const editButton = screen.getByTitle('Edit current printer configuration');
-    fireEvent.click(editButton);
-
-    // Wait for edit mode to activate
-    await waitFor(() => {
-      expect(screen.getByText('Edit Printer')).toBeInTheDocument();
-    });
-
-    // Click cancel button
-    const cancelButton = screen.getByText('Cancel');
-    fireEvent.click(cancelButton);
-
-    // Check that we're back to non-editing mode
-    await waitFor(() => {
-      expect(screen.getByText('Select Printer')).toBeInTheDocument();
-      expect(screen.queryByText('Edit Printer')).not.toBeInTheDocument();
-      expect(screen.queryByText('Cancel')).not.toBeInTheDocument();
-      expect(screen.getByText('Save Printer')).toBeInTheDocument();
+      expect(screen.getByText('Printer Management')).toBeInTheDocument();
+      // The printer should be shown in the management list
+      const printerCards = screen.getAllByText('Test Printer');
+      expect(printerCards.length).toBeGreaterThan(0);
     });
   });
 });

@@ -1,11 +1,14 @@
 import { render, screen } from '@testing-library/react';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import ConfigurationSummary from '../components/ConfigurationSummary';
 import {
   FilamentRequirement,
   AMSStatusResponse,
   FilamentMapping,
 } from '../types/api';
+
+// Mock fetch globally
+global.fetch = vi.fn();
 
 // Mock data for tests
 const mockFilamentRequirements: FilamentRequirement = {
@@ -52,14 +55,35 @@ const mockFilamentMappings: FilamentMapping[] = [
   },
 ];
 
+const mockPlates = [
+  {
+    index: 0,
+    prediction_seconds: 3600,
+    weight_grams: 25.5,
+    objects: [],
+  },
+];
+
 describe('ConfigurationSummary', () => {
+  // Setup fetch mock before each test
+  const setupFetchMock = () => {
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true }),
+    } as Response);
+  };
+
   it('renders configuration summary header', () => {
+    setupFetchMock();
     render(
       <ConfigurationSummary
         filamentRequirements={mockFilamentRequirements}
         amsStatus={mockAMSStatus}
         filamentMappings={mockFilamentMappings}
         selectedBuildPlate="cool_plate"
+        currentFileId="test-file-id"
+        selectedPlateIndex={0}
+        plates={mockPlates}
       />
     );
 
@@ -67,19 +91,24 @@ describe('ConfigurationSummary', () => {
   });
 
   it('shows "Ready to slice" when configuration is complete', () => {
+    setupFetchMock();
     render(
       <ConfigurationSummary
         filamentRequirements={mockFilamentRequirements}
         amsStatus={mockAMSStatus}
         filamentMappings={mockFilamentMappings}
         selectedBuildPlate="cool_plate"
+        currentFileId="test-file-id"
+        selectedPlateIndex={0}
+        plates={mockPlates}
       />
     );
 
     expect(screen.getByText('✅ Ready to slice')).toBeInTheDocument();
   });
 
-  it('shows "Configuration incomplete" when filament mappings are missing', () => {
+  it('shows "Ready to slice" even when filament mappings are incomplete', () => {
+    setupFetchMock();
     const incompleteMapping: FilamentMapping[] = [
       {
         filament_index: 0,
@@ -95,19 +124,27 @@ describe('ConfigurationSummary', () => {
         amsStatus={mockAMSStatus}
         filamentMappings={incompleteMapping}
         selectedBuildPlate="cool_plate"
+        currentFileId="test-file-id"
+        selectedPlateIndex={0}
+        plates={mockPlates}
       />
     );
 
-    expect(screen.getByText('⚠ Configuration incomplete')).toBeInTheDocument();
+    // Configuration is always considered complete since 3MF embedded settings are used as fallback
+    expect(screen.getByText('✅ Ready to slice')).toBeInTheDocument();
   });
 
   it('displays build plate information correctly', () => {
+    setupFetchMock();
     render(
       <ConfigurationSummary
         filamentRequirements={mockFilamentRequirements}
         amsStatus={mockAMSStatus}
         filamentMappings={mockFilamentMappings}
         selectedBuildPlate="engineering_plate"
+        currentFileId="test-file-id"
+        selectedPlateIndex={0}
+        plates={mockPlates}
       />
     );
 
@@ -116,12 +153,16 @@ describe('ConfigurationSummary', () => {
   });
 
   it('displays auto build plate correctly', () => {
+    setupFetchMock();
     render(
       <ConfigurationSummary
         filamentRequirements={mockFilamentRequirements}
         amsStatus={mockAMSStatus}
         filamentMappings={mockFilamentMappings}
         selectedBuildPlate="auto"
+        currentFileId="test-file-id"
+        selectedPlateIndex={0}
+        plates={mockPlates}
       />
     );
 
@@ -129,12 +170,16 @@ describe('ConfigurationSummary', () => {
   });
 
   it('displays filament mappings when requirements exist', () => {
+    setupFetchMock();
     render(
       <ConfigurationSummary
         filamentRequirements={mockFilamentRequirements}
         amsStatus={mockAMSStatus}
         filamentMappings={mockFilamentMappings}
         selectedBuildPlate="cool_plate"
+        currentFileId="test-file-id"
+        selectedPlateIndex={0}
+        plates={mockPlates}
       />
     );
 
@@ -151,12 +196,16 @@ describe('ConfigurationSummary', () => {
   });
 
   it('displays AMS slot information for mapped filaments', () => {
+    setupFetchMock();
     render(
       <ConfigurationSummary
         filamentRequirements={mockFilamentRequirements}
         amsStatus={mockAMSStatus}
         filamentMappings={mockFilamentMappings}
         selectedBuildPlate="cool_plate"
+        currentFileId="test-file-id"
+        selectedPlateIndex={0}
+        plates={mockPlates}
       />
     );
 
@@ -165,6 +214,7 @@ describe('ConfigurationSummary', () => {
   });
 
   it('displays "Not assigned" for unmapped filaments', () => {
+    setupFetchMock();
     const partialMapping: FilamentMapping[] = [
       {
         filament_index: 0,
@@ -179,6 +229,9 @@ describe('ConfigurationSummary', () => {
         amsStatus={mockAMSStatus}
         filamentMappings={partialMapping}
         selectedBuildPlate="cool_plate"
+        currentFileId="test-file-id"
+        selectedPlateIndex={0}
+        plates={mockPlates}
       />
     );
 
@@ -186,6 +239,7 @@ describe('ConfigurationSummary', () => {
   });
 
   it('handles zero filament requirements correctly', () => {
+    setupFetchMock();
     const zeroFilamentReq: FilamentRequirement = {
       filament_count: 0,
       filament_types: [],
@@ -199,6 +253,9 @@ describe('ConfigurationSummary', () => {
         amsStatus={mockAMSStatus}
         filamentMappings={[]}
         selectedBuildPlate="cool_plate"
+        currentFileId="test-file-id"
+        selectedPlateIndex={0}
+        plates={mockPlates}
       />
     );
 
@@ -207,6 +264,7 @@ describe('ConfigurationSummary', () => {
   });
 
   it('handles failed AMS status', () => {
+    setupFetchMock();
     const failedAMSStatus: AMSStatusResponse = {
       success: false,
       message: 'Failed to retrieve AMS status',
@@ -218,6 +276,9 @@ describe('ConfigurationSummary', () => {
         amsStatus={failedAMSStatus}
         filamentMappings={mockFilamentMappings}
         selectedBuildPlate="cool_plate"
+        currentFileId="test-file-id"
+        selectedPlateIndex={0}
+        plates={mockPlates}
       />
     );
 
@@ -226,12 +287,16 @@ describe('ConfigurationSummary', () => {
   });
 
   it('handles null AMS status', () => {
+    setupFetchMock();
     render(
       <ConfigurationSummary
         filamentRequirements={mockFilamentRequirements}
         amsStatus={null}
         filamentMappings={mockFilamentMappings}
         selectedBuildPlate="cool_plate"
+        currentFileId="test-file-id"
+        selectedPlateIndex={0}
+        plates={mockPlates}
       />
     );
 
@@ -239,12 +304,16 @@ describe('ConfigurationSummary', () => {
   });
 
   it('displays color swatches for hex colors', () => {
+    setupFetchMock();
     render(
       <ConfigurationSummary
         filamentRequirements={mockFilamentRequirements}
         amsStatus={mockAMSStatus}
         filamentMappings={mockFilamentMappings}
         selectedBuildPlate="cool_plate"
+        currentFileId="test-file-id"
+        selectedPlateIndex={0}
+        plates={mockPlates}
       />
     );
 
@@ -254,12 +323,16 @@ describe('ConfigurationSummary', () => {
   });
 
   it('displays color names for non-hex colors', () => {
+    setupFetchMock();
     render(
       <ConfigurationSummary
         filamentRequirements={mockFilamentRequirements}
         amsStatus={mockAMSStatus}
         filamentMappings={mockFilamentMappings}
         selectedBuildPlate="cool_plate"
+        currentFileId="test-file-id"
+        selectedPlateIndex={0}
+        plates={mockPlates}
       />
     );
 

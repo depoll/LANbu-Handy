@@ -158,6 +158,7 @@ class FilamentMatchingService:
     ) -> List[Tuple[AMSFilament, int, int]]:
         """
         Get all available AMS filaments across all units.
+        Excludes empty slots.
 
         Returns:
             List of tuples: (AMSFilament, unit_id, slot_id)
@@ -165,6 +166,9 @@ class FilamentMatchingService:
         all_filaments = []
         for unit in ams_units:
             for filament in unit.filaments:
+                # Skip empty slots
+                if filament.filament_type == "Empty":
+                    continue
                 all_filaments.append((filament, unit.unit_id, filament.slot_id))
         return all_filaments
 

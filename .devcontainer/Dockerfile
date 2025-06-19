@@ -30,6 +30,38 @@ RUN apt-get update && \
         openssh-client \
         # Docker CLI (minimal)
         docker.io \
+        # Dependencies for playwright browsers
+        libnspr4 \
+        libnss3 \
+        libasound2 \
+        libatk-bridge2.0-0 \
+        libatk1.0-0 \
+        libatspi2.0-0 \
+        libcairo2 \
+        libcups2 \
+        libdbus-1-3 \
+        libdrm2 \
+        libgbm1 \
+        libglib2.0-0 \
+        libgtk-3-0 \
+        libpango-1.0-0 \
+        libx11-6 \
+        libx11-xcb1 \
+        libxcb1 \
+        libxcomposite1 \
+        libxdamage1 \
+        libxext6 \
+        libxfixes3 \
+        libxkbcommon0 \
+        libxrandr2 \
+        libxshmfence1 \
+        libxtst6 \
+        fonts-liberation \
+        libegl1 \
+        libgl1 \
+        libgles2 \
+        libvulkan1 \
+        xvfb \
     && python3 -m pip install --upgrade pip \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
@@ -82,7 +114,10 @@ RUN python3 -m pip install --trusted-host pypi.org --trusted-host pypi.python.or
 
 # Install global npm packages for development
 RUN npm config set strict-ssl false && \
-    npm install -g typescript@5.8.3 @types/node@22.15.29
+    npm install -g typescript@5.8.3 @types/node@22.15.29 playwright@1.49.1
+
+# Install Playwright browsers as root before switching to non-root user
+RUN npx playwright install chromium
 
 # Switch to non-root user
 USER $USERNAME

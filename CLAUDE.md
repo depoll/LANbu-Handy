@@ -184,3 +184,19 @@ BAMBU_PRINTERS='[{"name":"X1C","ip":"192.168.1.100","access_code":"12345678"}]'
 - Input validation for all API endpoints
 - Secure temporary file handling for model downloads
 - Path traversal protection for file operations
+
+### Development Workflow
+
+- Running tests and pre-commits should happen inside the dev container
+
+## Memories
+
+- Use `bambu-studio-cli --help` as the canonical documentation for the cli's functionality. Where something is already built into the CLI, use it! There is some additional (but incomplete) documentation here that has some examples of usage: https://github.com/bambulab/BambuStudio/wiki/Command-Line-Usage
+- make sure we don't get out of sync with upstream in a way that will require us to revert changes to restore. As much as possible, keep the commits linear. So before committing, ensure we're in sync with the remote for the current branch (if there is one). If there are pending changes, that's fine -- just keep building up the changelist until we're ready to commit.
+- use `scripts/start-dev.sh` to start the dev servers. These will track changes and restart/refresh when code changes. You will want to run this in the background as it stays running until you ctrl-c it to shut it down. Use `scripts/stop-dev.sh` to stop the server. Gather the logs somewhere you'll be able to read them (e.g. in /tmp). The server will run on port 3000, and you may need to use the ip of the host to access it.
+- When you can safely run tasks in parallel, you should.
+- When possible, use the playwright mcp server rather than command line commands to test things in the browser. Use chromium with playwright.
+- You can find the Bambu MQTT API documented here: https://github.com/Doridian/OpenBambuAPI/blob/main/mqtt.md
+- You can find the mappings from bambu serial numbers to models here: https://wiki.bambulab.com/en/general/find-sn
+- don't commit with no-verify. Fix any failing precommits.
+- before committing, make sure everything still builds, lints, and passes tests

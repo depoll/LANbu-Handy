@@ -5,32 +5,53 @@ FastAPI application for LANbu Handy - a self-hosted PWA for slicing and
 printing 3D models to Bambu Lab printers in LAN-only mode.
 """
 
+import asyncio
+import json
 import logging
+import time
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from app.config import PrinterConfig, get_config
-from app.filament_matching_service import FilamentMatchingService
-from app.job_orchestration import (
+# Configure logging to show INFO level messages
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+
+# Import and apply async MQTT patch before other imports
+from app.mqtt_async_patch_v3 import add_async_support_to_printer_service  # noqa: E402
+
+add_async_support_to_printer_service()
+
+from app.config import get_config  # noqa: E402
+from app.filament_matching_service import FilamentMatchingService  # noqa: E402
+from app.job_orchestration import (  # noqa: E402
     download_model_step,
     slice_model_step,
     start_print_step,
     upload_gcode_step,
 )
-from app.model_service import (
+from app.model_service import (  # noqa: E402
     ModelDownloadError,
     ModelService,
     ModelValidationError,
 )
-from app.printer_service import (
+from app.printer_config import PrinterConfig  # noqa: E402
+from app.printer_service import (  # noqa: E402
     PrinterCommunicationError,
     PrinterMQTTError,
     PrinterService,
 )
-from app.slicer_service import slice_model
-from app.threemf_repair_service import ThreeMFRepairError, ThreeMFRepairService
-from app.thumbnail_service import ThumbnailGenerationError, ThumbnailService
-from app.utils import (
+from app.slice_progress_service import slice_progress_service  # noqa: E402
+from app.slicer_service import slice_model  # noqa: E402
+from app.threemf_repair_service import (  # noqa: E402
+    ThreeMFRepairError,
+    ThreeMFRepairService,
+)
+from app.thumbnail_service import (  # noqa: E402
+    ThumbnailGenerationError,
+    ThumbnailService,
+)
+from app.utils import (  # noqa: E402
     build_slicing_options_from_config,
     find_gcode_file,
     get_default_slicing_options,
@@ -38,10 +59,10 @@ from app.utils import (
     handle_model_errors,
     validate_ip_or_hostname,
 )
-from fastapi import FastAPI, File, HTTPException, UploadFile
-from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from fastapi import FastAPI, File, HTTPException, UploadFile  # noqa: E402
+from fastapi.responses import FileResponse, StreamingResponse  # noqa: E402
+from fastapi.staticfiles import StaticFiles  # noqa: E402
+from pydantic import BaseModel  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -95,6 +116,8 @@ async def startup_event():
 async def shutdown_event():
     """Clean up resources on shutdown."""
     logger.info("LANbu Handy backend shutting down...")
+
+    # MQTT cleanup now handled automatically by async cancellation
 
     # Clean up old repaired 3MF files
     try:
@@ -180,6 +203,7 @@ async def get_app_config():
         printers_info.append(
             {
                 "name": printer.name,
+                "canonical_id": printer.canonical_id,
                 "ip": printer.ip,
                 # Don't expose access codes in API for security
                 "has_access_code": bool(printer.access_code),
@@ -196,6 +220,7 @@ async def get_app_config():
         is_persistent = active_printer.ip in persistent_ips
         active_printer_info = {
             "name": active_printer.name,
+            "canonical_id": active_printer.canonical_id,
             "ip": active_printer.ip,
             "has_access_code": bool(active_printer.access_code),
             "has_serial_number": bool(active_printer.serial_number),
@@ -223,6 +248,7 @@ class ModelURLRequest(BaseModel):
 
 class PlateInfoResponse(BaseModel):
     index: int
+    name: Optional[str] = None
     prediction_seconds: Optional[int] = None
     weight_grams: Optional[float] = None
     has_support: bool = False
@@ -255,6 +281,7 @@ class SliceResponse(BaseModel):
     message: str
     gcode_path: str = None
     error_details: str = None
+    updated_plates: Optional[List[PlateInfoResponse]] = None
 
 
 class JobStartRequest(BaseModel):
@@ -266,6 +293,7 @@ class JobStartResponse(BaseModel):
     message: str
     job_steps: dict = None
     error_details: str = None
+    updated_plates: Optional[List[PlateInfoResponse]] = None
 
 
 class AMSFilamentResponse(BaseModel):
@@ -283,6 +311,15 @@ class AMSUnitResponse(BaseModel):
 class AMSStatusResponse(BaseModel):
     success: bool
     message: str
+    ams_units: Optional[List[AMSUnitResponse]] = None
+    error_details: Optional[str] = None
+
+
+class PrinterStatusResponse(BaseModel):
+    success: bool
+    message: str
+    printer_model: Optional[str] = None
+    printer_name: Optional[str] = None
     ams_units: Optional[List[AMSUnitResponse]] = None
     error_details: Optional[str] = None
 
@@ -366,6 +403,31 @@ class FilamentMatchResponse(BaseModel):
     error_details: Optional[str] = None
 
 
+class StartProgressSliceRequest(BaseModel):
+    file_id: str
+    filament_mappings: List[FilamentMapping]
+    build_plate_type: str
+    selected_plate_index: Optional[int] = None  # None means all plates
+
+
+class StartProgressSliceResponse(BaseModel):
+    success: bool
+    message: str
+    session_id: Optional[str] = None
+    error_details: Optional[str] = None
+
+
+class SliceProgressSessionStatus(BaseModel):
+    session_id: str
+    file_id: str
+    total_plates: int
+    completed_plates: int
+    current_plate: Optional[int]
+    is_active: bool
+    start_time: float
+    elapsed_time: float
+
+
 @app.post("/api/model/submit-url", response_model=ModelSubmissionResponse)
 async def submit_model_url(request: ModelURLRequest):
     """
@@ -387,11 +449,14 @@ async def submit_model_url(request: ModelURLRequest):
         # Download and validate the model
         file_path = await model_service.download_model(request.model_url)
 
-        # Get file information
-        file_info = model_service.get_file_info(file_path)
+        # Parse comprehensive model information (may convert STL to 3MF)
+        model_info, final_file_path = model_service.parse_3mf_model_info(file_path)
 
-        # Parse comprehensive model information if it's a .3mf file
-        model_info = model_service.parse_3mf_model_info(file_path)
+        # Update file_path to point to the actual file (potentially converted to 3MF)
+        file_path = final_file_path
+
+        # Get file information (using potentially updated file_path)
+        file_info = model_service.get_file_info(file_path)
 
         # Convert filament requirements to response model if found
         filament_requirements_response = None
@@ -410,6 +475,7 @@ async def submit_model_url(request: ModelURLRequest):
                 plates_response.append(
                     PlateInfoResponse(
                         index=plate.index,
+                        name=plate.name,
                         prediction_seconds=plate.prediction_seconds,
                         weight_grams=plate.weight_grams,
                         has_support=plate.has_support,
@@ -417,8 +483,7 @@ async def submit_model_url(request: ModelURLRequest):
                     )
                 )
 
-        # Generate file ID (using the filename without UUID prefix
-        # for user display)
+        # Generate file ID (using the actual filename after any conversion)
         file_id = file_path.name
 
         return ModelSubmissionResponse(
@@ -483,11 +548,14 @@ async def upload_model_file(file: UploadFile = File(...)):
         with open(temp_file_path, "wb") as f:
             f.write(content)
 
-        # Get file information
-        file_info = model_service.get_file_info(temp_file_path)
+        # Parse comprehensive model information (may convert STL to 3MF)
+        model_info, final_file_path = model_service.parse_3mf_model_info(temp_file_path)
 
-        # Parse comprehensive model information if it's a .3mf file
-        model_info = model_service.parse_3mf_model_info(temp_file_path)
+        # Update temp_file_path to point to the actual file (converted to 3MF)
+        temp_file_path = final_file_path
+
+        # Get file information (using potentially updated file_path)
+        file_info = model_service.get_file_info(temp_file_path)
 
         # Convert filament requirements to response model if found
         filament_requirements_response = None
@@ -506,6 +574,7 @@ async def upload_model_file(file: UploadFile = File(...)):
                 plates_response.append(
                     PlateInfoResponse(
                         index=plate.index,
+                        name=plate.name,
                         prediction_seconds=plate.prediction_seconds,
                         weight_grams=plate.weight_grams,
                         has_support=plate.has_support,
@@ -513,7 +582,7 @@ async def upload_model_file(file: UploadFile = File(...)):
                     )
                 )
 
-        # Generate file ID (using the filename with UUID prefix for storage)
+        # Generate file ID (using the actual filename after any conversion)
         file_id = temp_file_path.name
 
         return ModelSubmissionResponse(
@@ -703,6 +772,11 @@ async def get_model_thumbnail(file_id: str, width: int = 300, height: int = 300)
         HTTPException: If file is not found or thumbnail generation fails
     """
     try:
+        # Debug logging
+        logger.info(
+            f"Thumbnail request: file_id='{file_id}', width={width}, height={height}"
+        )
+
         # Find the model file in the temp directory
         model_file_path = model_service.temp_dir / file_id
 
@@ -717,16 +791,18 @@ async def get_model_thumbnail(file_id: str, width: int = 300, height: int = 300)
                 status_code=400, detail="Invalid file type for thumbnail"
             )
 
-        # Check if thumbnail already exists
-        if thumbnail_service.thumbnail_exists(model_file_path):
-            thumbnail_path = thumbnail_service.get_thumbnail_path(model_file_path)
-            logger.debug(f"Using existing thumbnail: {thumbnail_path}")
-        else:
-            # Generate new thumbnail
-            logger.info(f"Generating thumbnail for: {file_id}")
-            thumbnail_path = thumbnail_service.generate_thumbnail(
-                model_file_path, width=width, height=height
-            )
+        # Always try to generate/extract thumbnail to ensure we get the best quality
+        # For 3MF files, this will extract embedded thumbnails
+        # For other files or when extraction fails, it will use CLI or placeholders
+        logger.info(f"Generating thumbnail for: {file_id}")
+        thumbnail_path = thumbnail_service.generate_thumbnail(
+            model_file_path, width=width, height=height, prefer_embedded=True
+        )
+        size_info = thumbnail_path.stat().st_size if thumbnail_path.exists() else "N/A"
+        logger.info(
+            f"Thumbnail result: {thumbnail_path}, exists: {thumbnail_path.exists()}, "
+            f"size: {size_info}"
+        )
 
         # Determine media type based on file extension
         media_type = "image/png"
@@ -737,6 +813,11 @@ async def get_model_thumbnail(file_id: str, width: int = 300, height: int = 300)
             path=thumbnail_path,
             media_type=media_type,
             filename=f"{model_file_path.stem}_thumbnail{thumbnail_path.suffix}",
+            headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0",
+            },
         )
 
     except HTTPException:
@@ -749,6 +830,286 @@ async def get_model_thumbnail(file_id: str, width: int = 300, height: int = 300)
     except Exception as e:
         msg = f"Internal server error generating thumbnail: {str(e)}"
         raise HTTPException(status_code=500, detail=msg)
+
+
+@app.get("/api/model/thumbnail/{file_id}/plate/{plate_index}")
+async def get_plate_thumbnail(
+    file_id: str, plate_index: int, width: int = 300, height: int = 300
+):
+    """
+    Generate and serve a thumbnail image for a specific plate in a model file.
+
+    This endpoint extracts or generates a thumbnail for a specific plate from
+    a 3MF file. Falls back to general thumbnail if plate-specific not available.
+
+    Args:
+        file_id: Unique identifier for the downloaded model file
+        plate_index: Index of the plate (0-based)
+        width: Thumbnail width in pixels (default: 300)
+        height: Thumbnail height in pixels (default: 300)
+
+    Returns:
+        FileResponse with the thumbnail image (PNG or SVG)
+
+    Raises:
+        HTTPException: If file is not found or thumbnail generation fails
+    """
+    try:
+        # Find the model file in the temp directory
+        model_file_path = model_service.temp_dir / file_id
+
+        if not model_file_path.exists():
+            raise HTTPException(
+                status_code=404, detail=f"Model file not found: {file_id}"
+            )
+
+        # Validate file extension for security
+        if not model_service.validate_file_extension(model_file_path.name):
+            raise HTTPException(
+                status_code=400, detail="Invalid file type for thumbnail"
+            )
+
+        # Generate plate-specific thumbnail path
+        thumbnail_name = f"{model_file_path.stem}_plate_{plate_index}_thumbnail.png"
+        thumbnail_path = thumbnail_service.temp_dir / thumbnail_name
+
+        # Check if plate-specific thumbnail already exists
+        if thumbnail_path.exists():
+            logger.debug(f"Using existing plate thumbnail: {thumbnail_path}")
+        else:
+            # Extract/generate plate-specific thumbnail
+            logger.info(f"Generating plate {plate_index} thumbnail for: {file_id}")
+            extracted_path = thumbnail_service.extract_plate_thumbnail(
+                model_file_path, plate_index, thumbnail_path
+            )
+
+            if not extracted_path or not extracted_path.exists():
+                # Fallback to general thumbnail generation with embedded preference
+                thumbnail_path = thumbnail_service.generate_thumbnail(
+                    model_file_path, thumbnail_path, width, height, prefer_embedded=True
+                )
+
+        # Determine media type based on file extension
+        media_type = "image/png"
+        if thumbnail_path.suffix.lower() == ".svg":
+            media_type = "image/svg+xml"
+
+        return FileResponse(
+            path=thumbnail_path,
+            media_type=media_type,
+            filename=(
+                f"{model_file_path.stem}_plate_{plate_index}_thumbnail"
+                f"{thumbnail_path.suffix}"
+            ),
+            headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0",
+            },
+        )
+
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
+    except Exception as e:
+        msg = f"Internal server error generating plate thumbnail: {str(e)}"
+        raise HTTPException(status_code=500, detail=msg)
+
+
+@app.get("/api/model/thumbnails/{file_id}")
+async def get_available_thumbnails(file_id: str):
+    """
+    Get information about available thumbnails in a model file.
+
+    This endpoint analyzes a 3MF file and returns information about
+    available general and plate-specific thumbnails.
+
+    Args:
+        file_id: Unique identifier for the downloaded model file
+
+    Returns:
+        Dictionary with thumbnail availability information
+
+    Raises:
+        HTTPException: If file is not found
+    """
+    try:
+        # Find the model file in the temp directory
+        model_file_path = model_service.temp_dir / file_id
+
+        if not model_file_path.exists():
+            raise HTTPException(
+                status_code=404, detail=f"Model file not found: {file_id}"
+            )
+
+        # Validate file extension for security
+        if not model_service.validate_file_extension(model_file_path.name):
+            raise HTTPException(
+                status_code=400, detail="Invalid file type for thumbnail analysis"
+            )
+
+        # Analyze available thumbnails
+        thumbnail_info = thumbnail_service.get_available_thumbnails(model_file_path)
+
+        return {
+            "file_id": file_id,
+            "file_type": model_file_path.suffix.lower(),
+            "thumbnails": thumbnail_info,
+        }
+
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
+    except Exception as e:
+        msg = f"Internal server error analyzing thumbnails: {str(e)}"
+        raise HTTPException(status_code=500, detail=msg)
+
+
+@app.get("/api/model/debug-thumbnail/{file_id}")
+async def debug_thumbnail_extraction(file_id: str):
+    """
+    Debug endpoint to test thumbnail extraction step by step.
+    """
+    try:
+        # Find the model file in the temp directory
+        model_file_path = model_service.temp_dir / file_id
+
+        if not model_file_path.exists():
+            return {
+                "error": f"Model file not found: {file_id}",
+                "path": str(model_file_path),
+            }
+
+        debug_info = {
+            "file_id": file_id,
+            "file_path": str(model_file_path),
+            "file_exists": model_file_path.exists(),
+            "file_size": (
+                model_file_path.stat().st_size if model_file_path.exists() else 0
+            ),
+            "file_extension": model_file_path.suffix.lower(),
+            "is_3mf": model_file_path.suffix.lower() == ".3mf",
+        }
+
+        if model_file_path.suffix.lower() == ".3mf":
+            # Test thumbnail extraction
+            import zipfile
+
+            try:
+                with zipfile.ZipFile(model_file_path, "r") as zip_file:
+                    files = zip_file.namelist()
+
+                    # Categorize all files for better debugging
+                    metadata_files = [f for f in files if f.startswith("Metadata/")]
+                    auxiliaries_files = [
+                        f for f in files if f.startswith("Auxiliaries/")
+                    ]
+                    thumbnail_files = [
+                        f
+                        for f in files
+                        if "thumbnail" in f.lower() and f.lower().endswith(".png")
+                    ]
+                    image_files = [
+                        f
+                        for f in files
+                        if any(
+                            ext in f.lower()
+                            for ext in [".png", ".jpg", ".jpeg", ".bmp"]
+                        )
+                    ]
+
+                    debug_info.update(
+                        {
+                            "zip_files_count": len(files),
+                            "all_files": files[:20],  # Show first 20 files
+                            "metadata_files": metadata_files,
+                            "auxiliaries_files": auxiliaries_files,
+                            "thumbnail_files": thumbnail_files,
+                            "all_image_files": image_files,
+                        }
+                    )
+
+                    if thumbnail_files:
+                        # Try to extract the first thumbnail we find
+                        test_thumb = thumbnail_files[0]
+                        test_output = (
+                            thumbnail_service.temp_dir / f"debug_{file_id}_thumb.png"
+                        )
+
+                        with zip_file.open(test_thumb) as thumb_file:
+                            content = thumb_file.read()
+                            with open(test_output, "wb") as out_file:
+                                out_file.write(content)
+
+                        debug_info["extraction_test"] = {
+                            "extracted_file": test_thumb,
+                            "output_path": str(test_output),
+                            "output_exists": test_output.exists(),
+                            "output_size": len(content),
+                            "content_length": len(content),
+                        }
+
+                    # Also test our specific metadata paths
+                    metadata_thumbs = [
+                        f
+                        for f in files
+                        if f.startswith("Metadata/") and "thumbnail" in f.lower()
+                    ]
+                    debug_info["metadata_thumbnails"] = metadata_thumbs
+
+            except Exception as e:
+                debug_info["zip_error"] = str(e)
+
+        # Test thumbnail availability analysis
+        try:
+            available_thumbs = thumbnail_service.get_available_thumbnails(
+                model_file_path
+            )
+            debug_info["available_thumbnails"] = available_thumbs
+        except Exception as e:
+            debug_info["thumbnail_analysis_error"] = str(e)
+
+        # Test plate-specific thumbnail extraction
+        try:
+            debug_info["plate_extractions"] = {}
+            # Test first few plates
+            for plate_idx in [1, 2, 3]:
+                plate_result = thumbnail_service.extract_plate_thumbnail(
+                    model_file_path, plate_idx
+                )
+                if plate_result and plate_result.exists():
+                    debug_info["plate_extractions"][plate_idx] = {
+                        "path": str(plate_result),
+                        "size": plate_result.stat().st_size,
+                    }
+                else:
+                    debug_info["plate_extractions"][plate_idx] = None
+        except Exception as e:
+            debug_info["plate_extraction_error"] = str(e)
+
+        # Test the actual thumbnail service
+        try:
+            # First, clear any existing thumbnail to force regeneration
+            existing_thumb = thumbnail_service.get_thumbnail_path(model_file_path)
+            if existing_thumb.exists():
+                existing_thumb.unlink()
+                debug_info["cleared_existing"] = str(existing_thumb)
+
+            result_path = thumbnail_service.generate_thumbnail(
+                model_file_path, prefer_embedded=True
+            )
+            debug_info["service_result"] = {
+                "path": str(result_path),
+                "exists": result_path.exists(),
+                "size": result_path.stat().st_size if result_path.exists() else 0,
+            }
+        except Exception as e:
+            debug_info["service_error"] = str(e)
+
+        return debug_info
+
+    except Exception as e:
+        return {"error": f"Debug failed: {str(e)}"}
 
 
 @app.post("/api/slice/defaults", response_model=SliceResponse)
@@ -791,10 +1152,32 @@ async def slice_model_with_defaults(request: SliceRequest):
         if result.success:
             try:
                 gcode_path = str(find_gcode_file(output_dir))
+
+                # Update plate estimates from slice output
+                updated_plates = model_service.update_plate_estimates_from_slice_output(
+                    model_file_path, output_dir
+                )
+
+                # Convert to response format
+                plates_response = []
+                if updated_plates:
+                    for plate in updated_plates:
+                        plates_response.append(
+                            PlateInfoResponse(
+                                index=plate.index,
+                                name=plate.name,
+                                prediction_seconds=plate.prediction_seconds,
+                                weight_grams=plate.weight_grams,
+                                has_support=plate.has_support,
+                                object_count=plate.object_count,
+                            )
+                        )
+
                 return SliceResponse(
                     success=True,
                     message="Model sliced successfully with default settings",
                     gcode_path=gcode_path,
+                    updated_plates=plates_response if plates_response else None,
                 )
             except FileNotFoundError:
                 return SliceResponse(
@@ -860,16 +1243,41 @@ async def slice_model_with_configuration(request: ConfiguredSliceRequest):
 
         # Slice the model
         result = slice_model(
-            input_path=model_file_path, output_dir=output_dir, options=slicing_options
+            input_path=model_file_path,
+            output_dir=output_dir,
+            options=slicing_options,
+            plate_index=request.selected_plate_index,
         )
 
         if result.success:
             try:
                 gcode_path = str(find_gcode_file(output_dir))
+
+                # Update plate estimates from slice output
+                updated_plates = model_service.update_plate_estimates_from_slice_output(
+                    model_file_path, output_dir
+                )
+
+                # Convert to response format
+                plates_response = []
+                if updated_plates:
+                    for plate in updated_plates:
+                        plates_response.append(
+                            PlateInfoResponse(
+                                index=plate.index,
+                                name=plate.name,
+                                prediction_seconds=plate.prediction_seconds,
+                                weight_grams=plate.weight_grams,
+                                has_support=plate.has_support,
+                                object_count=plate.object_count,
+                            )
+                        )
+
                 return SliceResponse(
                     success=True,
                     message="Model sliced successfully with user configuration",
                     gcode_path=gcode_path,
+                    updated_plates=plates_response if plates_response else None,
                 )
             except FileNotFoundError:
                 return SliceResponse(
@@ -891,6 +1299,546 @@ async def slice_model_with_configuration(request: ConfiguredSliceRequest):
         raise
     except Exception as e:
         msg = f"Internal server error during configured slicing: {str(e)}"
+        raise HTTPException(status_code=500, detail=msg)
+
+
+@app.post("/api/slice/sequential-plates", response_model=SliceResponse)
+async def slice_model_sequential_plates(request: ConfiguredSliceRequest):
+    """
+    Slice a multi-plate model plate by plate sequentially using Bambu Studio CLI.
+
+    This endpoint slices each plate individually in sequence, allowing for
+    real-time progress tracking as each plate completes. Useful for large
+    multi-plate models where users want to see incremental progress.
+
+    Args:
+        request: ConfiguredSliceRequest containing file_id, filament_mappings,
+                build_plate_type, and optional selected_plate_index
+
+    Returns:
+        SliceResponse with success status and updated plate estimates
+
+    Raises:
+        HTTPException: If file is not found or slicing fails
+    """
+    try:
+        # Find the model file in the temp directory
+        model_file_path = model_service.temp_dir / request.file_id
+
+        if not model_file_path.exists():
+            raise HTTPException(
+                status_code=404, detail=f"Model file not found: {request.file_id}"
+            )
+
+        # Get plate information from the model
+        try:
+            plates_info = model_service.parse_3mf_plate_info(model_file_path)
+        except Exception as e:
+            raise HTTPException(
+                status_code=400, detail=f"Failed to analyze model plates: {str(e)}"
+            )
+
+        if not plates_info:
+            raise HTTPException(status_code=400, detail="No plates found in model")
+
+        # Determine which plates to slice
+        plates_to_slice = (
+            [p for p in plates_info if p.index == request.selected_plate_index]
+            if request.selected_plate_index is not None
+            else plates_info
+        )
+
+        if not plates_to_slice:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Plate {request.selected_plate_index} not found in model",
+            )
+
+        # Create output directory for G-code
+        output_dir = get_gcode_output_dir()
+
+        # Build slicing options from the configuration
+        slicing_options = build_slicing_options_from_config(
+            request.filament_mappings,
+            request.build_plate_type,
+            request.selected_plate_index,
+        )
+
+        updated_plates = []
+        all_gcode_paths = []
+
+        # Slice each plate sequentially
+        for plate in plates_to_slice:
+            logger.info(f"Slicing plate {plate.index} for file {request.file_id}")
+
+            # Create plate-specific output directory
+            plate_output_dir = output_dir / f"plate_{plate.index}"
+            plate_output_dir.mkdir(parents=True, exist_ok=True)
+
+            # Slice this specific plate
+            result = slice_model(
+                input_path=model_file_path,
+                output_dir=plate_output_dir,
+                options=slicing_options,
+                plate_index=plate.index,
+            )
+
+            if not result.success:
+                error_details = (
+                    f"CLI Error for plate {plate.index}: {result.stderr}"
+                    if result.stderr
+                    else result.stdout
+                )
+                return SliceResponse(
+                    success=False,
+                    message=f"Slicing failed for plate {plate.index}",
+                    error_details=error_details,
+                )
+
+            # Find and record the G-code file for this plate
+            try:
+                gcode_path = find_gcode_file(plate_output_dir)
+                all_gcode_paths.append(str(gcode_path))
+
+                # Update plate estimates from slice output
+                updated_plate = model_service.update_plate_estimates_from_slice_output(
+                    model_file_path, plate_output_dir, plate
+                )
+                updated_plates.append(updated_plate)
+
+            except FileNotFoundError:
+                return SliceResponse(
+                    success=False,
+                    message=f"Slicing completed for plate {plate.index} "
+                    f"but no G-code generated",
+                    error_details="No output found in expected location",
+                )
+
+        # Convert to response format
+        plates_response = [
+            PlateInfoResponse(
+                index=plate.index,
+                name=plate.name,
+                prediction_seconds=plate.prediction_seconds,
+                weight_grams=plate.weight_grams,
+                has_support=plate.has_support,
+                object_count=plate.object_count,
+            )
+            for plate in updated_plates
+        ]
+
+        return SliceResponse(
+            success=True,
+            message=f"Successfully sliced {len(plates_to_slice)} plate(s) sequentially",
+            gcode_path="; ".join(
+                all_gcode_paths
+            ),  # Multiple paths separated by semicolon
+            updated_plates=plates_response,
+        )
+
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
+    except Exception as e:
+        msg = f"Internal server error during sequential plate slicing: {str(e)}"
+        raise HTTPException(status_code=500, detail=msg)
+
+
+@app.post("/api/slice/start-progress", response_model=StartProgressSliceResponse)
+async def start_slice_with_progress(request: StartProgressSliceRequest):
+    """
+    Start a slicing operation with real-time progress tracking.
+
+    This endpoint initiates a slice operation that provides real-time progress
+    updates via Server-Sent Events. Each plate is sliced individually with
+    progress streamed as it happens.
+
+    Args:
+        request: ConfiguredSliceRequest with file and configuration details
+
+    Returns:
+        StartProgressSliceResponse with session ID for tracking progress
+
+    Raises:
+        HTTPException: If file is not found or initialization fails
+    """
+    try:
+        logger.info(f"Received start-progress request: {request}")
+        logger.info(
+            f"Request details - file_id: {request.file_id}, "
+            f"mappings: {len(request.filament_mappings)}, "
+            f"plate: {request.build_plate_type}, "
+            f"selected_plate: {request.selected_plate_index}"
+        )
+        # Find the model file in the temp directory
+        model_file_path = model_service.temp_dir / request.file_id
+
+        if not model_file_path.exists():
+            raise HTTPException(
+                status_code=404, detail=f"Model file not found: {request.file_id}"
+            )
+
+        # Get plate information from the model
+        try:
+            plates_info = model_service.parse_3mf_plate_info(model_file_path)
+        except Exception as e:
+            raise HTTPException(
+                status_code=400, detail=f"Failed to analyze model plates: {str(e)}"
+            )
+
+        if not plates_info:
+            raise HTTPException(status_code=400, detail="No plates found in model")
+
+        # Determine which plates to slice
+        plates_to_slice = (
+            [p.index for p in plates_info if p.index == request.selected_plate_index]
+            if request.selected_plate_index is not None
+            else [p.index for p in plates_info]
+        )
+
+        if not plates_to_slice:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Plate {request.selected_plate_index} not found in model",
+            )
+
+        # Create progress session
+        session_id = slice_progress_service.create_session(
+            file_id=request.file_id, plate_indices=plates_to_slice
+        )
+
+        # Store the configuration in the session for later use
+        session = slice_progress_service.sessions[session_id]
+        session.config = {
+            "filament_mappings": request.filament_mappings,
+            "build_plate_type": request.build_plate_type,
+            "selected_plate_index": request.selected_plate_index,
+        }
+
+        return StartProgressSliceResponse(
+            success=True,
+            message=f"Started slice progress session for "
+            f"{len(plates_to_slice)} plate(s)",
+            session_id=session_id,
+        )
+
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
+    except Exception as e:
+        msg = f"Internal server error starting slice progress: {str(e)}"
+        raise HTTPException(status_code=500, detail=msg)
+
+
+@app.get("/api/slice/progress/{session_id}/stream")
+async def stream_slice_progress(session_id: str):
+    """
+    Stream real-time slice progress updates via Server-Sent Events.
+
+    This endpoint provides a continuous stream of progress updates for a
+    slicing session. Clients can connect to this endpoint to receive real-time
+    updates as each plate is processed.
+
+    Args:
+        session_id: The session ID from start_slice_with_progress
+
+    Returns:
+        EventSourceResponse streaming progress updates
+
+    Raises:
+        HTTPException: If session is not found
+    """
+    try:
+        # Verify session exists
+        session_status = slice_progress_service.get_session_status(session_id)
+        if not session_status:
+            raise HTTPException(
+                status_code=404, detail=f"Progress session not found: {session_id}"
+            )
+
+        async def generate_progress_events():
+            """Generate Server-Sent Events for progress updates."""
+            try:
+                # Get the session
+                session = slice_progress_service.sessions[session_id]
+
+                # Send initial start event
+                logger.info(
+                    f"Starting streaming slice for session {session_id} "
+                    f"with {len(session.plate_indices)} plates"
+                )
+                start_event = {
+                    "type": "start",
+                    "data": {
+                        "session_id": session_id,
+                        "total_plates": len(session.plate_indices),
+                        "message": "Starting slice operation...",
+                        "timestamp": time.time(),
+                    },
+                }
+                yield f"data: {json.dumps(start_event)}\n\n"
+
+                # Actually slice each plate with progress tracking
+                model_file_path = model_service.temp_dir / session.file_id
+                output_dir = get_gcode_output_dir() / f"session_{session_id}"
+
+                # Get slicing options from stored configuration
+                if hasattr(session, "config") and session.config:
+                    from app.utils import build_slicing_options_from_config
+
+                    slicing_options = build_slicing_options_from_config(
+                        session.config["filament_mappings"],
+                        session.config["build_plate_type"],
+                        session.config["selected_plate_index"],
+                    )
+                else:
+                    # Fallback to defaults
+                    from app.utils import get_default_slicing_options
+
+                    slicing_options = get_default_slicing_options()
+
+                for i, plate_index in enumerate(session.plate_indices):
+                    # Update session state
+                    session.current_plate = plate_index
+                    logger.info(
+                        f"Processing plate {plate_index} "
+                        f"({i+1}/{len(session.plate_indices)})"
+                    )
+
+                    # Send plate start event
+                    plate_start_event = {
+                        "type": "progress",
+                        "data": {
+                            "plate_index": plate_index,
+                            "phase": "starting",
+                            "progress_percent": 0.0,
+                            "message": f"Starting slice for plate {plate_index}...",
+                            "timestamp": time.time(),
+                            "is_complete": False,
+                        },
+                    }
+                    yield f"data: {json.dumps(plate_start_event)}\n\n"
+                    logger.info(f"Sent start event for plate {plate_index}")
+
+                    # Create plate-specific output directory
+                    plate_output_dir = output_dir / f"plate_{plate_index}"
+                    plate_output_dir.mkdir(parents=True, exist_ok=True)
+
+                    # Send progress updates for this plate
+                    progress_phases = [
+                        (10, "preparing", "Preparing slice configuration..."),
+                        (30, "analyzing", "Analyzing model geometry..."),
+                        (50, "processing", "Processing objects..."),
+                        (70, "slicing", "Generating toolpaths..."),
+                        (90, "gcode", "Writing G-code output..."),
+                    ]
+
+                    # Send initial progress phases quickly
+                    for progress_percent, phase, message in progress_phases:
+                        progress_event = {
+                            "type": "progress",
+                            "data": {
+                                "plate_index": plate_index,
+                                "phase": phase,
+                                "progress_percent": progress_percent,
+                                "message": message,
+                                "timestamp": time.time(),
+                                "is_complete": False,
+                            },
+                        }
+                        yield f"data: {json.dumps(progress_event)}\n\n"
+                        await asyncio.sleep(0.5)  # Quick phase updates
+
+                    # Actually perform the slice for this plate
+                    try:
+                        # Run the actual slice operation in a thread to avoid blocking
+                        import concurrent.futures
+
+                        with concurrent.futures.ThreadPoolExecutor() as executor:
+                            future = executor.submit(
+                                slice_model,
+                                input_path=model_file_path,
+                                output_dir=plate_output_dir,
+                                options=slicing_options,
+                                plate_index=plate_index,
+                            )
+
+                            # Wait for completion while allowing other async tasks
+                            slice_result = (
+                                await asyncio.get_event_loop().run_in_executor(
+                                    None, future.result
+                                )
+                            )
+
+                        if slice_result.success:
+                            # Mark plate as complete
+                            session.completed_plates.append(plate_index)
+
+                            # Extract estimates from slice output
+                            estimates = {}
+                            try:
+                                # Get the model file path
+                                model_file_path = (
+                                    model_service.temp_dir / session.file_id
+                                )
+
+                                # Try to extract estimates from the slice output
+                                svc = model_service
+                                updated_plates = (
+                                    svc.update_plate_estimates_from_slice_output(
+                                        model_file_path, plate_output_dir
+                                    )
+                                )
+
+                                # Find the estimates for this specific plate
+                                if updated_plates:
+                                    for plate_info in updated_plates:
+                                        if plate_info.index == plate_index:
+                                            if plate_info.prediction_seconds:
+                                                estimates["prediction_seconds"] = (
+                                                    plate_info.prediction_seconds
+                                                )
+                                            if plate_info.weight_grams:
+                                                estimates["weight_grams"] = (
+                                                    plate_info.weight_grams
+                                                )
+                                            break
+
+                            except Exception as e:
+                                logger.warning(
+                                    f"Failed to extract estimates for "
+                                    f"plate {plate_index}: {e}"
+                                )
+
+                            plate_complete_event = {
+                                "type": "progress",
+                                "data": {
+                                    "plate_index": plate_index,
+                                    "phase": "complete",
+                                    "progress_percent": 100.0,
+                                    "message": f"Plate {plate_index} slicing "
+                                    f"completed successfully",
+                                    "timestamp": time.time(),
+                                    "is_complete": True,
+                                    "estimates": estimates,  # Include estimates
+                                },
+                            }
+                            yield f"data: {json.dumps(plate_complete_event)}\n\n"
+                        else:
+                            # Send error event
+                            error_event = {
+                                "type": "progress",
+                                "data": {
+                                    "plate_index": plate_index,
+                                    "phase": "error",
+                                    "progress_percent": 0.0,
+                                    "message": f"Plate {plate_index} slicing "
+                                    f"failed: {slice_result.stderr or 'Unknown error'}",
+                                    "timestamp": time.time(),
+                                    "is_complete": True,
+                                },
+                            }
+                            yield f"data: {json.dumps(error_event)}\n\n"
+                            break  # Stop processing on error
+
+                    except Exception as e:
+                        # Send error event
+                        error_event = {
+                            "type": "progress",
+                            "data": {
+                                "plate_index": plate_index,
+                                "phase": "error",
+                                "progress_percent": 0.0,
+                                "message": (
+                                    f"Plate {plate_index} slicing error: {str(e)}"
+                                ),
+                                "timestamp": time.time(),
+                                "is_complete": True,
+                            },
+                        }
+                        yield f"data: {json.dumps(error_event)}\n\n"
+                        break  # Stop processing on error
+
+                # Mark session as complete
+                session.is_active = False
+                session.current_plate = None
+
+                # Send final completion event
+                completion_event = {
+                    "type": "complete",
+                    "data": {
+                        "session_id": session_id,
+                        "message": f"Successfully sliced "
+                        f"{len(session.plate_indices)} plate(s)",
+                        "timestamp": time.time(),
+                    },
+                }
+                yield f"data: {json.dumps(completion_event)}\n\n"
+
+            except Exception as e:
+                # Send error event
+                error_event = {
+                    "type": "error",
+                    "data": {
+                        "session_id": session_id,
+                        "error": str(e),
+                        "timestamp": time.time(),
+                    },
+                }
+                yield f"data: {json.dumps(error_event)}\n\n"
+            finally:
+                # Clean up session
+                slice_progress_service.cleanup_session(session_id)
+
+        return StreamingResponse(
+            generate_progress_events(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Headers": "Cache-Control",
+            },
+        )
+
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
+    except Exception as e:
+        msg = f"Internal server error streaming progress: {str(e)}"
+        raise HTTPException(status_code=500, detail=msg)
+
+
+@app.get(
+    "/api/slice/progress/{session_id}/status", response_model=SliceProgressSessionStatus
+)
+async def get_slice_progress_status(session_id: str):
+    """
+    Get the current status of a slice progress session.
+
+    Args:
+        session_id: The session ID to check
+
+    Returns:
+        SliceProgressSessionStatus with current session information
+
+    Raises:
+        HTTPException: If session is not found
+    """
+    try:
+        session_status = slice_progress_service.get_session_status(session_id)
+        if not session_status:
+            raise HTTPException(
+                status_code=404, detail=f"Progress session not found: {session_id}"
+            )
+
+        return SliceProgressSessionStatus(**session_status)
+
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
+    except Exception as e:
+        msg = f"Internal server error getting session status: {str(e)}"
         raise HTTPException(status_code=500, detail=msg)
 
 
@@ -973,6 +1921,18 @@ async def start_basic_job(request: JobStartRequest):
 
         gcode_path = slice_result["gcode_path"]
 
+        # Extract plate estimates from slice output if successful
+        updated_plates = None
+        if slice_result["success"]:
+            try:
+                output_dir = get_gcode_output_dir()
+                updated_plates = model_service.update_plate_estimates_from_slice_output(
+                    file_path, output_dir
+                )
+            except Exception as e:
+                logger.warning(f"Failed to extract plate estimates in basic job: {e}")
+                # Don't fail the job if estimate extraction fails
+
         # Step 3: Upload G-code to printer
         upload_result = upload_gcode_step(printer_service, printer_config, gcode_path)
         job_steps["upload"].update(
@@ -1003,11 +1963,27 @@ async def start_basic_job(request: JobStartRequest):
             }
         )
 
+        # Convert updated plates to response format
+        plates_response = []
+        if updated_plates:
+            for plate in updated_plates:
+                plates_response.append(
+                    PlateInfoResponse(
+                        index=plate.index,
+                        name=plate.name,
+                        prediction_seconds=plate.prediction_seconds,
+                        weight_grams=plate.weight_grams,
+                        has_support=plate.has_support,
+                        object_count=plate.object_count,
+                    )
+                )
+
         if print_result["success"]:
             return JobStartResponse(
                 success=True,
                 message="Job completed successfully - print started",
                 job_steps=job_steps,
+                updated_plates=plates_response if plates_response else None,
             )
         else:
             return JobStartResponse(
@@ -1015,6 +1991,7 @@ async def start_basic_job(request: JobStartRequest):
                 message="Job failed at print initiation step",
                 job_steps=job_steps,
                 error_details=print_result["details"],
+                updated_plates=plates_response if plates_response else None,
             )
 
     except HTTPException:
@@ -1030,6 +2007,9 @@ async def get_ams_status(printer_id: str):
     """
     Query the printer's AMS status.
 
+    Args:
+        printer_id: The name of the printer to query (NOT the IP address)
+
     Retrieves the current status of all AMS units and their loaded filaments
     from the specified printer via MQTT.
 
@@ -1042,6 +2022,9 @@ async def get_ams_status(printer_id: str):
     Raises:
         HTTPException: If printer is not found, not configured, or query fails
     """
+    logger.info(
+        f"AMS status request for printer: '{printer_id}' (raw: {repr(printer_id)})"
+    )
     try:
         # Check if any printers are configured
         if not config.is_printer_configured():
@@ -1056,21 +2039,28 @@ async def get_ams_status(printer_id: str):
             # Use the first/default printer
             printer_config = config.get_default_printer()
         else:
-            # Look for printer by name
-            printer_config = config.get_printer_by_name(printer_id)
+            # Look for printer by canonical ID or name
+            printer_config = config.get_printer_by_id(printer_id)
 
         if not printer_config:
             # List available printers for helpful error message
             available_printers = [p.name for p in config.get_printers()]
+            logger.warning(
+                f"Printer '{printer_id}' not found. "
+                f"Available printers: {available_printers}"
+            )
             raise HTTPException(
                 status_code=404,
-                detail=f"Printer '{printer_id}' not found. "
-                f"Available printers: {available_printers}",
+                detail=(
+                    f"Printer '{printer_id}' not found. Available printers: "
+                    f"{available_printers}"
+                ),
             )
 
         # Query AMS status
         try:
-            ams_result = printer_service.query_ams_status(printer_config)
+            # Use async MQTT query that supports cancellation
+            ams_result = await printer_service.query_ams_status_async(printer_config)
 
             if ams_result.success:
                 # Convert internal data structures to API response format
@@ -1121,6 +2111,232 @@ async def get_ams_status(printer_id: str):
         raise
     except Exception as e:
         msg = f"Internal server error during AMS status query: {str(e)}"
+        raise HTTPException(status_code=500, detail=msg)
+
+
+@app.get("/api/printer/{printer_id}/status-debug")
+async def get_printer_status_debug(printer_id: str):
+    """
+    Get raw printer status data for debugging.
+
+    This endpoint returns the raw MQTT response without processing.
+    """
+    try:
+        # Check if any printers are configured
+        if not config.is_printer_configured():
+            raise HTTPException(
+                status_code=400,
+                detail="No printers configured. Please configure a printer first.",
+            )
+
+        # Find the printer by ID/name
+        printer_config = None
+        if printer_id.lower() == "default":
+            printer_config = config.get_default_printer()
+        else:
+            printer_config = config.get_printer_by_name(printer_id)
+
+        if not printer_config:
+            available_printers = [p.name for p in config.get_printers()]
+            raise HTTPException(
+                status_code=404,
+                detail=(
+                    f"Printer '{printer_id}' not found. Available printers: "
+                    f"{available_printers}"
+                ),
+            )
+
+        # Create a custom printer service that captures raw data
+        from app.printer_service import mqtt, ssl
+
+        raw_responses = []
+
+        def capture_raw_message(client, userdata, msg):
+            try:
+                payload = msg.payload.decode("utf-8")
+                data = json.loads(payload)
+                raw_responses.append(
+                    {"topic": msg.topic, "data": data, "timestamp": time.time()}
+                )
+            except Exception as e:
+                logger.error(f"Error capturing raw message: {e}")
+
+        # Create MQTT client with custom handler
+        client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+
+        if printer_config.access_code:
+            client.username_pw_set("bblp", printer_config.access_code)
+
+        ssl_context = ssl.create_default_context()
+        ssl_context.check_hostname = False
+        ssl_context.verify_mode = ssl.CERT_NONE
+        client.tls_set_context(ssl_context)
+
+        client.on_message = capture_raw_message
+
+        # Connect and subscribe
+        client.connect(printer_config.ip, 8883, 60)
+        client.loop_start()
+
+        # Subscribe to response topic
+        response_topic = f"device/{printer_config.serial_number}/report"
+        client.subscribe(response_topic, qos=1)
+
+        # Send status query
+        device_topic = f"device/{printer_config.serial_number}/request"
+        # Try info command first to get printer details
+        info_query = {"info": {"sequence_id": "0"}}
+        client.publish(device_topic, json.dumps(info_query), qos=1)
+
+        # Wait a bit for info response
+        time.sleep(2)
+
+        # Then send pushall for full status
+        status_query = {"pushing": {"sequence_id": "1", "command": "pushall"}}
+        client.publish(device_topic, json.dumps(status_query), qos=1)
+
+        # Wait for responses
+        import time
+
+        start_time = time.time()
+        while len(raw_responses) < 2 and time.time() - start_time < 10:
+            time.sleep(0.1)
+
+        client.loop_stop()
+        client.disconnect()
+
+        if raw_responses:
+            # Look for info response
+            info_response = None
+            status_response = None
+
+            for resp in raw_responses:
+                if "info" in resp["data"]:
+                    info_response = resp["data"]["info"]
+                if "print" in resp["data"]:
+                    status_response = resp["data"]
+
+            return {
+                "success": True,
+                "info_response": info_response,
+                "status_response": status_response,
+                "all_responses": raw_responses,
+            }
+        else:
+            return {"success": False, "error": "No response received from printer"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Debug endpoint error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/printer/{printer_id}/status", response_model=PrinterStatusResponse)
+async def get_printer_status(printer_id: str):
+    """
+    Query the printer's full status including model information.
+
+    Retrieves the current status of the printer including model type, name,
+    and AMS information from the specified printer via MQTT.
+
+    Args:
+        printer_id: The name of the printer to query (NOT the IP address)
+                   Examples: "My X1C", "Basement Printer", "default"
+
+    Returns:
+        PrinterStatusResponse: Printer status with model, name, and AMS information
+
+    Raises:
+        HTTPException: If printer is not found, not configured, or query fails
+    """
+    try:
+        # Check if any printers are configured
+        if not config.is_printer_configured():
+            raise HTTPException(
+                status_code=400,
+                detail="No printers configured. " "Please configure a printer first.",
+            )
+
+        # Find the printer by ID/name
+        printer_config = None
+        if printer_id.lower() == "default":
+            # Use the first/default printer
+            printer_config = config.get_default_printer()
+        else:
+            # Look for printer by canonical ID or name
+            printer_config = config.get_printer_by_id(printer_id)
+
+        if not printer_config:
+            # List available printers for helpful error message
+            available_printers = [p.name for p in config.get_printers()]
+            logger.warning(
+                f"Printer '{printer_id}' not found. "
+                f"Available printers: {available_printers}"
+            )
+            raise HTTPException(
+                status_code=404,
+                detail=(
+                    f"Printer '{printer_id}' not found. Available printers: "
+                    f"{available_printers}"
+                ),
+            )
+
+        # Query printer status
+        try:
+            status_result = printer_service.query_printer_status(printer_config)
+
+            if status_result.success:
+                # Convert internal data structures to API response format
+                ams_units_response = []
+                if status_result.ams_units:
+                    for ams_unit in status_result.ams_units:
+                        filaments_response = []
+                        for filament in ams_unit.filaments:
+                            filament_response = AMSFilamentResponse(
+                                slot_id=filament.slot_id,
+                                filament_type=filament.filament_type,
+                                color=filament.color,
+                                material_id=filament.material_id,
+                            )
+                            filaments_response.append(filament_response)
+
+                        unit_response = AMSUnitResponse(
+                            unit_id=ams_unit.unit_id, filaments=filaments_response
+                        )
+                        ams_units_response.append(unit_response)
+
+                return PrinterStatusResponse(
+                    success=True,
+                    message=status_result.message,
+                    printer_model=status_result.printer_model,
+                    printer_name=status_result.printer_name,
+                    ams_units=ams_units_response,
+                )
+            else:
+                # Query failed
+                return PrinterStatusResponse(
+                    success=False,
+                    message=status_result.message,
+                    error_details=status_result.error_details,
+                )
+
+        except PrinterMQTTError as e:
+            return PrinterStatusResponse(
+                success=False, message="MQTT communication error", error_details=str(e)
+            )
+        except PrinterCommunicationError as e:
+            return PrinterStatusResponse(
+                success=False,
+                message="Printer communication error",
+                error_details=str(e),
+            )
+
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
+    except Exception as e:
+        msg = f"Internal server error during printer status query: {str(e)}"
         raise HTTPException(status_code=500, detail=msg)
 
 
@@ -1232,7 +2448,21 @@ async def set_active_printer(request: SetActivePrinterRequest):
     Raises:
         HTTPException: If the printer configuration is invalid
     """
+    logger.info(f"Setting active printer: {request.name} ({request.ip})")
     try:
+        # Get the current active printer before switching
+        current_active = config.get_active_printer()
+
+        # IMPORTANT: Cancel any active MQTT operations for the OLD printer
+        # before switching. This prevents hanging issues when switching
+        # between printers
+        if current_active and current_active.ip != request.ip:
+            logger.debug(
+                f"Cancelling active MQTT operations for old printer: "
+                f"{current_active.ip}"
+            )
+            printer_service.cancel_printer_operations(current_active.ip)
+
         # Validate IP address or hostname format
         ip = validate_ip_or_hostname(request.ip)
 
@@ -1245,6 +2475,7 @@ async def set_active_printer(request: SetActivePrinterRequest):
         )
 
         # Check if this printer already exists in persistent storage
+        logger.debug("Checking if printer exists in storage...")
         try:
             existing_printer = config.get_printer_by_ip(ip)
         except Exception as e:
@@ -1270,6 +2501,7 @@ async def set_active_printer(request: SetActivePrinterRequest):
                 logger.warning(f"Unexpected error auto-saving printer: {e}")
 
         # Set the active printer (this will use the persistent version if it exists)
+        logger.debug("Setting printer as active...")
         try:
             active_printer = config.set_active_printer(
                 ip=ip,
@@ -1277,8 +2509,10 @@ async def set_active_printer(request: SetActivePrinterRequest):
                 name=request.name or f"Printer at {ip}",
                 serial_number=request.serial_number,
             )
+            logger.debug(f"Successfully set active printer: {active_printer.name}")
         except ValueError as e:
             # Handle configuration errors
+            logger.error(f"Failed to set active printer: {e}")
             raise HTTPException(status_code=400, detail=str(e))
 
         # Optional: Test connection to validate the printer
@@ -1287,7 +2521,8 @@ async def set_active_printer(request: SetActivePrinterRequest):
         # if not connection_test:
         #     logger.warning(f"Could not connect to printer at {ip}")
 
-        return SetActivePrinterResponse(
+        logger.debug("Preparing response...")
+        response = SetActivePrinterResponse(
             success=True,
             message=f"Active printer set to {active_printer.ip}",
             printer_info={
@@ -1297,6 +2532,8 @@ async def set_active_printer(request: SetActivePrinterRequest):
                 "has_serial_number": bool(active_printer.serial_number),
             },
         )
+        logger.info(f"Successfully set active printer to {active_printer.name}")
+        return response
 
     except HTTPException:
         # Re-raise HTTP exceptions as-is
