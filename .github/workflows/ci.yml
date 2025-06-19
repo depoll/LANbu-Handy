@@ -123,8 +123,10 @@ jobs:
           platforms: ${{ matrix.platform }}
           push: false
           tags: lanbu-handy:latest
-          cache-from: type=gha,key=buildx-${{ matrix.platform }}
-          cache-to: type=gha,mode=max,key=buildx-${{ matrix.platform }}
+          cache-from: |
+            type=registry,ref=ghcr.io/${{ steps.repo.outputs.name }}:build-cache-${{ github.ref_name }}-${{ matrix.arch }}
+            type=registry,ref=ghcr.io/${{ steps.repo.outputs.name }}:build-cache-main-${{ matrix.arch }}
+          cache-to: type=registry,ref=ghcr.io/${{ steps.repo.outputs.name }}:build-cache-${{ github.ref_name }}-${{ matrix.arch }},mode=max
 
   build-docker-images:
     runs-on: ${{ matrix.runner }}
@@ -182,8 +184,10 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,key=buildx-${{ matrix.platform }}
-          cache-to: type=gha,mode=max,key=buildx-${{ matrix.platform }}
+          cache-from: |
+            type=registry,ref=ghcr.io/${{ steps.repo.outputs.name }}:build-cache-${{ github.ref_name }}-${{ matrix.arch }}
+            type=registry,ref=ghcr.io/${{ steps.repo.outputs.name }}:build-cache-main-${{ matrix.arch }}
+          cache-to: type=registry,ref=ghcr.io/${{ steps.repo.outputs.name }}:build-cache-${{ github.ref_name }}-${{ matrix.arch }},mode=max
 
   publish-multi-arch-manifest:
     runs-on: ubuntu-latest

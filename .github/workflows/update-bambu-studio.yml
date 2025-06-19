@@ -234,8 +234,10 @@ jobs:
           tags: |
             ghcr.io/${{ steps.repo.outputs.name }}/bambu-studio-cli:${{ needs.check-for-updates.outputs.latest_version }}-${{ matrix.arch }}
             ghcr.io/${{ steps.repo.outputs.name }}/bambu-studio-cli:latest-${{ matrix.arch }}
-          cache-from: type=gha,scope=${{ matrix.arch }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.arch }}
+          cache-from: |
+            type=registry,ref=ghcr.io/${{ steps.repo.outputs.name }}/bambu-studio-cli:build-cache-${{ github.ref_name }}-${{ matrix.arch }}
+            type=registry,ref=ghcr.io/${{ steps.repo.outputs.name }}/bambu-studio-cli:build-cache-main-${{ matrix.arch }}
+          cache-to: type=registry,ref=ghcr.io/${{ steps.repo.outputs.name }}/bambu-studio-cli:build-cache-${{ github.ref_name }}-${{ matrix.arch }},mode=max
 
   create-multi-arch-manifest:
     needs: [check-for-updates, build-cli-images]
