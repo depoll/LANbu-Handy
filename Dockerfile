@@ -56,6 +56,9 @@ RUN chown -R lanbu:lanbu /app
 # Copy built PWA from the build stage and set proper ownership
 COPY --from=pwa-builder --chown=lanbu:lanbu /app/pwa/dist ./static_pwa
 
+# Copy Bambu Studio resources from the base image
+COPY --chown=lanbu:lanbu /opt/bambu-studio-resources ./bambu-studio-resources
+
 # Switch to non-root user
 USER lanbu
 
