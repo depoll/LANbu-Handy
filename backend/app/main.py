@@ -328,7 +328,9 @@ class FilamentMapping(BaseModel):
     filament_index: int  # Index in the model's filament requirements
     ams_unit_id: Optional[int] = None  # Optional for external spool
     ams_slot_id: Optional[int] = None  # Optional for external spool
-    use_external_spool: Optional[bool] = False  # True when using external spool instead of AMS
+    use_external_spool: Optional[bool] = (
+        False  # True when using external spool instead of AMS
+    )
 
 
 class ConfiguredSliceRequest(BaseModel):

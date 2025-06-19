@@ -132,7 +132,7 @@ class TestFilamentMatchingAPI:
         assert result["matches"] == []
 
     def test_match_filaments_partial_matches(self):
-        """Test filament matching with some unmatched requirements."""
+        """Test filament matching when some requirements can't be matched to AMS."""
         request_data = {
             "filament_requirements": {
                 "filament_count": 3,
@@ -170,20 +170,34 @@ class TestFilamentMatchingAPI:
         assert response.status_code == 200
         result = response.json()
 
-        assert result["success"] is True  # Should succeed even with partial matches  
-        assert len(result["matches"]) == 3  # All requirements matched (AMS + external)
-        
-        # Verify PLA and PETG matched to AMS, TPU to external spool
+        assert result["success"] is True
+        assert (
+            len(result["matches"]) == 3
+        )  # All requirements matched with external spool
+
+        # Since TPU cannot be matched to AMS, ALL filaments should use external spool
+        # (no mixing allowed)
         matches = result["matches"]
         pla_match = next(m for m in matches if m["requirement_index"] == 0)
-        tpu_match = next(m for m in matches if m["requirement_index"] == 1) 
+        tpu_match = next(m for m in matches if m["requirement_index"] == 1)
         petg_match = next(m for m in matches if m["requirement_index"] == 2)
-        
-        assert pla_match["use_external_spool"] is False
+
+        # All should use external spool due to no-mixing constraint
+        assert pla_match["use_external_spool"] is True
         assert tpu_match["use_external_spool"] is True
-        assert petg_match["use_external_spool"] is False
-        
-        assert result["unmatched_requirements"] is None  # No unmatched since external spool fallback
+        assert petg_match["use_external_spool"] is True
+
+        # AMS fields should be None for external spool
+        assert pla_match["ams_unit_id"] is None
+        assert pla_match["ams_slot_id"] is None
+        assert tpu_match["ams_unit_id"] is None
+        assert tpu_match["ams_slot_id"] is None
+        assert petg_match["ams_unit_id"] is None
+        assert petg_match["ams_slot_id"] is None
+
+        assert (
+            result["unmatched_requirements"] is None
+        )  # No unmatched since external spool fallback
 
     def test_match_filaments_invalid_request(self):
         """Test filament matching with invalid request data."""

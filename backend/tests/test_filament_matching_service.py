@@ -319,19 +319,19 @@ class TestErrorHandling:
 
         assert result.success is True  # All requirements matched (AMS + external)
         assert len(result.matches) == 3  # All requirements have matches
-        
+
         # First should be AMS match (PLA)
         pla_match = next(m for m in result.matches if m.requirement_index == 0)
         assert pla_match.use_external_spool is False
         assert pla_match.ams_unit_id == 0
         assert pla_match.ams_slot_id == 0
-        
+
         # TPU and WOOD should use external spool
         tpu_match = next(m for m in result.matches if m.requirement_index == 1)
         wood_match = next(m for m in result.matches if m.requirement_index == 2)
         assert tpu_match.use_external_spool is True
         assert wood_match.use_external_spool is True
-        
+
         # No unmatched requirements since external spool is fallback
         assert result.unmatched_requirements is None
 

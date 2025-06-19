@@ -194,7 +194,7 @@ function FilamentMappingConfig({
     // Create a default empty AMS status if not available (for external spool fallback)
     const effectiveAmsStatus = amsStatus?.success ? amsStatus : {
       success: true,
-      message: 'No AMS available - using external spool',
+      message: 'No AMS available - will use external spool',
       ams_units: [],
     };
 
@@ -318,6 +318,7 @@ function FilamentMappingConfig({
   };
 
   // Handle mapping change for a specific filament
+  // Note: All filaments must use the same mode (either all AMS or all external spool)
   const handleMappingChange = (filamentIndex: number, slotValue: string) => {
     let newMappings = [...filamentMappings];
 
@@ -327,14 +328,26 @@ function FilamentMappingConfig({
     // Add new mapping if a slot is selected
     if (slotValue) {
       if (slotValue === 'external-spool') {
-        // External spool mapping
-        newMappings.push({
-          filament_index: filamentIndex,
-          use_external_spool: true,
-        });
+        // External spool selected - set ALL filaments to external spool
+        newMappings = [];
+        for (let i = 0; i < filamentRequirements.filament_count; i++) {
+          newMappings.push({
+            filament_index: i,
+            use_external_spool: true,
+          });
+        }
       } else {
-        // AMS slot mapping
+        // AMS slot selected - this filament gets the AMS slot, 
+        // but we need to clear external spool flags for all others
         const [unitId, slotId] = slotValue.split('-').map(Number);
+        
+        // First, ensure no external spool flags exist
+        newMappings = newMappings.map(mapping => ({
+          ...mapping,
+          use_external_spool: false,
+        }));
+        
+        // Add the new AMS mapping
         newMappings.push({
           filament_index: filamentIndex,
           ams_unit_id: unitId,
@@ -353,8 +366,7 @@ function FilamentMappingConfig({
     const shouldAutoMatch =
       filamentMappings.length === 0 &&
       filamentRequirements.filament_count > 0 &&
-      hasAmsSlots && // Only auto-match if AMS slots are available
-      amsStatus?.success &&
+      availableSlots.length > 0 && // External spool is always available
       !isMatching &&
       !hasTriggeredAutoMatch;
 
@@ -364,6 +376,7 @@ function FilamentMappingConfig({
         filamentMappings: filamentMappings.length,
         filamentCount: filamentRequirements.filament_count,
         availableSlots: availableSlots.length,
+        hasAmsSlots,
         amsSuccess: amsStatus?.success,
         isMatching,
         hasTriggeredAutoMatch,
@@ -446,12 +459,13 @@ function FilamentMappingConfig({
           </button>
         </div>
         <p>
-          Map each model filament to an available AMS slot or use the external spool.
+          Map each model filament to an available AMS slot or use external spool.
+          Note: All filaments must use the same mode (either all AMS slots or all external spool).
           {filamentMappings.length === 0 && !isMatching && (
             <span className="auto-match-note">
               {' '}
-              Auto-matching will suggest optimal slots based on type and color
-              compatibility when AMS status loads. You can always choose external spool for manual loading.
+              Auto-matching will suggest optimal mappings based on available AMS slots,
+              or external spool if AMS is not available.
             </span>
           )}
         </p>
