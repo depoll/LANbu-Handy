@@ -36,8 +36,11 @@ jobs:
         run: |
           # The deleted branch name is in github.event.ref
           BRANCH_NAME="${{ github.event.ref }}"
-          echo "name=$BRANCH_NAME" >> $GITHUB_OUTPUT
+          # Replace forward slashes with hyphens for valid Docker tag names
+          SANITIZED_BRANCH=$(echo "$BRANCH_NAME" | sed 's/\//-/g')
+          echo "name=$SANITIZED_BRANCH" >> $GITHUB_OUTPUT
           echo "Deleted branch: $BRANCH_NAME"
+          echo "Sanitized branch for cache cleanup: $SANITIZED_BRANCH"
 
       - name: Clean up main application cache images
         run: |
