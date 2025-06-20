@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "serena": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "git+https://github.com/oraios/serena",
+        "serena-mcp-server"
+      ],
+      "env": {
+        "SERENA_CONFIG": "/home/vscode/.config/serena/lanbu-handy-config.yml"
+      }
+    }
+  }
+}
