@@ -161,6 +161,8 @@ if [ ! -f "/claude/.claude.json" ]; then
 fi
 
 # Create symlinks to home directory
+rm -rf /home/vscode/.claude
+rm -f /home/vscode/.claude.json
 ln -sf /claude/.claude /home/vscode/.claude
 ln -sf /claude/.claude.json /home/vscode/.claude.json
 sudo chown -R vscode:vscode /claude
