@@ -1,0 +1,56 @@
+# Serena Project Configuration for LANbu Handy
+
+# Language servers configuration
+language_servers:
+  python:
+    command: ['pylsp']
+    file_extensions: ['.py']
+    initialization_options:
+      pylsp:
+        plugins:
+          black:
+            enabled: true
+          flake8:
+            enabled: true
+          pycodestyle:
+            enabled: false
+          mccabe:
+            enabled: false
+          pyflakes:
+            enabled: false
+          rope_completion:
+            enabled: true
+          jedi_completion:
+            enabled: true
+            include_params: true
+            fuzzy: true
+          jedi_hover:
+            enabled: true
+          jedi_references:
+            enabled: true
+          jedi_signature_help:
+            enabled: true
+          jedi_symbols:
+            enabled: true
+            all_scopes: true
+          rope_autoimport:
+            enabled: true
+
+  typescript:
+    command: ['typescript-language-server', '--stdio']
+    file_extensions: ['.ts', '.tsx', '.js', '.jsx']
+    root_markers: ['tsconfig.json', 'package.json']
+    initialization_options:
+      preferences:
+        includeInlayParameterNameHints: 'all'
+        includeInlayParameterNameHintsWhenArgumentMatchesName: true
+        includeInlayFunctionParameterTypeHints: true
+        includeInlayVariableTypeHints: true
+        includeInlayPropertyDeclarationTypeHints: true
+        includeInlayFunctionLikeReturnTypeHints: true
+        includeInlayEnumMemberValueHints: true
+
+# Project settings
+settings:
+  auto_install_language_servers: true
+  log_level: 'INFO'

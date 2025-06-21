@@ -81,3 +81,6 @@ codemcp.toml
 *.local.*
 result.json
 backend/data/printers.json
+
+# Bambu Studio resources symlink
+bambu-studio-resources

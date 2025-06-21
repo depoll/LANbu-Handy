@@ -122,6 +122,14 @@ npx playwright test                              # E2E tests
 ./scripts/setup-dev-environment.sh    # Installs dependencies and hooks
 ```
 
+### Serena MCP Integration
+
+The development environment includes Serena MCP (Model Context Protocol) server:
+
+- **Auto-starts** with Claude Code via `.mcp.json` configuration
+- **Language servers**: Python (pylsp) and TypeScript configured
+- **Configuration**: Located at `.serena/project.yml`
+
 ## Printer Configuration
 
 ### Environment Variables (Docker)
@@ -145,6 +153,13 @@ BAMBU_PRINTERS='[{"name":"X1C","ip":"192.168.1.100","access_code":"12345678"}]'
 - `app/printer_service.py` - MQTT/FTP printer communication
 - `app/model_service.py` - 3D model download and validation
 - `app/job_orchestration.py` - End-to-end workflow coordination
+
+### Bambu Studio Resources
+
+- Resources are located at `/opt/bambu-studio-resources` in containers
+- In development, a symlink at `./bambu-studio-resources` provides access
+- Contains printer configurations, filament profiles, build plate settings, and images
+- These resources are automatically copied from the Bambu Studio repository during CLI build
 
 ### Frontend Core Components
 
