@@ -5,7 +5,13 @@
       "args": [
         "--from",
         "git+https://github.com/oraios/serena",
-        "serena-mcp-server"
+        "serena-mcp-server",
+        "--project",
+        "/workspace",
+        "--enable-web-dashboard",
+        "false",
+        "--enable-gui-log-window",
+        "false"
       ]
     }
   }

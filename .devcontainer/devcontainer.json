@@ -51,7 +51,7 @@
   },
 
   "postCreateCommand": "./scripts/setup-dev-environment.sh --devcontainer",
-  "postStartCommand": "sudo chgrp docker /var/run/docker.sock || true",
+  "postStartCommand": "sudo chgrp docker /var/run/docker.sock && ./scripts/dev-container-startup.sh || true",
 
   "remoteUser": "vscode",
   "containerUser": "vscode"
