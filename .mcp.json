@@ -1,17 +1,25 @@
 {
   "mcpServers": {
-    "serena": {
-      "command": "uvx",
+    "language-server-python": {
+      "command": "mcp-language-server",
       "args": [
-        "--from",
-        "git+https://github.com/oraios/serena",
-        "serena-mcp-server",
-        "--project",
-        "/workspace",
-        "--enable-web-dashboard",
-        "false",
-        "--enable-gui-log-window",
-        "false"
+        "--workspace",
+        "/workspace/",
+        "--lsp",
+        "pyright-langserver",
+        "--",
+        "--stdio"
+      ]
+    },
+    "language-server-typescript": {
+      "command": "mcp-language-server",
+      "args": [
+        "--workspace",
+        "/workspace/",
+        "--lsp",
+        "typescript-language-server",
+        "--",
+        "--stdio"
       ]
     }
   }

@@ -77,39 +77,6 @@ setup_pwa() {
     fi
 }
 
-# Function to setup Serena MCP
-setup_serena_mcp() {
-    echo "🤖 Setting up Serena MCP..."
-
-    # Check if uv is installed
-    if ! command_exists uv; then
-        echo "📦 Installing uv (Python package manager)..."
-        curl -LsSf https://astral.sh/uv/install.sh | sh
-        export PATH="$HOME/.cargo/bin:$PATH"
-        echo "✅ uv installed!"
-    else
-        echo "✅ uv already installed"
-    fi
-
-    echo "📦 Installing Serena MCP via uvx..."
-    echo "   This will allow you to run: uvx --from git+https://github.com/oraios/serena serena-mcp-server"
-
-    # Create a simple alias for easier access
-    ALIAS_FILE="$HOME/.bashrc"
-    if ! grep -q "alias serena-mcp" "$ALIAS_FILE" 2>/dev/null; then
-        echo "" >> "$ALIAS_FILE"
-        echo "# Serena MCP alias" >> "$ALIAS_FILE"
-        echo "alias serena-mcp='uvx --from git+https://github.com/oraios/serena serena-mcp-server'" >> "$ALIAS_FILE"
-        echo "✅ Added 'serena-mcp' alias to ~/.bashrc"
-        echo "   Run 'source ~/.bashrc' or start a new shell to use the alias"
-    else
-        echo "✅ Serena MCP alias already exists"
-    fi
-
-    echo "✅ Serena MCP setup complete!"
-    echo "   Run 'serena-mcp' to start the server (after sourcing ~/.bashrc)"
-}
-
 # Main setup
 echo "📁 Working directory: $REPO_ROOT"
 
@@ -129,7 +96,6 @@ if [[ "$DEVCONTAINER_MODE" == "true" ]]; then
     echo "🐳 Devcontainer detected - installing all dependencies automatically"
     setup_backend
     setup_pwa
-    setup_serena_mcp
 else
     # Interactive mode for local development
     read -p "🤔 Install backend dependencies? (y/N): " -n 1 -r
@@ -142,12 +108,6 @@ else
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
         setup_pwa
-    fi
-
-    read -p "🤔 Install Serena MCP? (y/N): " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        setup_serena_mcp
     fi
 fi
 
@@ -183,6 +143,10 @@ else
     echo "   They will be available after the next CLI image build"
 fi
 
+go install github.com/isaacphi/mcp-language-server@latest
+sudo npm install -g pyright
+sudo npm install -g typescript typescript-language-server
+
 echo ""
 echo "🎉 Development environment setup complete!"
 echo ""
@@ -191,7 +155,6 @@ echo "   • Pre-commit hooks are now active"
 echo "   • Code will be auto-formatted on commit"
 echo "   • Run 'pre-commit run --all-files' to format existing code"
 echo "   • Use 'scripts/test-dev-container.sh' to validate your environment"
-echo "   • Run 'serena-mcp' to start the Serena MCP server (after sourcing ~/.bashrc)"
 echo ""
 echo "💡 Tips:"
 echo "   • VS Code will auto-format on save (if using devcontainer)"

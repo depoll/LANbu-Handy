@@ -122,14 +122,6 @@ npx playwright test                              # E2E tests
 ./scripts/setup-dev-environment.sh    # Installs dependencies and hooks
 ```
 
-### Serena MCP Integration
-
-The development environment includes Serena MCP (Model Context Protocol) server:
-
-- **Auto-starts** with Claude Code via `.mcp.json` configuration
-- **Language servers**: Python (pylsp) and TypeScript configured
-- **Configuration**: Located at `.serena/project.yml`
-
 ## Printer Configuration
 
 ### Environment Variables (Docker)
@@ -215,3 +207,4 @@ BAMBU_PRINTERS='[{"name":"X1C","ip":"192.168.1.100","access_code":"12345678"}]'
 - You can find the mappings from bambu serial numbers to models here: https://wiki.bambulab.com/en/general/find-sn
 - don't commit with no-verify. Fix any failing precommits.
 - before committing, make sure everything still builds, lints, and passes tests
+- Use language-server-python for working with Python files and language-server-typescript for working with Typescript files
