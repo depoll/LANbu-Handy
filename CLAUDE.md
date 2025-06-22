@@ -122,14 +122,6 @@ npx playwright test                              # E2E tests
 ./scripts/setup-dev-environment.sh    # Installs dependencies and hooks
 ```
 
-### Serena MCP Integration
-
-The development environment includes Serena MCP (Model Context Protocol) server:
-
-- **Auto-starts** with Claude Code via `.mcp.json` configuration
-- **Language servers**: Python (pylsp) and TypeScript configured
-- **Configuration**: Located at `.serena/project.yml`
-
 ## Printer Configuration
 
 ### Environment Variables (Docker)
