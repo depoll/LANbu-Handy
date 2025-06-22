@@ -1,0 +1,26 @@
+{
+  "mcpServers": {
+    "language-server-python": {
+      "command": "mcp-language-server",
+      "args": [
+        "--workspace",
+        "/workspace/",
+        "--lsp",
+        "pyright-langserver",
+        "--",
+        "--stdio"
+      ]
+    },
+    "language-server-typescript": {
+      "command": "mcp-language-server",
+      "args": [
+        "--workspace",
+        "/workspace/",
+        "--lsp",
+        "typescript-language-server",
+        "--",
+        "--stdio"
+      ]
+    }
+  }
+}

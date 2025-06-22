@@ -143,6 +143,10 @@ else
     echo "   They will be available after the next CLI image build"
 fi
 
+go install github.com/isaacphi/mcp-language-server@latest
+sudo npm install -g pyright
+sudo npm install -g typescript typescript-language-server
+
 echo ""
 echo "🎉 Development environment setup complete!"
 echo ""
