@@ -29,6 +29,29 @@ interface PrinterSelectorProps {
 
 type PrinterModel = 'X1C' | 'X1' | 'P1P' | 'P1S' | 'A1' | 'A1-mini' | 'Unknown';
 
+// Map internal model IDs to image filenames
+const MODEL_ID_TO_IMAGE: Record<string, string> = {
+  'BL-P001': 'printer_preview_BL-P001.png', // X1 Carbon
+  'BL-P002': 'printer_preview_BL-P002.png', // X1
+  C11: 'printer_preview_C11.png', // P1P
+  C12: 'printer_preview_C12.png', // P1S
+  C13: 'printer_preview_C13.png', // X1E
+  N1: 'printer_preview_N1.png', // A1 mini
+  N2S: 'printer_preview_N2S.png', // A1
+  O1D: 'printer_preview_O1D.png', // H2D
+};
+
+// Map PrinterModel types to model IDs for image lookup
+const PRINTER_MODEL_TO_ID: Record<PrinterModel, string> = {
+  X1C: 'BL-P001',
+  X1: 'BL-P002',
+  P1P: 'C11',
+  P1S: 'C12',
+  A1: 'N2S',
+  'A1-mini': 'N1',
+  Unknown: '',
+};
+
 // Legacy function: Name-based printer model detection
 // This is now used as a fallback when real model data from MQTT isn't available
 // The preferred approach is to use getEffectivePrinterModel() which uses real data
@@ -68,17 +91,12 @@ const detectPrinterModel = (
   return 'Unknown';
 };
 
-const getPrinterImage = (model: PrinterModel): string => {
-  const printerImages: Record<PrinterModel, string> = {
-    X1C: '🖨️', // We'll use emojis for now, but these could be actual images
-    X1: '🖨️',
-    P1P: '🖨️',
-    P1S: '🖨️',
-    A1: '🖨️',
-    'A1-mini': '🖨️',
-    Unknown: '❓',
-  };
-  return printerImages[model];
+const getPrinterImage = (model: PrinterModel): string | null => {
+  const modelId = PRINTER_MODEL_TO_ID[model];
+  if (!modelId || !MODEL_ID_TO_IMAGE[modelId]) {
+    return null; // Return null for unknown models
+  }
+  return `/api/resources/images/${MODEL_ID_TO_IMAGE[modelId]}`;
 };
 
 const getPrinterDisplayName = (model: PrinterModel): string => {
@@ -569,7 +587,21 @@ function PrinterSelector({
             {currentPrinter ? (
               <>
                 <div className="printer-image">
-                  {getPrinterImage(getEffectivePrinterModel(currentPrinter))}
+                  {getPrinterImage(getEffectivePrinterModel(currentPrinter)) ? (
+                    <img
+                      src={
+                        getPrinterImage(
+                          getEffectivePrinterModel(currentPrinter)
+                        )!
+                      }
+                      alt={getPrinterDisplayName(
+                        getEffectivePrinterModel(currentPrinter)
+                      )}
+                      className="printer-thumbnail"
+                    />
+                  ) : (
+                    <div className="printer-placeholder-icon">🖨️</div>
+                  )}
                 </div>
                 <div className="printer-model-info">
                   <div className="model-name">
@@ -584,7 +616,9 @@ function PrinterSelector({
               </>
             ) : (
               <>
-                <div className="printer-image placeholder">❓</div>
+                <div className="printer-image placeholder">
+                  <div className="printer-placeholder-icon">❓</div>
+                </div>
                 <div className="printer-model-info">
                   <div className="model-name">No Printer</div>
                   <div className="printer-name-display">
@@ -644,7 +678,23 @@ function PrinterSelector({
                           }}
                         >
                           <div className="dropdown-printer-image">
-                            {getPrinterImage(getEffectivePrinterModel(printer))}
+                            {getPrinterImage(
+                              getEffectivePrinterModel(printer)
+                            ) ? (
+                              <img
+                                src={
+                                  getPrinterImage(
+                                    getEffectivePrinterModel(printer)
+                                  )!
+                                }
+                                alt={getPrinterDisplayName(
+                                  getEffectivePrinterModel(printer)
+                                )}
+                                className="dropdown-printer-thumbnail"
+                              />
+                            ) : (
+                              <div className="printer-placeholder-icon">🖨️</div>
+                            )}
                           </div>
                           <div className="dropdown-printer-info">
                             <div className="dropdown-printer-name">
@@ -759,6 +809,23 @@ function PrinterSelector({
                             <div className="printer-card-image">
                               {getPrinterImage(
                                 (printer.model as PrinterModel) || 'Unknown'
+                              ) ? (
+                                <img
+                                  src={
+                                    getPrinterImage(
+                                      (printer.model as PrinterModel) ||
+                                        'Unknown'
+                                    )!
+                                  }
+                                  alt={getPrinterDisplayName(
+                                    (printer.model as PrinterModel) || 'Unknown'
+                                  )}
+                                  className="card-printer-thumbnail"
+                                />
+                              ) : (
+                                <div className="printer-placeholder-icon">
+                                  🖨️
+                                </div>
                               )}
                             </div>
                             <div className="printer-card-info">

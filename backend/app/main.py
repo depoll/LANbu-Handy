@@ -151,6 +151,20 @@ if STATIC_PWA_DIR.exists():
         "/assets", StaticFiles(directory=STATIC_PWA_DIR / "assets"), name="assets"
     )
 
+# Mount Bambu Studio resources for printer images
+# These resources come from the base Docker image
+BAMBU_RESOURCES_DIR = Path("/opt/bambu-studio-resources")
+# In development, use the symlinked directory
+if not BAMBU_RESOURCES_DIR.exists():
+    BAMBU_RESOURCES_DIR = Path(__file__).parent.parent / "bambu-studio-resources"
+
+if BAMBU_RESOURCES_DIR.exists():
+    app.mount(
+        "/api/resources",
+        StaticFiles(directory=BAMBU_RESOURCES_DIR),
+        name="bambu-resources",
+    )
+
 
 @app.get("/")
 async def serve_pwa():
