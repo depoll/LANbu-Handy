@@ -43,7 +43,7 @@ interface SliceProgress {
 // Helper function to get mapped slot from either AMS units or external spool
 function getMappedSlot(
   mapping: FilamentMapping | undefined,
-  amsStatus: AMSStatusResponse | null
+  amsStatus: AMSStatusResponse | null | undefined
 ): { filament_type: string; color: string } | null {
   if (!mapping || !amsStatus) return null;
 
