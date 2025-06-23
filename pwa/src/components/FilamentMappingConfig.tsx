@@ -261,24 +261,40 @@ function FilamentMappingConfig({
   const getAvailableSlots = (): AMSSlotOption[] => {
     const slots: AMSSlotOption[] = [];
 
-    if (amsStatus?.success && amsStatus.ams_units) {
-      amsStatus.ams_units.forEach(unit => {
-        unit.filaments.forEach(filament => {
-          // Skip empty slots
-          if (filament.filament_type === 'Empty') {
-            return;
-          }
+    if (amsStatus?.success) {
+      // Add AMS slots
+      if (amsStatus.ams_units) {
+        amsStatus.ams_units.forEach(unit => {
+          unit.filaments.forEach(filament => {
+            // Skip empty slots
+            if (filament.filament_type === 'Empty') {
+              return;
+            }
 
-          slots.push({
-            unit_id: unit.unit_id,
-            slot_id: filament.slot_id,
-            filament_type: filament.filament_type,
-            color: filament.color,
-            label: `Unit ${unit.unit_id}, Slot ${filament.slot_id}: ${filament.filament_type} (${filament.color})`,
-            value: `${unit.unit_id}-${filament.slot_id}`,
+            slots.push({
+              unit_id: unit.unit_id,
+              slot_id: filament.slot_id,
+              filament_type: filament.filament_type,
+              color: filament.color,
+              label: `Unit ${unit.unit_id}, Slot ${filament.slot_id}: ${filament.filament_type} (${filament.color})`,
+              value: `${unit.unit_id}-${filament.slot_id}`,
+            });
           });
         });
-      });
+      }
+
+      // Add external spool if available
+      if (amsStatus.external_spool?.available) {
+        const extId = amsStatus.external_spool.slot_id || 254;
+        slots.push({
+          unit_id: extId,
+          slot_id: extId,
+          filament_type: amsStatus.external_spool.filament_type,
+          color: amsStatus.external_spool.color,
+          label: `External Spool: ${amsStatus.external_spool.filament_type} (${amsStatus.external_spool.color})`,
+          value: `${extId}-${extId}`,
+        });
+      }
     }
 
     return slots;
@@ -298,17 +314,51 @@ function FilamentMappingConfig({
   const handleMappingChange = (filamentIndex: number, slotValue: string) => {
     let newMappings = [...filamentMappings];
 
-    // Remove existing mapping for this filament index
-    newMappings = newMappings.filter(m => m.filament_index !== filamentIndex);
-
-    // Add new mapping if a slot is selected
     if (slotValue) {
       const [unitId, slotId] = slotValue.split('-').map(Number);
-      newMappings.push({
-        filament_index: filamentIndex,
-        ams_unit_id: unitId,
-        ams_slot_id: slotId,
-      });
+
+      // Check if external spool (unit 254 or 255) is selected
+      if (unitId === 254 || unitId === 255) {
+        // External spool selected - apply to all filaments
+        newMappings = [];
+        for (let i = 0; i < filamentRequirements.filament_count; i++) {
+          newMappings.push({
+            filament_index: i,
+            ams_unit_id: unitId,
+            ams_slot_id: slotId,
+          });
+        }
+      } else {
+        // Regular AMS slot selected
+        // First, check if we're currently using external spool for all
+        const wasUsingExternalSpool = filamentMappings.every(
+          m => m.ams_unit_id === 254 || m.ams_unit_id === 255
+        );
+
+        if (wasUsingExternalSpool) {
+          // Switching from external spool to AMS - clear all mappings first
+          newMappings = [
+            {
+              filament_index: filamentIndex,
+              ams_unit_id: unitId,
+              ams_slot_id: slotId,
+            },
+          ];
+        } else {
+          // Normal mapping update
+          newMappings = newMappings.filter(
+            m => m.filament_index !== filamentIndex
+          );
+          newMappings.push({
+            filament_index: filamentIndex,
+            ams_unit_id: unitId,
+            ams_slot_id: slotId,
+          });
+        }
+      }
+    } else {
+      // Clearing a mapping
+      newMappings = newMappings.filter(m => m.filament_index !== filamentIndex);
     }
 
     onMappingChange(newMappings);

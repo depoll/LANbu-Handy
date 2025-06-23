@@ -40,6 +40,45 @@ interface SliceProgress {
   };
 }
 
+// Helper function to get mapped slot from either AMS units or external spool
+function getMappedSlot(
+  mapping: FilamentMapping | undefined,
+  amsStatus: AMSStatusResponse | null
+): { filament_type: string; color: string } | null {
+  if (!mapping || !amsStatus) return null;
+
+  // Check if it's external spool (254 or 255)
+  if (
+    (mapping.ams_unit_id === 254 || mapping.ams_unit_id === 255) &&
+    amsStatus.external_spool?.available
+  ) {
+    return {
+      filament_type: amsStatus.external_spool.filament_type,
+      color: amsStatus.external_spool.color,
+    };
+  }
+
+  // Otherwise check AMS units
+  if (amsStatus.ams_units) {
+    const unit = amsStatus.ams_units.find(
+      u => u.unit_id === mapping.ams_unit_id
+    );
+    if (unit) {
+      const filament = unit.filaments.find(
+        f => f.slot_id === mapping.ams_slot_id
+      );
+      if (filament) {
+        return {
+          filament_type: filament.filament_type,
+          color: filament.color,
+        };
+      }
+    }
+  }
+
+  return null;
+}
+
 interface FilamentPillWithDropdownProps {
   index: number;
   type: string;
@@ -53,6 +92,7 @@ interface FilamentPillWithDropdownProps {
   filamentMappings?: FilamentMapping[];
   onMappingChange?: (mappings: FilamentMapping[]) => void;
   disabled?: boolean;
+  totalFilamentCount?: number;
 }
 
 // Component for interactive filament pill with dropdown
@@ -66,6 +106,7 @@ function FilamentPillWithDropdown({
   filamentMappings = [],
   onMappingChange,
   disabled = false,
+  totalFilamentCount = 4,
 }: FilamentPillWithDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -99,22 +140,53 @@ function FilamentPillWithDropdown({
   const handleMappingSelect = (unitId: number, slotId: number) => {
     if (!onMappingChange) return;
 
-    // Start with current mappings
-    const newMappings = [...filamentMappings];
+    let newMappings = [...filamentMappings];
 
-    // Remove any existing mapping for this filament index
-    const filteredMappings = newMappings.filter(
-      m => m.filament_index !== index
-    );
+    // Check if external spool (unit 254 or 255) is selected
+    if (unitId === 254 || unitId === 255) {
+      // External spool selected - apply to all filaments
+      newMappings = [];
+      for (let i = 0; i < totalFilamentCount; i++) {
+        newMappings.push({
+          filament_index: i,
+          ams_unit_id: unitId,
+          ams_slot_id: slotId,
+        });
+      }
+    } else {
+      // Regular AMS slot selected
+      // First, check if we're currently using external spool for all
+      const wasUsingExternalSpool = filamentMappings.every(
+        m => m.ams_unit_id === 254 || m.ams_unit_id === 255
+      );
 
-    // Add the new mapping
-    filteredMappings.push({
-      filament_index: index,
-      ams_unit_id: unitId,
-      ams_slot_id: slotId,
-    });
+      if (wasUsingExternalSpool) {
+        // Switching from external spool to AMS - clear all mappings first
+        newMappings = [
+          {
+            filament_index: index,
+            ams_unit_id: unitId,
+            ams_slot_id: slotId,
+          },
+        ];
+      } else {
+        // Normal mapping update
+        // Remove any existing mapping for this filament index
+        const filteredMappings = newMappings.filter(
+          m => m.filament_index !== index
+        );
 
-    onMappingChange(filteredMappings);
+        // Add the new mapping
+        filteredMappings.push({
+          filament_index: index,
+          ams_unit_id: unitId,
+          ams_slot_id: slotId,
+        });
+        newMappings = filteredMappings;
+      }
+    }
+
+    onMappingChange(newMappings);
     setIsOpen(false);
   };
 
@@ -159,7 +231,9 @@ function FilamentPillWithDropdown({
               }}
             >
               <span className="mapped-info">
-                AMS {mapping.ams_unit_id}-{mapping.ams_slot_id}
+                {mapping.ams_unit_id === 254 || mapping.ams_unit_id === 255
+                  ? 'Ext'
+                  : `AMS ${mapping.ams_unit_id}-${mapping.ams_slot_id}`}
               </span>
               <span className="mapped-type">{mappedSlot.filament_type}</span>
             </div>
@@ -225,6 +299,37 @@ function FilamentPillWithDropdown({
                   </div>
                 );
               })
+          )}
+
+          {/* Add external spool if available */}
+          {amsStatus?.external_spool?.available && (
+            <div
+              className={`dropdown-option ${
+                mapping?.ams_unit_id ===
+                (amsStatus.external_spool.slot_id || 254)
+                  ? 'selected'
+                  : ''
+              }`}
+              onClick={() => {
+                const extId = amsStatus.external_spool?.slot_id || 254;
+                handleMappingSelect(extId, extId);
+              }}
+            >
+              <div
+                className="option-color-swatch"
+                style={{ backgroundColor: amsStatus.external_spool.color }}
+              />
+              <div className="option-details">
+                <span className="option-label">External Spool</span>
+                <span className="option-type">
+                  {amsStatus.external_spool.filament_type}
+                </span>
+              </div>
+              {mapping?.ams_unit_id ===
+                (amsStatus.external_spool.slot_id || 254) && (
+                <span className="selected-indicator">✓</span>
+              )}
+            </div>
           )}
         </div>
       )}
@@ -997,16 +1102,10 @@ function PlateSelector({
                               const mapping = filamentMappings?.find(
                                 m => m.filament_index === index
                               );
-                              const mappedSlot =
-                                mapping && amsStatus?.ams_units
-                                  ? amsStatus.ams_units
-                                      .find(
-                                        u => u.unit_id === mapping.ams_unit_id
-                                      )
-                                      ?.filaments.find(
-                                        f => f.slot_id === mapping.ams_slot_id
-                                      )
-                                  : null;
+                              const mappedSlot = getMappedSlot(
+                                mapping,
+                                amsStatus
+                              );
 
                               return (
                                 <FilamentPillWithDropdown
@@ -1024,6 +1123,9 @@ function PlateSelector({
                                   filamentMappings={filamentMappings}
                                   onMappingChange={onMappingChange}
                                   disabled={disabled || !amsStatus}
+                                  totalFilamentCount={
+                                    activeFilamentRequirements.filament_count
+                                  }
                                 />
                               );
                             }
@@ -1222,14 +1324,7 @@ function PlateSelector({
                           const mapping = filamentMappings?.find(
                             m => m.filament_index === index
                           );
-                          const mappedSlot =
-                            mapping && amsStatus?.ams_units
-                              ? amsStatus.ams_units
-                                  .find(u => u.unit_id === mapping.ams_unit_id)
-                                  ?.filaments.find(
-                                    f => f.slot_id === mapping.ams_slot_id
-                                  )
-                              : null;
+                          const mappedSlot = getMappedSlot(mapping, amsStatus);
 
                           return (
                             <FilamentPillWithDropdown
@@ -1246,6 +1341,9 @@ function PlateSelector({
                               filamentMappings={filamentMappings}
                               onMappingChange={onMappingChange}
                               disabled={disabled || !amsStatus}
+                              totalFilamentCount={
+                                filamentRequirements.filament_count
+                              }
                             />
                           );
                         }

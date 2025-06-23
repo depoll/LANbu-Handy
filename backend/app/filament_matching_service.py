@@ -26,6 +26,7 @@ class FilamentMatch:
     match_quality: str  # "perfect", "type_only", "fallback", "none"
     confidence: float  # 0.0 to 1.0
     ams_filament: Optional[AMSFilament] = None
+    is_external_spool: bool = False  # True if this is external spool (unit_id=254)
 
 
 @dataclass
@@ -77,10 +78,10 @@ class FilamentMatchingService:
         Returns:
             FilamentMatchingResult with suggested mappings
         """
-        if not ams_status.success or not ams_status.ams_units:
+        if not ams_status.success:
             return FilamentMatchingResult(
                 success=False,
-                message="AMS status not available or no AMS units found",
+                message="AMS status not available",
                 matches=[],
                 error_details="Cannot match filaments without valid AMS status",
             )
@@ -95,6 +96,18 @@ class FilamentMatchingService:
 
         # Get all available AMS filaments
         available_filaments = self._get_all_ams_filaments(ams_status.ams_units)
+
+        # Add external spool to available filaments if it's loaded
+        if ams_status.external_spool and ams_status.external_spool.available:
+            external_filament = AMSFilament(
+                slot_id=ams_status.external_spool.slot_id,
+                filament_type=ams_status.external_spool.filament_type,
+                color=ams_status.external_spool.color,
+                material_id=ams_status.external_spool.material_id,
+            )
+            # Use the actual external spool ID from the data
+            ext_id = ams_status.external_spool.slot_id
+            available_filaments.append((external_filament, ext_id, ext_id))
 
         if not available_filaments:
             return FilamentMatchingResult(
@@ -128,6 +141,8 @@ class FilamentMatchingService:
             if best_match:
                 # Update the requirement index for this match
                 best_match.requirement_index = req_index
+                # Set external spool flag if unit_id is 254
+                best_match.is_external_spool = best_match.ams_unit_id in [254, 255]
                 matches.append(best_match)
                 used_slots.add((best_match.ams_unit_id, best_match.ams_slot_id))
             else:

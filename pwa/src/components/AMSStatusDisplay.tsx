@@ -299,6 +299,8 @@ function AMSStatusDisplay({
     // Check if this is an empty slot or transparent
     const isEmpty = isEmptyColor(filament.color);
     const isTransparent = isTransparentColor(filament.color);
+    const isExternalSpool =
+      filament.slot_id === 254 || filament.slot_id === 255;
 
     // Convert color hex codes to a readable format or use the raw value
     const colorDisplay = filament.color.startsWith('#')
@@ -318,7 +320,9 @@ function AMSStatusDisplay({
     return (
       <div key={filament.slot_id} className="filament-slot">
         <div className="slot-header">
-          <span className="slot-id">Slot {filament.slot_id}</span>
+          {!isExternalSpool && (
+            <span className="slot-id">Slot {filament.slot_id}</span>
+          )}
           <span className="filament-type">{filament.filament_type}</span>
         </div>
         <div className="filament-details">
@@ -443,6 +447,25 @@ function AMSStatusDisplay({
             </div>
           ) : (
             <div className="no-ams">No AMS units found</div>
+          )}
+
+          {/* External Spool Display */}
+          {amsStatus.external_spool && (
+            <div className="external-spool-section">
+              <h4>External Spool</h4>
+              {amsStatus.external_spool.available ? (
+                <div className="filament-slots">
+                  {renderFilamentSlot({
+                    slot_id: amsStatus.external_spool.slot_id,
+                    filament_type: amsStatus.external_spool.filament_type,
+                    color: amsStatus.external_spool.color,
+                    material_id: amsStatus.external_spool.material_id,
+                  })}
+                </div>
+              ) : (
+                <div className="no-filaments">No external spool loaded</div>
+              )}
+            </div>
           )}
         </div>
       ) : (
