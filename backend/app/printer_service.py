@@ -81,6 +81,17 @@ class AMSFilament:
 
 
 @dataclass
+class ExternalSpool:
+    """Information about the external spool (virtual tray)."""
+
+    slot_id: int = 254  # Usually 254, but can be 255 on X1C
+    filament_type: str = "Unknown"
+    color: str = "#00000000"
+    material_id: str = None
+    available: bool = False  # Whether external spool is available/loaded
+
+
+@dataclass
 class AMSUnit:
     """Information about an AMS unit."""
 
@@ -97,6 +108,7 @@ class PrinterStatusResult:
     printer_model: str = None
     printer_name: str = None
     ams_units: List[AMSUnit] = None
+    external_spool: ExternalSpool = None
     error_details: str = None
 
 
@@ -107,6 +119,7 @@ class AMSStatusResult:
     success: bool
     message: str
     ams_units: List[AMSUnit] = None
+    external_spool: ExternalSpool = None
     error_details: str = None
 
 
@@ -819,7 +832,7 @@ class PrinterService:
                 )
 
             # Parse the AMS data from the response
-            ams_units = self._parse_ams_data(response_data)
+            ams_units, external_spool = self._parse_ams_data(response_data)
 
             logger.info(
                 f"Successfully retrieved AMS status from printer "
@@ -831,6 +844,7 @@ class PrinterService:
                 message=f"AMS status retrieved successfully from "
                 f"{printer_config.name}",
                 ams_units=ams_units,
+                external_spool=external_spool,
             )
 
         except PrinterMQTTError:
@@ -851,21 +865,28 @@ class PrinterService:
                 except Exception as e:
                     logger.debug(f"Error during MQTT cleanup: {e}")
 
-    def _parse_ams_data(self, response_data: dict) -> List[AMSUnit]:
+    def _parse_ams_data(
+        self, response_data: dict
+    ) -> tuple[List[AMSUnit], ExternalSpool]:
         """Parse AMS data from MQTT response.
 
         Args:
             response_data: The JSON response from the printer
 
         Returns:
-            List[AMSUnit]: List of AMS units with their filament information
+            tuple: (List[AMSUnit], ExternalSpool) - AMS units and external spool info
         """
         ams_units = []
+        external_spool = ExternalSpool()
 
         try:
+            # Log the full response to understand the structure
+            logger.debug(f"Full response_data: {json.dumps(response_data, indent=2)}")
+
             # Bambu Lab AMS data is typically structured as:
             # {"ams": {"ams": [{"id": 0, "tray": [{"id": 0, ...}, ...]}, ...]}}
             ams_data = response_data.get("ams", {})
+            logger.debug(f"Full AMS data structure: {json.dumps(ams_data, indent=2)}")
             ams_list = ams_data.get("ams", [])
 
             for ams_unit_data in ams_list:
@@ -905,11 +926,49 @@ class PrinterService:
                 ams_unit = AMSUnit(unit_id=unit_id, filaments=filaments)
                 ams_units.append(ams_unit)
 
+            # Parse external spool (vt_tray) data
+            # Check in print level first (X1C location), then ams_data, then top level
+            vt_tray = None
+            if "vt_tray" in response_data:
+                # Check if we're looking at the print object directly
+                vt_tray = response_data.get("vt_tray", {})
+                logger.debug(f"vt_tray found at response_data level: {vt_tray}")
+            elif vt_tray is None:
+                vt_tray = ams_data.get("vt_tray", {})
+                if vt_tray:
+                    logger.debug(f"vt_tray found in ams_data: {vt_tray}")
+
+            if vt_tray:
+                external_spool.slot_id = int(vt_tray.get("id", 254))
+                external_spool.filament_type = vt_tray.get("tray_type", "Unknown")
+                external_spool.material_id = vt_tray.get("tray_sub_brands", None)
+                external_spool.color = "#" + vt_tray.get("tray_color", "00000000")
+
+                # X1C doesn't have state field in vt_tray, check if filament type exists
+                # or if tray_now == external spool id to determine availability
+                if (
+                    external_spool.filament_type
+                    and external_spool.filament_type != "Unknown"
+                ):
+                    external_spool.available = True
+                else:
+                    # Also check if currently selected
+                    tray_now = ams_data.get("tray_now", "")
+                    external_spool.available = str(tray_now) == str(
+                        external_spool.slot_id
+                    )
+
+                logger.debug(
+                    f"External spool parsed: available={external_spool.available}, "
+                    f"type={external_spool.filament_type}, "
+                    f"color={external_spool.color}, id={external_spool.slot_id}"
+                )
+
         except Exception as e:
             logger.warning(f"Error parsing AMS data: {e}")
             # Return empty list on parsing error
 
-        return ams_units
+        return ams_units, external_spool
 
     def query_printer_status(
         self, printer_config: PrinterConfig, timeout: Optional[int] = None
@@ -1093,8 +1152,8 @@ class PrinterService:
                 )
 
             # Parse the printer status data from the response
-            printer_model, printer_name, ams_units = self._parse_printer_status_data(
-                response_data
+            printer_model, printer_name, ams_units, external_spool = (
+                self._parse_printer_status_data(response_data)
             )
 
             logger.info(
@@ -1109,6 +1168,7 @@ class PrinterService:
                 printer_model=printer_model,
                 printer_name=printer_name,
                 ams_units=ams_units,
+                external_spool=external_spool,
             )
 
         except PrinterMQTTError:
@@ -1134,18 +1194,19 @@ class PrinterService:
 
     def _parse_printer_status_data(
         self, response_data: dict
-    ) -> tuple[str, str, List[AMSUnit]]:
+    ) -> tuple[str, str, List[AMSUnit], ExternalSpool]:
         """Parse printer status data from MQTT response.
 
         Args:
             response_data: The JSON response from the printer
 
         Returns:
-            tuple: (printer_model, printer_name, ams_units)
+            tuple: (printer_model, printer_name, ams_units, external_spool)
         """
         printer_model = "Unknown"
         printer_name = "Unknown"
         ams_units = []
+        external_spool = ExternalSpool()
 
         try:
             print_data = response_data.get("print", {})
@@ -1257,12 +1318,12 @@ class PrinterService:
 
             # Parse AMS data if present
             if "ams" in print_data:
-                ams_units = self._parse_ams_data(print_data)
+                ams_units, external_spool = self._parse_ams_data(print_data)
 
         except Exception as e:
             logger.warning(f"Error parsing printer status data: {e}")
 
-        return printer_model, printer_name, ams_units
+        return printer_model, printer_name, ams_units, external_spool
 
     def test_connection(self, printer_config: PrinterConfig) -> bool:
         """Test FTP connection to a printer without uploading.

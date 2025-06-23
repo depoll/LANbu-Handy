@@ -274,7 +274,7 @@ class TestErrorHandling:
         result = service.match_filaments(requirements, empty_status)
 
         assert result.success is False
-        assert "no AMS units found" in result.message
+        assert "No filaments found in AMS units" in result.message
 
     def test_no_loaded_filaments(self, service):
         """Test handling of AMS units with no loaded filaments."""

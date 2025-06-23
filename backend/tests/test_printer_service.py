@@ -353,6 +353,31 @@ TEST_AMS_RESPONSE_DATA = {
         "tray_tar": "255",
         "unbind_ams_stat": 0,
         "version": 98743,
+        "vt_tray": {
+            "id": "254",
+            "bed_temp": "0",
+            "bed_temp_type": "0",
+            "cali_idx": 0,
+            "cols": ["000000FF"],
+            "ctype": 0,
+            "drying_temp": "0",
+            "drying_time": "0",
+            "nozzle_temp_max": "0",
+            "nozzle_temp_min": "0",
+            "remain": 0,
+            "state": 10,
+            "tag_uid": "0000000000000000",
+            "total_len": 0,
+            "tray_color": "00000000",
+            "tray_diameter": "1.75",
+            "tray_id_name": "",
+            "tray_info_idx": "",
+            "tray_sub_brands": "",
+            "tray_type": "",
+            "tray_uuid": "00000000000000000000000000000000",
+            "tray_weight": "0",
+            "xcam_info": "000000000000000000000000",
+        },
     }
 }
 
@@ -1380,9 +1405,14 @@ class TestAMSQuery:
         """Test parsing valid AMS data."""
         response_data = TEST_AMS_RESPONSE_DATA
 
-        ams_units = printer_service._parse_ams_data(response_data)
+        ams_units, external_spool = printer_service._parse_ams_data(response_data)
 
         assert len(ams_units) == 3
+
+        # Check external spool (should be empty based on state=10)
+        assert external_spool is not None
+        assert external_spool.slot_id == 254
+        assert external_spool.available is False  # state=10 means empty
 
         # First AMS unit
         unit1 = ams_units[0]
@@ -1460,19 +1490,70 @@ class TestAMSQuery:
         assert filament12.filament_type == "PETG"
         assert filament12.color == "F75403FF" or filament12.color == "#F75403FF"
 
+    def test_parse_ams_data_with_loaded_external_spool(self, printer_service):
+        """Test parsing AMS data with loaded external spool."""
+        response_data = {
+            "ams": {
+                "ams": [],  # No AMS units
+                "vt_tray": {
+                    "id": "254",
+                    "state": 11,  # Loaded state
+                    "tray_type": "PLA",
+                    "tray_color": "FF0000FF",
+                    "tray_sub_brands": "PLA Basic",
+                },
+            }
+        }
+
+        ams_units, external_spool = printer_service._parse_ams_data(response_data)
+
+        assert len(ams_units) == 0
+        assert external_spool is not None
+        assert external_spool.slot_id == 254
+        assert external_spool.available is True  # state != 10 means loaded
+        assert external_spool.filament_type == "PLA"
+        assert external_spool.color == "#FF0000FF"
+        assert external_spool.material_id == "PLA Basic"
+
     def test_parse_ams_data_invalid(self, printer_service):
         """Test parsing invalid AMS data."""
         # Missing AMS data
         response_data = {"status": "ok"}
 
-        ams_units = printer_service._parse_ams_data(response_data)
+        ams_units, external_spool = printer_service._parse_ams_data(response_data)
         assert len(ams_units) == 0
 
         # Malformed data
         response_data = {"ams": "invalid"}
 
-        ams_units = printer_service._parse_ams_data(response_data)
+        ams_units, external_spool = printer_service._parse_ams_data(response_data)
         assert len(ams_units) == 0
+
+    def test_parse_ams_data_x1c_style_external_spool(self, printer_service):
+        """Test parsing X1C-style data with external spool in print object."""
+        # X1C sends vt_tray at print level, not inside ams
+        response_data = {
+            "vt_tray": {
+                "id": "255",
+                "tray_type": "TPU",
+                "tray_color": "000000FF",
+                "tray_sub_brands": "",
+                # No state field in X1C data
+            },
+            "ams": {
+                "ams": [],  # No AMS units
+                "tray_now": "255",  # External spool selected
+            },
+        }
+
+        ams_units, external_spool = printer_service._parse_ams_data(response_data)
+
+        assert len(ams_units) == 0
+        assert external_spool is not None
+        assert external_spool.slot_id == 255
+        assert external_spool.available is True  # Has filament type
+        assert external_spool.filament_type == "TPU"
+        assert external_spool.color == "#000000FF"
 
 
 class TestMQTTIntegration:
