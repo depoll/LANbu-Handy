@@ -2,7 +2,8 @@
 
 # Stop any running development servers
 # This is useful when servers are orphaned or start-dev.sh didn't clean up properly
-# NOTE: This script is careful to avoid killing VSCode-related processes
+# NOTE: This script is careful to avoid killing VSCode-related processes, SSH connections,
+# or other critical processes that would disconnect you from the dev container
 
 # Colors for output
 RED='\033[0;31m'
@@ -14,7 +15,10 @@ echo -e "${YELLOW}Stopping LANbu Handy development servers...${NC}"
 
 # First, kill any running start-dev.sh scripts
 echo -e "${YELLOW}Stopping start-dev.sh scripts...${NC}"
-if pkill -f "bash.*start-dev\.sh"; then
+# Be more specific - only kill start-dev.sh processes that are in the scripts directory
+START_DEV_PIDS=$(pgrep -f "bash.*/workspace/scripts/start-dev\.sh" || true)
+if [ -n "$START_DEV_PIDS" ]; then
+    echo "$START_DEV_PIDS" | xargs -r kill 2>/dev/null || true
     echo -e "${GREEN}start-dev.sh scripts stopped.${NC}"
     # Give it a moment to clean up its children
     sleep 1
@@ -77,20 +81,20 @@ echo -e "${YELLOW}Stopping PWA dev server...${NC}"
 # Look for npm run dev specifically in the pwa directory
 PWA_KILLED=false
 # Check for npm run dev process started from pwa directory
-if pgrep -f "npm.*run.*dev.*pwa" > /dev/null; then
-    pkill -f "npm.*run.*dev.*pwa"
-    PWA_KILLED=true
-fi
-# Also check for npm started from within pwa directory by checking the working directory
-for pid in $(pgrep -f "npm run dev"); do
+NPM_DEV_PIDS=$(pgrep -f "npm.*run.*dev" | while read pid; do
     if [ -e "/proc/$pid/cwd" ]; then
         CWD=$(readlink /proc/$pid/cwd 2>/dev/null)
-        if [[ "$CWD" == *"/pwa"* ]]; then
-            kill -9 "$pid" 2>/dev/null || true
-            PWA_KILLED=true
+        # Only kill if it's running from the pwa directory
+        if [[ "$CWD" == "/workspace/pwa" ]]; then
+            echo "$pid"
         fi
     fi
-done
+done)
+
+if [ -n "$NPM_DEV_PIDS" ]; then
+    echo "$NPM_DEV_PIDS" | xargs -r kill 2>/dev/null || true
+    PWA_KILLED=true
+fi
 
 if [ "$PWA_KILLED" = true ]; then
     echo -e "${GREEN}PWA npm process stopped.${NC}"
@@ -100,17 +104,29 @@ fi
 
 # Kill vite processes - be specific about vite dev server
 VITE_KILLED=false
-# Look for vite processes that are clearly the dev server, not VSCode extensions
-if pgrep -f "node.*bin/vite.*serve" > /dev/null; then
-    pkill -f "node.*bin/vite.*serve"
+# Look for vite processes that are running from our PWA directory
+VITE_PIDS=$(pgrep -f "node.*vite" | while read pid; do
+    if [ -e "/proc/$pid/cwd" ]; then
+        CWD=$(readlink /proc/$pid/cwd 2>/dev/null)
+        # Only kill if it's running from the pwa directory
+        if [[ "$CWD" == "/workspace/pwa" ]]; then
+            echo "$pid"
+        fi
+    fi
+done)
+
+# Also check for vite processes listening on port 3000
+if command -v lsof >/dev/null 2>&1; then
+    PORT_3000_PIDS=$(lsof -ti:3000 2>/dev/null || true)
+    if [ -n "$PORT_3000_PIDS" ]; then
+        VITE_PIDS="${VITE_PIDS}${VITE_PIDS:+$'\n'}${PORT_3000_PIDS}"
+    fi
+fi
+
+if [ -n "$VITE_PIDS" ]; then
+    echo "$VITE_PIDS" | sort -u | xargs -r kill 2>/dev/null || true
     VITE_KILLED=true
 fi
-# Check for vite processes by port (3000 is configured in our vite.config.ts)
-# Since lsof might not be available, kill all vite processes
-for pid in $(pgrep -f "node.*vite"); do
-    kill -9 "$pid" 2>/dev/null || true
-    VITE_KILLED=true
-done
 
 if [ "$VITE_KILLED" = true ]; then
     echo -e "${GREEN}PWA vite process stopped.${NC}"
@@ -118,29 +134,7 @@ else
     echo -e "${YELLOW}No PWA vite process was running.${NC}"
 fi
 
-# Kill processes on port 3000 - try graceful shutdown first
-if command -v lsof >/dev/null 2>&1 && lsof -ti:3000 >/dev/null 2>&1; then
-    # Try SIGTERM first, then SIGKILL if needed
-    lsof -ti:3000 | xargs -r kill 2>/dev/null || true
-    sleep 1
-    if lsof -ti:3000 >/dev/null 2>&1; then
-        lsof -ti:3000 | xargs -r kill -9 2>/dev/null || true
-    fi
-    echo -e "${GREEN}Killed processes on port 3000.${NC}"
-elif command -v netstat >/dev/null 2>&1; then
-    # Use netstat as fallback
-    PIDS=$(netstat -tlnp 2>/dev/null | grep :3000 | awk '{print $7}' | cut -d'/' -f1 | grep -E '^[0-9]+$' || true)
-    if [ -n "$PIDS" ]; then
-        echo "$PIDS" | xargs -r kill 2>/dev/null || true
-        sleep 1
-        # Force kill if still running
-        PIDS=$(netstat -tlnp 2>/dev/null | grep :3000 | awk '{print $7}' | cut -d'/' -f1 | grep -E '^[0-9]+$' || true)
-        if [ -n "$PIDS" ]; then
-            echo "$PIDS" | xargs -r kill -9 2>/dev/null || true
-        fi
-        echo -e "${GREEN}Killed processes on port 3000.${NC}"
-    fi
-fi
+# Port 3000 cleanup already handled above with Vite processes
 
 # Check if any servers are still running
 echo -e "\n${YELLOW}Checking server status...${NC}"
@@ -180,13 +174,21 @@ fi
 # Final targeted cleanup for any missed LANbu Handy processes
 echo -e "${YELLOW}Final cleanup...${NC}"
 # Only clean up processes that are definitely ours, not VSCode's
-# Check for any remaining vite processes on our dev port
-if lsof -ti:3000 >/dev/null 2>&1; then
-    lsof -ti:3000 | xargs -r kill -9 2>/dev/null || true
-fi
-# Check for any remaining uvicorn processes on our backend port
-if lsof -ti:8000 >/dev/null 2>&1; then
-    lsof -ti:8000 | xargs -r kill -9 2>/dev/null || true
+# Check for any remaining processes on our dev ports
+if command -v lsof >/dev/null 2>&1; then
+    # Check port 3000 for any remaining processes
+    PORT_3000_REMAINING=$(lsof -ti:3000 2>/dev/null || true)
+    if [ -n "$PORT_3000_REMAINING" ]; then
+        echo -e "${YELLOW}Found remaining processes on port 3000, cleaning up...${NC}"
+        echo "$PORT_3000_REMAINING" | xargs -r kill -9 2>/dev/null || true
+    fi
+
+    # Check port 8000 for any remaining processes
+    PORT_8000_REMAINING=$(lsof -ti:8000 2>/dev/null || true)
+    if [ -n "$PORT_8000_REMAINING" ]; then
+        echo -e "${YELLOW}Found remaining processes on port 8000, cleaning up...${NC}"
+        echo "$PORT_8000_REMAINING" | xargs -r kill -9 2>/dev/null || true
+    fi
 fi
 
 echo -e "\n${GREEN}Done.${NC}"
