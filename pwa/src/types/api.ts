@@ -15,10 +15,19 @@ export interface AMSUnit {
   filaments: AMSFilament[];
 }
 
+export interface ExternalSpool {
+  slot_id: number;
+  filament_type: string;
+  color: string;
+  material_id?: string;
+  available: boolean;
+}
+
 export interface AMSStatusResponse {
   success: boolean;
   message: string;
   ams_units?: AMSUnit[];
+  external_spool?: ExternalSpool;
   error_details?: string;
 }
 
@@ -28,6 +37,7 @@ export interface PrinterStatusResponse {
   printer_model?: string;
   printer_name?: string;
   ams_units?: AMSUnit[];
+  external_spool?: ExternalSpool;
   error_details?: string;
 }
 
@@ -199,6 +209,7 @@ export interface FilamentMatchResult {
   ams_slot_id: number;
   match_quality: string; // "perfect", "type_only", "fallback", "none"
   confidence: number;
+  is_external_spool?: boolean;
 }
 
 export interface FilamentMatchResponse {

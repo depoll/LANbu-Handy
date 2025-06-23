@@ -184,7 +184,23 @@ function ConfigurationSummary({
 
   // Get AMS slot details for a mapping
   const getAMSSlotDetails = (mapping: FilamentMapping) => {
-    if (!amsStatus?.success || !amsStatus.ams_units) return null;
+    if (!amsStatus?.success) return null;
+
+    // Check if it's external spool (254 or 255)
+    if (
+      (mapping.ams_unit_id === 254 || mapping.ams_unit_id === 255) &&
+      amsStatus.external_spool?.available
+    ) {
+      return {
+        slot_id: amsStatus.external_spool.slot_id,
+        filament_type: amsStatus.external_spool.filament_type,
+        color: amsStatus.external_spool.color,
+        material_id: amsStatus.external_spool.material_id,
+      };
+    }
+
+    // Otherwise check AMS units
+    if (!amsStatus.ams_units) return null;
 
     const unit = amsStatus.ams_units.find(
       u => u.unit_id === mapping.ams_unit_id
@@ -287,8 +303,10 @@ function ConfigurationSummary({
                         {amsSlot ? (
                           <>
                             <span className="ams-slot">
-                              Unit {mapping!.ams_unit_id}, Slot{' '}
-                              {mapping!.ams_slot_id}
+                              {mapping!.ams_unit_id === 254 ||
+                              mapping!.ams_unit_id === 255
+                                ? 'External Spool'
+                                : `Unit ${mapping!.ams_unit_id}, Slot ${mapping!.ams_slot_id}`}
                             </span>
                             <span className="ams-type">
                               {amsSlot.filament_type}

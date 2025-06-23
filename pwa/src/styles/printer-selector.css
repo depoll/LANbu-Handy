@@ -754,3 +754,42 @@
     height: 2rem;
   }
 }
+
+/* Printer thumbnail image styles */
+.printer-thumbnail,
+.dropdown-printer-thumbnail,
+.card-printer-thumbnail {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: white;
+  border-radius: 8px;
+  padding: 0.25rem;
+}
+
+/* Ensure images fit within their containers */
+.printer-image img,
+.dropdown-printer-image img,
+.printer-card-image img {
+  max-width: 100%;
+  max-height: 100%;
+}
+
+/* Placeholder icon styles when no image is available */
+.printer-placeholder-icon {
+  font-size: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
+/* Specific size adjustments for different contexts */
+.dropdown-printer-image .printer-placeholder-icon {
+  font-size: 1.5rem;
+}
+
+.printer-card-image .printer-placeholder-icon {
+  font-size: 2rem;
+}

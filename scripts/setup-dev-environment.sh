@@ -121,10 +121,31 @@ if [ ! -f "/claude/.claude.json" ]; then
 fi
 
 # Create symlinks to home directory
+rm -rf /home/vscode/.claude
+rm -f /home/vscode/.claude.json
 ln -sf /claude/.claude /home/vscode/.claude
 ln -sf /claude/.claude.json /home/vscode/.claude.json
 sudo chown -R vscode:vscode /claude
 echo "🔗 Symlinks created for Claude configuration"
+sudo npm i -g @anthropic-ai/claude-code
+echo "Claude Code CLI Updated"
+
+# Create symlink to Bambu Studio resources if they exist
+if [ -d "/opt/bambu-studio-resources" ]; then
+    if [ ! -L "$REPO_ROOT/bambu-studio-resources" ]; then
+        ln -sf /opt/bambu-studio-resources "$REPO_ROOT/bambu-studio-resources"
+        echo "🔗 Symlink created for Bambu Studio resources"
+    else
+        echo "✅ Bambu Studio resources symlink already exists"
+    fi
+else
+    echo "⚠️  Bambu Studio resources not found at /opt/bambu-studio-resources"
+    echo "   They will be available after the next CLI image build"
+fi
+
+go install github.com/isaacphi/mcp-language-server@latest
+sudo npm install -g pyright
+sudo npm install -g typescript typescript-language-server
 
 echo ""
 echo "🎉 Development environment setup complete!"

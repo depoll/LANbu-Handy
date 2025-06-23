@@ -58,6 +58,19 @@ RUN chown -R lanbu:lanbu /app
 # Copy built PWA from the build stage and set proper ownership
 COPY --from=pwa-builder --chown=lanbu:lanbu /app/pwa/dist ./static_pwa
 
+# Create symlink to Bambu Studio resources from the base image
+# TODO: Remove the conditional check once CLI images are rebuilt with resources
+RUN if [ -d /opt/bambu-studio-resources ]; then \
+        echo "Found Bambu Studio resources, creating symlink..." && \
+        ln -s /opt/bambu-studio-resources ./bambu-studio-resources && \
+        chown -h lanbu:lanbu ./bambu-studio-resources; \
+    else \
+        echo "Bambu Studio resources not found in base image (CLI image needs rebuild)" && \
+        mkdir -p ./bambu-studio-resources && \
+        chown lanbu:lanbu ./bambu-studio-resources && \
+        echo "Created empty resources directory as placeholder"; \
+    fi
+
 # Switch to non-root user
 USER lanbu
 

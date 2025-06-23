@@ -151,6 +151,20 @@ if STATIC_PWA_DIR.exists():
         "/assets", StaticFiles(directory=STATIC_PWA_DIR / "assets"), name="assets"
     )
 
+# Mount Bambu Studio resources for printer images
+# These resources come from the base Docker image
+BAMBU_RESOURCES_DIR = Path("/opt/bambu-studio-resources")
+# In development, use the symlinked directory
+if not BAMBU_RESOURCES_DIR.exists():
+    BAMBU_RESOURCES_DIR = Path(__file__).parent.parent / "bambu-studio-resources"
+
+if BAMBU_RESOURCES_DIR.exists():
+    app.mount(
+        "/api/resources",
+        StaticFiles(directory=BAMBU_RESOURCES_DIR),
+        name="bambu-resources",
+    )
+
 
 @app.get("/")
 async def serve_pwa():
@@ -308,10 +322,19 @@ class AMSUnitResponse(BaseModel):
     filaments: List[AMSFilamentResponse]
 
 
+class ExternalSpoolResponse(BaseModel):
+    slot_id: int = 254
+    filament_type: str
+    color: str
+    material_id: Optional[str] = None
+    available: bool
+
+
 class AMSStatusResponse(BaseModel):
     success: bool
     message: str
     ams_units: Optional[List[AMSUnitResponse]] = None
+    external_spool: Optional[ExternalSpoolResponse] = None
     error_details: Optional[str] = None
 
 
@@ -321,6 +344,7 @@ class PrinterStatusResponse(BaseModel):
     printer_model: Optional[str] = None
     printer_name: Optional[str] = None
     ams_units: Optional[List[AMSUnitResponse]] = None
+    external_spool: Optional[ExternalSpoolResponse] = None
     error_details: Optional[str] = None
 
 
@@ -393,6 +417,7 @@ class FilamentMatchResult(BaseModel):
     ams_slot_id: int
     match_quality: str  # "perfect", "type_only", "fallback", "none"
     confidence: float
+    is_external_spool: bool = False
 
 
 class FilamentMatchResponse(BaseModel):
@@ -2082,10 +2107,22 @@ async def get_ams_status(printer_id: str):
                         )
                         ams_units_response.append(unit_response)
 
+                # Convert external spool if present
+                external_spool_response = None
+                if ams_result.external_spool:
+                    external_spool_response = ExternalSpoolResponse(
+                        slot_id=ams_result.external_spool.slot_id,
+                        filament_type=ams_result.external_spool.filament_type,
+                        color=ams_result.external_spool.color,
+                        material_id=ams_result.external_spool.material_id,
+                        available=ams_result.external_spool.available,
+                    )
+
                 return AMSStatusResponse(
                     success=True,
                     message=ams_result.message,
                     ams_units=ams_units_response,
+                    external_spool=external_spool_response,
                 )
             else:
                 # Query failed
@@ -2306,12 +2343,24 @@ async def get_printer_status(printer_id: str):
                         )
                         ams_units_response.append(unit_response)
 
+                # Convert external spool if present
+                external_spool_response = None
+                if status_result.external_spool:
+                    external_spool_response = ExternalSpoolResponse(
+                        slot_id=status_result.external_spool.slot_id,
+                        filament_type=status_result.external_spool.filament_type,
+                        color=status_result.external_spool.color,
+                        material_id=status_result.external_spool.material_id,
+                        available=status_result.external_spool.available,
+                    )
+
                 return PrinterStatusResponse(
                     success=True,
                     message=status_result.message,
                     printer_model=status_result.printer_model,
                     printer_name=status_result.printer_name,
                     ams_units=ams_units_response,
+                    external_spool=external_spool_response,
                 )
             else:
                 # Query failed
@@ -2388,10 +2437,24 @@ async def match_filaments(request: FilamentMatchRequest):
                 ams_unit = AMSUnit(unit_id=unit_response.unit_id, filaments=filaments)
                 ams_units.append(ams_unit)
 
+        # Convert external spool if present
+        external_spool = None
+        if request.ams_status.external_spool:
+            from app.printer_service import ExternalSpool
+
+            external_spool = ExternalSpool(
+                slot_id=request.ams_status.external_spool.slot_id,
+                filament_type=request.ams_status.external_spool.filament_type,
+                color=request.ams_status.external_spool.color,
+                material_id=request.ams_status.external_spool.material_id,
+                available=request.ams_status.external_spool.available,
+            )
+
         ams_status = AMSStatusResult(
             success=request.ams_status.success,
             message=request.ams_status.message,
             ams_units=ams_units,
+            external_spool=external_spool,
             error_details=request.ams_status.error_details,
         )
 
@@ -2410,6 +2473,7 @@ async def match_filaments(request: FilamentMatchRequest):
                     ams_slot_id=match.ams_slot_id,
                     match_quality=match.match_quality,
                     confidence=match.confidence,
+                    is_external_spool=match.is_external_spool,
                 )
                 matches.append(match_result)
 

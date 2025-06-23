@@ -179,6 +179,9 @@ RUN apt-get update && \
 # Copy the built binary
 COPY --from=builder /usr/local/bin/BambuStudio.AppImage /usr/local/bin/BambuStudio.AppImage
 
+# Copy Bambu Studio resources directory
+COPY --from=builder /build/BambuStudio/resources /opt/bambu-studio-resources
+
 # Create virtual display startup script
 RUN echo '#!/bin/bash\n\
 # Start virtual Wayland compositor if not already running\n\

@@ -8,7 +8,8 @@
   "features": {
     "ghcr.io/devcontainers/features/git:1": {},
     "ghcr.io/anthropics/devcontainer-features/claude-code:1.0.5": {},
-    "ghcr.io/devcontainers/features/github-cli:1": {}
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/devcontainers/features/go:1": {}
   },
 
   "customizations": {
@@ -51,7 +52,7 @@
   },
 
   "postCreateCommand": "./scripts/setup-dev-environment.sh --devcontainer",
-  "postStartCommand": "sudo chgrp docker /var/run/docker.sock || true",
+  "postStartCommand": "sudo chgrp docker /var/run/docker.sock && ./scripts/dev-container-startup.sh || true",
 
   "remoteUser": "vscode",
   "containerUser": "vscode"

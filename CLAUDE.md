@@ -146,6 +146,13 @@ BAMBU_PRINTERS='[{"name":"X1C","ip":"192.168.1.100","access_code":"12345678"}]'
 - `app/model_service.py` - 3D model download and validation
 - `app/job_orchestration.py` - End-to-end workflow coordination
 
+### Bambu Studio Resources
+
+- Resources are located at `/opt/bambu-studio-resources` in containers
+- In development, a symlink at `./bambu-studio-resources` provides access
+- Contains printer configurations, filament profiles, build plate settings, and images
+- These resources are automatically copied from the Bambu Studio repository during CLI build
+
 ### Frontend Core Components
 
 - `src/components/ModelPreview.tsx` - 3D model visualization with Three.js
@@ -200,3 +207,5 @@ BAMBU_PRINTERS='[{"name":"X1C","ip":"192.168.1.100","access_code":"12345678"}]'
 - You can find the mappings from bambu serial numbers to models here: https://wiki.bambulab.com/en/general/find-sn
 - don't commit with no-verify. Fix any failing precommits.
 - before committing, make sure everything still builds, lints, and passes tests
+- when I ask you to run tests, that includes both backend and frontend tests
+- ensuring tests pass should also include ensuring there are no build failures
