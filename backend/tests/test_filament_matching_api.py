@@ -213,5 +213,5 @@ class TestFilamentMatchingAPI:
         result = response.json()
 
         assert result["success"] is False
-        assert "AMS status not available or no AMS units found" in result["message"]
+        assert "No filaments found in AMS units" in result["message"]
         assert result["matches"] == []
