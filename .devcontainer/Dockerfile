@@ -62,6 +62,20 @@ RUN apt-get update && \
         libgles2 \
         libvulkan1 \
         xvfb \
+        # Additional fonts required by Playwright
+        fonts-freefont-ttf \
+        fonts-ipafont-gothic \
+        fonts-noto-color-emoji \
+        fonts-tlwg-loma-otf \
+        fonts-unifont \
+        fonts-wqy-zenhei \
+        xfonts-cyrillic \
+        xfonts-encodings \
+        xfonts-scalable \
+        xfonts-utils \
+        libfontconfig1 \
+        libfreetype6 \
+        libwayland-client0 \
     && python3 -m pip install --upgrade pip \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
@@ -114,10 +128,13 @@ RUN python3 -m pip install --trusted-host pypi.org --trusted-host pypi.python.or
 
 # Install global npm packages for development
 RUN npm config set strict-ssl false && \
-    npm install -g typescript@5.8.3 @types/node@22.15.29 playwright@1.49.1
+    npm install -g typescript@5.8.3 @types/node@22.15.29 playwright@1.53.0
 
 # Install Playwright browsers as root before switching to non-root user
-RUN npx playwright install chromium
+# Install all supported browsers and their dependencies
+RUN npx playwright install --with-deps chromium firefox webkit && \
+    # Also run playwright install-deps to ensure all system dependencies are installed
+    npx playwright install-deps
 
 # Switch to non-root user
 USER $USERNAME
@@ -128,6 +145,10 @@ WORKDIR /workspace
 # Set environment variables for development
 ENV PYTHONPATH=/workspace/backend
 ENV NODE_ENV=development
+
+# Install Playwright browsers for the non-root user as well
+# This ensures they're available in the user's home directory
+RUN npx playwright install chromium firefox webkit
 
 # Default command
 CMD ["sleep", "infinity"]
