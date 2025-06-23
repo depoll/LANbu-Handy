@@ -208,3 +208,4 @@ BAMBU_PRINTERS='[{"name":"X1C","ip":"192.168.1.100","access_code":"12345678"}]'
 - don't commit with no-verify. Fix any failing precommits.
 - before committing, make sure everything still builds, lints, and passes tests
 - when I ask you to run tests, that includes both backend and frontend tests
+- ensuring tests pass should also include ensuring there are no build failures
