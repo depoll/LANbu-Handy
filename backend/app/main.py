@@ -43,9 +43,9 @@ from app.printer_service import (  # noqa: E402
 )
 from app.slice_progress_service import slice_progress_service  # noqa: E402
 from app.slicer_service import slice_model  # noqa: E402
-from app.threemf_repair_service import (  # noqa: E402
-    ThreeMFRepairError,
-    ThreeMFRepairService,
+from app.threemf_repair_service import ThreeMFRepairError  # noqa: E402
+from app.threemf_repair_service_enhanced import (  # noqa: E402
+    EnhancedThreeMFRepairService,
 )
 from app.thumbnail_service import (  # noqa: E402
     ThumbnailGenerationError,
@@ -77,7 +77,8 @@ app = FastAPI(
 model_service = ModelService()
 
 # Initialize 3MF repair service
-threemf_repair_service = ThreeMFRepairService()
+logger.info("Using enhanced 3MF repair service for better Three.js compatibility")
+threemf_repair_service = EnhancedThreeMFRepairService()
 
 # Initialize thumbnail service
 thumbnail_service = ThumbnailService()
