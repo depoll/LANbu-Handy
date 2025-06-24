@@ -47,6 +47,7 @@ from app.threemf_repair_service import ThreeMFRepairError  # noqa: E402
 from app.threemf_repair_service_enhanced import (  # noqa: E402
     EnhancedThreeMFRepairService,
 )
+from app.threemf_to_gltf_service import ThreeMFToGLTFService  # noqa: E402
 from app.thumbnail_service import (  # noqa: E402
     ThumbnailGenerationError,
     ThumbnailService,
@@ -82,6 +83,9 @@ threemf_repair_service = EnhancedThreeMFRepairService()
 
 # Initialize thumbnail service
 thumbnail_service = ThumbnailService()
+
+# Initialize 3MF to GLTF conversion service
+gltf_service = ThreeMFToGLTFService()
 
 # Initialize printer service
 printer_service = PrinterService()
@@ -360,6 +364,13 @@ class ConfiguredSliceRequest(BaseModel):
     filament_mappings: List[FilamentMapping]
     build_plate_type: str
     selected_plate_index: Optional[int] = None  # None means all plates
+    printer_model: Optional[str] = None  # For profile selection
+    nozzle_diameter: Optional[float] = None  # For profile selection
+    print_quality: Optional[str] = None  # Optional quality override
+    filament_types: Optional[List[str]] = (
+        None  # Material types for each filament mapping
+    )
+    filament_colors: Optional[List[str]] = None  # Colors for each filament mapping
 
 
 class SetActivePrinterRequest(BaseModel):
@@ -991,6 +1002,183 @@ async def get_available_thumbnails(file_id: str):
         raise HTTPException(status_code=500, detail=msg)
 
 
+@app.get("/api/model/gltf/{file_id}")
+async def get_model_as_gltf(file_id: str):
+    """
+    Convert and serve a 3MF model as GLTF format or serve GLTF buffer files.
+
+    This endpoint converts 3MF files to GLTF format which is better supported
+    by Three.js. It also serves binary buffer files referenced by GLTF files.
+
+    Args:
+        file_id: Unique identifier for the model file or buffer file name
+
+    Returns:
+        FileResponse with the GLTF file or binary buffer
+
+    Raises:
+        HTTPException: If file is not found or conversion fails
+    """
+    try:
+        # Check if this is a request for a binary buffer file
+        if file_id.endswith(".bin"):
+            # Serve binary buffer file
+            buffer_path = gltf_service.temp_dir / file_id
+
+            if not buffer_path.exists():
+                raise HTTPException(
+                    status_code=404, detail=f"GLTF buffer file not found: {file_id}"
+                )
+
+            return FileResponse(
+                path=buffer_path,
+                media_type="application/octet-stream",
+                filename=buffer_path.name,
+                headers={
+                    "Cache-Control": "public, max-age=3600",
+                    "Access-Control-Allow-Origin": "*",
+                },
+            )
+
+        # Otherwise, it's a request for GLTF conversion
+        # Find the model file
+        model_file_path = model_service.temp_dir / file_id
+
+        if not model_file_path.exists():
+            raise HTTPException(
+                status_code=404, detail=f"Model file not found: {file_id}"
+            )
+
+        # Only convert 3MF files
+        if model_file_path.suffix.lower() != ".3mf":
+            raise HTTPException(
+                status_code=400, detail="Only 3MF files can be converted to GLTF"
+            )
+
+        # Check if already converted
+        gltf_path = gltf_service.temp_dir / f"{model_file_path.stem}.gltf"
+
+        if (
+            not gltf_path.exists()
+            or gltf_path.stat().st_mtime < model_file_path.stat().st_mtime
+        ):
+            # Convert to GLTF
+            logger.info(f"Converting 3MF to GLTF: {file_id}")
+            gltf_path = gltf_service.convert_to_gltf(model_file_path)
+
+        return FileResponse(
+            path=gltf_path,
+            media_type="model/gltf+json",
+            filename=f"{model_file_path.stem}.gltf",
+            headers={
+                "Cache-Control": "public, max-age=3600",
+                "Access-Control-Allow-Origin": "*",
+            },
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to handle GLTF request: {e}")
+        raise HTTPException(status_code=500, detail=f"GLTF request failed: {str(e)}")
+
+
+@app.get("/api/model/gltf-buffer/{file_id}")
+async def get_gltf_buffer(file_id: str):
+    """
+    Serve the binary buffer file for a GLTF model.
+
+    Args:
+        file_id: Unique identifier for the model file
+
+    Returns:
+        FileResponse with the binary buffer
+
+    Raises:
+        HTTPException: If buffer file is not found
+    """
+    try:
+        # The buffer file uses the same stem as the GLTF
+        model_file_path = model_service.temp_dir / file_id
+        buffer_path = gltf_service.temp_dir / f"{model_file_path.stem}.bin"
+
+        if not buffer_path.exists():
+            raise HTTPException(status_code=404, detail="GLTF buffer file not found")
+
+        return FileResponse(
+            path=buffer_path,
+            media_type="application/octet-stream",
+            filename=buffer_path.name,
+            headers={
+                "Cache-Control": "public, max-age=3600",
+                "Access-Control-Allow-Origin": "*",
+            },
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to serve GLTF buffer: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to serve buffer: {str(e)}")
+
+
+@app.get("/api/model/obj/{file_id}")
+async def get_model_as_obj(file_id: str):
+    """
+    Convert and serve a 3MF model as OBJ format.
+
+    Args:
+        file_id: Unique identifier for the model file
+
+    Returns:
+        FileResponse with the OBJ file
+
+    Raises:
+        HTTPException: If file is not found or conversion fails
+    """
+    try:
+        # Find the model file
+        model_file_path = model_service.temp_dir / file_id
+
+        if not model_file_path.exists():
+            raise HTTPException(
+                status_code=404, detail=f"Model file not found: {file_id}"
+            )
+
+        # Only convert 3MF files
+        if model_file_path.suffix.lower() != ".3mf":
+            raise HTTPException(
+                status_code=400, detail="Only 3MF files can be converted to OBJ"
+            )
+
+        # Check if already converted
+        obj_path = gltf_service.temp_dir / f"{model_file_path.stem}.obj"
+
+        if (
+            not obj_path.exists()
+            or obj_path.stat().st_mtime < model_file_path.stat().st_mtime
+        ):
+            # Convert to OBJ
+            logger.info(f"Converting 3MF to OBJ: {file_id}")
+            obj_path = gltf_service.convert_to_obj(model_file_path)
+
+        return FileResponse(
+            path=obj_path,
+            media_type="text/plain",
+            filename=f"{model_file_path.stem}.obj",
+            headers={
+                "Cache-Control": "public, max-age=3600",
+                "Access-Control-Allow-Origin": "*",
+            },
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to convert to OBJ: {e}")
+        raise HTTPException(status_code=500, detail=f"OBJ conversion failed: {str(e)}")
+
+
 @app.get("/api/model/debug-thumbnail/{file_id}")
 async def debug_thumbnail_extraction(file_id: str):
     """
@@ -1265,6 +1453,11 @@ async def slice_model_with_configuration(request: ConfiguredSliceRequest):
             request.filament_mappings,
             request.build_plate_type,
             request.selected_plate_index,
+            request.printer_model,
+            request.nozzle_diameter,
+            request.print_quality,
+            request.filament_types,
+            request.filament_colors,
         )
 
         # Slice the model
@@ -1388,6 +1581,11 @@ async def slice_model_sequential_plates(request: ConfiguredSliceRequest):
             request.filament_mappings,
             request.build_plate_type,
             request.selected_plate_index,
+            request.printer_model,
+            request.nozzle_diameter,
+            request.print_quality,
+            request.filament_types,
+            request.filament_colors,
         )
 
         updated_plates = []
@@ -2026,6 +2224,77 @@ async def start_basic_job(request: JobStartRequest):
     except Exception as e:
         msg = f"Internal server error during job orchestration: {str(e)}"
         raise HTTPException(status_code=500, detail=msg)
+
+
+@app.get("/api/gcode/download/{file_name}")
+async def download_gcode(file_name: str):
+    """
+    Download a generated G-code file.
+
+    This endpoint allows users to download G-code files that have been generated
+    by the slicing process. For security, it validates that the file exists in
+    the designated G-code output directory.
+
+    Args:
+        file_name: The name of the G-code file to download (not a full path)
+
+    Returns:
+        FileResponse with the G-code file as a download
+
+    Raises:
+        HTTPException: If file not found or access denied
+    """
+    try:
+        # Get the G-code output directory
+        gcode_dir = get_gcode_output_dir()
+
+        # Construct the file path (security: don't allow path traversal)
+        if "/" in file_name or "\\" in file_name or ".." in file_name:
+            raise HTTPException(
+                status_code=400, detail="Invalid file name - path traversal not allowed"
+            )
+
+        file_path = gcode_dir / file_name
+
+        # Verify the file exists and is within the gcode directory
+        if not file_path.exists() or not file_path.is_file():
+            raise HTTPException(
+                status_code=404, detail=f"G-code file not found: {file_name}"
+            )
+
+        # Verify the file is actually in the gcode directory (prevent symlink attacks)
+        if not file_path.resolve().parent == gcode_dir.resolve():
+            raise HTTPException(
+                status_code=403,
+                detail="Access denied - file is not in G-code directory",
+            )
+
+        # Determine media type based on file extension
+        if file_name.endswith(".gcode.3mf"):
+            media_type = "application/x-zip-compressed"  # 3MF is a ZIP-based format
+        elif file_name.endswith(".gcode"):
+            media_type = "text/x-gcode"
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid file type - only .gcode and .gcode.3mf files allowed",
+            )
+
+        # Return the file as a download
+        return FileResponse(
+            path=file_path,
+            media_type=media_type,
+            filename=file_name,
+            headers={"Content-Disposition": f"attachment; filename={file_name}"},
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error downloading G-code file: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Internal server error downloading file: {str(e)}"
+        )
 
 
 @app.get("/api/printer/{printer_id}/ams-status", response_model=AMSStatusResponse)

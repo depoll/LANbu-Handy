@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import ModelPreview from './ModelPreview';
+import ModelPreviewEnhanced from './ModelPreviewEnhanced';
 import OperationProgress, { OperationStep } from './OperationProgress';
 import SliceProgressTracker from './SliceProgressTracker';
 import { useToast } from '../hooks/useToast';
@@ -520,7 +520,7 @@ export function ModelTab({
       {/* Model Preview */}
       {modelSubmitted && currentFileId && (
         <div data-testid="model-analysis-success">
-          <ModelPreview
+          <ModelPreviewEnhanced
             fileId={currentFileId}
             filamentRequirements={filamentRequirements || undefined}
             filamentMappings={filamentMappings}

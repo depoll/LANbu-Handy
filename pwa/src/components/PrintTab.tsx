@@ -7,6 +7,7 @@ import {
   FilamentRequirement,
   FilamentMapping,
   PlateInfo,
+  AMSStatusResponse,
 } from '../types/api';
 
 interface JobStep {
@@ -42,6 +43,9 @@ interface PrintTabProps {
   onProcessingChange: (processing: boolean) => void;
   onStatusMessage: (message: string) => void;
   onPlatesUpdate?: (plates: PlateInfo[]) => void;
+  printerModel?: string;
+  nozzleDiameter?: number;
+  amsStatus?: AMSStatusResponse | null;
 }
 
 export function PrintTab({
@@ -58,6 +62,9 @@ export function PrintTab({
   onProcessingChange,
   onStatusMessage,
   onPlatesUpdate,
+  printerModel,
+  nozzleDiameter,
+  amsStatus,
 }: PrintTabProps) {
   const [isSliced, setIsSliced] = useState(false);
   const [sliceResponse, setSliceResponse] = useState<SliceResponse | null>(
@@ -166,11 +173,41 @@ export function PrintTab({
       // Step 1: Prepare Configuration
       updateOperationStep(0, 'running', 'Preparing slice configuration...');
 
+      // Extract filament types and colors from AMS status based on mappings
+      const filamentTypes: string[] = [];
+      const filamentColors: string[] = [];
+      if (amsStatus && amsStatus.ams_units) {
+        for (const mapping of filamentMappings) {
+          // Find the AMS unit
+          const amsUnit = amsStatus.ams_units.find(
+            unit => unit.unit_id === mapping.ams_unit_id
+          );
+          if (amsUnit) {
+            // Find the filament in the slot
+            const filament = amsUnit.filaments.find(
+              f => f.slot_id === mapping.ams_slot_id
+            );
+            if (filament) {
+              if (filament.filament_type) {
+                filamentTypes.push(filament.filament_type);
+              }
+              if (filament.color) {
+                filamentColors.push(filament.color);
+              }
+            }
+          }
+        }
+      }
+
       const request: ConfiguredSliceRequest = {
         file_id: currentFileId,
         filament_mappings: filamentMappings,
         build_plate_type: selectedBuildPlate,
         selected_plate_index: selectedPlateIndex,
+        printer_model: printerModel,
+        nozzle_diameter: nozzleDiameter,
+        filament_types: filamentTypes.length > 0 ? filamentTypes : undefined,
+        filament_colors: filamentColors.length > 0 ? filamentColors : undefined,
       };
 
       updateOperationStep(0, 'completed', 'Configuration prepared');
@@ -268,6 +305,53 @@ export function PrintTab({
     } finally {
       onProcessingChange(false);
       setCurrentWorkflowStep('');
+    }
+  };
+
+  const handleDownloadGcode = async () => {
+    if (!sliceResponse?.gcode_path) {
+      showError('No G-code file available for download');
+      return;
+    }
+
+    try {
+      // Extract just the filename from the path
+      const filename =
+        sliceResponse.gcode_path.split('/').pop() || 'output.gcode';
+
+      // Fetch the G-code file
+      const response = await fetch(
+        `/api/gcode/download/${encodeURIComponent(filename)}`
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to download G-code: ${response.statusText}`);
+      }
+
+      // Create a blob from the response
+      const blob = await response.blob();
+
+      // Create a temporary URL for the blob
+      const url = window.URL.createObjectURL(blob);
+
+      // Create a temporary anchor element to trigger download
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+
+      // Clean up
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+
+      onStatusMessage(`✅ Downloaded G-code file: ${filename}`);
+      showSuccess('G-code file downloaded successfully', 'Download Complete');
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Download failed';
+      onStatusMessage(`❌ Download error: ${errorMessage}`);
+      showError(errorMessage, 'Download Failed');
     }
   };
 
@@ -530,6 +614,13 @@ export function PrintTab({
                   className="secondary-button"
                 >
                   Re-slice
+                </button>
+                <button
+                  onClick={handleDownloadGcode}
+                  disabled={isProcessing || !sliceResponse?.gcode_path}
+                  className="secondary-button"
+                >
+                  Download G-code
                 </button>
                 <button
                   onClick={handlePrintJob}

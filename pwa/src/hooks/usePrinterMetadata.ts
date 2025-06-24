@@ -4,6 +4,7 @@ import { printerEvents } from '../utils/printerEvents';
 interface PrinterMetadata {
   printer_model?: string;
   printer_name?: string;
+  nozzle_diameter?: number;
   ip: string;
 }
 
@@ -12,6 +13,7 @@ interface PrinterStatusResponse {
   message: string;
   printer_model?: string;
   printer_name?: string;
+  nozzle_diameter?: number;
   ams_units?: Array<{
     unit_id: number;
     filaments: Array<{
@@ -62,10 +64,14 @@ export function usePrinterMetadata(printerId: string | null) {
 
         const data: PrinterStatusResponse = await response.json();
 
-        if (data.success && (data.printer_model || data.printer_name)) {
+        if (
+          data.success &&
+          (data.printer_model || data.printer_name || data.nozzle_diameter)
+        ) {
           const newMetadata: PrinterMetadata = {
             printer_model: data.printer_model,
             printer_name: data.printer_name,
+            nozzle_diameter: data.nozzle_diameter,
             ip: printerId,
           };
 

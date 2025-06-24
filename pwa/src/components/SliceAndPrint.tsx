@@ -7,6 +7,7 @@ import { PrintTab } from './PrintTab';
 import { useToast } from '../hooks/useToast';
 import { useCurrentPrinter } from '../hooks/useCurrentPrinter';
 import { useProactiveAMSStatus } from '../hooks/useProactiveAMSStatus';
+import { usePrinterMetadata } from '../hooks/usePrinterMetadata';
 import {
   FilamentRequirement,
   AMSStatusResponse,
@@ -59,6 +60,9 @@ function SliceAndPrint() {
     currentPrinterName,
     loading: printerLoading,
   } = useCurrentPrinter();
+
+  // Printer metadata including nozzle info
+  const { metadata: printerMetadata } = usePrinterMetadata(currentPrinterId);
 
   // Toast notifications
   const { showSuccess, showError, showWarning, showInfo } = useToast();
@@ -338,6 +342,9 @@ function SliceAndPrint() {
           onProcessingChange={setIsProcessing}
           onStatusMessage={addStatusMessage}
           onPlatesUpdate={setPlates}
+          printerModel={printerMetadata?.printer_model}
+          nozzleDiameter={printerMetadata?.nozzle_diameter}
+          amsStatus={amsStatus}
         />
       ),
     },

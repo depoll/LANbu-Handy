@@ -8,10 +8,11 @@ for error handling, path management, and other shared operations.
 import re
 import tempfile
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from app.model_service import ModelDownloadError, ModelValidationError
 from app.printer_service import PrinterCommunicationError, PrinterMQTTError
+from app.settings_builder import SettingsBuilder
 from fastapi import HTTPException
 
 
@@ -218,6 +219,7 @@ def validate_ip_address(address: str) -> str:
 def find_gcode_file(output_dir: Path) -> Path:
     """
     Find the generated G-code file in the output directory.
+    Looks for .gcode.3mf files first, then falls back to .gcode files.
 
     Args:
         output_dir: The directory to search for G-code files
@@ -228,14 +230,28 @@ def find_gcode_file(output_dir: Path) -> Path:
     Raises:
         FileNotFoundError: If no G-code file is found
     """
+    # First look for .gcode.3mf files (preferred format)
+    gcode_3mf_files = list(output_dir.glob("*.gcode.3mf"))
+    if gcode_3mf_files:
+        return gcode_3mf_files[0]
+
+    # Fall back to .gcode files for backward compatibility
     gcode_files = list(output_dir.glob("*.gcode"))
-    if not gcode_files:
-        raise FileNotFoundError("No G-code file generated")
-    return gcode_files[0]
+    if gcode_files:
+        return gcode_files[0]
+
+    raise FileNotFoundError("No G-code file generated (.gcode.3mf or .gcode)")
 
 
 def build_slicing_options_from_config(
-    filament_mappings: List, build_plate_type: str, selected_plate_index: int = None
+    filament_mappings: List,
+    build_plate_type: str,
+    selected_plate_index: int = None,
+    printer_model: Optional[str] = None,
+    nozzle_diameter: Optional[float] = None,
+    print_quality: Optional[str] = None,
+    filament_types: Optional[List[str]] = None,
+    filament_colors: Optional[List[str]] = None,
 ) -> Dict[str, str]:
     """
     Build CLI options dictionary from filament mappings, build plate configuration,
@@ -245,12 +261,40 @@ def build_slicing_options_from_config(
         filament_mappings: List of filament mappings from model indices to AMS slots
         build_plate_type: Selected build plate type
         selected_plate_index: Index of the specific plate to slice (None for all plates)
+        printer_model: Printer model for profile selection (e.g., "X1C", "P1P")
+        nozzle_diameter: Nozzle diameter in mm for profile selection
+        print_quality: Optional print quality profile name
+        filament_types: List of filament material types
+        filament_colors: List of filament colors in hex format
 
     Returns:
         Dictionary of CLI options for the slicer
     """
-    # Note: Bambu Studio CLI doesn't support these options directly
-    # It requires JSON settings files for configuration
-    # For now, return empty options and rely on 3MF embedded settings
-    # TODO: Implement JSON settings file generation for custom configurations
-    return {}
+    options = {}
+
+    # The Bambu Studio CLI doesn't have direct AMS mapping options
+    # The filament assignment is handled through the loaded filament settings
+    # and the order they are specified in --load-filaments
+
+    # If we have printer info, generate settings files
+    if printer_model and filament_types:
+        settings_builder = SettingsBuilder()
+
+        # Build settings files using the provided filament types and colors
+        machine_settings_path, filament_settings_path = settings_builder.build_settings(
+            printer_model=printer_model,
+            nozzle_diameter=nozzle_diameter,
+            filament_types=filament_types,
+            print_quality=print_quality,
+            build_plate_type=build_plate_type,
+            filament_colors=filament_colors,
+        )
+
+        # Add settings file paths to CLI options
+        if machine_settings_path:
+            options["load-settings"] = str(machine_settings_path)
+
+        if filament_settings_path:
+            options["load-filaments"] = str(filament_settings_path)
+
+    return options
