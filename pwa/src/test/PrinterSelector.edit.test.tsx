@@ -326,7 +326,7 @@ describe('PrinterSelector Edit Functionality', () => {
     // Verify PATCH was called with correct data
     await waitFor(() => {
       const patchCalls = mockFetch.mock.calls.filter(
-        ([url, options]) => options?.method === 'PATCH'
+        ([, options]) => options?.method === 'PATCH'
       );
       expect(patchCalls.length).toBe(1);
       const [url, options] = patchCalls[0];
