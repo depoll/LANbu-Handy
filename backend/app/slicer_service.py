@@ -340,5 +340,12 @@ def slice_model(
     Returns:
         CLIResult with slicing results
     """
+    from .threemf_config_cleaner import clean_3mf_before_slicing
+
+    # Clean the 3MF file if needed (removes 'nil' values)
+    cleaned_path = clean_3mf_before_slicing(input_path)
+
     wrapper = BambuStudioCLIWrapper()
-    return wrapper.slice_model(input_path, output_dir, options, plate_index, export_3mf)
+    return wrapper.slice_model(
+        cleaned_path, output_dir, options, plate_index, export_3mf
+    )

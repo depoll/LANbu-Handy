@@ -324,3 +324,105 @@ class TestPrinterManagementAPI:
         persistent_data = response.json()
         assert persistent_data["success"] is True
         assert len(persistent_data["printers"]) == 1
+
+    def test_update_printer_success(self):
+        """Test updating an existing printer using PATCH."""
+        # First, add a printer
+        request_data = {
+            "ip": "192.168.1.100",
+            "access_code": "12345678",
+            "name": "Original Printer",
+            "serial_number": "01S00C123456789",
+        }
+        response = self.client.post("/api/printers/add", json=request_data)
+        assert response.status_code == 200
+
+        # Update the printer
+        update_data = {
+            "name": "Updated Printer",
+            "new_ip": "192.168.1.101",
+        }
+        response = self.client.patch("/api/printers/192.168.1.100", json=update_data)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["name"] == "Updated Printer"
+        assert data["ip"] == "192.168.1.101"
+        assert data["has_access_code"] is True  # Should be preserved
+        assert data["has_serial_number"] is True  # Should be preserved
+
+        # Verify the old IP no longer exists
+        response = self.client.get("/api/printers/persistent")
+        printers = response.json()["printers"]
+        assert not any(p["ip"] == "192.168.1.100" for p in printers)
+        assert any(p["ip"] == "192.168.1.101" for p in printers)
+
+    def test_update_printer_preserve_credentials(self):
+        """Test that updating a printer preserves access code and serial number
+        when not provided."""
+        # First, add a printer with all fields
+        request_data = {
+            "ip": "192.168.1.110",
+            "access_code": "secret123",
+            "name": "Test Printer",
+            "serial_number": "01S00C987654321",
+        }
+        response = self.client.post("/api/printers/add", json=request_data)
+        assert response.status_code == 200
+
+        # Update only the name
+        update_data = {"name": "Renamed Printer"}
+        response = self.client.patch("/api/printers/192.168.1.110", json=update_data)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["name"] == "Renamed Printer"
+        assert data["ip"] == "192.168.1.110"
+        assert data["has_access_code"] is True
+        assert data["has_serial_number"] is True
+
+        # Now set this printer as active and verify credentials still work
+        set_active_data = {
+            "ip": "192.168.1.110",
+            "access_code": "",  # Empty since we're just switching
+            "name": "Renamed Printer",
+        }
+        response = self.client.post("/api/printer/set-active", json=set_active_data)
+        assert response.status_code == 200
+
+    def test_update_printer_not_found(self):
+        """Test updating a non-existent printer returns 404."""
+        update_data = {"name": "New Name"}
+        # Use a valid IP that doesn't exist
+        response = self.client.patch("/api/printers/10.0.0.1", json=update_data)
+        assert response.status_code == 404
+        assert "No printer found" in response.text
+
+    def test_update_printer_invalid_ip(self):
+        """Test updating with invalid IP in URL returns 400."""
+        update_data = {"name": "New Name"}
+        # Use an actually invalid IP
+        response = self.client.patch("/api/printers/999.999.999.999", json=update_data)
+        assert response.status_code == 400
+        assert "Invalid IP address" in response.text
+
+    def test_update_printer_clear_credentials(self):
+        """Test that empty strings in update clear credentials."""
+        # First, add a printer with credentials
+        request_data = {
+            "ip": "192.168.1.120",
+            "access_code": "password",
+            "name": "Secure Printer",
+            "serial_number": "01S00C111111111",
+        }
+        response = self.client.post("/api/printers/add", json=request_data)
+        assert response.status_code == 200
+
+        # Update with empty credentials
+        update_data = {
+            "access_code": "",
+            "serial_number": "",
+        }
+        response = self.client.patch("/api/printers/192.168.1.120", json=update_data)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["has_access_code"] is False
+        assert data["has_serial_number"] is False

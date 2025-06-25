@@ -7,6 +7,7 @@ import {
   AddPrinterResponse,
   PrinterConfigResponse,
   SetActivePrinterRequest,
+  UpdatePrinterRequest,
 } from '../types/api';
 
 interface PrinterInfo {
@@ -155,6 +156,7 @@ function PrinterSelector({
   const [managementMode, setManagementMode] = useState<'add' | 'edit' | 'list'>(
     'list'
   );
+  const [editingPrinterIp, setEditingPrinterIp] = useState<string | null>(null);
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
   const dropdownRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -335,7 +337,8 @@ function PrinterSelector({
       return;
     }
 
-    if (!manualSerialNumber.trim()) {
+    // Only check for serial number when adding new printer
+    if (managementMode === 'add' && !manualSerialNumber.trim()) {
       const confirmWithoutSerial = confirm(
         'No serial number provided. MQTT features (print commands, AMS status) will not work. Continue anyway?'
       );
@@ -345,23 +348,40 @@ function PrinterSelector({
     }
 
     setIsSettingPrinter(true);
-    setStatusMessage(`Saving printer: ${manualIp}...`);
+    setStatusMessage(
+      `${managementMode === 'edit' ? 'Updating' : 'Saving'} printer: ${manualIp}...`
+    );
 
     try {
-      const request: AddPrinterRequest = {
-        ip: manualIp.trim(),
-        access_code: manualAccessCode.trim(),
-        name: manualName.trim() || `Printer at ${manualIp.trim()}`,
-        serial_number: manualSerialNumber.trim(),
-      };
+      if (managementMode === 'edit' && editingPrinterIp) {
+        // Update existing printer
+        const updateRequest: UpdatePrinterRequest = {
+          new_ip:
+            manualIp.trim() !== editingPrinterIp ? manualIp.trim() : undefined,
+          name: manualName.trim() || undefined,
+          access_code: manualAccessCode.trim() || undefined,
+          serial_number: manualSerialNumber.trim() || undefined,
+        };
 
-      await addPrinter(request);
+        await updatePrinter(editingPrinterIp, updateRequest);
+      } else {
+        // Add new printer
+        const addRequest: AddPrinterRequest = {
+          ip: manualIp.trim(),
+          access_code: manualAccessCode.trim(),
+          name: manualName.trim() || `Printer at ${manualIp.trim()}`,
+          serial_number: manualSerialNumber.trim(),
+        };
+
+        await addPrinter(addRequest);
+      }
 
       // Clear manual input fields on success
       setManualIp('');
       setManualAccessCode('');
       setManualName('');
       setManualSerialNumber('');
+      setEditingPrinterIp(null);
       setManagementMode('list');
 
       // Reload all printers to update the list
@@ -522,6 +542,52 @@ function PrinterSelector({
         error instanceof Error ? error.message : 'Unknown error';
       setStatusMessage(`❌ Failed to add printer: ${errorMessage}`);
       console.error('Add printer error:', error);
+    }
+  };
+
+  const updatePrinter = async (
+    printerIp: string,
+    request: UpdatePrinterRequest
+  ) => {
+    try {
+      const response = await fetch(
+        `/api/printers/${encodeURIComponent(printerIp)}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(request),
+        }
+      );
+
+      // Check if response exists and is valid
+      if (!response) {
+        throw new Error('No response received from server');
+      }
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      }
+
+      // Parse response to verify it's valid JSON
+      await response.json();
+
+      setStatusMessage('');
+
+      // If this was the active printer, update current printer
+      if (currentPrinter && currentPrinter.ip === printerIp) {
+        await loadCurrentPrinter();
+      }
+
+      // Emit printer change event to notify other components
+      printerEvents.emit();
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      setStatusMessage(`❌ Failed to update printer: ${errorMessage}`);
+      console.error('Update printer error:', error);
     }
   };
 
@@ -787,6 +853,7 @@ function PrinterSelector({
                       className="add-printer-button"
                       onClick={() => {
                         setManagementMode('add');
+                        setEditingPrinterIp(null);
                         setManualIp('');
                         setManualAccessCode('');
                         setManualName('');
@@ -874,6 +941,7 @@ function PrinterSelector({
                               className="card-action-button edit"
                               onClick={() => {
                                 setManagementMode('edit');
+                                setEditingPrinterIp(printer.ip);
                                 setManualIp(printer.ip);
                                 setManualName(printer.name);
                                 setManualAccessCode('');
@@ -920,7 +988,10 @@ function PrinterSelector({
                     </h3>
                     <button
                       className="back-button"
-                      onClick={() => setManagementMode('list')}
+                      onClick={() => {
+                        setManagementMode('list');
+                        setEditingPrinterIp(null);
+                      }}
                     >
                       ← Back to List
                     </button>
@@ -958,34 +1029,52 @@ function PrinterSelector({
                     </div>
 
                     <div className="form-field">
-                      <label htmlFor="dialog-access-code">Access Code</label>
+                      <label htmlFor="dialog-access-code">
+                        Access Code{' '}
+                        {managementMode === 'edit' &&
+                          '(leave empty to keep existing)'}
+                      </label>
                       <input
                         id="dialog-access-code"
                         type="text"
                         value={manualAccessCode}
                         onChange={e => setManualAccessCode(e.target.value)}
                         onKeyDown={handleKeyDown}
-                        placeholder="Access code (optional)"
+                        placeholder={
+                          managementMode === 'edit'
+                            ? 'Leave empty to keep existing'
+                            : 'Access code (optional)'
+                        }
                         disabled={isSettingPrinter}
                         className="form-input"
                       />
                     </div>
 
                     <div className="form-field">
-                      <label htmlFor="dialog-serial">Serial Number *</label>
+                      <label htmlFor="dialog-serial">
+                        Serial Number{' '}
+                        {managementMode === 'add'
+                          ? '*'
+                          : '(leave empty to keep existing)'}
+                      </label>
                       <input
                         id="dialog-serial"
                         type="text"
                         value={manualSerialNumber}
                         onChange={e => setManualSerialNumber(e.target.value)}
                         onKeyDown={handleKeyDown}
-                        placeholder="01S00C123456789"
+                        placeholder={
+                          managementMode === 'edit'
+                            ? 'Leave empty to keep existing'
+                            : '01S00C123456789'
+                        }
                         disabled={isSettingPrinter}
                         className="form-input"
                       />
                       <div className="form-help">
-                        Required for MQTT communication. Find it in Settings →
-                        Device → Serial Number.
+                        {managementMode === 'add'
+                          ? 'Required for MQTT communication. Find it in Settings → Device → Serial Number.'
+                          : 'Leave empty to keep the existing serial number.'}
                       </div>
                     </div>
                   </div>
@@ -1004,7 +1093,10 @@ function PrinterSelector({
                     </button>
                     <button
                       className="form-cancel-button"
-                      onClick={() => setManagementMode('list')}
+                      onClick={() => {
+                        setManagementMode('list');
+                        setEditingPrinterIp(null);
+                      }}
                       disabled={isSettingPrinter}
                     >
                       Cancel

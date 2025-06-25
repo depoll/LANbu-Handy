@@ -335,28 +335,42 @@ class SettingsBuilder:
                     # Use the base profile as-is if no color specified
                     filament_paths.append(str(base_profile_path))
                 else:
-                    # No profile found, create a minimal one
+                    # No profile found, try to find a fallback profile
                     logger.warning(
                         f"No filament profile found for {filament_type} "
-                        f"on {printer_model}"
+                        f"on {printer_model}, looking for fallback"
                     )
-                    minimal_profile = {
-                        "type": "filament",
-                        "name": f"Generic {filament_type}",
-                        "filament_id": [filament_type],
-                        "filament_type": [filament_type],
-                        "filament_colour": [
-                            filament_color if filament_color else "#00000000"
-                        ],
-                        "nozzle_temperature": [210 if filament_type == "PLA" else 240],
-                        "bed_temperature": [60 if filament_type == "PLA" else 80],
-                    }
 
-                    # Save minimal profile
-                    temp_file = self.temp_dir / f"filament_{filament_type}_{idx}.json"
-                    with open(temp_file, "w") as f:
-                        json.dump(minimal_profile, f, indent=2)
-                    filament_paths.append(str(temp_file))
+                    # Try to find a fallback profile from a similar material
+                    fallback_profile_data = self._find_fallback_filament_profile(
+                        filament_type, printer_model, nozzle_size
+                    )
+
+                    if fallback_profile_data:
+                        # Update the profile with custom settings
+                        fallback_profile_data["name"] = f"Generic {filament_type}"
+                        fallback_profile_data["filament_id"] = [filament_type]
+                        fallback_profile_data["filament_type"] = [filament_type]
+                        if filament_color:
+                            fallback_profile_data["filament_colour"] = [filament_color]
+
+                        # Save the adapted profile
+                        temp_file = (
+                            self.temp_dir / f"filament_{filament_type}_{idx}.json"
+                        )
+                        with open(temp_file, "w") as f:
+                            json.dump(fallback_profile_data, f, indent=2)
+                        filament_paths.append(str(temp_file))
+                        logger.info(
+                            f"Created adapted filament profile from fallback: "
+                            f"{temp_file}"
+                        )
+                    else:
+                        # If no fallback found, skip this filament
+                        logger.error(
+                            f"Could not find any suitable profile for {filament_type}, "
+                            f"skipping"
+                        )
 
             # Return semicolon-separated list
             if filament_paths:
@@ -368,6 +382,128 @@ class SettingsBuilder:
 
         except Exception as e:
             logger.error(f"Error building filament settings: {e}")
+            return None
+
+    def _find_fallback_filament_profile(
+        self, filament_type: str, printer_model: str, nozzle_size: float
+    ) -> Optional[Dict]:
+        """
+        Find a suitable fallback filament profile by searching for similar materials.
+
+        Args:
+            filament_type: The requested filament type
+            printer_model: The printer model
+            nozzle_size: The nozzle size
+
+        Returns:
+            Dict containing profile data or None if no suitable profile found
+        """
+        try:
+            # Define fallback order for different material types
+            fallback_map = {
+                # PLA variants fall back to basic PLA
+                "PLA": ["Bambu PLA Basic", "Generic PLA"],
+                "PLA-CF": ["Bambu PLA-CF", "Bambu PLA Basic", "Generic PLA"],
+                "PLA-SILK": ["Bambu PLA Silk", "Bambu PLA Basic", "Generic PLA"],
+                # PETG variants
+                "PETG": ["Bambu PETG Basic", "Generic PETG"],
+                "PETG-CF": ["Bambu PETG-CF", "Bambu PETG Basic", "Generic PETG"],
+                "PETG-HF": ["Bambu PETG HF", "Bambu PETG Basic", "Generic PETG"],
+                # ABS/ASA are similar
+                "ABS": ["Bambu ABS", "Generic ABS", "Bambu ASA", "Generic ASA"],
+                "ASA": ["Bambu ASA", "Generic ASA", "Bambu ABS", "Generic ABS"],
+                # TPU variants
+                "TPU": ["Bambu TPU 95A", "Generic TPU"],
+                "TPU-95A": ["Bambu TPU 95A", "Generic TPU"],
+                # Engineering materials
+                "PC": ["Bambu PC", "Generic PC"],
+                "PA": ["Bambu PA-CF", "Generic PA"],
+                "PA-CF": ["Bambu PA-CF", "Generic PA"],
+                "PVA": ["Bambu Support W", "Generic PVA"],
+            }
+
+            # Get fallback list for this material
+            fallback_materials = fallback_map.get(
+                filament_type.upper(),
+                [f"Generic {filament_type}", "Bambu PLA Basic", "Generic PLA"],
+            )
+
+            # Remove "Bambu Lab " prefix for filament profiles
+            profile_name = self.PRINTER_MODEL_MAP.get(printer_model, printer_model)
+            profile_suffix = profile_name.replace("Bambu Lab ", "")
+
+            # Try each fallback material
+            for material_name in fallback_materials:
+                # Try different file name patterns
+                test_paths = [
+                    # Nozzle-specific for this printer
+                    FILAMENT_PROFILES_PATH
+                    / f"{material_name} @BBL {profile_suffix} {nozzle_size} "
+                    f"nozzle.json",
+                    # Generic for this printer
+                    FILAMENT_PROFILES_PATH
+                    / f"{material_name} @BBL {profile_suffix}.json",
+                    # Base profile
+                    FILAMENT_PROFILES_PATH / f"{material_name} @base.json",
+                    # Generic BBL profile
+                    FILAMENT_PROFILES_PATH / f"{material_name} @BBL.json",
+                    # Try X1C as a generic fallback
+                    FILAMENT_PROFILES_PATH / f"{material_name} @BBL X1C.json",
+                ]
+
+                for test_path in test_paths:
+                    if test_path.exists():
+                        try:
+                            with open(test_path, "r") as f:
+                                profile_data = json.load(f)
+                            logger.info(
+                                f"Found fallback profile for {filament_type}: "
+                                f"{test_path.name}"
+                            )
+                            return profile_data
+                        except Exception as e:
+                            logger.warning(
+                                f"Error loading fallback profile {test_path}: {e}"
+                            )
+                            continue
+
+            # Last resort: try to find ANY filament profile and use it as template
+            logger.warning(
+                f"No fallback found for {filament_type}, trying generic profile"
+            )
+            generic_pla_path = FILAMENT_PROFILES_PATH / "Bambu PLA Basic @BBL X1C.json"
+            if generic_pla_path.exists():
+                try:
+                    with open(generic_pla_path, "r") as f:
+                        profile_data = json.load(f)
+                    logger.info("Using generic PLA profile as last resort")
+
+                    # Adjust temperatures based on material type
+                    if "ABS" in filament_type.upper() or "ASA" in filament_type.upper():
+                        profile_data["nozzle_temperature"] = ["250"]
+                        profile_data["bed_temperature"] = ["90"]
+                    elif "PETG" in filament_type.upper():
+                        profile_data["nozzle_temperature"] = ["240"]
+                        profile_data["bed_temperature"] = ["80"]
+                    elif "TPU" in filament_type.upper():
+                        profile_data["nozzle_temperature"] = ["230"]
+                        profile_data["bed_temperature"] = ["60"]
+                        profile_data["filament_max_volumetric_speed"] = ["4"]
+                    elif "PC" in filament_type.upper():
+                        profile_data["nozzle_temperature"] = ["270"]
+                        profile_data["bed_temperature"] = ["110"]
+                    elif "PA" in filament_type.upper():
+                        profile_data["nozzle_temperature"] = ["280"]
+                        profile_data["bed_temperature"] = ["100"]
+
+                    return profile_data
+                except Exception as e:
+                    logger.error(f"Error loading generic PLA profile: {e}")
+
+            return None
+
+        except Exception as e:
+            logger.error(f"Error finding fallback filament profile: {e}")
             return None
 
     def cleanup_temp_files(self):

@@ -190,6 +190,13 @@ export interface RemovePrinterResponse {
   error_details?: string;
 }
 
+export interface UpdatePrinterRequest {
+  new_ip?: string; // New IP if changing
+  access_code?: string; // New access code (omit to keep existing)
+  name?: string; // New name (omit to keep existing)
+  serial_number?: string; // New serial number (omit to keep existing)
+}
+
 export interface PersistentPrintersResponse {
   success: boolean;
   message: string;

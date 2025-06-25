@@ -215,4 +215,169 @@ describe('PrinterSelector Edit Functionality', () => {
       expect(printerCards.length).toBeGreaterThan(0);
     });
   });
+
+  it('should update printer and preserve credentials when editing', async () => {
+    // Mock initial config with a printer
+    mockFetch.mockImplementation((url: string, options?: RequestInit) => {
+      if (url === '/api/config') {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              active_printer: {
+                name: 'Original Printer',
+                ip: '192.168.1.100',
+                has_access_code: true,
+                has_serial_number: true,
+                is_runtime_set: false,
+                is_persistent: true,
+              },
+              printers: [
+                {
+                  name: 'Original Printer',
+                  ip: '192.168.1.100',
+                  has_access_code: true,
+                  has_serial_number: true,
+                  is_persistent: true,
+                  source: 'persistent',
+                },
+              ],
+              printer_configured: true,
+              printer_count: 1,
+            }),
+        });
+      }
+      if (url.includes('/api/printer/') && url.includes('/status')) {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              success: true,
+              printer_model: 'X1C',
+              printer_name: 'Original Printer',
+            }),
+        });
+      }
+      // Mock PATCH update endpoint
+      if (options?.method === 'PATCH' && url.includes('/api/printers/')) {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              name: 'Updated Printer',
+              ip: '192.168.1.100',
+              has_access_code: true,
+              has_serial_number: true,
+              is_persistent: true,
+            }),
+        });
+      }
+      return Promise.resolve({ ok: false });
+    });
+
+    render(<PrinterSelector />);
+
+    // Wait for component to load
+    await waitFor(() => {
+      expect(screen.getByText('Original Printer')).toBeInTheDocument();
+    });
+
+    // Open dropdown and go to manage printers
+    fireEvent.click(screen.getByText('Switch Printer'));
+    fireEvent.click(screen.getByText('Manage Printers'));
+
+    // Wait for management dialog
+    await waitFor(() => {
+      expect(screen.getByText('Printer Management')).toBeInTheDocument();
+    });
+
+    // Click Edit button
+    const editButton = screen.getByText('Edit');
+    fireEvent.click(editButton);
+
+    // Check that we're in edit mode
+    await waitFor(() => {
+      expect(screen.getByText('Edit Printer')).toBeInTheDocument();
+    });
+
+    // Check that fields show appropriate placeholders
+    const accessCodeInput = screen.getByLabelText(/Access Code/i);
+    expect(accessCodeInput).toHaveAttribute(
+      'placeholder',
+      'Leave empty to keep existing'
+    );
+
+    const serialNumberInput = screen.getByLabelText(/Serial Number/i);
+    expect(serialNumberInput).toHaveAttribute(
+      'placeholder',
+      'Leave empty to keep existing'
+    );
+
+    // Update only the name
+    const nameInput = screen.getByPlaceholderText(
+      'My X1C Printer'
+    ) as HTMLInputElement;
+    fireEvent.change(nameInput, { target: { value: 'Updated Printer' } });
+
+    // Click Update button
+    const updateButton = screen.getByText('Update Printer');
+    fireEvent.click(updateButton);
+
+    // Verify PATCH was called with correct data
+    await waitFor(() => {
+      const patchCalls = mockFetch.mock.calls.filter(
+        ([url, options]) => options?.method === 'PATCH'
+      );
+      expect(patchCalls.length).toBe(1);
+      const [url, options] = patchCalls[0];
+      expect(url).toBe('/api/printers/192.168.1.100');
+      const body = JSON.parse(options.body as string);
+      expect(body.name).toBe('Updated Printer');
+      expect(body.access_code).toBeUndefined(); // Not sent when empty
+      expect(body.serial_number).toBeUndefined(); // Not sent when empty
+    });
+  });
+
+  it('should show different UI elements for add vs edit mode', async () => {
+    // Mock API response with no printers
+    mockFetch.mockImplementation((url: string) => {
+      if (url === '/api/config') {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              active_printer: null,
+              printers: [],
+              printer_configured: false,
+              printer_count: 0,
+            }),
+        });
+      }
+      return Promise.resolve({ ok: false });
+    });
+
+    render(<PrinterSelector />);
+
+    // Open dropdown and go to manage printers
+    fireEvent.click(screen.getByText('Select Printer'));
+    fireEvent.click(screen.getByText('Manage Printers'));
+
+    // Wait for management dialog
+    await waitFor(() => {
+      expect(screen.getByText('Printer Management')).toBeInTheDocument();
+    });
+
+    // Click Add New Printer
+    fireEvent.click(screen.getByText('Add New Printer'));
+
+    // Check add mode UI
+    await waitFor(() => {
+      expect(screen.getByText('Add New Printer')).toBeInTheDocument();
+      expect(screen.getByText('Serial Number *')).toBeInTheDocument();
+      expect(
+        screen.getByPlaceholderText('01S00C123456789')
+      ).toBeInTheDocument();
+      expect(screen.getByText('Add Printer')).toBeInTheDocument();
+    });
+  });
 });

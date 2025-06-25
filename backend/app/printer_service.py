@@ -128,7 +128,7 @@ class PrinterService:
     """Service for communicating with Bambu Lab printers via FTP and MQTT."""
 
     # Default FTP settings for Bambu Lab printers
-    DEFAULT_FTP_PORT = 21
+    DEFAULT_FTP_PORT = 990  # Bambu Lab uses FTPS on port 990
     DEFAULT_FTP_TIMEOUT = 30
     DEFAULT_UPLOAD_PATH = "/upload"  # Common path for Bambu printers
 
@@ -256,31 +256,26 @@ class PrinterService:
         )
         ftp = None
         try:
-            # Connect to the printer's FTP server
-            ftp = ftplib.FTP()
+            # Connect to the printer's FTPS server
+            # Bambu Lab printers use FTPS (FTP over TLS) on port 990
+            ftp = ftplib.FTP_TLS()
             ftp.connect(printer_config.ip, self.DEFAULT_FTP_PORT, self.timeout)
 
-            # Authenticate - Bambu printers typically use anonymous login
-            # or specific credentials based on access code
+            # Bambu printers require authentication with username "bblp"
+            # and the access code as password
             try:
-                # Try anonymous login first (common for LAN mode)
-                ftp.login()
+                ftp.login("bblp", printer_config.access_code)
                 logger.debug(
-                    f"Connected to printer {printer_config.ip} " f"using anonymous FTP"
+                    f"Connected to printer {printer_config.ip} "
+                    f"via FTPS using access code authentication"
                 )
-            except ftplib.error_perm:
-                # If anonymous fails, try with access code as password
-                try:
-                    ftp.login("bblp", printer_config.access_code)
-                    logger.debug(
-                        f"Connected to printer {printer_config.ip} "
-                        f"using access code authentication"
-                    )
-                except ftplib.error_perm as e:
-                    raise PrinterAuthenticationError(
-                        f"FTP authentication failed for printer "
-                        f"{printer_config.name}: {str(e)}"
-                    )
+                # Enable protection level for data transfer
+                ftp.prot_p()
+            except ftplib.error_perm as e:
+                raise PrinterAuthenticationError(
+                    f"FTPS authentication failed for printer "
+                    f"{printer_config.name}: {str(e)}"
+                )
             # Change to the target directory (create if needed)
             try:
                 ftp.cwd(remote_path)
@@ -1363,16 +1358,18 @@ class PrinterService:
                 f"{printer_config.name} ({printer_config.ip})"
             )
 
-            ftp = ftplib.FTP()
+            ftp = ftplib.FTP_TLS()
             ftp.connect(printer_config.ip, self.DEFAULT_FTP_PORT, self.timeout)
 
-            # Try authentication
+            # Authenticate with "bblp" username and access code
             try:
-                ftp.login()
-                logger.debug("Anonymous FTP login successful")
-            except ftplib.error_perm:
-                ftp.login("user", printer_config.access_code)
-                logger.debug("Access code authentication successful")
+                ftp.login("bblp", printer_config.access_code)
+                logger.debug("FTPS access code authentication successful")
+                # Enable protection level for data transfer
+                ftp.prot_p()
+            except ftplib.error_perm as e:
+                logger.error(f"FTPS authentication failed: {e}")
+                raise
 
             logger.info(f"FTP connection test successful for " f"{printer_config.name}")
             return True

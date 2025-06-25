@@ -371,7 +371,7 @@ export function ConfigureAndPrintTab({
   };
 
   const handlePrintJob = async () => {
-    if (!sliceResponse?.success) {
+    if (!sliceResponse?.success || !sliceResponse?.gcode_path) {
       onStatusMessage('❌ Error: No valid slice available for printing');
       return;
     }
@@ -382,14 +382,13 @@ export function ConfigureAndPrintTab({
     onStatusMessage('📤 Preparing to send G-code to printer...');
 
     try {
-      onStatusMessage('⚠ Note: Using basic print workflow as fallback');
-      onStatusMessage(
-        '📋 The configured slice is complete, initiating print with basic workflow...'
-      );
+      // Extract just the filename from the full path
+      const gcode_filename = sliceResponse.gcode_path.split('/').pop() || '';
+      onStatusMessage(`📄 Sending G-code file: ${gcode_filename}`);
 
-      const requestBody = { model_url: modelUrl.trim() };
+      const requestBody = { gcode_filename };
 
-      const response = await fetch('/api/job/start-basic', {
+      const response = await fetch('/api/job/start-print', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -409,31 +408,21 @@ export function ConfigureAndPrintTab({
       const result: JobResponse = await response.json();
       console.log('Print job response received:', result);
 
-      // Update plates with estimates if received
-      if (result.updated_plates && onPlatesUpdate) {
-        console.log(
-          'Updating plates with estimates from print job:',
-          result.updated_plates
-        );
-        onPlatesUpdate(result.updated_plates);
-        onStatusMessage('📊 Updated plate time and weight estimates');
-      } else {
-        console.log('No updated plates in print job response or no callback');
-      }
-
       // Display main result
       if (result.success) {
-        onStatusMessage(`✅ Print job completed: ${result.message}`);
+        onStatusMessage(`✅ ${result.message}`);
+        showSuccess('Print job started successfully!', 'Print Started');
       } else {
-        onStatusMessage(`❌ Print job failed: ${result.message}`);
+        onStatusMessage(`❌ ${result.message}`);
         if (result.error_details) {
           onStatusMessage(`🔍 Details: ${result.error_details}`);
         }
+        showError(result.message, 'Print Failed');
       }
 
       // Display step-by-step progress if available
       if (result.job_steps) {
-        const steps = ['download', 'slice', 'upload', 'print'] as const;
+        const steps = ['upload', 'print'] as const;
 
         for (const stepName of steps) {
           const step = result.job_steps[stepName];

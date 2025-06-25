@@ -55,7 +55,7 @@ from app.utils import (  # noqa: E402
     handle_model_errors,
     validate_ip_or_hostname,
 )
-from fastapi import FastAPI, File, HTTPException, UploadFile  # noqa: E402
+from fastapi import Body, FastAPI, File, HTTPException, UploadFile  # noqa: E402
 from fastapi.responses import FileResponse, StreamingResponse  # noqa: E402
 from fastapi.staticfiles import StaticFiles  # noqa: E402
 from pydantic import BaseModel  # noqa: E402
@@ -384,6 +384,13 @@ class RemovePrinterResponse(BaseModel):
     success: bool
     message: str
     error_details: Optional[str] = None
+
+
+class UpdatePrinterRequest(BaseModel):
+    new_ip: Optional[str] = None  # New IP if changing
+    access_code: Optional[str] = None  # New access code (omit to keep existing)
+    name: Optional[str] = None  # New name (omit to keep existing)
+    serial_number: Optional[str] = None  # New serial number (omit to keep existing)
 
 
 class PersistentPrintersResponse(BaseModel):
@@ -2027,6 +2034,103 @@ async def start_basic_job(request: JobStartRequest):
         raise HTTPException(status_code=500, detail=msg)
 
 
+@app.post("/api/job/start-print")
+async def start_print_job(request: dict = Body(...)):
+    """
+    Start a print job with an already-sliced G-code file.
+
+    This endpoint is used when the user has already sliced a model with custom
+    configuration and wants to send the G-code to the printer.
+
+    Args:
+        request: JSON body containing:
+            - gcode_filename: Name of the G-code file to print (from slice output)
+
+    Returns:
+        JobStartResponse with upload and print status
+    """
+    try:
+        gcode_filename = request.get("gcode_filename")
+        if not gcode_filename:
+            raise HTTPException(status_code=400, detail="gcode_filename is required")
+
+        # Check if printer is configured
+        if not config.is_printer_configured():
+            raise HTTPException(
+                status_code=400,
+                detail="No printer configured. Please configure a printer first.",
+            )
+
+        # Get the first configured printer
+        printers = config.get_printers()
+        printer_config = printers[0]
+
+        # Initialize response tracking
+        job_steps = {
+            "upload": {"success": False, "message": "", "details": ""},
+            "print": {"success": False, "message": "", "details": ""},
+        }
+
+        # Get the G-code file path
+        gcode_dir = get_gcode_output_dir()
+        gcode_path = gcode_dir / gcode_filename
+
+        if not gcode_path.exists():
+            return JobStartResponse(
+                success=False,
+                message=f"G-code file not found: {gcode_filename}",
+                error_details="The sliced file could not be found on the server",
+            )
+
+        # Step 1: Upload G-code to printer
+        upload_result = upload_gcode_step(printer_service, printer_config, gcode_path)
+        job_steps["upload"].update(
+            {
+                "success": upload_result["success"],
+                "message": upload_result["message"],
+                "details": upload_result["details"],
+            }
+        )
+
+        if not upload_result["success"]:
+            return JobStartResponse(
+                success=False,
+                message="Failed to upload G-code to printer",
+                job_steps=job_steps,
+                error_details=upload_result["details"],
+            )
+
+        # Step 2: Start print
+        print_result = start_print_step(printer_service, printer_config, gcode_filename)
+        job_steps["print"].update(
+            {
+                "success": print_result["success"],
+                "message": print_result["message"],
+                "details": print_result["details"],
+            }
+        )
+
+        if print_result["success"]:
+            return JobStartResponse(
+                success=True,
+                message="Print job started successfully",
+                job_steps=job_steps,
+            )
+        else:
+            return JobStartResponse(
+                success=False,
+                message="Failed to start print on printer",
+                job_steps=job_steps,
+                error_details=print_result["details"],
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error starting print job: {e}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
 @app.get("/api/gcode/download/{file_name}")
 async def download_gcode(file_name: str):
     """
@@ -2776,6 +2880,87 @@ async def remove_printer(request: RemovePrinterRequest):
         raise
     except Exception as e:
         msg = f"Internal server error while removing printer: {str(e)}"
+        logger.error(msg)
+        raise HTTPException(status_code=500, detail=msg)
+
+
+@app.patch("/api/printers/{printer_ip}")
+async def update_printer(printer_ip: str, request: UpdatePrinterRequest):
+    """
+    Update an existing printer in persistent storage.
+
+    Updates a printer configuration in persistent storage. Only provided fields
+    will be updated; omitted fields will retain their existing values.
+
+    Args:
+        printer_ip: IP address of the printer to update (from URL path)
+        request: UpdatePrinterRequest containing the fields to change
+
+    Returns:
+        Updated printer information
+
+    Raises:
+        HTTPException: If update fails due to internal server error or printer not found
+    """
+    try:
+        # Validate IP address or hostname format
+        ip = validate_ip_or_hostname(printer_ip)
+
+        # Get the existing printer
+        existing_printer = None
+        for printer in config.get_persistent_printers():
+            if printer.ip == ip:
+                existing_printer = printer
+                break
+
+        if not existing_printer:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No printer found with IP {ip} in persistent storage",
+            )
+
+        # Remove the old printer
+        config.remove_persistent_printer(ip)
+
+        # Create updated printer with new values or existing ones
+        updated_printer = PrinterConfig(
+            name=request.name if request.name is not None else existing_printer.name,
+            ip=request.new_ip if request.new_ip is not None else existing_printer.ip,
+            access_code=(
+                request.access_code
+                if request.access_code is not None
+                else existing_printer.access_code
+            ),
+            serial_number=(
+                request.serial_number
+                if request.serial_number is not None
+                else existing_printer.serial_number
+            ),
+        )
+
+        # Add the updated printer
+        config.add_persistent_printer(updated_printer)
+
+        # If this was the active printer and IP changed, update it
+        active_printer = config.get_active_printer()
+        if active_printer and active_printer.ip == ip:
+            config.set_active_printer(updated_printer)
+
+        # Return updated printer info
+        return {
+            "name": updated_printer.name,
+            "canonical_id": updated_printer.canonical_id,
+            "ip": updated_printer.ip,
+            "has_access_code": bool(updated_printer.access_code),
+            "has_serial_number": bool(updated_printer.serial_number),
+            "is_persistent": True,
+        }
+
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
+    except Exception as e:
+        msg = f"Internal server error while updating printer: {str(e)}"
         logger.error(msg)
         raise HTTPException(status_code=500, detail=msg)
 
