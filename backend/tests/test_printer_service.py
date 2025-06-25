@@ -1012,7 +1012,7 @@ M84 ; disable steppers
 
         # Verify all FTPS operations occurred
         mock_ftp.connect.assert_called_once_with("192.168.1.200", 990, 5)
-        mock_ftp.login.assert_called_once_with("bblp", "12345678")
+        mock_ftp.login.assert_called_once_with("bblp", "mocktest456")
         mock_ftp.prot_p.assert_called_once()  # Enable data protection
         mock_ftp.cwd.assert_called_with("/printer/upload")
         mock_ftp.storbinary.assert_called_once()
@@ -1072,7 +1072,7 @@ M84 ; disable steppers
         assert result is True
         mock_ftp.connect.assert_called_once_with("192.168.1.200", 990, 5)
         mock_ftp.login.assert_called_once_with(
-            "bblp", "12345678"
+            "bblp", "mocktest456"
         )  # bblp login with access code
         mock_ftp.prot_p.assert_called_once()  # Enable data protection
         mock_ftp.quit.assert_called_once()
