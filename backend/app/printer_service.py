@@ -271,7 +271,7 @@ class PrinterService:
             except ftplib.error_perm:
                 # If anonymous fails, try with access code as password
                 try:
-                    ftp.login("user", printer_config.access_code)
+                    ftp.login("bblp", printer_config.access_code)
                     logger.debug(
                         f"Connected to printer {printer_config.ip} "
                         f"using access code authentication"

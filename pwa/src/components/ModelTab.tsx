@@ -1,12 +1,10 @@
 import { useState } from 'react';
 import OperationProgress, { OperationStep } from './OperationProgress';
-import SliceProgressTracker from './SliceProgressTracker';
 import { useToast } from '../hooks/useToast';
 import {
   ModelSubmissionResponse,
   FilamentRequirement,
   PlateInfo,
-  FilamentMapping,
 } from '../types/api';
 
 interface ModelTabProps {
@@ -17,26 +15,14 @@ interface ModelTabProps {
     hasMultiplePlates: boolean;
     modelUrl: string;
   }) => void;
-  currentFileId: string;
-  filamentRequirements: FilamentRequirement | null;
-  plates: PlateInfo[];
-  selectedPlateIndex: number | null;
-  filamentMappings: FilamentMapping[];
   isProcessing: boolean;
   onProcessingChange: (processing: boolean) => void;
-  isInitialSlicing?: boolean;
 }
 
 export function ModelTab({
   onModelAnalyzed,
-  currentFileId,
-  filamentRequirements,
-  plates,
-  selectedPlateIndex,
-  filamentMappings,
   isProcessing,
   onProcessingChange,
-  isInitialSlicing = false,
 }: ModelTabProps) {
   const [modelUrl, setModelUrl] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -508,13 +494,7 @@ export function ModelTab({
       )}
 
       {/* Initial Slice Progress Tracker */}
-      {isInitialSlicing && plates.length > 0 && (
-        <SliceProgressTracker
-          isSlicing={isInitialSlicing}
-          plates={plates}
-          selectedPlateIndex={null}
-        />
-      )}
+      {/* SliceProgressTracker moved to Configuration tab where plates are available */}
     </div>
   );
 }
