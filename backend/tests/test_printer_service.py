@@ -603,12 +603,12 @@ class TestUploadGcode:
 
             assert "Path is not a file" in str(exc_info.value)
 
-    @patch("ftplib.FTP")
-    def test_upload_gcode_successful_anonymous(
+    @patch("ftplib.FTP_TLS")
+    def test_upload_gcode_successful(
         self, mock_ftp_class, printer_service, test_printer_config, temp_gcode_file
     ):
-        """Test successful G-code upload with anonymous FTP."""
-        # Set up mock FTP
+        """Test successful G-code upload with FTPS."""
+        # Set up mock FTPS
         mock_ftp = Mock()
         mock_ftp_class.return_value = mock_ftp
         mock_ftp.size.return_value = temp_gcode_file.stat().st_size
@@ -617,9 +617,12 @@ class TestUploadGcode:
         with patch("builtins.open", mock_open(read_data=b"test gcode")):
             result = printer_service.upload_gcode(test_printer_config, temp_gcode_file)
 
-        # Verify FTP operations
-        mock_ftp.connect.assert_called_once_with("192.168.1.100", 21, 10)
-        mock_ftp.login.assert_called_once_with()  # Anonymous login
+        # Verify FTPS operations
+        mock_ftp.connect.assert_called_once_with("192.168.1.100", 990, 10)
+        mock_ftp.login.assert_called_once_with(
+            "bblp", "test123"
+        )  # bblp login with access code
+        mock_ftp.prot_p.assert_called_once()  # Enable data protection
         mock_ftp.cwd.assert_called_once_with("/upload")
         mock_ftp.storbinary.assert_called_once()
         mock_ftp.quit.assert_called_once()
@@ -629,31 +632,24 @@ class TestUploadGcode:
         assert "uploaded successfully" in result.message
         assert result.remote_path == f"/upload/{temp_gcode_file.name}"
 
-    @patch("ftplib.FTP")
-    def test_upload_gcode_successful_with_credentials(
+    @patch("ftplib.FTP_TLS")
+    def test_upload_gcode_authentication_error_handling(
         self, mock_ftp_class, printer_service, test_printer_config, temp_gcode_file
     ):
-        """Test successful G-code upload with credential authentication."""
-        # Set up mock FTP - anonymous login fails, credential login succeeds
+        """Test G-code upload with authentication error."""
+        # Set up mock FTPS - login fails
         mock_ftp = Mock()
         mock_ftp_class.return_value = mock_ftp
-        mock_ftp.login.side_effect = [
-            ftplib.error_perm("Anonymous login failed"),  # First call
-            None,  # Second call succeeds
-        ]
-        mock_ftp.size.return_value = temp_gcode_file.stat().st_size
+        mock_ftp.login.side_effect = ftplib.error_perm("Invalid credentials")
 
-        with patch("builtins.open", mock_open(read_data=b"test gcode")):
-            result = printer_service.upload_gcode(test_printer_config, temp_gcode_file)
+        with pytest.raises(PrinterAuthenticationError) as exc_info:
+            printer_service.upload_gcode(test_printer_config, temp_gcode_file)
 
-        # Verify credential authentication was attempted
-        assert mock_ftp.login.call_count == 2
-        mock_ftp.login.assert_any_call()  # Anonymous
-        mock_ftp.login.assert_any_call("user", "test123")  # With credentials
+        # Verify authentication was attempted with correct credentials
+        mock_ftp.login.assert_called_once_with("bblp", "test123")
+        assert "FTPS authentication failed" in str(exc_info.value)
 
-        assert result.success is True
-
-    @patch("ftplib.FTP")
+    @patch("ftplib.FTP_TLS")
     def test_upload_gcode_custom_remote_filename(
         self, mock_ftp_class, printer_service, test_printer_config, temp_gcode_file
     ):
@@ -676,7 +672,7 @@ class TestUploadGcode:
 
         assert result.remote_path == f"/upload/{custom_filename}"
 
-    @patch("ftplib.FTP")
+    @patch("ftplib.FTP_TLS")
     def test_upload_gcode_custom_remote_path(
         self, mock_ftp_class, printer_service, test_printer_config, temp_gcode_file
     ):
@@ -696,7 +692,7 @@ class TestUploadGcode:
         mock_ftp.cwd.assert_called_once_with(custom_path)
         assert result.remote_path == f"{custom_path}/{temp_gcode_file.name}"
 
-    @patch("ftplib.FTP")
+    @patch("ftplib.FTP_TLS")
     def test_upload_gcode_directory_creation(
         self, mock_ftp_class, printer_service, test_printer_config, temp_gcode_file
     ):
@@ -719,7 +715,7 @@ class TestUploadGcode:
         assert mock_ftp.cwd.call_count == 2
         assert result.success is True
 
-    @patch("ftplib.FTP")
+    @patch("ftplib.FTP_TLS")
     def test_upload_gcode_connection_error(
         self, mock_ftp_class, printer_service, test_printer_config, temp_gcode_file
     ):
@@ -733,7 +729,7 @@ class TestUploadGcode:
 
         assert "FTP connection error" in str(exc_info.value)
 
-    @patch("ftplib.FTP")
+    @patch("ftplib.FTP_TLS")
     def test_upload_gcode_authentication_error(
         self, mock_ftp_class, printer_service, test_printer_config, temp_gcode_file
     ):
@@ -741,18 +737,17 @@ class TestUploadGcode:
         mock_ftp = Mock()
         mock_ftp_class.return_value = mock_ftp
 
-        # Both anonymous and credential login fail
-        mock_ftp.login.side_effect = [
-            ftplib.error_perm("Anonymous login failed"),
-            ftplib.error_perm("Invalid credentials"),
-        ]
+        # Login with bblp fails
+        mock_ftp.login.side_effect = ftplib.error_perm("Invalid credentials")
 
         with pytest.raises(PrinterAuthenticationError) as exc_info:
             printer_service.upload_gcode(test_printer_config, temp_gcode_file)
 
-        assert "FTP authentication failed" in str(exc_info.value)
+        # Verify bblp authentication was attempted
+        mock_ftp.login.assert_called_once_with("bblp", "test123")
+        assert "FTPS authentication failed" in str(exc_info.value)
 
-    @patch("ftplib.FTP")
+    @patch("ftplib.FTP_TLS")
     def test_upload_gcode_transfer_error(
         self, mock_ftp_class, printer_service, test_printer_config, temp_gcode_file
     ):
@@ -767,7 +762,7 @@ class TestUploadGcode:
 
         assert "FTP temporary error" in str(exc_info.value)
 
-    @patch("ftplib.FTP")
+    @patch("ftplib.FTP_TLS")
     def test_upload_gcode_size_verification_warning(
         self, mock_ftp_class, printer_service, test_printer_config, temp_gcode_file
     ):
@@ -789,7 +784,7 @@ class TestUploadGcode:
         assert result.success is True
         mock_logger.warning.assert_called_once()
 
-    @patch("ftplib.FTP")
+    @patch("ftplib.FTP_TLS")
     def test_upload_gcode_cleanup_on_error(
         self, mock_ftp_class, printer_service, test_printer_config, temp_gcode_file
     ):
@@ -823,39 +818,39 @@ class TestConnectionTesting:
             serial_number="01S00C123456789",
         )
 
-    @patch("ftplib.FTP")
-    def test_connection_test_successful_anonymous(
+    @patch("ftplib.FTP_TLS")
+    def test_connection_test_successful(
         self, mock_ftp_class, printer_service, test_printer_config
     ):
-        """Test successful connection test with anonymous login."""
+        """Test successful connection test with FTPS."""
         mock_ftp = Mock()
         mock_ftp_class.return_value = mock_ftp
 
         result = printer_service.test_connection(test_printer_config)
 
         assert result is True
-        mock_ftp.connect.assert_called_once_with("192.168.1.100", 21, 10)
-        mock_ftp.login.assert_called_once_with()
+        mock_ftp.connect.assert_called_once_with("192.168.1.100", 990, 10)
+        mock_ftp.login.assert_called_once_with("bblp", "test123")
+        mock_ftp.prot_p.assert_called_once()  # Enable data protection
         mock_ftp.quit.assert_called_once()
 
-    @patch("ftplib.FTP")
-    def test_connection_test_successful_with_credentials(
+    @patch("ftplib.FTP_TLS")
+    def test_connection_test_authentication_failure(
         self, mock_ftp_class, printer_service, test_printer_config
     ):
-        """Test successful connection test with credential authentication."""
+        """Test connection test with authentication failure."""
         mock_ftp = Mock()
         mock_ftp_class.return_value = mock_ftp
 
-        # Anonymous fails, credential succeeds
-        mock_ftp.login.side_effect = [ftplib.error_perm("Anonymous failed"), None]
+        # FTPS login fails
+        mock_ftp.login.side_effect = ftplib.error_perm("Invalid credentials")
 
         result = printer_service.test_connection(test_printer_config)
 
-        assert result is True
-        assert mock_ftp.login.call_count == 2
-        mock_ftp.login.assert_any_call("user", "test123")
+        assert result is False
+        mock_ftp.login.assert_called_once_with("bblp", "test123")
 
-    @patch("ftplib.FTP")
+    @patch("ftplib.FTP_TLS")
     def test_connection_test_failure(
         self, mock_ftp_class, printer_service, test_printer_config
     ):
@@ -868,7 +863,7 @@ class TestConnectionTesting:
 
         assert result is False
 
-    @patch("ftplib.FTP")
+    @patch("ftplib.FTP_TLS")
     def test_connection_test_cleanup_on_error(
         self, mock_ftp_class, printer_service, test_printer_config
     ):
@@ -907,14 +902,14 @@ class TestIntegration:
         assert hasattr(PrinterService, "DEFAULT_FTP_TIMEOUT")
         assert hasattr(PrinterService, "DEFAULT_UPLOAD_PATH")
 
-        assert PrinterService.DEFAULT_FTP_PORT == 21
+        assert PrinterService.DEFAULT_FTP_PORT == 990
         assert PrinterService.DEFAULT_FTP_TIMEOUT == 30
         assert PrinterService.DEFAULT_UPLOAD_PATH == "/upload"
 
     def test_logging_integration(self, printer_service, test_printer_config):
         """Test that logging works correctly."""
         with patch("app.printer_service.logger") as mock_logger:
-            with patch("ftplib.FTP") as mock_ftp_class:
+            with patch("ftplib.FTP_TLS") as mock_ftp_class:
                 mock_ftp = Mock()
                 mock_ftp_class.return_value = mock_ftp
 
@@ -991,7 +986,7 @@ M84 ; disable steppers
             yield Path(f.name)
         os.unlink(f.name)
 
-    @patch("ftplib.FTP")
+    @patch("ftplib.FTP_TLS")
     def test_complete_upload_workflow(
         self, mock_ftp_class, printer_service, test_printer_config, sample_gcode_file
     ):
@@ -1015,9 +1010,10 @@ M84 ; disable steppers
                 remote_path="/printer/upload",
             )
 
-        # Verify all FTP operations occurred
-        mock_ftp.connect.assert_called_once_with("192.168.1.200", 21, 5)
-        mock_ftp.login.assert_called()
+        # Verify all FTPS operations occurred
+        mock_ftp.connect.assert_called_once_with("192.168.1.200", 990, 5)
+        mock_ftp.login.assert_called_once_with("bblp", "mocktest456")
+        mock_ftp.prot_p.assert_called_once()  # Enable data protection
         mock_ftp.cwd.assert_called_with("/printer/upload")
         mock_ftp.storbinary.assert_called_once()
 
@@ -1037,7 +1033,7 @@ M84 ; disable steppers
         assert result.remote_path == "/printer/upload/test_model.gcode"
         assert result.error_details is None
 
-    @patch("ftplib.FTP")
+    @patch("ftplib.FTP_TLS")
     def test_upload_with_directory_creation_scenario(
         self, mock_ftp_class, printer_service, test_printer_config, sample_gcode_file
     ):
@@ -1062,7 +1058,7 @@ M84 ; disable steppers
         mock_ftp.mkd.assert_called_once_with("/upload")
         assert result.success is True
 
-    @patch("ftplib.FTP")
+    @patch("ftplib.FTP_TLS")
     def test_connection_test_workflow(
         self, mock_ftp_class, printer_service, test_printer_config
     ):
@@ -1074,8 +1070,11 @@ M84 ; disable steppers
         result = printer_service.test_connection(test_printer_config)
 
         assert result is True
-        mock_ftp.connect.assert_called_once_with("192.168.1.200", 21, 5)
-        mock_ftp.login.assert_called_once_with()  # Anonymous login
+        mock_ftp.connect.assert_called_once_with("192.168.1.200", 990, 5)
+        mock_ftp.login.assert_called_once_with(
+            "bblp", "mocktest456"
+        )  # bblp login with access code
+        mock_ftp.prot_p.assert_called_once()  # Enable data protection
         mock_ftp.quit.assert_called_once()
 
     def test_error_handling_chain(self, printer_service, test_printer_config):

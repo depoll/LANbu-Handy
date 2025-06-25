@@ -43,10 +43,6 @@ from app.printer_service import (  # noqa: E402
 )
 from app.slice_progress_service import slice_progress_service  # noqa: E402
 from app.slicer_service import slice_model  # noqa: E402
-from app.threemf_repair_service import (  # noqa: E402
-    ThreeMFRepairError,
-    ThreeMFRepairService,
-)
 from app.thumbnail_service import (  # noqa: E402
     ThumbnailGenerationError,
     ThumbnailService,
@@ -59,7 +55,7 @@ from app.utils import (  # noqa: E402
     handle_model_errors,
     validate_ip_or_hostname,
 )
-from fastapi import FastAPI, File, HTTPException, UploadFile  # noqa: E402
+from fastapi import Body, FastAPI, File, HTTPException, UploadFile  # noqa: E402
 from fastapi.responses import FileResponse, StreamingResponse  # noqa: E402
 from fastapi.staticfiles import StaticFiles  # noqa: E402
 from pydantic import BaseModel  # noqa: E402
@@ -76,11 +72,9 @@ app = FastAPI(
 # Initialize model service
 model_service = ModelService()
 
-# Initialize 3MF repair service
-threemf_repair_service = ThreeMFRepairService()
-
 # Initialize thumbnail service
 thumbnail_service = ThumbnailService()
+
 
 # Initialize printer service
 printer_service = PrinterService()
@@ -97,13 +91,6 @@ async def startup_event():
     """Initialize services and clean up old files on startup."""
     logger.info("LANbu Handy backend starting up...")
 
-    # Clean up old repaired 3MF files
-    try:
-        threemf_repair_service.cleanup_old_repaired_files(max_age_hours=24)
-        logger.info("Cleaned up old repaired 3MF files")
-    except Exception as e:
-        logger.warning(f"Error during startup cleanup: {e}")
-
     # Clean up old thumbnail files
     try:
         thumbnail_service.cleanup_old_thumbnails(max_age_hours=24)
@@ -118,13 +105,6 @@ async def shutdown_event():
     logger.info("LANbu Handy backend shutting down...")
 
     # MQTT cleanup now handled automatically by async cancellation
-
-    # Clean up old repaired 3MF files
-    try:
-        threemf_repair_service.cleanup_old_repaired_files(max_age_hours=0)
-        logger.info("Final cleanup of repaired 3MF files")
-    except Exception as e:
-        logger.warning(f"Error during shutdown cleanup: {e}")
 
     # Clean up thumbnail files
     try:
@@ -359,6 +339,13 @@ class ConfiguredSliceRequest(BaseModel):
     filament_mappings: List[FilamentMapping]
     build_plate_type: str
     selected_plate_index: Optional[int] = None  # None means all plates
+    printer_model: Optional[str] = None  # For profile selection
+    nozzle_diameter: Optional[float] = None  # For profile selection
+    print_quality: Optional[str] = None  # Optional quality override
+    filament_types: Optional[List[str]] = (
+        None  # Material types for each filament mapping
+    )
+    filament_colors: Optional[List[str]] = None  # Colors for each filament mapping
 
 
 class SetActivePrinterRequest(BaseModel):
@@ -397,6 +384,13 @@ class RemovePrinterResponse(BaseModel):
     success: bool
     message: str
     error_details: Optional[str] = None
+
+
+class UpdatePrinterRequest(BaseModel):
+    new_ip: Optional[str] = None  # New IP if changing
+    access_code: Optional[str] = None  # New access code (omit to keep existing)
+    name: Optional[str] = None  # New name (omit to keep existing)
+    serial_number: Optional[str] = None  # New serial number (omit to keep existing)
 
 
 class PersistentPrintersResponse(BaseModel):
@@ -725,48 +719,19 @@ async def get_model_preview(file_id: str):
         if not model_service.validate_file_extension(model_file_path.name):
             raise HTTPException(status_code=400, detail="Invalid file type for preview")
 
-        # Handle 3MF files with repair service
+        # Serve the file based on its type
         if model_file_path.suffix.lower() == ".3mf":
-            try:
-                # Check if the file needs repair
-                if threemf_repair_service.needs_repair(model_file_path):
-                    logger.info(f"Repairing 3MF file for preview: {file_id}")
-                    repaired_file_path = threemf_repair_service.repair_3mf_file(
-                        model_file_path
-                    )
-                    final_file_path = repaired_file_path
-                    logger.info(f"Using repaired 3MF file: {repaired_file_path}")
-                else:
-                    final_file_path = model_file_path
-                    logger.debug(f"3MF file does not need repair: {file_id}")
-
-                return FileResponse(
-                    path=final_file_path,
-                    media_type="model/3mf",
-                    filename=final_file_path.name,
-                )
-
-            except ThreeMFRepairError as e:
-                logger.warning(f"Failed to repair 3MF file {file_id}: {e}")
-                # Fall back to serving the original file
-                return FileResponse(
-                    path=model_file_path,
-                    media_type="model/3mf",
-                    filename=model_file_path.name,
-                )
-
-        # Handle STL files (no repair needed)
+            media_type = "model/3mf"
+        elif model_file_path.suffix.lower() == ".stl":
+            media_type = "model/stl"
         else:
-            media_type = (
-                "model/stl"
-                if model_file_path.suffix.lower() == ".stl"
-                else "application/octet-stream"
-            )
-            return FileResponse(
-                path=model_file_path,
-                media_type=media_type,
-                filename=model_file_path.name,
-            )
+            media_type = "application/octet-stream"
+
+        return FileResponse(
+            path=model_file_path,
+            media_type=media_type,
+            filename=model_file_path.name,
+        )
 
     except HTTPException:
         # Re-raise HTTP exceptions as-is
@@ -1259,12 +1224,38 @@ async def slice_model_with_configuration(request: ConfiguredSliceRequest):
         # Create output directory for G-code
         output_dir = get_gcode_output_dir()
 
+        # Clean the output directory to remove old files
+        import shutil
+
+        if output_dir.exists():
+            logger.info(f"Cleaning output directory: {output_dir}")
+            shutil.rmtree(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+
         # Build slicing options from the configuration
         slicing_options = build_slicing_options_from_config(
             request.filament_mappings,
             request.build_plate_type,
             request.selected_plate_index,
+            request.printer_model,
+            request.nozzle_diameter,
+            request.print_quality,
+            request.filament_types,
+            request.filament_colors,
         )
+
+        # Log the plate selection
+        logger.info(
+            f"Configured slice - selected_plate_index: "
+            f"{request.selected_plate_index} (None means all plates)"
+        )
+
+        # Determine the expected output filename
+        if request.selected_plate_index is not None:
+            expected_filename = f"plate_{request.selected_plate_index}.gcode.3mf"
+        else:
+            expected_filename = "output.gcode.3mf"
+        expected_output_path = output_dir / expected_filename
 
         # Slice the model
         result = slice_model(
@@ -1276,7 +1267,18 @@ async def slice_model_with_configuration(request: ConfiguredSliceRequest):
 
         if result.success:
             try:
-                gcode_path = str(find_gcode_file(output_dir))
+                # Use the expected output path instead of searching
+                if not expected_output_path.exists():
+                    # Fallback to find_gcode_file if expected file doesn't exist
+                    logger.warning(
+                        f"Expected output file not found: {expected_output_path}, "
+                        f"searching for any gcode file..."
+                    )
+                    gcode_path = str(find_gcode_file(output_dir))
+                    logger.info(f"Found gcode file: {gcode_path}")
+                else:
+                    gcode_path = str(expected_output_path)
+                    logger.info(f"Using expected output file: {gcode_path}")
 
                 # Update plate estimates from slice output
                 updated_plates = model_service.update_plate_estimates_from_slice_output(
@@ -1387,6 +1389,11 @@ async def slice_model_sequential_plates(request: ConfiguredSliceRequest):
             request.filament_mappings,
             request.build_plate_type,
             request.selected_plate_index,
+            request.printer_model,
+            request.nozzle_diameter,
+            request.print_quality,
+            request.filament_types,
+            request.filament_colors,
         )
 
         updated_plates = []
@@ -2025,6 +2032,174 @@ async def start_basic_job(request: JobStartRequest):
     except Exception as e:
         msg = f"Internal server error during job orchestration: {str(e)}"
         raise HTTPException(status_code=500, detail=msg)
+
+
+@app.post("/api/job/start-print")
+async def start_print_job(request: dict = Body(...)):
+    """
+    Start a print job with an already-sliced G-code file.
+
+    This endpoint is used when the user has already sliced a model with custom
+    configuration and wants to send the G-code to the printer.
+
+    Args:
+        request: JSON body containing:
+            - gcode_filename: Name of the G-code file to print (from slice output)
+
+    Returns:
+        JobStartResponse with upload and print status
+    """
+    try:
+        gcode_filename = request.get("gcode_filename")
+        if not gcode_filename:
+            raise HTTPException(status_code=400, detail="gcode_filename is required")
+
+        # Check if printer is configured
+        if not config.is_printer_configured():
+            raise HTTPException(
+                status_code=400,
+                detail="No printer configured. Please configure a printer first.",
+            )
+
+        # Get the first configured printer
+        printers = config.get_printers()
+        printer_config = printers[0]
+
+        # Initialize response tracking
+        job_steps = {
+            "upload": {"success": False, "message": "", "details": ""},
+            "print": {"success": False, "message": "", "details": ""},
+        }
+
+        # Get the G-code file path
+        gcode_dir = get_gcode_output_dir()
+        gcode_path = gcode_dir / gcode_filename
+
+        if not gcode_path.exists():
+            return JobStartResponse(
+                success=False,
+                message=f"G-code file not found: {gcode_filename}",
+                error_details="The sliced file could not be found on the server",
+            )
+
+        # Step 1: Upload G-code to printer
+        upload_result = upload_gcode_step(printer_service, printer_config, gcode_path)
+        job_steps["upload"].update(
+            {
+                "success": upload_result["success"],
+                "message": upload_result["message"],
+                "details": upload_result["details"],
+            }
+        )
+
+        if not upload_result["success"]:
+            return JobStartResponse(
+                success=False,
+                message="Failed to upload G-code to printer",
+                job_steps=job_steps,
+                error_details=upload_result["details"],
+            )
+
+        # Step 2: Start print
+        print_result = start_print_step(printer_service, printer_config, gcode_filename)
+        job_steps["print"].update(
+            {
+                "success": print_result["success"],
+                "message": print_result["message"],
+                "details": print_result["details"],
+            }
+        )
+
+        if print_result["success"]:
+            return JobStartResponse(
+                success=True,
+                message="Print job started successfully",
+                job_steps=job_steps,
+            )
+        else:
+            return JobStartResponse(
+                success=False,
+                message="Failed to start print on printer",
+                job_steps=job_steps,
+                error_details=print_result["details"],
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error starting print job: {e}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
+@app.get("/api/gcode/download/{file_name}")
+async def download_gcode(file_name: str):
+    """
+    Download a generated G-code file.
+
+    This endpoint allows users to download G-code files that have been generated
+    by the slicing process. For security, it validates that the file exists in
+    the designated G-code output directory.
+
+    Args:
+        file_name: The name of the G-code file to download (not a full path)
+
+    Returns:
+        FileResponse with the G-code file as a download
+
+    Raises:
+        HTTPException: If file not found or access denied
+    """
+    try:
+        # Get the G-code output directory
+        gcode_dir = get_gcode_output_dir()
+
+        # Construct the file path (security: don't allow path traversal)
+        if "/" in file_name or "\\" in file_name or ".." in file_name:
+            raise HTTPException(
+                status_code=400, detail="Invalid file name - path traversal not allowed"
+            )
+
+        file_path = gcode_dir / file_name
+
+        # Verify the file exists and is within the gcode directory
+        if not file_path.exists() or not file_path.is_file():
+            raise HTTPException(
+                status_code=404, detail=f"G-code file not found: {file_name}"
+            )
+
+        # Verify the file is actually in the gcode directory (prevent symlink attacks)
+        if not file_path.resolve().parent == gcode_dir.resolve():
+            raise HTTPException(
+                status_code=403,
+                detail="Access denied - file is not in G-code directory",
+            )
+
+        # Determine media type based on file extension
+        if file_name.endswith(".gcode.3mf"):
+            media_type = "application/x-zip-compressed"  # 3MF is a ZIP-based format
+        elif file_name.endswith(".gcode"):
+            media_type = "text/x-gcode"
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid file type - only .gcode and .gcode.3mf files allowed",
+            )
+
+        # Return the file as a download
+        return FileResponse(
+            path=file_path,
+            media_type=media_type,
+            filename=file_name,
+            headers={"Content-Disposition": f"attachment; filename={file_name}"},
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error downloading G-code file: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Internal server error downloading file: {str(e)}"
+        )
 
 
 @app.get("/api/printer/{printer_id}/ams-status", response_model=AMSStatusResponse)
@@ -2705,6 +2880,87 @@ async def remove_printer(request: RemovePrinterRequest):
         raise
     except Exception as e:
         msg = f"Internal server error while removing printer: {str(e)}"
+        logger.error(msg)
+        raise HTTPException(status_code=500, detail=msg)
+
+
+@app.patch("/api/printers/{printer_ip}")
+async def update_printer(printer_ip: str, request: UpdatePrinterRequest):
+    """
+    Update an existing printer in persistent storage.
+
+    Updates a printer configuration in persistent storage. Only provided fields
+    will be updated; omitted fields will retain their existing values.
+
+    Args:
+        printer_ip: IP address of the printer to update (from URL path)
+        request: UpdatePrinterRequest containing the fields to change
+
+    Returns:
+        Updated printer information
+
+    Raises:
+        HTTPException: If update fails due to internal server error or printer not found
+    """
+    try:
+        # Validate IP address or hostname format
+        ip = validate_ip_or_hostname(printer_ip)
+
+        # Get the existing printer
+        existing_printer = None
+        for printer in config.get_persistent_printers():
+            if printer.ip == ip:
+                existing_printer = printer
+                break
+
+        if not existing_printer:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No printer found with IP {ip} in persistent storage",
+            )
+
+        # Remove the old printer
+        config.remove_persistent_printer(ip)
+
+        # Create updated printer with new values or existing ones
+        updated_printer = PrinterConfig(
+            name=request.name if request.name is not None else existing_printer.name,
+            ip=request.new_ip if request.new_ip is not None else existing_printer.ip,
+            access_code=(
+                request.access_code
+                if request.access_code is not None
+                else existing_printer.access_code
+            ),
+            serial_number=(
+                request.serial_number
+                if request.serial_number is not None
+                else existing_printer.serial_number
+            ),
+        )
+
+        # Add the updated printer
+        config.add_persistent_printer(updated_printer)
+
+        # If this was the active printer and IP changed, update it
+        active_printer = config.get_active_printer()
+        if active_printer and active_printer.ip == ip:
+            config.set_active_printer(updated_printer)
+
+        # Return updated printer info
+        return {
+            "name": updated_printer.name,
+            "canonical_id": updated_printer.canonical_id,
+            "ip": updated_printer.ip,
+            "has_access_code": bool(updated_printer.access_code),
+            "has_serial_number": bool(updated_printer.serial_number),
+            "is_persistent": True,
+        }
+
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
+    except Exception as e:
+        msg = f"Internal server error while updating printer: {str(e)}"
         logger.error(msg)
         raise HTTPException(status_code=500, detail=msg)
 

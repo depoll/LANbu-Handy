@@ -38,6 +38,7 @@ export interface PrinterStatusResponse {
   printer_name?: string;
   ams_units?: AMSUnit[];
   external_spool?: ExternalSpool;
+  nozzle_diameter?: number;
   error_details?: string;
 }
 
@@ -84,6 +85,11 @@ export interface ConfiguredSliceRequest {
   filament_mappings: FilamentMapping[];
   build_plate_type: string;
   selected_plate_index?: number | null; // null means all plates
+  printer_model?: string; // For profile selection
+  nozzle_diameter?: number; // For profile selection
+  print_quality?: string; // Optional quality override
+  filament_types?: string[]; // Material types for each filament mapping
+  filament_colors?: string[]; // Colors for each filament mapping
 }
 
 export interface StartProgressSliceRequest {
@@ -182,6 +188,13 @@ export interface RemovePrinterResponse {
   success: boolean;
   message: string;
   error_details?: string;
+}
+
+export interface UpdatePrinterRequest {
+  new_ip?: string; // New IP if changing
+  access_code?: string; // New access code (omit to keep existing)
+  name?: string; // New name (omit to keep existing)
+  serial_number?: string; // New serial number (omit to keep existing)
 }
 
 export interface PersistentPrintersResponse {

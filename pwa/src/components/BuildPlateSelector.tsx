@@ -9,30 +9,30 @@ function BuildPlateSelector({
   onPlateSelect,
   disabled = false,
 }: BuildPlateSelectorProps) {
-  // Common Bambu Lab build plate types (removed auto option)
+  // Common Bambu Lab build plate types with actual thumbnail images
   const buildPlateOptions = [
     {
       value: 'textured_pei_plate',
       label: 'Textured PEI',
-      icon: '🔹',
+      image: '/api/resources/images/bed_pei.png',
       description: 'Best for most prints',
     },
     {
-      value: 'smooth_pei_plate',
+      value: 'hot_plate',
       label: 'Smooth PEI',
-      icon: '⚪',
+      image: '/api/resources/images/bed_high_templ.png',
       description: 'Smooth bottom finish',
     },
     {
       value: 'cool_plate',
       label: 'Cool Plate',
-      icon: '❄️',
+      image: '/api/resources/images/bed_cool.png',
       description: 'For delicate materials',
     },
     {
       value: 'engineering_plate',
       label: 'Engineering',
-      icon: '🔧',
+      image: '/api/resources/images/bed_engineering.png',
       description: 'High-temp materials',
     },
   ];
@@ -55,7 +55,11 @@ function BuildPlateSelector({
             style={{ cursor: disabled ? 'not-allowed' : 'pointer' }}
           >
             <div className="plate-visual">
-              <span className="plate-icon">{option.icon}</span>
+              <img
+                src={option.image}
+                alt={option.label}
+                className="plate-thumbnail-image"
+              />
             </div>
             <div className="plate-info">
               <div className="plate-name">{option.label}</div>

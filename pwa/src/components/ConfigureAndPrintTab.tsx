@@ -1,13 +1,14 @@
 import { useState } from 'react';
+import PlateSelector from './PlateSelector';
 import OperationProgress, { OperationStep } from './OperationProgress';
 import { useToast } from '../hooks/useToast';
 import {
-  ConfiguredSliceRequest,
-  SliceResponse,
   FilamentRequirement,
+  AMSStatusResponse,
   FilamentMapping,
   PlateInfo,
-  AMSStatusResponse,
+  ConfiguredSliceRequest,
+  SliceResponse,
 } from '../types/api';
 
 interface JobStep {
@@ -29,43 +30,51 @@ interface JobResponse {
   updated_plates?: PlateInfo[];
 }
 
-interface PrintTabProps {
-  currentFileId: string;
+interface ConfigureAndPrintTabProps {
   filamentRequirements: FilamentRequirement | null;
   plateFilamentRequirements: FilamentRequirement | null;
+  isFilamentRequirementsFiltered: boolean;
+  amsStatus: AMSStatusResponse | null;
   filamentMappings: FilamentMapping[];
+  onMappingChange: (mappings: FilamentMapping[]) => void;
   selectedBuildPlate: string;
-  selectedPlateIndex: number | null;
+  onBuildPlateSelect: (plate: string) => void;
   plates: PlateInfo[];
+  selectedPlateIndex: number | null;
+  onPlateSelect: (plateIndex: number | null) => void;
+  isProcessing: boolean;
+  currentFileId: string;
+  onPlatesUpdate?: (plates: PlateInfo[]) => void;
   hasMultiplePlates: boolean;
   modelUrl: string;
-  isProcessing: boolean;
   onProcessingChange: (processing: boolean) => void;
   onStatusMessage: (message: string) => void;
-  onPlatesUpdate?: (plates: PlateInfo[]) => void;
   printerModel?: string;
   nozzleDiameter?: number;
-  amsStatus?: AMSStatusResponse | null;
 }
 
-export function PrintTab({
-  currentFileId,
+export function ConfigureAndPrintTab({
   filamentRequirements,
   plateFilamentRequirements,
+  isFilamentRequirementsFiltered,
+  amsStatus,
   filamentMappings,
+  onMappingChange,
   selectedBuildPlate,
-  selectedPlateIndex,
+  onBuildPlateSelect,
   plates,
+  selectedPlateIndex,
+  onPlateSelect,
+  isProcessing,
+  currentFileId,
+  onPlatesUpdate,
   hasMultiplePlates,
   modelUrl,
-  isProcessing,
   onProcessingChange,
   onStatusMessage,
-  onPlatesUpdate,
   printerModel,
   nozzleDiameter,
-  amsStatus,
-}: PrintTabProps) {
+}: ConfigureAndPrintTabProps) {
   const [isSliced, setIsSliced] = useState(false);
   const [sliceResponse, setSliceResponse] = useState<SliceResponse | null>(
     null
@@ -362,7 +371,7 @@ export function PrintTab({
   };
 
   const handlePrintJob = async () => {
-    if (!sliceResponse?.success) {
+    if (!sliceResponse?.success || !sliceResponse?.gcode_path) {
       onStatusMessage('❌ Error: No valid slice available for printing');
       return;
     }
@@ -373,14 +382,13 @@ export function PrintTab({
     onStatusMessage('📤 Preparing to send G-code to printer...');
 
     try {
-      onStatusMessage('⚠ Note: Using basic print workflow as fallback');
-      onStatusMessage(
-        '📋 The configured slice is complete, initiating print with basic workflow...'
-      );
+      // Extract just the filename from the full path
+      const gcode_filename = sliceResponse.gcode_path.split('/').pop() || '';
+      onStatusMessage(`📄 Sending G-code file: ${gcode_filename}`);
 
-      const requestBody = { model_url: modelUrl.trim() };
+      const requestBody = { gcode_filename };
 
-      const response = await fetch('/api/job/start-basic', {
+      const response = await fetch('/api/job/start-print', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -400,31 +408,21 @@ export function PrintTab({
       const result: JobResponse = await response.json();
       console.log('Print job response received:', result);
 
-      // Update plates with estimates if received
-      if (result.updated_plates && onPlatesUpdate) {
-        console.log(
-          'Updating plates with estimates from print job:',
-          result.updated_plates
-        );
-        onPlatesUpdate(result.updated_plates);
-        onStatusMessage('📊 Updated plate time and weight estimates');
-      } else {
-        console.log('No updated plates in print job response or no callback');
-      }
-
       // Display main result
       if (result.success) {
-        onStatusMessage(`✅ Print job completed: ${result.message}`);
+        onStatusMessage(`✅ ${result.message}`);
+        showSuccess('Print job started successfully!', 'Print Started');
       } else {
-        onStatusMessage(`❌ Print job failed: ${result.message}`);
+        onStatusMessage(`❌ ${result.message}`);
         if (result.error_details) {
           onStatusMessage(`🔍 Details: ${result.error_details}`);
         }
+        showError(result.message, 'Print Failed');
       }
 
       // Display step-by-step progress if available
       if (result.job_steps) {
-        const steps = ['download', 'slice', 'upload', 'print'] as const;
+        const steps = ['upload', 'print'] as const;
 
         for (const stepName of steps) {
           const step = result.job_steps[stepName];
@@ -536,12 +534,24 @@ export function PrintTab({
 
   if (!currentFileId) {
     return (
-      <div className="print-tab">
-        <div className="print-placeholder">
-          <div className="placeholder-icon">🖨️</div>
-          <h3>Print Control</h3>
+      <div className="configure-and-print-tab">
+        <div className="config-placeholder">
+          <div className="placeholder-icon">⚙️</div>
+          <h3>Configuration & Print</h3>
+          <p>Please analyze a model first to configure print settings.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!filamentRequirements && !amsStatus) {
+    return (
+      <div className="configure-and-print-tab">
+        <div className="config-placeholder">
+          <div className="placeholder-icon">⏳</div>
+          <h3>Loading Configuration</h3>
           <p>
-            Please analyze a model and configure settings to start printing.
+            Waiting for model analysis and AMS status to enable configuration...
           </p>
         </div>
       </div>
@@ -549,17 +559,37 @@ export function PrintTab({
   }
 
   return (
-    <div className="print-tab">
-      <div className="print-header">
-        <h3>Print Control</h3>
-        <p>Slice your model with the configured settings and start printing</p>
+    <div className="configure-and-print-tab">
+      <div className="configuration-header">
+        <h3>Configuration & Print</h3>
+        <p>Configure your settings and print your model</p>
+      </div>
+
+      {/* Configuration Section */}
+      <div className="config-section">
+        <PlateSelector
+          plates={plates}
+          selectedPlateIndex={selectedPlateIndex}
+          onPlateSelect={onPlateSelect}
+          disabled={isProcessing}
+          fileId={currentFileId}
+          filamentRequirements={filamentRequirements}
+          plateFilamentRequirements={plateFilamentRequirements}
+          isFilamentRequirementsFiltered={isFilamentRequirementsFiltered}
+          amsStatus={amsStatus}
+          filamentMappings={filamentMappings}
+          onMappingChange={onMappingChange}
+          selectedBuildPlate={selectedBuildPlate}
+          onBuildPlateSelect={onBuildPlateSelect}
+          onPlatesUpdate={onPlatesUpdate}
+        />
       </div>
 
       {/* Enhanced Operation Progress */}
       {showOperationProgress && operationSteps.length > 0 && (
         <div className="print-section">
           <OperationProgress
-            title="Print Operation"
+            title="Operation Progress"
             steps={operationSteps}
             className="workflow-section"
           />
@@ -592,7 +622,7 @@ export function PrintTab({
                 }
                 className="slice-and-print-button"
               >
-                {isProcessing ? 'Slicing...' : 'Slice with Configuration'}
+                {isProcessing ? 'Slicing...' : 'Slice and Print'}
               </button>
 
               <button
@@ -602,7 +632,7 @@ export function PrintTab({
               >
                 {isProcessing
                   ? 'Processing...'
-                  : 'Quick Slice & Print (Defaults)'}
+                  : 'Quick Print (Default Settings)'}
               </button>
             </div>
           ) : (

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { STLLoader } from 'three-stdlib';
 import { ThreeMFLoader } from 'three-stdlib';
+import { Enhanced3MFLoader } from '../utils/enhanced3MFLoader';
 import { FilamentRequirement, FilamentMapping, PlateInfo } from '../types/api';
 
 interface ModelPreviewProps {
@@ -347,8 +348,11 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({
       }
     } else if (fileExtension === '3mf') {
       try {
-        console.log('ModelPreview: Creating 3MF loader');
-        const loader = new ThreeMFLoader();
+        console.log('ModelPreview: Creating enhanced 3MF loader');
+        const enhancedLoader = new Enhanced3MFLoader();
+
+        // Also create standard loader as fallback
+        const standardLoader = new ThreeMFLoader();
 
         // Set up loading manager for better error handling
         const loadingManager = new THREE.LoadingManager();
@@ -360,56 +364,111 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({
           handleError(new Error(`Failed to load resource: ${url}`));
         };
 
-        loader.manager = loadingManager;
-        loader.load(
+        standardLoader.manager = loadingManager;
+
+        // Try enhanced loader first
+        enhancedLoader.load(
           modelUrl,
           (object: THREE.Group) => {
             console.log('ModelPreview: Processing 3MF object');
+            console.log('Object type:', object.type);
+            console.log('Children count:', object.children.length);
+
             // ThreeMFLoader returns a Group, we need to extract the geometry
             // and handle potential multiple objects/materials
             const geometries: THREE.BufferGeometry[] = [];
+            const meshes: THREE.Mesh[] = [];
 
+            // Traverse all children including nested groups
             object.traverse(child => {
               if (child instanceof THREE.Mesh && child.geometry) {
+                console.log(
+                  'Found mesh:',
+                  child.name || 'unnamed',
+                  'vertices:',
+                  child.geometry.attributes.position?.count || 0
+                );
+                meshes.push(child);
                 geometries.push(child.geometry);
               }
             });
 
+            console.log(`ModelPreview: Total meshes found: ${meshes.length}`);
+            console.log(
+              `ModelPreview: Total geometries found: ${geometries.length}`
+            );
+
             if (geometries.length > 0) {
-              console.log(
-                `ModelPreview: Found ${geometries.length} geometries in 3MF`
+              // Check if geometries have actual vertex data
+              const validGeometries = geometries.filter(
+                geom =>
+                  geom.attributes.position && geom.attributes.position.count > 0
               );
 
-              if (geometries.length === 1) {
-                handleGeometry(geometries[0]);
+              console.log(
+                `ModelPreview: Valid geometries with vertices: ${validGeometries.length}`
+              );
+
+              if (validGeometries.length === 0) {
+                console.error('ModelPreview: All geometries are empty!');
+                handleError(
+                  new Error('3MF file contains no valid geometry data')
+                );
+                return;
+              }
+
+              if (validGeometries.length === 1) {
+                handleGeometry(validGeometries[0]);
               } else {
                 console.log(
-                  `ModelPreview: Found ${geometries.length} geometries, attempting to merge...`
+                  `ModelPreview: Found ${validGeometries.length} valid geometries, attempting to merge...`
                 );
 
                 try {
                   // Try to merge multiple geometries for better preview
-                  const mergedGeometry = mergeGeometries(geometries);
+                  const mergedGeometry = mergeGeometries(validGeometries);
                   if (mergedGeometry) {
                     console.log('ModelPreview: Successfully merged geometries');
                     handleGeometry(mergedGeometry);
                   } else {
                     console.log(
-                      'ModelPreview: Merge failed, using first geometry'
+                      'ModelPreview: Merge failed, using largest geometry'
                     );
-                    handleGeometry(geometries[0]);
+                    // Use the geometry with most vertices
+                    const largestGeometry = validGeometries.reduce(
+                      (prev, curr) => {
+                        const prevCount = prev.attributes.position?.count || 0;
+                        const currCount = curr.attributes.position?.count || 0;
+                        return currCount > prevCount ? curr : prev;
+                      }
+                    );
+                    handleGeometry(largestGeometry);
                   }
                 } catch (mergeError) {
                   console.warn(
                     'ModelPreview: Geometry merge failed:',
                     mergeError
                   );
-                  console.log('ModelPreview: Falling back to first geometry');
-                  handleGeometry(geometries[0]);
+                  console.log('ModelPreview: Falling back to largest geometry');
+                  const largestGeometry = validGeometries.reduce(
+                    (prev, curr) => {
+                      const prevCount = prev.attributes.position?.count || 0;
+                      const currCount = curr.attributes.position?.count || 0;
+                      return currCount > prevCount ? curr : prev;
+                    }
+                  );
+                  handleGeometry(largestGeometry);
                 }
               }
             } else {
-              handleError(new Error('No valid geometry found in 3MF file'));
+              console.error(
+                'ModelPreview: No meshes with geometry found in 3MF'
+              );
+              handleError(
+                new Error(
+                  'No valid geometry found in 3MF file. The file may need repair.'
+                )
+              );
             }
           },
           handleProgress,
@@ -617,15 +676,85 @@ function mergeGeometries(
     if (geometries.length === 0) return null;
     if (geometries.length === 1) return geometries[0];
 
-    // For now, just use the first geometry since proper merging is complex
-    // This is an improvement over the previous approach as we at least check
-    // if there are multiple geometries and could implement proper merging later
-    console.log(
-      'ModelPreview: Multiple geometries detected, using first geometry for now'
+    console.log('ModelPreview: Attempting to merge geometries');
+
+    // Note: BufferGeometryUtils is not available in the standard THREE export
+    // We'll use manual merge instead
+
+    // Manual merge as fallback
+    console.log('ModelPreview: Attempting manual geometry merge');
+    const mergedGeometry = new THREE.BufferGeometry();
+
+    // Combine all positions, normals, and indices
+    const positions: number[] = [];
+    const normals: number[] = [];
+    const indices: number[] = [];
+    let indexOffset = 0;
+
+    for (const geom of geometries) {
+      const posAttr = geom.attributes.position;
+      const normAttr = geom.attributes.normal;
+
+      if (!posAttr || posAttr.count === 0) continue;
+
+      // Add positions
+      for (let i = 0; i < posAttr.count * 3; i++) {
+        positions.push(posAttr.array[i]);
+      }
+
+      // Add normals if available
+      if (normAttr && normAttr.count === posAttr.count) {
+        for (let i = 0; i < normAttr.count * 3; i++) {
+          normals.push(normAttr.array[i]);
+        }
+      } else {
+        // Generate default normals if missing
+        for (let i = 0; i < posAttr.count; i++) {
+          normals.push(0, 1, 0); // Default up normal
+        }
+      }
+
+      // Add indices
+      if (geom.index) {
+        for (let i = 0; i < geom.index.count; i++) {
+          indices.push(geom.index.array[i] + indexOffset);
+        }
+      } else {
+        // Generate indices for non-indexed geometry
+        for (let i = 0; i < posAttr.count; i++) {
+          indices.push(i + indexOffset);
+        }
+      }
+
+      indexOffset += posAttr.count;
+    }
+
+    if (positions.length === 0) {
+      console.error('ModelPreview: No valid positions found during merge');
+      return null;
+    }
+
+    // Set attributes
+    mergedGeometry.setAttribute(
+      'position',
+      new THREE.Float32BufferAttribute(positions, 3)
     );
-    return geometries[0].clone();
+    mergedGeometry.setAttribute(
+      'normal',
+      new THREE.Float32BufferAttribute(normals, 3)
+    );
+    mergedGeometry.setIndex(indices);
+
+    // Compute bounds
+    mergedGeometry.computeBoundingBox();
+    mergedGeometry.computeBoundingSphere();
+
+    console.log(
+      `ModelPreview: Manual merge complete - ${positions.length / 3} vertices`
+    );
+    return mergedGeometry;
   } catch (error) {
-    console.error('ModelPreview: Error processing geometries:', error);
+    console.error('ModelPreview: Error merging geometries:', error);
     return null;
   }
 }

@@ -6,7 +6,33 @@ import {
   FilamentMapping,
   StartProgressSliceRequest,
   StartProgressSliceResponse,
+  FilamentMatchRequest,
+  FilamentMatchResponse,
 } from '../types/api';
+
+// Shared build plate configuration
+const BUILD_PLATES = [
+  {
+    id: 'textured_pei_plate',
+    name: 'Textured PEI',
+    image: '/api/resources/images/bed_pei.png',
+  },
+  {
+    id: 'cool_plate',
+    name: 'Cool Plate',
+    image: '/api/resources/images/bed_cool.png',
+  },
+  {
+    id: 'eng_plate',
+    name: 'Engineering',
+    image: '/api/resources/images/bed_engineering.png',
+  },
+  {
+    id: 'hot_plate',
+    name: 'Smooth PEI',
+    image: '/api/resources/images/bed_high_templ.png',
+  },
+];
 
 interface PlateSelectorProps {
   plates: PlateInfo[];
@@ -379,6 +405,101 @@ function PlateSelector({
     new Set()
   );
   const autoSliceTimerRef = useRef<number | null>(null);
+  const [isMatching, setIsMatching] = useState(false);
+  const [matchingError, setMatchingError] = useState<string | null>(null);
+
+  // Function to re-apply filament matching
+  const reapplyFilamentMatching = useCallback(async () => {
+    // Determine which filament requirements to use based on selected plate
+    const activeFilamentRequirements =
+      selectedPlateIndex !== null
+        ? plateFilamentRequirements || filamentRequirements
+        : filamentRequirements;
+
+    if (!amsStatus || !amsStatus.success || !activeFilamentRequirements) {
+      const errorMsg =
+        'Cannot apply matching: AMS status not available or no filament requirements';
+      console.warn('Filament matching precondition failed:', {
+        hasAmsStatus: !!amsStatus,
+        amsSuccess: amsStatus?.success,
+        hasFilamentRequirements: !!activeFilamentRequirements,
+        filamentCount: activeFilamentRequirements?.filament_count,
+      });
+      setMatchingError(errorMsg);
+      return;
+    }
+
+    console.log('Starting filament matching...', {
+      activeFilamentRequirements,
+      selectedPlateIndex,
+      amsStatus: {
+        success: amsStatus.success,
+        unitCount: amsStatus.ams_units?.length,
+        totalSlots: amsStatus.ams_units?.reduce(
+          (sum, unit) => sum + unit.filaments.length,
+          0
+        ),
+      },
+    });
+
+    setIsMatching(true);
+    setMatchingError(null);
+
+    try {
+      const request: FilamentMatchRequest = {
+        filament_requirements: activeFilamentRequirements,
+        ams_status: amsStatus,
+      };
+
+      const response = await fetch('/api/filament/match', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(request),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      }
+
+      const result: FilamentMatchResponse = await response.json();
+      console.log('Filament matching result:', result);
+
+      if (result.success && result.matches) {
+        // Convert backend matches to frontend FilamentMapping format
+        const newMappings: FilamentMapping[] = result.matches.map(match => ({
+          filament_index: match.requirement_index,
+          ams_unit_id: match.ams_unit_id,
+          ams_slot_id: match.ams_slot_id,
+        }));
+
+        console.log('Applying new filament mappings:', newMappings);
+        if (onMappingChange) {
+          onMappingChange(newMappings);
+        }
+        setMatchingError(null);
+      } else {
+        const errorMsg = result.message || 'Filament matching failed';
+        console.error('Filament matching failed:', errorMsg);
+        setMatchingError(errorMsg);
+      }
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error('Filament matching error:', error);
+      setMatchingError(`Failed to apply filament matching: ${errorMessage}`);
+    } finally {
+      setIsMatching(false);
+    }
+  }, [
+    amsStatus,
+    filamentRequirements,
+    plateFilamentRequirements,
+    selectedPlateIndex,
+    onMappingChange,
+  ]);
 
   // Check if configuration is complete
   const isConfigurationComplete = useCallback((): boolean => {
@@ -1095,7 +1216,24 @@ function PlateSelector({
                   {activeFilamentRequirements &&
                     activeFilamentRequirements.filament_count > 0 && (
                       <div className="detail-section">
-                        <h6>Required Filaments</h6>
+                        <div className="detail-section-header">
+                          <h6>Required Filaments</h6>
+                          <button
+                            onClick={reapplyFilamentMatching}
+                            disabled={
+                              disabled || isMatching || !amsStatus?.success
+                            }
+                            className="auto-match-button"
+                            title="Auto-select filament matches"
+                          >
+                            {isMatching ? '🔄' : '🪄'}
+                          </button>
+                        </div>
+                        {matchingError && (
+                          <div className="matching-error-compact">
+                            ⚠️ {matchingError}
+                          </div>
+                        )}
                         <div className="filament-requirements-compact">
                           {activeFilamentRequirements.filament_types.map(
                             (type, index) => {
@@ -1138,54 +1276,37 @@ function PlateSelector({
                   {onBuildPlateSelect && (
                     <div className="detail-section">
                       <h6>Build Plate</h6>
-                      <div className="build-plate-selector">
-                        {[
-                          {
-                            id: 'textured_pei_plate',
-                            name: 'Textured PEI',
-                            icon: '⬛',
-                            color: '#2c2c2c',
-                          },
-                          {
-                            id: 'cool_plate',
-                            name: 'Cool Plate',
-                            icon: '🔷',
-                            color: '#4a90e2',
-                          },
-                          {
-                            id: 'eng_plate',
-                            name: 'Engineering',
-                            icon: '🔶',
-                            color: '#f5a623',
-                          },
-                          {
-                            id: 'hot_plate',
-                            name: 'Hot Plate',
-                            icon: '🔴',
-                            color: '#e74c3c',
-                          },
-                        ].map(plate => (
-                          <div
-                            key={plate.id}
-                            className={`build-plate-option ${(selectedBuildPlate || 'textured_pei_plate') === plate.id ? 'selected' : ''}`}
-                            onClick={() =>
-                              !disabled && onBuildPlateSelect(plate.id)
-                            }
-                            style={{
-                              cursor: disabled ? 'not-allowed' : 'pointer',
-                            }}
-                          >
-                            <div className="plate-visual">
-                              <div
-                                className="plate-icon"
-                                style={{ backgroundColor: plate.color }}
-                              >
-                                {plate.icon}
+                      <div className="build-plate-grid">
+                        {BUILD_PLATES.map(plate => {
+                          return (
+                            <div
+                              key={plate.id}
+                              className={`build-plate-option ${(selectedBuildPlate || 'textured_pei_plate') === plate.id ? 'selected' : ''}`}
+                              onClick={() =>
+                                !disabled && onBuildPlateSelect(plate.id)
+                              }
+                              style={{
+                                cursor: disabled ? 'not-allowed' : 'pointer',
+                              }}
+                            >
+                              <div className="plate-visual">
+                                <img
+                                  src={plate.image}
+                                  alt={plate.name}
+                                  className="plate-thumbnail-image"
+                                  onError={e =>
+                                    console.error(
+                                      'Failed to load image:',
+                                      plate.image,
+                                      e
+                                    )
+                                  }
+                                />
                               </div>
+                              <div className="plate-name">{plate.name}</div>
                             </div>
-                            <div className="plate-name">{plate.name}</div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
                   )}
@@ -1317,7 +1438,22 @@ function PlateSelector({
               {filamentRequirements &&
                 filamentRequirements.filament_count > 0 && (
                   <div className="detail-section">
-                    <h6>Required Filaments</h6>
+                    <div className="detail-section-header">
+                      <h6>Required Filaments</h6>
+                      <button
+                        onClick={reapplyFilamentMatching}
+                        disabled={disabled || isMatching || !amsStatus?.success}
+                        className="auto-match-button"
+                        title="Auto-select filament matches"
+                      >
+                        {isMatching ? '🔄' : '🪄'}
+                      </button>
+                    </div>
+                    {matchingError && (
+                      <div className="matching-error-compact">
+                        ⚠️ {matchingError}
+                      </div>
+                    )}
                     <div className="filament-requirements-compact">
                       {filamentRequirements.filament_types.map(
                         (type, index) => {
@@ -1356,54 +1492,37 @@ function PlateSelector({
               {onBuildPlateSelect && (
                 <div className="detail-section">
                   <h6>Build Plate</h6>
-                  <div className="build-plate-selector">
-                    {[
-                      {
-                        id: 'textured_pei_plate',
-                        name: 'Textured PEI',
-                        icon: '⬛',
-                        color: '#2c2c2c',
-                      },
-                      {
-                        id: 'cool_plate',
-                        name: 'Cool Plate',
-                        icon: '🔷',
-                        color: '#4a90e2',
-                      },
-                      {
-                        id: 'eng_plate',
-                        name: 'Engineering',
-                        icon: '🔶',
-                        color: '#f5a623',
-                      },
-                      {
-                        id: 'hot_plate',
-                        name: 'Hot Plate',
-                        icon: '🔴',
-                        color: '#e74c3c',
-                      },
-                    ].map(plate => (
-                      <div
-                        key={plate.id}
-                        className={`build-plate-option ${(selectedBuildPlate || 'textured_pei_plate') === plate.id ? 'selected' : ''}`}
-                        onClick={() =>
-                          !disabled && onBuildPlateSelect(plate.id)
-                        }
-                        style={{
-                          cursor: disabled ? 'not-allowed' : 'pointer',
-                        }}
-                      >
-                        <div className="plate-visual">
-                          <div
-                            className="plate-icon"
-                            style={{ backgroundColor: plate.color }}
-                          >
-                            {plate.icon}
+                  <div className="build-plate-grid">
+                    {BUILD_PLATES.map(plate => {
+                      return (
+                        <div
+                          key={plate.id}
+                          className={`build-plate-option ${(selectedBuildPlate || 'textured_pei_plate') === plate.id ? 'selected' : ''}`}
+                          onClick={() =>
+                            !disabled && onBuildPlateSelect(plate.id)
+                          }
+                          style={{
+                            cursor: disabled ? 'not-allowed' : 'pointer',
+                          }}
+                        >
+                          <div className="plate-visual">
+                            <img
+                              src={plate.image}
+                              alt={plate.name}
+                              className="plate-thumbnail-image"
+                              onError={e =>
+                                console.error(
+                                  'Failed to load image:',
+                                  plate.image,
+                                  e
+                                )
+                              }
+                            />
                           </div>
+                          <div className="plate-name">{plate.name}</div>
                         </div>
-                        <div className="plate-name">{plate.name}</div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}

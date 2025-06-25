@@ -158,6 +158,7 @@ class BambuStudioCLIWrapper:
         output_dir: Union[str, Path],
         options: Optional[Dict[str, str]] = None,
         plate_index: Optional[int] = None,
+        export_3mf: bool = True,
     ) -> CLIResult:
         """
         Slice a 3D model using Bambu Studio CLI.
@@ -167,6 +168,7 @@ class BambuStudioCLIWrapper:
             output_dir: Directory where the output G-code should be saved
             options: Optional dictionary of CLI options/parameters
             plate_index: Optional plate number to slice (None means all plates)
+            export_3mf: Whether to export as .gcode.3mf file (default: True)
 
         Returns:
             CLIResult with slicing results
@@ -194,13 +196,35 @@ class BambuStudioCLIWrapper:
         slice_value = str(plate_index) if plate_index is not None else "0"
         args.extend(["--slice", slice_value])
 
+        # Log the slice value for debugging
+        logger.info(
+            f"Slicing with plate_index={plate_index}, slice_value={slice_value}"
+        )
+
         # Add output directory
         args.extend(["--outputdir", str(output_dir)])
+
+        # Add export-3mf option if requested
+        if export_3mf:
+            # Generate filename based on plate index
+            if plate_index is not None:
+                export_filename = f"plate_{plate_index}.gcode.3mf"
+            else:
+                export_filename = "output.gcode.3mf"
+            # Just use the filename, not the full path
+            # The CLI will save it in the output directory
+            args.extend(["--export-3mf", export_filename])
 
         # Add any additional options
         if options:
             for key, value in options.items():
                 args.extend([f"--{key}", value])
+
+        # Log the full command for debugging
+        full_command = [self.cli_command] + args
+        logger.info(
+            f"Executing slice command: {' '.join(str(arg) for arg in full_command)}"
+        )
 
         # 5 minute timeout for slicing
         return self._run_command(args, timeout=300)
@@ -301,6 +325,7 @@ def slice_model(
     output_dir: Union[str, Path],
     options: Optional[Dict[str, str]] = None,
     plate_index: Optional[int] = None,
+    export_3mf: bool = True,
 ) -> CLIResult:
     """
     Slice a 3D model using Bambu Studio CLI.
@@ -310,9 +335,17 @@ def slice_model(
         output_dir: Directory for output G-code
         options: Optional CLI options
         plate_index: Optional plate number to slice (None means all plates)
+        export_3mf: Whether to export as .gcode.3mf file (default: True)
 
     Returns:
         CLIResult with slicing results
     """
+    from .threemf_config_cleaner import clean_3mf_before_slicing
+
+    # Clean the 3MF file if needed (removes 'nil' values)
+    cleaned_path = clean_3mf_before_slicing(input_path)
+
     wrapper = BambuStudioCLIWrapper()
-    return wrapper.slice_model(input_path, output_dir, options, plate_index)
+    return wrapper.slice_model(
+        cleaned_path, output_dir, options, plate_index, export_3mf
+    )

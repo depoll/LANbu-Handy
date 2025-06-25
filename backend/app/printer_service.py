@@ -109,6 +109,7 @@ class PrinterStatusResult:
     printer_name: str = None
     ams_units: List[AMSUnit] = None
     external_spool: ExternalSpool = None
+    nozzle_diameter: float = None
     error_details: str = None
 
 
@@ -127,7 +128,7 @@ class PrinterService:
     """Service for communicating with Bambu Lab printers via FTP and MQTT."""
 
     # Default FTP settings for Bambu Lab printers
-    DEFAULT_FTP_PORT = 21
+    DEFAULT_FTP_PORT = 990  # Bambu Lab uses FTPS on port 990
     DEFAULT_FTP_TIMEOUT = 30
     DEFAULT_UPLOAD_PATH = "/upload"  # Common path for Bambu printers
 
@@ -255,31 +256,26 @@ class PrinterService:
         )
         ftp = None
         try:
-            # Connect to the printer's FTP server
-            ftp = ftplib.FTP()
+            # Connect to the printer's FTPS server
+            # Bambu Lab printers use FTPS (FTP over TLS) on port 990
+            ftp = ftplib.FTP_TLS()
             ftp.connect(printer_config.ip, self.DEFAULT_FTP_PORT, self.timeout)
 
-            # Authenticate - Bambu printers typically use anonymous login
-            # or specific credentials based on access code
+            # Bambu printers require authentication with username "bblp"
+            # and the access code as password
             try:
-                # Try anonymous login first (common for LAN mode)
-                ftp.login()
+                ftp.login("bblp", printer_config.access_code)
                 logger.debug(
-                    f"Connected to printer {printer_config.ip} " f"using anonymous FTP"
+                    f"Connected to printer {printer_config.ip} "
+                    f"via FTPS using access code authentication"
                 )
-            except ftplib.error_perm:
-                # If anonymous fails, try with access code as password
-                try:
-                    ftp.login("user", printer_config.access_code)
-                    logger.debug(
-                        f"Connected to printer {printer_config.ip} "
-                        f"using access code authentication"
-                    )
-                except ftplib.error_perm as e:
-                    raise PrinterAuthenticationError(
-                        f"FTP authentication failed for printer "
-                        f"{printer_config.name}: {str(e)}"
-                    )
+                # Enable protection level for data transfer
+                ftp.prot_p()
+            except ftplib.error_perm as e:
+                raise PrinterAuthenticationError(
+                    f"FTPS authentication failed for printer "
+                    f"{printer_config.name}: {str(e)}"
+                )
             # Change to the target directory (create if needed)
             try:
                 ftp.cwd(remote_path)
@@ -1152,7 +1148,7 @@ class PrinterService:
                 )
 
             # Parse the printer status data from the response
-            printer_model, printer_name, ams_units, external_spool = (
+            printer_model, printer_name, ams_units, external_spool, nozzle_diameter = (
                 self._parse_printer_status_data(response_data)
             )
 
@@ -1169,6 +1165,7 @@ class PrinterService:
                 printer_name=printer_name,
                 ams_units=ams_units,
                 external_spool=external_spool,
+                nozzle_diameter=nozzle_diameter,
             )
 
         except PrinterMQTTError:
@@ -1194,19 +1191,21 @@ class PrinterService:
 
     def _parse_printer_status_data(
         self, response_data: dict
-    ) -> tuple[str, str, List[AMSUnit], ExternalSpool]:
+    ) -> tuple[str, str, List[AMSUnit], ExternalSpool, float]:
         """Parse printer status data from MQTT response.
 
         Args:
             response_data: The JSON response from the printer
 
         Returns:
-            tuple: (printer_model, printer_name, ams_units, external_spool)
+            tuple: (printer_model, printer_name, ams_units, external_spool,
+                   nozzle_diameter)
         """
         printer_model = "Unknown"
         printer_name = "Unknown"
         ams_units = []
         external_spool = ExternalSpool()
+        nozzle_diameter = None
 
         try:
             print_data = response_data.get("print", {})
@@ -1260,16 +1259,34 @@ class PrinterService:
                     }
                     printer_model = model_map.get(module, module)
 
-            # Also check nozzle type as a hint
-            if printer_model == "Unknown":
-                nozzle_info = (
-                    print_data.get("device", {}).get("nozzle", {}).get("info", [])
-                )
-                if nozzle_info and len(nozzle_info) > 0:
-                    nozzle_type = nozzle_info[0].get("type", "")
-                    if nozzle_type.startswith("HX"):
-                        # HX nozzles are typically X1 series
-                        printer_model = "X1 Series"
+            # Check nozzle info for model hints and diameter
+            nozzle_info = print_data.get("device", {}).get("nozzle", {}).get("info", [])
+            if nozzle_info and len(nozzle_info) > 0:
+                nozzle_type = nozzle_info[0].get("type", "")
+
+                # Extract nozzle diameter from type string
+                # Nozzle types are typically like "HX-stainless steel-0.4" or similar
+                if nozzle_type:
+                    # Try to extract diameter from the nozzle type string
+                    import re
+
+                    diameter_match = re.search(r"(\d+\.?\d*)", nozzle_type)
+                    if diameter_match:
+                        try:
+                            nozzle_diameter = float(diameter_match.group(1))
+                            logger.info(
+                                f"Detected nozzle diameter: {nozzle_diameter}mm "
+                                f"from type: {nozzle_type}"
+                            )
+                        except ValueError:
+                            logger.warning(
+                                f"Could not parse nozzle diameter from: {nozzle_type}"
+                            )
+
+                # Use nozzle type for model hints if model unknown
+                if printer_model == "Unknown" and nozzle_type.startswith("HX"):
+                    # HX nozzles are typically X1 series
+                    printer_model = "X1 Series"
 
             # Try multiple potential fields for printer model as fallback
             if printer_model == "Unknown":
@@ -1323,7 +1340,7 @@ class PrinterService:
         except Exception as e:
             logger.warning(f"Error parsing printer status data: {e}")
 
-        return printer_model, printer_name, ams_units, external_spool
+        return printer_model, printer_name, ams_units, external_spool, nozzle_diameter
 
     def test_connection(self, printer_config: PrinterConfig) -> bool:
         """Test FTP connection to a printer without uploading.
@@ -1341,16 +1358,18 @@ class PrinterService:
                 f"{printer_config.name} ({printer_config.ip})"
             )
 
-            ftp = ftplib.FTP()
+            ftp = ftplib.FTP_TLS()
             ftp.connect(printer_config.ip, self.DEFAULT_FTP_PORT, self.timeout)
 
-            # Try authentication
+            # Authenticate with "bblp" username and access code
             try:
-                ftp.login()
-                logger.debug("Anonymous FTP login successful")
-            except ftplib.error_perm:
-                ftp.login("user", printer_config.access_code)
-                logger.debug("Access code authentication successful")
+                ftp.login("bblp", printer_config.access_code)
+                logger.debug("FTPS access code authentication successful")
+                # Enable protection level for data transfer
+                ftp.prot_p()
+            except ftplib.error_perm as e:
+                logger.error(f"FTPS authentication failed: {e}")
+                raise
 
             logger.info(f"FTP connection test successful for " f"{printer_config.name}")
             return True

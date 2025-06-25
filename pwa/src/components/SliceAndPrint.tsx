@@ -1,12 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { TabSystem, Tab } from './TabSystem';
 import { ModelTab } from './ModelTab';
-import { ConfigurationTab } from './ConfigurationTab';
+import { ConfigureAndPrintTab } from './ConfigureAndPrintTab';
 import { StatusTab } from './StatusTab';
-import { PrintTab } from './PrintTab';
 import { useToast } from '../hooks/useToast';
 import { useCurrentPrinter } from '../hooks/useCurrentPrinter';
 import { useProactiveAMSStatus } from '../hooks/useProactiveAMSStatus';
+import { usePrinterMetadata } from '../hooks/usePrinterMetadata';
 import {
   FilamentRequirement,
   AMSStatusResponse,
@@ -48,7 +48,6 @@ function SliceAndPrint() {
   const [statusMessages, setStatusMessages] = useState<string[]>([]);
   const [operationSteps] = useState<OperationStep[]>([]);
   const [showOperationProgress] = useState(false);
-  const [isInitialSlicing] = useState(false);
 
   // Model URL for quick slice and print
   const [modelUrl, setModelUrl] = useState('');
@@ -59,6 +58,9 @@ function SliceAndPrint() {
     currentPrinterName,
     loading: printerLoading,
   } = useCurrentPrinter();
+
+  // Printer metadata including nozzle info
+  const { metadata: printerMetadata } = usePrinterMetadata(currentPrinterId);
 
   // Toast notifications
   const { showSuccess, showError, showWarning, showInfo } = useToast();
@@ -235,7 +237,7 @@ function SliceAndPrint() {
     }
 
     // Automatically switch to configuration tab when model is analyzed
-    setActiveTab('configuration');
+    setActiveTab('configure-print');
 
     // Let the Configuration tab handle slicing with streaming progress
     // No initial slice needed here - streaming slice will happen automatically in PlateSelector
@@ -243,7 +245,7 @@ function SliceAndPrint() {
 
   const getTabBadge = (tabId: string): string | number | undefined => {
     switch (tabId) {
-      case 'configuration':
+      case 'configure-print':
         if (filamentRequirements && filamentRequirements.filament_count > 0) {
           return filamentRequirements.filament_count;
         }
@@ -266,25 +268,19 @@ function SliceAndPrint() {
       content: (
         <ModelTab
           onModelAnalyzed={handleModelAnalyzed}
-          currentFileId={currentFileId}
-          filamentRequirements={filamentRequirements}
-          plates={plates}
-          selectedPlateIndex={selectedPlateIndex}
-          filamentMappings={filamentMappings}
           isProcessing={isProcessing}
           onProcessingChange={setIsProcessing}
-          isInitialSlicing={isInitialSlicing}
         />
       ),
     },
     {
-      id: 'configuration',
-      label: 'Configuration',
-      icon: '⚙️',
-      badge: getTabBadge('configuration'),
+      id: 'configure-print',
+      label: 'Configure & Print',
+      icon: '🎯',
+      badge: getTabBadge('configure-print'),
       disabled: !modelSubmitted,
       content: (
-        <ConfigurationTab
+        <ConfigureAndPrintTab
           filamentRequirements={filamentRequirements}
           plateFilamentRequirements={plateFilamentRequirements}
           isFilamentRequirementsFiltered={isFilamentRequirementsFiltered}
@@ -299,6 +295,12 @@ function SliceAndPrint() {
           isProcessing={isProcessing}
           currentFileId={currentFileId}
           onPlatesUpdate={setPlates}
+          hasMultiplePlates={hasMultiplePlates}
+          modelUrl={modelUrl}
+          onProcessingChange={setIsProcessing}
+          onStatusMessage={addStatusMessage}
+          printerModel={printerMetadata?.printer_model}
+          nozzleDiameter={printerMetadata?.nozzle_diameter}
         />
       ),
     },
@@ -315,29 +317,6 @@ function SliceAndPrint() {
           operationSteps={operationSteps}
           showOperationProgress={showOperationProgress}
           statusMessages={statusMessages}
-        />
-      ),
-    },
-    {
-      id: 'print',
-      label: 'Print',
-      icon: '🖨️',
-      disabled: !modelSubmitted,
-      content: (
-        <PrintTab
-          currentFileId={currentFileId}
-          filamentRequirements={filamentRequirements}
-          plateFilamentRequirements={plateFilamentRequirements}
-          filamentMappings={filamentMappings}
-          selectedBuildPlate={selectedBuildPlate}
-          selectedPlateIndex={selectedPlateIndex}
-          plates={plates}
-          hasMultiplePlates={hasMultiplePlates}
-          modelUrl={modelUrl}
-          isProcessing={isProcessing}
-          onProcessingChange={setIsProcessing}
-          onStatusMessage={addStatusMessage}
-          onPlatesUpdate={setPlates}
         />
       ),
     },
