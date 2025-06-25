@@ -1278,7 +1278,6 @@ function PlateSelector({
                       <h6>Build Plate</h6>
                       <div className="build-plate-grid">
                         {BUILD_PLATES.map(plate => {
-                          console.log('Build plate image URL:', plate.image);
                           return (
                             <div
                               key={plate.id}
@@ -1495,7 +1494,6 @@ function PlateSelector({
                   <h6>Build Plate</h6>
                   <div className="build-plate-grid">
                     {BUILD_PLATES.map(plate => {
-                      console.log('Build plate image URL:', plate.image);
                       return (
                         <div
                           key={plate.id}

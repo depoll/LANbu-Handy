@@ -1217,6 +1217,14 @@ async def slice_model_with_configuration(request: ConfiguredSliceRequest):
         # Create output directory for G-code
         output_dir = get_gcode_output_dir()
 
+        # Clean the output directory to remove old files
+        import shutil
+
+        if output_dir.exists():
+            logger.info(f"Cleaning output directory: {output_dir}")
+            shutil.rmtree(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+
         # Build slicing options from the configuration
         slicing_options = build_slicing_options_from_config(
             request.filament_mappings,
@@ -1229,6 +1237,19 @@ async def slice_model_with_configuration(request: ConfiguredSliceRequest):
             request.filament_colors,
         )
 
+        # Log the plate selection
+        logger.info(
+            f"Configured slice - selected_plate_index: "
+            f"{request.selected_plate_index} (None means all plates)"
+        )
+
+        # Determine the expected output filename
+        if request.selected_plate_index is not None:
+            expected_filename = f"plate_{request.selected_plate_index}.gcode.3mf"
+        else:
+            expected_filename = "output.gcode.3mf"
+        expected_output_path = output_dir / expected_filename
+
         # Slice the model
         result = slice_model(
             input_path=model_file_path,
@@ -1239,7 +1260,18 @@ async def slice_model_with_configuration(request: ConfiguredSliceRequest):
 
         if result.success:
             try:
-                gcode_path = str(find_gcode_file(output_dir))
+                # Use the expected output path instead of searching
+                if not expected_output_path.exists():
+                    # Fallback to find_gcode_file if expected file doesn't exist
+                    logger.warning(
+                        f"Expected output file not found: {expected_output_path}, "
+                        f"searching for any gcode file..."
+                    )
+                    gcode_path = str(find_gcode_file(output_dir))
+                    logger.info(f"Found gcode file: {gcode_path}")
+                else:
+                    gcode_path = str(expected_output_path)
+                    logger.info(f"Using expected output file: {gcode_path}")
 
                 # Update plate estimates from slice output
                 updated_plates = model_service.update_plate_estimates_from_slice_output(

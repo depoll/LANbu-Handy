@@ -196,6 +196,11 @@ class BambuStudioCLIWrapper:
         slice_value = str(plate_index) if plate_index is not None else "0"
         args.extend(["--slice", slice_value])
 
+        # Log the slice value for debugging
+        logger.info(
+            f"Slicing with plate_index={plate_index}, slice_value={slice_value}"
+        )
+
         # Add output directory
         args.extend(["--outputdir", str(output_dir)])
 
@@ -214,6 +219,12 @@ class BambuStudioCLIWrapper:
         if options:
             for key, value in options.items():
                 args.extend([f"--{key}", value])
+
+        # Log the full command for debugging
+        full_command = [self.cli_command] + args
+        logger.info(
+            f"Executing slice command: {' '.join(str(arg) for arg in full_command)}"
+        )
 
         # 5 minute timeout for slicing
         return self._run_command(args, timeout=300)

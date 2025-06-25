@@ -210,6 +210,12 @@ export function PrintTab({
         filament_colors: filamentColors.length > 0 ? filamentColors : undefined,
       };
 
+      console.log(
+        'Slice request - selectedPlateIndex:',
+        selectedPlateIndex,
+        '(null means all plates)'
+      );
+
       updateOperationStep(0, 'completed', 'Configuration prepared');
 
       // Step 2: Generate G-code
