@@ -1,5 +1,4 @@
 import PlateSelector from './PlateSelector';
-import ModelPreviewEnhanced from './ModelPreviewEnhanced';
 import {
   FilamentRequirement,
   AMSStatusResponse,
@@ -74,18 +73,6 @@ export function ConfigurationTab({
           Configure your plate selection, filament mappings, and build plate
           before slicing
         </p>
-      </div>
-
-      {/* 3D Model Preview */}
-      <div className="config-section">
-        <ModelPreviewEnhanced
-          fileId={currentFileId}
-          filamentRequirements={filamentRequirements || undefined}
-          filamentMappings={filamentMappings}
-          plates={plates}
-          selectedPlateIndex={selectedPlateIndex}
-          className="workflow-section"
-        />
       </div>
 
       {/* Always use integrated PlateSelector for consistent UI experience */}

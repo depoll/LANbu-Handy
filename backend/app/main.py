@@ -43,11 +43,6 @@ from app.printer_service import (  # noqa: E402
 )
 from app.slice_progress_service import slice_progress_service  # noqa: E402
 from app.slicer_service import slice_model  # noqa: E402
-from app.threemf_repair_service import ThreeMFRepairError  # noqa: E402
-from app.threemf_repair_service_enhanced import (  # noqa: E402
-    EnhancedThreeMFRepairService,
-)
-from app.threemf_to_gltf_service import ThreeMFToGLTFService  # noqa: E402
 from app.thumbnail_service import (  # noqa: E402
     ThumbnailGenerationError,
     ThumbnailService,
@@ -77,15 +72,9 @@ app = FastAPI(
 # Initialize model service
 model_service = ModelService()
 
-# Initialize 3MF repair service
-logger.info("Using enhanced 3MF repair service for better Three.js compatibility")
-threemf_repair_service = EnhancedThreeMFRepairService()
-
 # Initialize thumbnail service
 thumbnail_service = ThumbnailService()
 
-# Initialize 3MF to GLTF conversion service
-gltf_service = ThreeMFToGLTFService()
 
 # Initialize printer service
 printer_service = PrinterService()
@@ -102,13 +91,6 @@ async def startup_event():
     """Initialize services and clean up old files on startup."""
     logger.info("LANbu Handy backend starting up...")
 
-    # Clean up old repaired 3MF files
-    try:
-        threemf_repair_service.cleanup_old_repaired_files(max_age_hours=24)
-        logger.info("Cleaned up old repaired 3MF files")
-    except Exception as e:
-        logger.warning(f"Error during startup cleanup: {e}")
-
     # Clean up old thumbnail files
     try:
         thumbnail_service.cleanup_old_thumbnails(max_age_hours=24)
@@ -123,13 +105,6 @@ async def shutdown_event():
     logger.info("LANbu Handy backend shutting down...")
 
     # MQTT cleanup now handled automatically by async cancellation
-
-    # Clean up old repaired 3MF files
-    try:
-        threemf_repair_service.cleanup_old_repaired_files(max_age_hours=0)
-        logger.info("Final cleanup of repaired 3MF files")
-    except Exception as e:
-        logger.warning(f"Error during shutdown cleanup: {e}")
 
     # Clean up thumbnail files
     try:
@@ -737,48 +712,19 @@ async def get_model_preview(file_id: str):
         if not model_service.validate_file_extension(model_file_path.name):
             raise HTTPException(status_code=400, detail="Invalid file type for preview")
 
-        # Handle 3MF files with repair service
+        # Serve the file based on its type
         if model_file_path.suffix.lower() == ".3mf":
-            try:
-                # Check if the file needs repair
-                if threemf_repair_service.needs_repair(model_file_path):
-                    logger.info(f"Repairing 3MF file for preview: {file_id}")
-                    repaired_file_path = threemf_repair_service.repair_3mf_file(
-                        model_file_path
-                    )
-                    final_file_path = repaired_file_path
-                    logger.info(f"Using repaired 3MF file: {repaired_file_path}")
-                else:
-                    final_file_path = model_file_path
-                    logger.debug(f"3MF file does not need repair: {file_id}")
-
-                return FileResponse(
-                    path=final_file_path,
-                    media_type="model/3mf",
-                    filename=final_file_path.name,
-                )
-
-            except ThreeMFRepairError as e:
-                logger.warning(f"Failed to repair 3MF file {file_id}: {e}")
-                # Fall back to serving the original file
-                return FileResponse(
-                    path=model_file_path,
-                    media_type="model/3mf",
-                    filename=model_file_path.name,
-                )
-
-        # Handle STL files (no repair needed)
+            media_type = "model/3mf"
+        elif model_file_path.suffix.lower() == ".stl":
+            media_type = "model/stl"
         else:
-            media_type = (
-                "model/stl"
-                if model_file_path.suffix.lower() == ".stl"
-                else "application/octet-stream"
-            )
-            return FileResponse(
-                path=model_file_path,
-                media_type=media_type,
-                filename=model_file_path.name,
-            )
+            media_type = "application/octet-stream"
+
+        return FileResponse(
+            path=model_file_path,
+            media_type=media_type,
+            filename=model_file_path.name,
+        )
 
     except HTTPException:
         # Re-raise HTTP exceptions as-is
@@ -1000,183 +946,6 @@ async def get_available_thumbnails(file_id: str):
     except Exception as e:
         msg = f"Internal server error analyzing thumbnails: {str(e)}"
         raise HTTPException(status_code=500, detail=msg)
-
-
-@app.get("/api/model/gltf/{file_id}")
-async def get_model_as_gltf(file_id: str):
-    """
-    Convert and serve a 3MF model as GLTF format or serve GLTF buffer files.
-
-    This endpoint converts 3MF files to GLTF format which is better supported
-    by Three.js. It also serves binary buffer files referenced by GLTF files.
-
-    Args:
-        file_id: Unique identifier for the model file or buffer file name
-
-    Returns:
-        FileResponse with the GLTF file or binary buffer
-
-    Raises:
-        HTTPException: If file is not found or conversion fails
-    """
-    try:
-        # Check if this is a request for a binary buffer file
-        if file_id.endswith(".bin"):
-            # Serve binary buffer file
-            buffer_path = gltf_service.temp_dir / file_id
-
-            if not buffer_path.exists():
-                raise HTTPException(
-                    status_code=404, detail=f"GLTF buffer file not found: {file_id}"
-                )
-
-            return FileResponse(
-                path=buffer_path,
-                media_type="application/octet-stream",
-                filename=buffer_path.name,
-                headers={
-                    "Cache-Control": "public, max-age=3600",
-                    "Access-Control-Allow-Origin": "*",
-                },
-            )
-
-        # Otherwise, it's a request for GLTF conversion
-        # Find the model file
-        model_file_path = model_service.temp_dir / file_id
-
-        if not model_file_path.exists():
-            raise HTTPException(
-                status_code=404, detail=f"Model file not found: {file_id}"
-            )
-
-        # Only convert 3MF files
-        if model_file_path.suffix.lower() != ".3mf":
-            raise HTTPException(
-                status_code=400, detail="Only 3MF files can be converted to GLTF"
-            )
-
-        # Check if already converted
-        gltf_path = gltf_service.temp_dir / f"{model_file_path.stem}.gltf"
-
-        if (
-            not gltf_path.exists()
-            or gltf_path.stat().st_mtime < model_file_path.stat().st_mtime
-        ):
-            # Convert to GLTF
-            logger.info(f"Converting 3MF to GLTF: {file_id}")
-            gltf_path = gltf_service.convert_to_gltf(model_file_path)
-
-        return FileResponse(
-            path=gltf_path,
-            media_type="model/gltf+json",
-            filename=f"{model_file_path.stem}.gltf",
-            headers={
-                "Cache-Control": "public, max-age=3600",
-                "Access-Control-Allow-Origin": "*",
-            },
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to handle GLTF request: {e}")
-        raise HTTPException(status_code=500, detail=f"GLTF request failed: {str(e)}")
-
-
-@app.get("/api/model/gltf-buffer/{file_id}")
-async def get_gltf_buffer(file_id: str):
-    """
-    Serve the binary buffer file for a GLTF model.
-
-    Args:
-        file_id: Unique identifier for the model file
-
-    Returns:
-        FileResponse with the binary buffer
-
-    Raises:
-        HTTPException: If buffer file is not found
-    """
-    try:
-        # The buffer file uses the same stem as the GLTF
-        model_file_path = model_service.temp_dir / file_id
-        buffer_path = gltf_service.temp_dir / f"{model_file_path.stem}.bin"
-
-        if not buffer_path.exists():
-            raise HTTPException(status_code=404, detail="GLTF buffer file not found")
-
-        return FileResponse(
-            path=buffer_path,
-            media_type="application/octet-stream",
-            filename=buffer_path.name,
-            headers={
-                "Cache-Control": "public, max-age=3600",
-                "Access-Control-Allow-Origin": "*",
-            },
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to serve GLTF buffer: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to serve buffer: {str(e)}")
-
-
-@app.get("/api/model/obj/{file_id}")
-async def get_model_as_obj(file_id: str):
-    """
-    Convert and serve a 3MF model as OBJ format.
-
-    Args:
-        file_id: Unique identifier for the model file
-
-    Returns:
-        FileResponse with the OBJ file
-
-    Raises:
-        HTTPException: If file is not found or conversion fails
-    """
-    try:
-        # Find the model file
-        model_file_path = model_service.temp_dir / file_id
-
-        if not model_file_path.exists():
-            raise HTTPException(
-                status_code=404, detail=f"Model file not found: {file_id}"
-            )
-
-        # Only convert 3MF files
-        if model_file_path.suffix.lower() != ".3mf":
-            raise HTTPException(
-                status_code=400, detail="Only 3MF files can be converted to OBJ"
-            )
-
-        # Check if already converted
-        obj_path = gltf_service.temp_dir / f"{model_file_path.stem}.obj"
-
-        if (
-            not obj_path.exists()
-            or obj_path.stat().st_mtime < model_file_path.stat().st_mtime
-        ):
-            # Convert to OBJ
-            logger.info(f"Converting 3MF to OBJ: {file_id}")
-            obj_path = gltf_service.convert_to_obj(model_file_path)
-
-        return FileResponse(
-            path=obj_path,
-            media_type="text/plain",
-            filename=f"{model_file_path.stem}.obj",
-            headers={
-                "Cache-Control": "public, max-age=3600",
-                "Access-Control-Allow-Origin": "*",
-            },
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to convert to OBJ: {e}")
-        raise HTTPException(status_code=500, detail=f"OBJ conversion failed: {str(e)}")
 
 
 @app.get("/api/model/debug-thumbnail/{file_id}")
