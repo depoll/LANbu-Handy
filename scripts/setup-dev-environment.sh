@@ -130,6 +130,8 @@ echo "🔗 Symlinks created for Claude configuration"
 sudo npm i -g @anthropic-ai/claude-code
 echo "Claude Code CLI Updated"
 
+sudo chown -R vscode:vscode ~/.gemini
+
 # Create symlink to Bambu Studio resources if they exist
 if [ -d "/opt/bambu-studio-resources" ]; then
     if [ ! -L "$REPO_ROOT/bambu-studio-resources" ]; then

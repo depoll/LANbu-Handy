@@ -7,6 +7,7 @@ services:
       - ..:/workspace:cached
       - /var/run/docker.sock:/var/run/docker.sock
       - claude:/claude
+      - gemini:/home/vscode/.gemini
       - /etc/timezone:/etc/timezone:ro
       - /etc/localtime:/etc/localtime:ro
     command: sleep infinity
@@ -20,3 +21,4 @@ services:
     working_dir: /workspace
 volumes:
   claude:
+  gemini:

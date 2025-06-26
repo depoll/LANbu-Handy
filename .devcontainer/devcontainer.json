@@ -4,14 +4,11 @@
   "service": "dev",
   "workspaceFolder": "/workspace",
   "shutdownAction": "stopCompose",
-
   "features": {
     "ghcr.io/devcontainers/features/git:1": {},
-    "ghcr.io/anthropics/devcontainer-features/claude-code:1.0.5": {},
     "ghcr.io/devcontainers/features/github-cli:1": {},
     "ghcr.io/devcontainers/features/go:1": {}
   },
-
   "customizations": {
     "vscode": {
       "extensions": [
@@ -22,8 +19,7 @@
         "esbenp.prettier-vscode",
         "ms-vscode.vscode-typescript-next",
         "ms-vscode.vscode-eslint",
-        "vitest.explorer",
-        "anthropic.claude-code"
+        "vitest.explorer"
       ],
       "settings": {
         "python.defaultInterpreterPath": "/usr/local/bin/python",
@@ -38,7 +34,6 @@
       }
     }
   },
-
   "forwardPorts": [8000, 3000, 5173],
   "portsAttributes": {
     "8000": {
@@ -50,10 +45,8 @@
       "onAutoForward": "notify"
     }
   },
-
   "postCreateCommand": "./scripts/setup-dev-environment.sh --devcontainer",
   "postStartCommand": "sudo chgrp docker /var/run/docker.sock && ./scripts/dev-container-startup.sh || true",
-
   "remoteUser": "vscode",
   "containerUser": "vscode"
 }
