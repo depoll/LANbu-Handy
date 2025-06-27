@@ -281,13 +281,14 @@ export function ModelTab({
         setModelSubmitted(true);
         setCurrentWorkflowStep('');
 
-        // Notify parent component with file name as fallback URL
+        // Notify parent component - for file uploads, pass the filename
+        // This helps distinguish file uploads from URLs in downstream components
         onModelAnalyzed({
           fileId: result.file_id || '',
           filamentRequirements: result.filament_requirements || null,
           plates,
           hasMultiplePlates,
-          modelUrl: selectedFile.name,
+          modelUrl: selectedFile.name, // Filename for display purposes
         });
       } else {
         updateOperationStep(2, 'error', 'Analysis failed', result.message);

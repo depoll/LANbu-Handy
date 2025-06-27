@@ -2131,6 +2131,73 @@ async def start_print_job(request: dict = Body(...)):
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
+@app.post("/api/job/send-to-printer")
+async def send_to_printer(request: dict = Body(...)):
+    """
+    Send a G-code file to the printer's storage without starting a print.
+
+    This endpoint uploads the G-code file to the printer's SD card/storage
+    but does not initiate printing. The file can be printed later from the
+    printer's control panel or via a separate print command.
+
+    Args:
+        request: JSON body containing:
+            - gcode_filename: Name of the G-code file to send (from slice output)
+
+    Returns:
+        JSON response with upload status and details
+    """
+    try:
+        gcode_filename = request.get("gcode_filename")
+        if not gcode_filename:
+            raise HTTPException(status_code=400, detail="gcode_filename is required")
+
+        # Check if printer is configured
+        if not config.is_printer_configured():
+            raise HTTPException(
+                status_code=400,
+                detail="No printer configured. Please configure a printer first.",
+            )
+
+        # Get the first configured printer
+        printers = config.get_printers()
+        printer_config = printers[0]
+
+        # Get the G-code file path
+        gcode_dir = get_gcode_output_dir()
+        gcode_path = gcode_dir / gcode_filename
+
+        if not gcode_path.exists():
+            return {
+                "success": False,
+                "message": f"G-code file not found: {gcode_filename}",
+                "error_details": "The sliced file could not be found on the server",
+            }
+
+        # Upload G-code to printer (without starting print)
+        upload_result = upload_gcode_step(printer_service, printer_config, gcode_path)
+
+        if upload_result["success"]:
+            return {
+                "success": True,
+                "message": f"Successfully sent {gcode_filename} to printer storage",
+                "details": upload_result["details"],
+                "printer": printer_config.name,
+            }
+        else:
+            return {
+                "success": False,
+                "message": "Failed to send G-code to printer",
+                "error_details": upload_result["details"],
+            }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error sending file to printer: {e}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
 @app.get("/api/gcode/download/{file_name}")
 async def download_gcode(file_name: str):
     """

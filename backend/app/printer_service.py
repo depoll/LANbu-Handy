@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import List, Optional
 
 import paho.mqtt.client as mqtt
+from app.ftp_curl_wrapper import CurlFTPSClient
 from app.printer_config import PrinterConfig
 
 logger = logging.getLogger(__name__)
@@ -254,11 +255,71 @@ class PrinterService:
             f"Uploading G-code to printer {printer_config.name} "
             f"({printer_config.ip}): {gcode_file_path.name}"
         )
+
+        # Check if this is an X1C printer (serial number starts with 00M09)
+        is_x1c = (
+            printer_config.serial_number
+            and printer_config.serial_number.startswith("00M09")
+        )
+
+        if is_x1c:
+            logger.info("Detected X1C printer, using curl-based FTP client")
+            # Use curl-based FTP for X1C printers (SSL session reuse support)
+            try:
+                client = CurlFTPSClient(
+                    host=printer_config.ip,
+                    password=printer_config.access_code,
+                    timeout=self.timeout,
+                )
+
+                # Test connection first
+                if not client.test_connection():
+                    raise PrinterConnectionError(
+                        f"Failed to connect to X1C printer {printer_config.name}"
+                    )
+
+                # Upload the file
+                success, message = client.upload_file(
+                    gcode_file_path,
+                    remote_filename,
+                    remote_dir=remote_path.rstrip("/"),
+                )
+
+                if success:
+                    logger.info(
+                        f"Successfully uploaded {gcode_file_path.name} to X1C printer"
+                    )
+                    return FTPUploadResult(
+                        success=True,
+                        message=message,
+                        remote_path=full_remote_path,
+                    )
+                else:
+                    raise PrinterFileTransferError(message)
+
+            except Exception as e:
+                if isinstance(e, (PrinterConnectionError, PrinterFileTransferError)):
+                    raise
+                error_msg = f"X1C upload error: {str(e)}"
+                logger.error(f"Upload failed to {printer_config.name}: {error_msg}")
+                raise PrinterCommunicationError(error_msg)
+
+        # Use standard ftplib for non-X1C printers
         ftp = None
         try:
             # Connect to the printer's FTPS server
             # Bambu Lab printers use FTPS (FTP over TLS) on port 990
+            logger.debug(
+                f"Attempting FTP connection to {printer_config.ip}:"
+                f"{self.DEFAULT_FTP_PORT} with timeout {self.timeout}s"
+            )
             ftp = ftplib.FTP_TLS()
+            ftp.debugging = 2  # Enable FTP debugging for troubleshooting
+            # Configure SSL context to be more permissive (like FileZilla)
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+            ftp.ssl_context = ctx
             ftp.connect(printer_config.ip, self.DEFAULT_FTP_PORT, self.timeout)
 
             # Bambu printers require authentication with username "bblp"
@@ -271,6 +332,9 @@ class PrinterService:
                 )
                 # Enable protection level for data transfer
                 ftp.prot_p()
+                # Set passive mode for data transfers (required by many firewalls)
+                ftp.set_pasv(True)
+                logger.debug("FTP passive mode enabled")
             except ftplib.error_perm as e:
                 raise PrinterAuthenticationError(
                     f"FTPS authentication failed for printer "

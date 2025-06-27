@@ -370,6 +370,71 @@ export function ConfigureAndPrintTab({
     }
   };
 
+  const handleSendToPrinter = async () => {
+    if (!sliceResponse?.success || !sliceResponse?.gcode_path) {
+      onStatusMessage('❌ Error: No valid slice available to send');
+      return;
+    }
+
+    onProcessingChange(true);
+    setCurrentWorkflowStep('Sending to printer');
+    onStatusMessage('📤 Sending G-code to printer storage...');
+
+    try {
+      // Extract just the filename from the full path
+      const gcode_filename = sliceResponse.gcode_path.split('/').pop() || '';
+      onStatusMessage(`📄 Sending G-code file: ${gcode_filename}`);
+
+      const requestBody = { gcode_filename };
+
+      const response = await fetch('/api/job/send-to-printer', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      if (!response) {
+        throw new Error('No response received from server');
+      }
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      }
+
+      const result = await response.json();
+      console.log('Send to printer response received:', result);
+
+      if (result.success) {
+        onStatusMessage(`✅ ${result.message}`);
+        if (result.details) {
+          onStatusMessage(`📝 ${result.details}`);
+        }
+        showSuccess(
+          'G-code sent to printer storage successfully! You can print it later from the printer.',
+          'File Sent'
+        );
+      } else {
+        onStatusMessage(`❌ ${result.message}`);
+        if (result.error_details) {
+          onStatusMessage(`🔍 Details: ${result.error_details}`);
+        }
+        showError(result.message, 'Send Failed');
+      }
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error occurred';
+      onStatusMessage(`❌ Send to printer error: ${errorMessage}`);
+      console.error('Send to printer error:', error);
+      showError(errorMessage, 'Send Failed');
+    } finally {
+      onProcessingChange(false);
+      setCurrentWorkflowStep('');
+    }
+  };
+
   const handlePrintJob = async () => {
     if (!sliceResponse?.success || !sliceResponse?.gcode_path) {
       onStatusMessage('❌ Error: No valid slice available for printing');
@@ -451,73 +516,195 @@ export function ConfigureAndPrintTab({
   };
 
   const handleQuickSliceAndPrint = async () => {
-    if (!modelUrl.trim()) {
+    // Check if we have a file ID (uploaded file) or a URL
+    const isFileUpload = currentFileId && !modelUrl.startsWith('http');
+
+    if (!isFileUpload && !modelUrl.trim()) {
       onStatusMessage('Error: Please enter a model URL');
       return;
     }
 
     onProcessingChange(true);
-    onStatusMessage('Starting slice and print workflow...');
+
+    // Initialize operation steps for file-based workflow
+    if (isFileUpload) {
+      initializeOperationSteps([
+        'Slice with Defaults',
+        'Upload to Printer',
+        'Start Print',
+      ]);
+      onStatusMessage('🚀 Starting quick print with uploaded file...');
+    } else {
+      onStatusMessage('Starting slice and print workflow...');
+    }
 
     try {
-      const requestBody = { model_url: modelUrl.trim() };
+      if (isFileUpload) {
+        // File-based workflow: slice first, then send to printer
+        onStatusMessage(`📄 Using uploaded file: ${modelUrl}`);
 
-      onStatusMessage('Sending request to backend...');
-      const response = await fetch('/api/job/start-basic', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody),
-      });
+        // Step 1: Slice with defaults
+        updateOperationStep(0, 'running', 'Slicing with default settings...');
 
-      if (!response) {
-        throw new Error('No response received from server');
-      }
+        const sliceResponse = await fetch('/api/slice/defaults', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ file_id: currentFileId }),
+        });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`HTTP ${response.status}: ${errorText}`);
-      }
-
-      const result: JobResponse = await response.json();
-      console.log('Basic job response received:', result);
-
-      // Update plates with estimates if received
-      if (result.updated_plates && onPlatesUpdate) {
-        console.log(
-          'Updating plates with estimates from basic job:',
-          result.updated_plates
-        );
-        onPlatesUpdate(result.updated_plates);
-        onStatusMessage('📊 Updated plate time and weight estimates');
-      } else {
-        console.log('No updated plates in basic job response or no callback');
-      }
-
-      // Display main result
-      if (result.success) {
-        onStatusMessage(`✅ ${result.message}`);
-      } else {
-        onStatusMessage(`❌ ${result.message}`);
-        if (result.error_details) {
-          onStatusMessage(`Details: ${result.error_details}`);
+        if (!sliceResponse.ok) {
+          const errorText = await sliceResponse.text();
+          updateOperationStep(0, 'error', 'Slicing failed', errorText);
+          throw new Error(`Slicing failed: ${errorText}`);
         }
-      }
 
-      // Display step-by-step progress if available
-      if (result.job_steps) {
-        const steps = ['download', 'slice', 'upload', 'print'] as const;
+        const sliceResult = await sliceResponse.json();
 
-        for (const stepName of steps) {
-          const step = result.job_steps[stepName];
-          if (step && step.message) {
-            const status = step.success ? '✅' : '❌';
-            onStatusMessage(
-              `${status} ${stepName.charAt(0).toUpperCase() + stepName.slice(1)}: ${step.message}`
-            );
-            if (step.details && step.details !== step.message) {
-              onStatusMessage(`   Details: ${step.details}`);
+        if (!sliceResult.success) {
+          updateOperationStep(
+            0,
+            'error',
+            'Slicing failed',
+            sliceResult.message
+          );
+          throw new Error(`Slicing failed: ${sliceResult.message}`);
+        }
+
+        updateOperationStep(0, 'completed', 'Sliced successfully');
+        onStatusMessage(`✅ Slicing completed: ${sliceResult.message}`);
+
+        // Extract just the filename from the G-code path
+        const gcode_filename = sliceResult.gcode_path.split('/').pop() || '';
+
+        // Step 2 & 3: Send to printer and start print
+        updateOperationStep(1, 'running', 'Uploading G-code to printer...');
+
+        const printResponse = await fetch('/api/job/start-print', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ gcode_filename }),
+        });
+
+        if (!printResponse.ok) {
+          const errorText = await printResponse.text();
+          updateOperationStep(1, 'error', 'Upload failed', errorText);
+          throw new Error(`Print job failed: ${errorText}`);
+        }
+
+        const printResult = await printResponse.json();
+
+        // Update operation steps based on job steps
+        if (printResult.job_steps) {
+          if (printResult.job_steps.upload) {
+            if (printResult.job_steps.upload.success) {
+              updateOperationStep(1, 'completed', 'G-code uploaded to printer');
+            } else {
+              updateOperationStep(
+                1,
+                'error',
+                'Upload failed',
+                printResult.job_steps.upload.message
+              );
+            }
+          }
+
+          if (printResult.job_steps.print) {
+            updateOperationStep(2, 'running', 'Starting print...');
+            if (printResult.job_steps.print.success) {
+              updateOperationStep(2, 'completed', 'Print started successfully');
+            } else {
+              updateOperationStep(
+                2,
+                'error',
+                'Print start failed',
+                printResult.job_steps.print.message
+              );
+            }
+          }
+        }
+
+        // Display results
+        if (printResult.success) {
+          onStatusMessage(`✅ ${printResult.message}`);
+          showSuccess('Quick print started successfully!', 'Print Started');
+        } else {
+          onStatusMessage(`❌ ${printResult.message}`);
+          if (printResult.error_details) {
+            onStatusMessage(`🔍 Details: ${printResult.error_details}`);
+          }
+          showError(printResult.message, 'Print Failed');
+        }
+
+        // Update plates if provided
+        if (sliceResult.updated_plates && onPlatesUpdate) {
+          onPlatesUpdate(sliceResult.updated_plates);
+          onStatusMessage('📊 Updated plate time and weight estimates');
+        }
+      } else {
+        // URL-based workflow: use the existing start-basic endpoint
+        const requestBody = { model_url: modelUrl.trim() };
+
+        onStatusMessage('Sending request to backend...');
+        const response = await fetch('/api/job/start-basic', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(requestBody),
+        });
+
+        if (!response) {
+          throw new Error('No response received from server');
+        }
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`HTTP ${response.status}: ${errorText}`);
+        }
+
+        const result: JobResponse = await response.json();
+        console.log('Basic job response received:', result);
+
+        // Update plates with estimates if received
+        if (result.updated_plates && onPlatesUpdate) {
+          console.log(
+            'Updating plates with estimates from basic job:',
+            result.updated_plates
+          );
+          onPlatesUpdate(result.updated_plates);
+          onStatusMessage('📊 Updated plate time and weight estimates');
+        } else {
+          console.log('No updated plates in basic job response or no callback');
+        }
+
+        // Display main result
+        if (result.success) {
+          onStatusMessage(`✅ ${result.message}`);
+        } else {
+          onStatusMessage(`❌ ${result.message}`);
+          if (result.error_details) {
+            onStatusMessage(`Details: ${result.error_details}`);
+          }
+        }
+
+        // Display step-by-step progress if available
+        if (result.job_steps) {
+          const steps = ['download', 'slice', 'upload', 'print'] as const;
+
+          for (const stepName of steps) {
+            const step = result.job_steps[stepName];
+            if (step && step.message) {
+              const status = step.success ? '✅' : '❌';
+              onStatusMessage(
+                `${status} ${stepName.charAt(0).toUpperCase() + stepName.slice(1)}: ${step.message}`
+              );
+              if (step.details && step.details !== step.message) {
+                onStatusMessage(`   Details: ${step.details}`);
+              }
             }
           }
         }
@@ -525,7 +712,24 @@ export function ConfigureAndPrintTab({
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error occurred';
+
+      // Update the current running step to error if using file workflow
+      if (isFileUpload && operationSteps.length > 0) {
+        const runningStepIndex = operationSteps.findIndex(
+          step => step.status === 'running'
+        );
+        if (runningStepIndex >= 0) {
+          updateOperationStep(
+            runningStepIndex,
+            'error',
+            'Operation failed',
+            errorMessage
+          );
+        }
+      }
+
       onStatusMessage(`❌ Error: ${errorMessage}`);
+      showError(errorMessage, 'Quick Print Failed');
       console.error('Slice and print error:', error);
     } finally {
       onProcessingChange(false);
@@ -657,6 +861,13 @@ export function ConfigureAndPrintTab({
                   className="secondary-button"
                 >
                   Download G-code
+                </button>
+                <button
+                  onClick={handleSendToPrinter}
+                  disabled={isProcessing}
+                  className="secondary-button"
+                >
+                  {isProcessing ? 'Sending...' : 'Send to Printer'}
                 </button>
                 <button
                   onClick={handlePrintJob}
