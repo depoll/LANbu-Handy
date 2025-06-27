@@ -68,25 +68,36 @@ function PrinterInfoDisplay({
 
         const data: PrinterStatusResponse = await response.json();
 
-        if (data.success && (data.printer_model || data.printer_name)) {
-          const metadata: PrinterMetadata = {
-            printer_model: data.printer_model,
-            printer_name: data.printer_name,
-            // Note: We don't have the IP in this response, would need to fetch from config
-          };
-
-          setPrinterMetadata(metadata);
-
-          // Notify parent component if callback provided
-          if (onMetadataFetched) {
-            onMetadataFetched(metadata);
-          }
-        } else {
-          // If no metadata in response, fetch printer config as fallback
+        if (data.success) {
+          // Always fetch printer config to get the configured name and IP
           const configResponse = await fetch('/api/config');
           if (configResponse.ok) {
             const config = await configResponse.json();
             // Note: printerId is the printer name, not IP
+            const currentPrinter = config.printers?.find(
+              (p: { name: string }) => p.name === printerId
+            );
+
+            const metadata: PrinterMetadata = {
+              printer_model: data.printer_model || 'Unknown',
+              printer_name: currentPrinter?.name || printerId, // Use configured name
+              ip: currentPrinter?.ip,
+              has_access_code: currentPrinter?.has_access_code,
+              has_serial_number: currentPrinter?.has_serial_number,
+            };
+
+            setPrinterMetadata(metadata);
+
+            // Notify parent component if callback provided
+            if (onMetadataFetched) {
+              onMetadataFetched(metadata);
+            }
+          }
+        } else {
+          // Status query failed, still try to show configured info
+          const configResponse = await fetch('/api/config');
+          if (configResponse.ok) {
+            const config = await configResponse.json();
             const currentPrinter = config.printers?.find(
               (p: { name: string }) => p.name === printerId
             );

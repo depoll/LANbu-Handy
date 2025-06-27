@@ -47,6 +47,9 @@ export function usePrinterMetadata(printerId: string | null) {
       return;
     }
 
+    // Create abort controller for cleanup
+    const abortController = new AbortController();
+
     const fetchMetadata = async () => {
       setIsLoading(true);
       setError(null);
@@ -54,7 +57,18 @@ export function usePrinterMetadata(printerId: string | null) {
       try {
         // Properly encode the printer name for the URL
         const encodedPrinterId = encodeURIComponent(printerId);
-        const response = await fetch(`/api/printer/${encodedPrinterId}/status`);
+
+        // Add timeout to prevent hanging
+        const timeoutId = setTimeout(() => abortController.abort(), 5000); // 5 second timeout
+
+        const response = await fetch(
+          `/api/printer/${encodedPrinterId}/status`,
+          {
+            signal: abortController.signal,
+          }
+        );
+
+        clearTimeout(timeoutId);
 
         if (!response.ok) {
           throw new Error(
@@ -72,7 +86,7 @@ export function usePrinterMetadata(printerId: string | null) {
             printer_model: data.printer_model,
             printer_name: data.printer_name,
             nozzle_diameter: data.nozzle_diameter,
-            ip: printerId,
+            ip: '', // IP is not available from the status endpoint
           };
 
           // Update cache
@@ -80,6 +94,12 @@ export function usePrinterMetadata(printerId: string | null) {
           setMetadata(newMetadata);
         }
       } catch (err) {
+        // Don't set error state if the request was aborted
+        if (err instanceof Error && err.name === 'AbortError') {
+          console.debug('Printer metadata fetch aborted');
+          return;
+        }
+
         console.error('Error fetching printer metadata:', err);
         setError(
           err instanceof Error
@@ -92,6 +112,11 @@ export function usePrinterMetadata(printerId: string | null) {
     };
 
     fetchMetadata();
+
+    // Cleanup function to abort the request if component unmounts or printerId changes
+    return () => {
+      abortController.abort();
+    };
   }, [printerId]);
 
   // Listen for printer changes to clear cache

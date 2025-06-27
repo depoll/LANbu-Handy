@@ -2257,8 +2257,44 @@ async def get_ams_status(printer_id: str):
                 ),
             )
 
-        # Query AMS status
+        # First, query printer status to check if it has AMS
         try:
+            # Get printer status first to check if AMS exists
+            status_result = await printer_service.query_printer_status_async(
+                printer_config, timeout=10
+            )
+
+            # Check if printer has AMS
+            if status_result.success and (
+                not status_result.ams_units or len(status_result.ams_units) == 0
+            ):
+                # No AMS present - return empty response immediately
+                logger.info(
+                    f"Printer {printer_config.name} has no AMS, skipping AMS query"
+                )
+
+                # Include external spool info if available
+                external_spool_response = None
+                if (
+                    status_result.external_spool
+                    and status_result.external_spool.available
+                ):
+                    external_spool_response = ExternalSpoolResponse(
+                        slot_id=status_result.external_spool.slot_id,
+                        filament_type=status_result.external_spool.filament_type,
+                        color=status_result.external_spool.color,
+                        material_id=status_result.external_spool.material_id,
+                        available=status_result.external_spool.available,
+                    )
+
+                return AMSStatusResponse(
+                    success=True,
+                    message=f"No AMS detected on printer {printer_config.name}",
+                    ams_units=[],
+                    external_spool=external_spool_response,
+                )
+
+            # If we get here, printer has AMS, so query for detailed status
             # Use async MQTT query that supports cancellation
             ams_result = await printer_service.query_ams_status_async(printer_config)
 
@@ -2688,19 +2724,36 @@ async def set_active_printer(request: SetActivePrinterRequest):
         HTTPException: If the printer configuration is invalid
     """
     logger.info(f"Setting active printer: {request.name} ({request.ip})")
-    try:
-        # Get the current active printer before switching
-        current_active = config.get_active_printer()
 
-        # IMPORTANT: Cancel any active MQTT operations for the OLD printer
-        # before switching. This prevents hanging issues when switching
-        # between printers
-        if current_active and current_active.ip != request.ip:
-            logger.debug(
-                f"Cancelling active MQTT operations for old printer: "
-                f"{current_active.ip}"
-            )
-            printer_service.cancel_printer_operations(current_active.ip)
+    # Wrap the entire operation in a timeout to prevent hanging
+    try:
+        # First, immediately cancel ALL MQTT operations before even starting
+        # This ensures we don't wait for any ongoing operations
+        from app.mqtt_async_patch_v3 import cancel_all_mqtt_operations
+
+        logger.debug("Pre-emptively cancelling all MQTT operations")
+        cancel_all_mqtt_operations()
+
+        # Use asyncio.wait_for for Python 3.10 compatibility
+        return await asyncio.wait_for(_set_active_printer_impl(request), timeout=10)
+    except asyncio.TimeoutError:
+        logger.error(f"Timeout while setting active printer: {request.ip}")
+        # Force cleanup of any pending operations
+        printer_service.cancel_printer_operations(request.ip)
+        raise HTTPException(
+            status_code=504,
+            detail="Operation timed out while switching printer. Please try again.",
+        )
+    except Exception as e:
+        logger.error(f"Error setting active printer: {e}")
+        raise
+
+
+async def _set_active_printer_impl(request: SetActivePrinterRequest):
+    """Implementation of set_active_printer with timeout protection."""
+    try:
+        # The cancellation is already done in set_active_printer before calling this
+        # So we don't need to do it again here
 
         # Validate IP address or hostname format
         ip = validate_ip_or_hostname(request.ip)

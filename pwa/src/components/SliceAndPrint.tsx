@@ -67,36 +67,65 @@ function SliceAndPrint() {
 
   const addStatusMessage = useCallback((message: string) => {
     setStatusMessages(prev => [
-      ...prev,
       `${new Date().toLocaleTimeString()}: ${message}`,
+      ...prev,
     ]);
   }, []);
+
+  // Track previous AMS status to detect changes
+  const prevAmsStatusRef = useRef<AMSStatusResponse | null>(null);
 
   // AMS status update handler
   const handleAMSStatusUpdate = useCallback(
     (status: AMSStatusResponse) => {
+      const prevStatus = prevAmsStatusRef.current;
+      const isInitialFetch = prevStatus === null;
+
+      // Check if status actually changed
+      const statusChanged =
+        !prevStatus ||
+        prevStatus.success !== status.success ||
+        JSON.stringify(prevStatus.ams_units) !==
+          JSON.stringify(status.ams_units) ||
+        JSON.stringify(prevStatus.external_spool) !==
+          JSON.stringify(status.external_spool);
+
       setAmsStatus(status);
-      if (status.success) {
-        addStatusMessage('✅ AMS status retrieved successfully');
-        if (status.ams_units && status.ams_units.length > 0) {
-          const totalFilaments = status.ams_units.reduce(
-            (total, unit) => total + unit.filaments.length,
-            0
-          );
-          addStatusMessage(
-            `📊 Found ${status.ams_units.length} AMS unit(s) with ${totalFilaments} loaded filament(s)`
-          );
-          showSuccess(
-            `Found ${status.ams_units.length} AMS unit(s) with ${totalFilaments} loaded filament(s)`,
-            'AMS Connected'
-          );
+      prevAmsStatusRef.current = status;
+
+      // Only show notifications if this is the first fetch or something changed
+      if (isInitialFetch || statusChanged) {
+        if (status.success) {
+          addStatusMessage('✅ AMS status retrieved successfully');
+          if (status.ams_units && status.ams_units.length > 0) {
+            const totalFilaments = status.ams_units.reduce(
+              (total, unit) => total + unit.filaments.length,
+              0
+            );
+            addStatusMessage(
+              `📊 Found ${status.ams_units.length} AMS unit(s) with ${totalFilaments} loaded filament(s)`
+            );
+            // Only show toast notification on initial fetch or if units/filaments changed
+            if (isInitialFetch) {
+              showSuccess(
+                `Found ${status.ams_units.length} AMS unit(s) with ${totalFilaments} loaded filament(s)`,
+                'AMS Connected'
+              );
+            }
+          } else {
+            addStatusMessage('⚠ No AMS units or filaments detected');
+            // Only show warning on initial fetch
+            if (isInitialFetch) {
+              showWarning('No AMS units or filaments detected', 'AMS Status');
+            }
+          }
         } else {
-          addStatusMessage('⚠ No AMS units or filaments detected');
-          showWarning('No AMS units or filaments detected', 'AMS Status');
+          addStatusMessage('❌ Failed to retrieve AMS status');
+          showError(
+            status.message || 'AMS status retrieval failed',
+            'AMS Error'
+          );
         }
-      } else {
-        addStatusMessage('❌ Failed to retrieve AMS status');
-        showError(status.message || 'AMS status retrieval failed', 'AMS Error');
       }
     },
     [addStatusMessage, showSuccess, showWarning, showError]

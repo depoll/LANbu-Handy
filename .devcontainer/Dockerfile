@@ -89,6 +89,7 @@ RUN apt-get update && \
         libfreetype6 \
         libwayland-client0 \
     && python3 -m pip install --upgrade pip \
+    && update-alternatives --install /usr/bin/python python /usr/bin/python3 1 \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Install Docker Compose V2 plugin (latest stable version)

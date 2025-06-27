@@ -488,14 +488,93 @@ class PrinterService:
             # Publish the message
             msg_info = client.publish(device_topic, message, qos=1)
 
-            # Wait for publish to complete
+            # Check if publish failed immediately
+            if msg_info.rc != mqtt.MQTT_ERR_SUCCESS:
+                raise PrinterMQTTError(f"MQTT publish failed with code {msg_info.rc}")
+
+            # Wait for publish to complete using wait_for_publish with timeout
             start_time = time.time()
-            while not msg_info.is_published() and publish_error is None:
-                if time.time() - start_time > timeout:
-                    raise PrinterMQTTError(
-                        f"MQTT publish timeout after {timeout} seconds"
-                    )
-                time.sleep(0.1)
+            remaining_timeout = timeout
+
+            logger.debug(
+                f"Waiting for MQTT publish to complete for {printer_config.name}"
+            )
+
+            # Add a maximum iteration count as a failsafe
+            max_iterations = int(timeout * 2)  # 2 iterations per second
+            iteration_count = 0
+
+            while (
+                remaining_timeout > 0
+                and publish_error is None
+                and iteration_count < max_iterations
+            ):
+                # Check if cancelled - is client still tracked
+                from app.mqtt_async_patch_v3 import (
+                    _active_mqtt_clients,
+                    _clients_lock,
+                    _switching_lock,
+                    _switching_printers,
+                )
+
+                # First check if we're switching printers - fail immediately
+                with _switching_lock:
+                    if _switching_printers:
+                        logger.debug(
+                            "Printer switching in progress - cancelling operation"
+                        )
+                        raise PrinterMQTTError(
+                            "Operation cancelled - switching printers"
+                        )
+
+                with _clients_lock:
+                    if printer_config.ip not in _active_mqtt_clients:
+                        logger.debug(
+                            f"MQTT client no longer active for {printer_config.ip}"
+                        )
+                        raise PrinterMQTTError("Operation cancelled")
+
+                try:
+                    # Try to check if client is still connected
+                    if not client.is_connected():
+                        logger.warning(
+                            f"MQTT client disconnected for {printer_config.ip}"
+                        )
+                        raise PrinterMQTTError("MQTT client disconnected")
+
+                    # Use wait_for_publish with a short timeout
+                    msg_info.wait_for_publish(timeout=min(0.5, remaining_timeout))
+                    # If we get here, publish completed successfully
+                    logger.debug(f"MQTT publish completed for {printer_config.name}")
+                    break
+                except Exception as e:
+                    # Log the specific error
+                    logger.debug(f"wait_for_publish error: {type(e).__name__}: {e}")
+
+                    # Timeout or other error - check if we should continue
+                    elapsed = time.time() - start_time
+                    remaining_timeout = timeout - elapsed
+                    if remaining_timeout <= 0:
+                        logger.error(
+                            f"MQTT publish timeout for {printer_config.name} "
+                            f"after {elapsed:.1f}s"
+                        )
+                        raise PrinterMQTTError(
+                            f"MQTT publish timeout after {timeout} seconds"
+                        )
+
+                # Increment iteration counter
+                iteration_count += 1
+
+            # Check if we exited due to iteration limit
+            if iteration_count >= max_iterations:
+                logger.error(
+                    f"MQTT publish exceeded max iterations for "
+                    f"{printer_config.name}"
+                )
+                raise PrinterMQTTError(
+                    "MQTT publish operation stuck - operation cancelled"
+                )
 
             if publish_error:
                 raise PrinterMQTTError(publish_error)
@@ -526,7 +605,7 @@ class PrinterService:
             # Cleanup now handled by async wrapper
             if client:
                 try:
-                    client.loop_stop()
+                    client.loop_stop(force=True)
                     client.disconnect()
                 except Exception as e:
                     logger.debug(f"Error during MQTT cleanup: {e}")
@@ -748,14 +827,93 @@ class PrinterService:
             # Publish the query message
             msg_info = client.publish(device_topic, message, qos=1)
 
-            # Wait for publish to complete
+            # Check if publish failed immediately
+            if msg_info.rc != mqtt.MQTT_ERR_SUCCESS:
+                raise PrinterMQTTError(f"MQTT publish failed with code {msg_info.rc}")
+
+            # Wait for publish to complete using wait_for_publish with timeout
             start_time = time.time()
-            while not msg_info.is_published() and publish_error is None:
-                if time.time() - start_time > timeout:
-                    raise PrinterMQTTError(
-                        f"MQTT publish timeout after {timeout} seconds"
-                    )
-                time.sleep(0.1)
+            remaining_timeout = timeout
+
+            logger.debug(
+                f"Waiting for MQTT publish to complete for {printer_config.name}"
+            )
+
+            # Add a maximum iteration count as a failsafe
+            max_iterations = int(timeout * 2)  # 2 iterations per second
+            iteration_count = 0
+
+            while (
+                remaining_timeout > 0
+                and publish_error is None
+                and iteration_count < max_iterations
+            ):
+                # Check if cancelled - is client still tracked
+                from app.mqtt_async_patch_v3 import (
+                    _active_mqtt_clients,
+                    _clients_lock,
+                    _switching_lock,
+                    _switching_printers,
+                )
+
+                # First check if we're switching printers - fail immediately
+                with _switching_lock:
+                    if _switching_printers:
+                        logger.debug(
+                            "Printer switching in progress - cancelling operation"
+                        )
+                        raise PrinterMQTTError(
+                            "Operation cancelled - switching printers"
+                        )
+
+                with _clients_lock:
+                    if printer_config.ip not in _active_mqtt_clients:
+                        logger.debug(
+                            f"MQTT client no longer active for {printer_config.ip}"
+                        )
+                        raise PrinterMQTTError("Operation cancelled")
+
+                try:
+                    # Try to check if client is still connected
+                    if not client.is_connected():
+                        logger.warning(
+                            f"MQTT client disconnected for {printer_config.ip}"
+                        )
+                        raise PrinterMQTTError("MQTT client disconnected")
+
+                    # Use wait_for_publish with a short timeout
+                    msg_info.wait_for_publish(timeout=min(0.5, remaining_timeout))
+                    # If we get here, publish completed successfully
+                    logger.debug(f"MQTT publish completed for {printer_config.name}")
+                    break
+                except Exception as e:
+                    # Log the specific error
+                    logger.debug(f"wait_for_publish error: {type(e).__name__}: {e}")
+
+                    # Timeout or other error - check if we should continue
+                    elapsed = time.time() - start_time
+                    remaining_timeout = timeout - elapsed
+                    if remaining_timeout <= 0:
+                        logger.error(
+                            f"MQTT publish timeout for {printer_config.name} "
+                            f"after {elapsed:.1f}s"
+                        )
+                        raise PrinterMQTTError(
+                            f"MQTT publish timeout after {timeout} seconds"
+                        )
+
+                # Increment iteration counter
+                iteration_count += 1
+
+            # Check if we exited due to iteration limit
+            if iteration_count >= max_iterations:
+                logger.error(
+                    f"MQTT publish exceeded max iterations for "
+                    f"{printer_config.name}"
+                )
+                raise PrinterMQTTError(
+                    "MQTT publish operation stuck - operation cancelled"
+                )
 
             if publish_error:
                 raise PrinterMQTTError(publish_error)
@@ -856,7 +1014,7 @@ class PrinterService:
             # Cleanup now handled by async wrapper
             if client:
                 try:
-                    client.loop_stop()
+                    client.loop_stop(force=True)
                     client.disconnect()
                 except Exception as e:
                     logger.debug(f"Error during MQTT cleanup: {e}")
@@ -1119,14 +1277,93 @@ class PrinterService:
             # Publish the query message
             msg_info = client.publish(device_topic, message, qos=1)
 
-            # Wait for publish to complete
+            # Check if publish failed immediately
+            if msg_info.rc != mqtt.MQTT_ERR_SUCCESS:
+                raise PrinterMQTTError(f"MQTT publish failed with code {msg_info.rc}")
+
+            # Wait for publish to complete using wait_for_publish with timeout
             start_time = time.time()
-            while not msg_info.is_published() and publish_error is None:
-                if time.time() - start_time > timeout:
-                    raise PrinterMQTTError(
-                        f"MQTT publish timeout after {timeout} seconds"
-                    )
-                time.sleep(0.1)
+            remaining_timeout = timeout
+
+            logger.debug(
+                f"Waiting for MQTT publish to complete for {printer_config.name}"
+            )
+
+            # Add a maximum iteration count as a failsafe
+            max_iterations = int(timeout * 2)  # 2 iterations per second
+            iteration_count = 0
+
+            while (
+                remaining_timeout > 0
+                and publish_error is None
+                and iteration_count < max_iterations
+            ):
+                # Check if cancelled - is client still tracked
+                from app.mqtt_async_patch_v3 import (
+                    _active_mqtt_clients,
+                    _clients_lock,
+                    _switching_lock,
+                    _switching_printers,
+                )
+
+                # First check if we're switching printers - fail immediately
+                with _switching_lock:
+                    if _switching_printers:
+                        logger.debug(
+                            "Printer switching in progress - cancelling operation"
+                        )
+                        raise PrinterMQTTError(
+                            "Operation cancelled - switching printers"
+                        )
+
+                with _clients_lock:
+                    if printer_config.ip not in _active_mqtt_clients:
+                        logger.debug(
+                            f"MQTT client no longer active for {printer_config.ip}"
+                        )
+                        raise PrinterMQTTError("Operation cancelled")
+
+                try:
+                    # Try to check if client is still connected
+                    if not client.is_connected():
+                        logger.warning(
+                            f"MQTT client disconnected for {printer_config.ip}"
+                        )
+                        raise PrinterMQTTError("MQTT client disconnected")
+
+                    # Use wait_for_publish with a short timeout
+                    msg_info.wait_for_publish(timeout=min(0.5, remaining_timeout))
+                    # If we get here, publish completed successfully
+                    logger.debug(f"MQTT publish completed for {printer_config.name}")
+                    break
+                except Exception as e:
+                    # Log the specific error
+                    logger.debug(f"wait_for_publish error: {type(e).__name__}: {e}")
+
+                    # Timeout or other error - check if we should continue
+                    elapsed = time.time() - start_time
+                    remaining_timeout = timeout - elapsed
+                    if remaining_timeout <= 0:
+                        logger.error(
+                            f"MQTT publish timeout for {printer_config.name} "
+                            f"after {elapsed:.1f}s"
+                        )
+                        raise PrinterMQTTError(
+                            f"MQTT publish timeout after {timeout} seconds"
+                        )
+
+                # Increment iteration counter
+                iteration_count += 1
+
+            # Check if we exited due to iteration limit
+            if iteration_count >= max_iterations:
+                logger.error(
+                    f"MQTT publish exceeded max iterations for "
+                    f"{printer_config.name}"
+                )
+                raise PrinterMQTTError(
+                    "MQTT publish operation stuck - operation cancelled"
+                )
 
             if publish_error:
                 raise PrinterMQTTError(publish_error)
@@ -1134,6 +1371,12 @@ class PrinterService:
             # Wait for response with printer status data
             start_time = time.time()
             while not response_received and time.time() - start_time < timeout:
+                # Check if cancelled - is client still tracked
+                from app.mqtt_async_patch_v3 import _active_mqtt_clients, _clients_lock
+
+                with _clients_lock:
+                    if printer_config.ip not in _active_mqtt_clients:
+                        raise PrinterMQTTError("Operation cancelled")
                 time.sleep(0.1)
 
             if not response_received:
@@ -1184,7 +1427,7 @@ class PrinterService:
             # Cleanup now handled by async wrapper
             if client:
                 try:
-                    client.loop_stop()
+                    client.loop_stop(force=True)
                     client.disconnect()
                 except Exception as e:
                     logger.debug(f"Error during MQTT cleanup: {e}")
