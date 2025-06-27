@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import PlateSelector from './PlateSelector';
 import OperationProgress, { OperationStep } from './OperationProgress';
+import { UploadProgress } from './UploadProgress';
 import { useToast } from '../hooks/useToast';
 import {
   FilamentRequirement,
@@ -15,6 +16,8 @@ interface JobStep {
   success: boolean;
   message: string;
   details: string;
+  upload_id?: string;
+  remote_path?: string;
 }
 
 interface JobResponse {
@@ -44,6 +47,7 @@ interface ConfigureAndPrintTabProps {
   onPlateSelect: (plateIndex: number | null) => void;
   isProcessing: boolean;
   currentFileId: string;
+  originalFilename?: string;
   onPlatesUpdate?: (plates: PlateInfo[]) => void;
   hasMultiplePlates: boolean;
   modelUrl: string;
@@ -67,6 +71,7 @@ export function ConfigureAndPrintTab({
   onPlateSelect,
   isProcessing,
   currentFileId,
+  originalFilename,
   onPlatesUpdate,
   hasMultiplePlates,
   modelUrl,
@@ -82,6 +87,7 @@ export function ConfigureAndPrintTab({
   const [currentWorkflowStep, setCurrentWorkflowStep] = useState<string>('');
   const [operationSteps, setOperationSteps] = useState<OperationStep[]>([]);
   const [showOperationProgress, setShowOperationProgress] = useState(false);
+  const [uploadId, setUploadId] = useState<string | null>(null);
 
   const { showSuccess, showError, showWarning, showInfo } = useToast();
 
@@ -210,6 +216,7 @@ export function ConfigureAndPrintTab({
 
       const request: ConfiguredSliceRequest = {
         file_id: currentFileId,
+        original_filename: originalFilename,
         filament_mappings: filamentMappings,
         build_plate_type: selectedBuildPlate,
         selected_plate_index: selectedPlateIndex,
@@ -408,14 +415,21 @@ export function ConfigureAndPrintTab({
       console.log('Send to printer response received:', result);
 
       if (result.success) {
-        onStatusMessage(`✅ ${result.message}`);
-        if (result.details) {
-          onStatusMessage(`📝 ${result.details}`);
+        // Set upload ID for progress tracking
+        if (result.upload_id) {
+          setUploadId(result.upload_id);
+          // Don't show success message yet, wait for upload completion
+        } else {
+          // No upload ID means it completed immediately or doesn't support progress
+          onStatusMessage(`✅ ${result.message}`);
+          if (result.details) {
+            onStatusMessage(`📝 ${result.details}`);
+          }
+          showSuccess(
+            'G-code sent to printer storage successfully! You can print it later from the printer.',
+            'File Sent'
+          );
         }
-        showSuccess(
-          'G-code sent to printer storage successfully! You can print it later from the printer.',
-          'File Sent'
-        );
       } else {
         onStatusMessage(`❌ ${result.message}`);
         if (result.error_details) {
@@ -430,8 +444,11 @@ export function ConfigureAndPrintTab({
       console.error('Send to printer error:', error);
       showError(errorMessage, 'Send Failed');
     } finally {
-      onProcessingChange(false);
-      setCurrentWorkflowStep('');
+      // Only set processing to false if we don't have an upload in progress
+      if (!uploadId) {
+        onProcessingChange(false);
+        setCurrentWorkflowStep('');
+      }
     }
   };
 
@@ -500,6 +517,11 @@ export function ConfigureAndPrintTab({
             );
             if (step.details && step.details !== step.message) {
               onStatusMessage(`   📝 Details: ${step.details}`);
+            }
+
+            // Capture upload ID for progress tracking
+            if (stepName === 'upload' && step.upload_id) {
+              setUploadId(step.upload_id);
             }
           }
         }
@@ -798,6 +820,30 @@ export function ConfigureAndPrintTab({
             className="workflow-section"
           />
         </div>
+      )}
+
+      {/* Upload Progress */}
+      {uploadId && (
+        <UploadProgress
+          uploadId={uploadId}
+          onComplete={remotePath => {
+            onStatusMessage(`✅ File successfully uploaded to: ${remotePath}`);
+            showSuccess(
+              'G-code sent to printer storage successfully! You can print it later from the printer.',
+              'File Sent'
+            );
+            setUploadId(null);
+            onProcessingChange(false);
+            setCurrentWorkflowStep('');
+          }}
+          onError={error => {
+            onStatusMessage(`❌ Upload error: ${error}`);
+            showError(`Upload failed: ${error}`, 'Upload Failed');
+            setUploadId(null);
+            onProcessingChange(false);
+            setCurrentWorkflowStep('');
+          }}
+        />
       )}
 
       {/* Slice and Print Controls */}

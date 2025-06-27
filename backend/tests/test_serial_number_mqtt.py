@@ -56,6 +56,16 @@ class TestSerialNumberMQTT:
 
         assert config.serial_number == "01S00C123456789"
 
+    @patch("app.mqtt_async_patch_v3._active_mqtt_clients", {"192.168.1.100": Mock()})
+    @patch("app.mqtt_async_patch_v3._switching_printers", False)
+    @patch(
+        "app.mqtt_async_patch_v3._clients_lock",
+        Mock(__enter__=Mock(return_value=None), __exit__=Mock(return_value=None)),
+    )
+    @patch(
+        "app.mqtt_async_patch_v3._switching_lock",
+        Mock(__enter__=Mock(return_value=None), __exit__=Mock(return_value=None)),
+    )
     @patch("paho.mqtt.client.Client")
     def test_mqtt_topic_with_serial_number(
         self, mock_mqtt_client_class, printer_service
@@ -82,7 +92,10 @@ class TestSerialNumberMQTT:
 
         mock_msg_info = Mock()
         mock_msg_info.is_published.return_value = True
+        mock_msg_info.rc = 0  # MQTT_ERR_SUCCESS
+        mock_msg_info.wait_for_publish.return_value = None
         mock_client.publish.return_value = mock_msg_info
+        mock_client.is_connected.return_value = True
 
         # Execute start_print to trigger MQTT topic usage
         result = printer_service.start_print(printer_config, "test.gcode")
@@ -165,6 +178,16 @@ class TestSerialNumberMQTT:
         mock_client.subscribe.assert_not_called()
         mock_client.publish.assert_not_called()
 
+    @patch("app.mqtt_async_patch_v3._active_mqtt_clients", {"192.168.1.100": Mock()})
+    @patch("app.mqtt_async_patch_v3._switching_printers", False)
+    @patch(
+        "app.mqtt_async_patch_v3._clients_lock",
+        Mock(__enter__=Mock(return_value=None), __exit__=Mock(return_value=None)),
+    )
+    @patch(
+        "app.mqtt_async_patch_v3._switching_lock",
+        Mock(__enter__=Mock(return_value=None), __exit__=Mock(return_value=None)),
+    )
     @patch("paho.mqtt.client.Client")
     def test_ams_query_topic_with_serial_number(
         self, mock_mqtt_client_class, printer_service
@@ -192,7 +215,10 @@ class TestSerialNumberMQTT:
         # Mock successful publish
         mock_msg_info = Mock()
         mock_msg_info.is_published.return_value = True
+        mock_msg_info.rc = 0  # MQTT_ERR_SUCCESS
+        mock_msg_info.wait_for_publish.return_value = None
         mock_client.publish.return_value = mock_msg_info
+        mock_client.is_connected.return_value = True
 
         # Execute AMS query with short timeout
         printer_service.query_ams_status(printer_config, timeout=1)

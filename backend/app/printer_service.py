@@ -5,7 +5,6 @@ Handles FTP communication with Bambu Lab printers in LAN-only mode,
 including G-code file uploads and basic error handling.
 """
 
-import ftplib
 import json
 import logging
 import ssl
@@ -131,7 +130,7 @@ class PrinterService:
     # Default FTP settings for Bambu Lab printers
     DEFAULT_FTP_PORT = 990  # Bambu Lab uses FTPS on port 990
     DEFAULT_FTP_TIMEOUT = 30
-    DEFAULT_UPLOAD_PATH = "/upload"  # Common path for Bambu printers
+    DEFAULT_UPLOAD_PATH = "models"  # Upload to models directory
 
     # Default MQTT settings for Bambu Lab printers
     DEFAULT_MQTT_PORT = 8883  # Bambu Lab uses secure MQTT on port 8883
@@ -222,6 +221,7 @@ class PrinterService:
         gcode_file_path: Path,
         remote_filename: Optional[str] = None,
         remote_path: str = DEFAULT_UPLOAD_PATH,
+        progress_callback: Optional[callable] = None,
     ) -> FTPUploadResult:
         """Upload a G-code file to the printer via FTP.
 
@@ -256,179 +256,45 @@ class PrinterService:
             f"({printer_config.ip}): {gcode_file_path.name}"
         )
 
-        # Check if this is an X1C printer (serial number starts with 00M09)
-        is_x1c = (
-            printer_config.serial_number
-            and printer_config.serial_number.startswith("00M09")
-        )
-
-        if is_x1c:
-            logger.info("Detected X1C printer, using curl-based FTP client")
-            # Use curl-based FTP for X1C printers (SSL session reuse support)
-            try:
-                client = CurlFTPSClient(
-                    host=printer_config.ip,
-                    password=printer_config.access_code,
-                    timeout=self.timeout,
-                )
-
-                # Test connection first
-                if not client.test_connection():
-                    raise PrinterConnectionError(
-                        f"Failed to connect to X1C printer {printer_config.name}"
-                    )
-
-                # Upload the file
-                success, message = client.upload_file(
-                    gcode_file_path,
-                    remote_filename,
-                    remote_dir=remote_path.rstrip("/"),
-                )
-
-                if success:
-                    logger.info(
-                        f"Successfully uploaded {gcode_file_path.name} to X1C printer"
-                    )
-                    return FTPUploadResult(
-                        success=True,
-                        message=message,
-                        remote_path=full_remote_path,
-                    )
-                else:
-                    raise PrinterFileTransferError(message)
-
-            except Exception as e:
-                if isinstance(e, (PrinterConnectionError, PrinterFileTransferError)):
-                    raise
-                error_msg = f"X1C upload error: {str(e)}"
-                logger.error(f"Upload failed to {printer_config.name}: {error_msg}")
-                raise PrinterCommunicationError(error_msg)
-
-        # Use standard ftplib for non-X1C printers
-        ftp = None
+        # Always use curl-based FTP client for implicit FTPS support
+        logger.info("Using curl-based FTP client for implicit FTPS")
         try:
-            # Connect to the printer's FTPS server
-            # Bambu Lab printers use FTPS (FTP over TLS) on port 990
-            logger.debug(
-                f"Attempting FTP connection to {printer_config.ip}:"
-                f"{self.DEFAULT_FTP_PORT} with timeout {self.timeout}s"
-            )
-            ftp = ftplib.FTP_TLS()
-            ftp.debugging = 2  # Enable FTP debugging for troubleshooting
-            # Configure SSL context to be more permissive (like FileZilla)
-            ctx = ssl.create_default_context()
-            ctx.check_hostname = False
-            ctx.verify_mode = ssl.CERT_NONE
-            ftp.ssl_context = ctx
-            ftp.connect(printer_config.ip, self.DEFAULT_FTP_PORT, self.timeout)
-
-            # Bambu printers require authentication with username "bblp"
-            # and the access code as password
-            try:
-                ftp.login("bblp", printer_config.access_code)
-                logger.debug(
-                    f"Connected to printer {printer_config.ip} "
-                    f"via FTPS using access code authentication"
-                )
-                # Enable protection level for data transfer
-                ftp.prot_p()
-                # Set passive mode for data transfers (required by many firewalls)
-                ftp.set_pasv(True)
-                logger.debug("FTP passive mode enabled")
-            except ftplib.error_perm as e:
-                raise PrinterAuthenticationError(
-                    f"FTPS authentication failed for printer "
-                    f"{printer_config.name}: {str(e)}"
-                )
-            # Change to the target directory (create if needed)
-            try:
-                ftp.cwd(remote_path)
-            except ftplib.error_perm:
-                # Directory might not exist, try to create it
-                try:
-                    ftp.mkd(remote_path)
-                    ftp.cwd(remote_path)
-                    logger.debug(f"Created remote directory: {remote_path}")
-                except ftplib.error_perm as e:
-                    logger.warning(
-                        f"Could not create/access directory " f"{remote_path}: {e}"
-                    )
-                    # Continue anyway, upload to current directory
-
-            # Upload the file in binary mode
-            with open(gcode_file_path, "rb") as file:
-                upload_command = f"STOR {remote_filename}"
-                ftp.storbinary(upload_command, file)
-
-            # Verify the upload by checking file size
-            try:
-                remote_size = ftp.size(remote_filename)
-                local_size = gcode_file_path.stat().st_size
-
-                if remote_size == local_size:
-                    logger.info(
-                        f"Successfully uploaded "
-                        f"{gcode_file_path.name} to printer "
-                        f"{printer_config.name} ({local_size} bytes)"
-                    )
-                else:
-                    logger.warning(
-                        f"File size mismatch after upload: "
-                        f"local={local_size}, "
-                        f"remote={remote_size}"
-                    )
-            except (ftplib.error_perm, OSError):
-                # Size verification failed, but upload might still be OK
-                logger.debug("Could not verify upload file size")
-            return FTPUploadResult(
-                success=True,
-                message=f"G-code uploaded successfully to " f"{printer_config.name}",
-                remote_path=full_remote_path,
+            client = CurlFTPSClient(
+                host=printer_config.ip,
+                password=printer_config.access_code,
+                timeout=self.timeout,
             )
 
-        except PrinterAuthenticationError:
-            # Re-raise our custom authentication errors
-            raise
+            # Test connection first
+            if not client.test_connection():
+                raise PrinterConnectionError(
+                    f"Failed to connect to printer {printer_config.name}"
+                )
 
-        except PrinterFileTransferError:
-            # Re-raise our custom file transfer errors
-            raise
+            # Upload the file with progress callback
+            success, message = client.upload_file(
+                gcode_file_path,
+                remote_filename,
+                remote_dir=remote_path.rstrip("/"),
+                progress_callback=progress_callback,
+            )
 
-        except PrinterConnectionError:
-            # Re-raise our custom connection errors
-            raise
-
-        except ftplib.error_perm as e:
-            error_msg = f"FTP permission error: {str(e)}"
-            logger.error(f"Upload failed to {printer_config.name}: " f"{error_msg}")
-            raise PrinterAuthenticationError(error_msg)
-
-        except ftplib.error_temp as e:
-            error_msg = f"FTP temporary error: {str(e)}"
-            logger.error(f"Upload failed to {printer_config.name}: " f"{error_msg}")
-            raise PrinterFileTransferError(error_msg)
-
-        except (ftplib.error_proto, ConnectionError, OSError) as e:
-            error_msg = f"FTP connection error: {str(e)}"
-            logger.error(f"Upload failed to {printer_config.name}: " f"{error_msg}")
-            raise PrinterConnectionError(error_msg)
+            if success:
+                logger.info(f"Successfully uploaded {gcode_file_path.name} to printer")
+                return FTPUploadResult(
+                    success=True,
+                    message=message,
+                    remote_path=full_remote_path,
+                )
+            else:
+                raise PrinterFileTransferError(message)
 
         except Exception as e:
-            error_msg = f"Unexpected error during FTP upload: {str(e)}"
-            logger.error(f"Upload failed to {printer_config.name}: " f"{error_msg}")
+            if isinstance(e, (PrinterConnectionError, PrinterFileTransferError)):
+                raise
+            error_msg = f"FTP upload error: {str(e)}"
+            logger.error(f"Upload failed to {printer_config.name}: {error_msg}")
             raise PrinterCommunicationError(error_msg)
-        finally:
-            # Always close the FTP connection
-            if ftp:
-                try:
-                    ftp.quit()
-                    logger.debug(f"Closed FTP connection to " f"{printer_config.ip}")
-                except Exception:
-                    # If quit fails, try close
-                    try:
-                        ftp.close()
-                    except Exception:
-                        pass
 
     def start_print(
         self,
@@ -755,7 +621,7 @@ class PrinterService:
                     messages_received += 1
 
                     # Log the raw response for debugging
-                    logger.info(
+                    logger.debug(
                         f"Raw MQTT response for AMS query "
                         f"(message #{messages_received}): "
                         f"{json.dumps(response_json, indent=2)}"
@@ -1257,7 +1123,7 @@ class PrinterService:
                     response_json = json.loads(payload)
 
                     # Log the raw response for debugging
-                    logger.info(
+                    logger.debug(
                         f"Raw MQTT response from printer: "
                         f"{json.dumps(response_json, indent=2)}"
                     )
@@ -1658,41 +1524,27 @@ class PrinterService:
         Returns:
             bool: True if connection successful, False otherwise
         """
-        ftp = None
         try:
             logger.info(
                 f"Testing FTP connection to printer "
                 f"{printer_config.name} ({printer_config.ip})"
             )
 
-            ftp = ftplib.FTP_TLS()
-            ftp.connect(printer_config.ip, self.DEFAULT_FTP_PORT, self.timeout)
+            # Use curl-based FTP client for implicit FTPS
+            client = CurlFTPSClient(
+                host=printer_config.ip,
+                password=printer_config.access_code,
+                timeout=self.timeout,
+            )
 
-            # Authenticate with "bblp" username and access code
-            try:
-                ftp.login("bblp", printer_config.access_code)
-                logger.debug("FTPS access code authentication successful")
-                # Enable protection level for data transfer
-                ftp.prot_p()
-            except ftplib.error_perm as e:
-                logger.error(f"FTPS authentication failed: {e}")
-                raise
-
-            logger.info(f"FTP connection test successful for " f"{printer_config.name}")
-            return True
+            # Test connection
+            if client.test_connection():
+                logger.info(f"FTP connection test successful for {printer_config.name}")
+                return True
+            else:
+                logger.warning(f"FTP connection test failed for {printer_config.name}")
+                return False
 
         except Exception as e:
-            logger.warning(
-                f"FTP connection test failed for " f"{printer_config.name}: {e}"
-            )
+            logger.warning(f"FTP connection test failed for {printer_config.name}: {e}")
             return False
-
-        finally:
-            if ftp:
-                try:
-                    ftp.quit()
-                except Exception:
-                    try:
-                        ftp.close()
-                    except Exception:
-                        pass

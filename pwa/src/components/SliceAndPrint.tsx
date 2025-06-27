@@ -22,6 +22,9 @@ function SliceAndPrint() {
     useState<FilamentRequirement | null>(null);
   const [amsStatus, setAmsStatus] = useState<AMSStatusResponse | null>(null);
   const [currentFileId, setCurrentFileId] = useState<string>('');
+  const [originalFilename, setOriginalFilename] = useState<
+    string | undefined
+  >();
 
   // Plate selection state
   const [plates, setPlates] = useState<PlateInfo[]>([]);
@@ -239,12 +242,14 @@ function SliceAndPrint() {
 
   const handleModelAnalyzed = (data: {
     fileId: string;
+    originalFilename?: string;
     filamentRequirements: FilamentRequirement | null;
     plates: PlateInfo[];
     hasMultiplePlates: boolean;
     modelUrl: string;
   }) => {
     setCurrentFileId(data.fileId);
+    setOriginalFilename(data.originalFilename);
     setFilamentRequirements(data.filamentRequirements);
     setPlates(data.plates);
     // Always treat models as multi-plate for consistent UI experience
@@ -323,6 +328,7 @@ function SliceAndPrint() {
           onPlateSelect={handlePlateSelection}
           isProcessing={isProcessing}
           currentFileId={currentFileId}
+          originalFilename={originalFilename}
           onPlatesUpdate={setPlates}
           hasMultiplePlates={hasMultiplePlates}
           modelUrl={modelUrl}
