@@ -21,6 +21,18 @@ RUN apt-get update && \
         vim \
         nano \
         sudo \
+        # Network and system tools
+        net-tools \
+        lsof \
+        procps \
+        psmisc \
+        iproute2 \
+        dnsutils \
+        telnet \
+        htop \
+        strace \
+        tcpdump \
+        jq \
         # Build tools and dependencies
         build-essential \
         pkg-config \
