@@ -826,17 +826,7 @@ export function ConfigureAndPrintTab({
                 }
                 className="slice-and-print-button"
               >
-                {isProcessing ? 'Slicing...' : 'Slice and Print'}
-              </button>
-
-              <button
-                onClick={handleQuickSliceAndPrint}
-                disabled={isProcessing || !currentFileId}
-                className="secondary-button"
-              >
-                {isProcessing
-                  ? 'Processing...'
-                  : 'Quick Print (Default Settings)'}
+                {isProcessing ? 'Slicing...' : 'Slice'}
               </button>
             </div>
           ) : (
