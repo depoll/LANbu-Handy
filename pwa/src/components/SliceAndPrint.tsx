@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { TabSystem, Tab } from './TabSystem';
 import { ModelTab } from './ModelTab';
 import { ConfigureAndPrintTab } from './ConfigureAndPrintTab';
