@@ -1085,6 +1085,18 @@ class ModelService:
             return None
 
         try:
+            # First check if the plate index is valid
+            model_info, _ = self.parse_3mf_model_info(file_path)
+            if model_info.plates:
+                # Validate plate index
+                plate_indices = [plate.index for plate in model_info.plates]
+                if plate_index not in plate_indices:
+                    return None
+            else:
+                # Single plate model - only plate 1 is valid
+                if plate_index != 1:
+                    return None
+
             # For plate-specific requirements, we always return the full model
             # requirements to ensure all configured filaments are available
             # for AMS mapping, even if the plate doesn't use all of them

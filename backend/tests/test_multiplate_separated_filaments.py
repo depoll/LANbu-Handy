@@ -52,38 +52,21 @@ class TestMultiplateSeparatedFilaments(unittest.TestCase):
             )
 
     def test_multiplate_separated_filaments_requirements(self):
-        """Test plate-specific filament requirements extraction."""
+        """Test that all filaments are returned for each plate (design decision)."""
         if not self.test_file.exists():
             self.skipTest("multiplate separated filaments.3mf not available")
 
-        # Expected filament configuration per plate based on the test file
-        expected_requirements = {
-            1: {  # Object 2 uses extruder 1
-                "count": 1,
-                "types": ["PLA"],
-                "colors": ["#996633"],  # Brown
-            },
-            2: {  # Object 4 uses extruder 4
-                "count": 1,
-                "types": ["PLA"],
-                "colors": ["#0000FF"],  # Blue
-            },
-            3: {  # Object 6 uses extruder 12
-                "count": 1,
-                "types": ["PLA"],
-                "colors": ["#515151"],  # Dark Gray
-            },
-            4: {  # Objects 8,10 use extruders 8,5
-                "count": 2,
-                "types": ["PLA", "PLA"],
-                "colors": [
-                    "#21FF06",
-                    "#800080",
-                ],  # Green, Purple (sorted by extruder ID)
-            },
-        }
+        # Per design decision, get_plate_specific_filament_requirements returns
+        # ALL configured filaments for better UX with multi-color models,
+        # not just the filaments used by that specific plate.
 
-        for plate_index, expected in expected_requirements.items():
+        # Get full model requirements
+        full_req = self.model_service.parse_3mf_filament_requirements(self.test_file)
+        self.assertIsNotNone(full_req)
+        self.assertEqual(full_req.filament_count, 13)
+
+        # Each plate should return the same full requirements
+        for plate_index in [1, 2, 3, 4]:
             with self.subTest(plate=plate_index):
                 plate_req = self.model_service.get_plate_specific_filament_requirements(
                     self.test_file, plate_index
@@ -93,29 +76,28 @@ class TestMultiplateSeparatedFilaments(unittest.TestCase):
                     plate_req, f"No requirements found for plate {plate_index}"
                 )
 
-                # Check filament count
+                # Should return all 13 filaments regardless of plate
                 self.assertEqual(
                     plate_req.filament_count,
-                    expected["count"],
-                    f"Plate {plate_index} should require {expected['count']} filaments",
+                    13,
+                    f"Plate {plate_index} should return all 13 filaments",
                 )
 
-                # Check filament types
+                # Should match full model requirements
                 self.assertEqual(
                     plate_req.filament_types,
-                    expected["types"],
-                    f"Plate {plate_index} should have types {expected['types']}",
+                    full_req.filament_types,
+                    f"Plate {plate_index} should have same types as full model",
                 )
 
-                # Check filament colors
                 self.assertEqual(
                     plate_req.filament_colors,
-                    expected["colors"],
-                    f"Plate {plate_index} should have colors {expected['colors']}",
+                    full_req.filament_colors,
+                    f"Plate {plate_index} should have same colors as full model",
                 )
 
     def test_multiplate_separated_filaments_vs_full_model(self):
-        """Test that plate requirements are properly filtered from full model."""
+        """Test that plate requirements match full model (design decision)."""
         if not self.test_file.exists():
             self.skipTest("multiplate separated filaments.3mf not available")
 
@@ -126,7 +108,7 @@ class TestMultiplateSeparatedFilaments(unittest.TestCase):
             full_req.filament_count, 13, "Full model should have 13 filaments"
         )
 
-        # Test each plate shows significant reduction
+        # Per design decision, plate requirements should match full model
         for plate_index in [1, 2, 3, 4]:
             plate_req = self.model_service.get_plate_specific_filament_requirements(
                 self.test_file, plate_index
@@ -134,18 +116,23 @@ class TestMultiplateSeparatedFilaments(unittest.TestCase):
 
             self.assertIsNotNone(plate_req)
 
-            # Plate requirements should be much less than full model
-            self.assertLess(
+            # Plate requirements should equal full model
+            self.assertEqual(
                 plate_req.filament_count,
                 full_req.filament_count,
-                f"Plate {plate_index} should require fewer filaments than full model",
+                f"Plate {plate_index} should have same filament count as full model",
             )
 
-            # Should require at most 2 filaments (plate 4 has 2, others have 1)
-            self.assertLessEqual(
-                plate_req.filament_count,
-                2,
-                f"Plate {plate_index} should require at most 2 filaments",
+            # Should match full model exactly
+            self.assertEqual(
+                plate_req.filament_types,
+                full_req.filament_types,
+                f"Plate {plate_index} should have same types as full model",
+            )
+            self.assertEqual(
+                plate_req.filament_colors,
+                full_req.filament_colors,
+                f"Plate {plate_index} should have same colors as full model",
             )
 
     def test_multiplate_separated_filaments_invalid_plate(self):
@@ -165,43 +152,37 @@ class TestMultiplateSeparatedFilaments(unittest.TestCase):
             )
 
     def test_extruder_mapping_accuracy(self):
-        """Test that extruder to filament mapping is accurate."""
+        """Test that all filaments are returned regardless of plate."""
         if not self.test_file.exists():
             self.skipTest("multiplate separated filaments.3mf not available")
 
-        # Mapping from plate to expected extruder IDs (based on objects in that plate)
-        expected_extruders = {
-            1: [1],  # Object 2 uses extruder 1
-            2: [4],  # Object 4 uses extruder 4
-            3: [12],  # Object 6 uses extruder 12
-            4: [5, 8],  # Objects 10,8 use extruders 5,8 (sorted order)
-        }
+        # Per design decision, all plates return all configured filaments
+        # to support proper AMS mapping for multi-color models
 
-        # Expected colors by extruder ID (1-based indexing)
-        extruder_colors = {
-            1: "#996633",  # Extruder 1 -> filament_colour[0]
-            4: "#0000FF",  # Extruder 4 -> filament_colour[3]
-            5: "#21FF06",  # Extruder 5 -> filament_colour[4]
-            8: "#800080",  # Extruder 8 -> filament_colour[7]
-            12: "#515151",  # Extruder 12 -> filament_colour[11]
-        }
+        # Get full model requirements
+        full_req = self.model_service.parse_3mf_filament_requirements(self.test_file)
+        self.assertIsNotNone(full_req)
+        self.assertEqual(full_req.filament_count, 13)
 
-        for plate_index, expected_extruder_ids in expected_extruders.items():
+        # Test all plates return same requirements
+        for plate_index in [1, 2, 3, 4]:
             plate_req = self.model_service.get_plate_specific_filament_requirements(
                 self.test_file, plate_index
             )
 
             self.assertIsNotNone(plate_req)
-            self.assertEqual(len(plate_req.filament_colors), len(expected_extruder_ids))
+            self.assertEqual(plate_req.filament_count, 13)
 
-            # Verify colors match expected extruders (in sorted order)
-            expected_colors = [
-                extruder_colors[ext_id] for ext_id in sorted(expected_extruder_ids)
-            ]
+            # All plates should have same 13 colors as full model
+            self.assertEqual(
+                len(plate_req.filament_colors),
+                13,
+                f"Plate {plate_index} should have all 13 colors",
+            )
             self.assertEqual(
                 plate_req.filament_colors,
-                expected_colors,
-                f"Plate {plate_index} colors don't match expected extruder mapping",
+                full_req.filament_colors,
+                f"Plate {plate_index} colors should match full model",
             )
 
 
