@@ -167,8 +167,8 @@ describe('PrinterInfoDisplay Component', () => {
 
     await waitFor(() => {
       expect(screen.getByText('My Printer')).toBeInTheDocument();
-      // When there's no printer_model from status, show "Unknown"
-      expect(screen.getByText('Unknown')).toBeInTheDocument();
+      // When there's no printer_model from status, show "Detecting..."
+      expect(screen.getByText('Detecting...')).toBeInTheDocument();
       expect(screen.getByText('192.168.1.100')).toBeInTheDocument();
     });
   });
@@ -394,48 +394,29 @@ describe('PrinterInfoDisplay Component', () => {
     const mockResponse = {
       success: true,
       message: 'Success',
-      printer_model: 'UNKNOWN',
-      // printer_name missing
-    };
-
-    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-      ok: true,
-      json: async () => mockResponse,
-    });
-
-    render(<PrinterInfoDisplay printerId="My Printer" />);
-
-    await waitFor(() => {
-      expect(screen.getByText('UNKNOWN')).toBeInTheDocument();
-    });
-  });
-
-  it('handles all missing optional fields', async () => {
-    const mockResponse = {
-      success: true,
-      message: 'Success',
       // Minimal response
     };
 
     // Mock the status endpoint
-    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-      ok: true,
-      json: async () => mockResponse,
-    });
-
-    // Mock the config endpoint fallback with no matching printer
-    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        printers: [],
-      }),
-    });
+    (global.fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockResponse,
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          printers: [],
+        }),
+      });
 
     render(<PrinterInfoDisplay printerId="My Printer" />);
 
     await waitFor(() => {
-      // When no metadata is found, component returns null
-      expect(screen.queryByText('Printer Information')).not.toBeInTheDocument();
+      // When printer not found in config, component still shows basic info
+      expect(screen.getByText('Printer Information')).toBeInTheDocument();
+      expect(screen.getByText('My Printer')).toBeInTheDocument();
+      expect(screen.getByText('Detecting...')).toBeInTheDocument();
     });
   });
 

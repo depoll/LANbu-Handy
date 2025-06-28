@@ -8,6 +8,7 @@ we use curl as a subprocess which has full support for FTPS with session reuse.
 import logging
 import shutil
 import subprocess
+import urllib.parse
 from pathlib import Path
 from typing import Optional, Tuple
 
@@ -54,7 +55,9 @@ class CurlFTPSClient:
         ]
 
         # Build URL - for implicit FTPS, use ftps:// protocol
-        url = f"ftps://{self.host}:{self.port}/{remote_path}"
+        # URL-encode the remote path to handle special characters and spaces
+        encoded_path = urllib.parse.quote(remote_path, safe="/") if remote_path else ""
+        url = f"ftps://{self.host}:{self.port}/{encoded_path}"
 
         if operation == "upload" and local_file:
             cmd.extend(["-T", local_file])  # Upload file
@@ -63,6 +66,7 @@ class CurlFTPSClient:
         elif operation == "download":
             cmd.extend(["-o", local_file] if local_file else ["-O"])  # Download
         elif operation == "delete":
+            # For DELE command, we don't URL-encode as it's an FTP command, not a URL
             cmd.extend(["-Q", f"DELE {remote_path}"])  # Delete file
             url = f"ftps://{self.host}:{self.port}/"  # Use root for QUOTE commands
 

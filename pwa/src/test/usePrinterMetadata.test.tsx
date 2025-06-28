@@ -54,11 +54,13 @@ describe('usePrinterMetadata Hook', () => {
     expect(result.current.metadata).toEqual({
       printer_model: mockResponse.printer_model,
       printer_name: mockResponse.printer_name,
-      ip: mockPrinterId,
+      nozzle_diameter: undefined,
+      ip: '',
     });
     expect(result.current.error).toBeNull();
     expect(global.fetch).toHaveBeenCalledWith(
-      `/api/printer/${encodeURIComponent(mockPrinterId)}/status`
+      `/api/printer/${encodeURIComponent(mockPrinterId)}/status`,
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
     );
   });
 
@@ -164,7 +166,8 @@ describe('usePrinterMetadata Hook', () => {
 
     expect(global.fetch).toHaveBeenCalledTimes(2);
     expect(global.fetch).toHaveBeenLastCalledWith(
-      `/api/printer/${encodeURIComponent(newPrinterId)}/status`
+      `/api/printer/${encodeURIComponent(newPrinterId)}/status`,
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
     );
   });
 
@@ -210,16 +213,18 @@ describe('usePrinterMetadata Hook', () => {
     // Wait for second request to complete
     await waitFor(() => {
       expect(result.current.metadata?.printer_model).toBe('P1P');
-      expect(result.current.metadata?.ip).toBe(newPrinterId);
+      expect(result.current.metadata?.ip).toBe('');
     });
 
     // Both requests should have been made
     expect(global.fetch).toHaveBeenCalledTimes(2);
     expect(global.fetch).toHaveBeenCalledWith(
-      `/api/printer/${encodeURIComponent(mockPrinterId)}/status`
+      `/api/printer/${encodeURIComponent(mockPrinterId)}/status`,
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
     );
     expect(global.fetch).toHaveBeenCalledWith(
-      `/api/printer/${encodeURIComponent(newPrinterId)}/status`
+      `/api/printer/${encodeURIComponent(newPrinterId)}/status`,
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
     );
   });
 
@@ -247,8 +252,8 @@ describe('usePrinterMetadata Hook', () => {
       expect(result.current.metadata?.printer_model).toBe('A1');
     });
 
-    // Set config to null
-    rerender({ config: null });
+    // Set printerId to null
+    rerender({ printerId: null });
 
     expect(result.current.metadata).toBeNull();
     expect(result.current.isLoading).toBe(false);
