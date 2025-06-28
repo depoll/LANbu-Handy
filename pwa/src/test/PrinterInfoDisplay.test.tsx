@@ -51,11 +51,10 @@ describe('PrinterInfoDisplay Component', () => {
   });
 
   it('renders printer metadata correctly', async () => {
-    const mockResponse = {
+    const mockStatusResponse = {
       success: true,
       message: 'Success',
       printer_model: 'X1 Carbon',
-      printer_name: 'Bambu Lab X1 Carbon',
       ams_units: [
         {
           unit_id: 0,
@@ -67,39 +66,71 @@ describe('PrinterInfoDisplay Component', () => {
       ],
     };
 
-    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-      ok: true,
-      json: async () => mockResponse,
-    });
+    const mockConfigResponse = {
+      printers: [
+        {
+          name: 'My X1 Carbon',
+          ip: '192.168.1.100',
+          has_access_code: true,
+          has_serial_number: true,
+        },
+      ],
+    };
+
+    // First call is to status endpoint, second is to config endpoint
+    (global.fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockStatusResponse,
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockConfigResponse,
+      });
 
     render(<PrinterInfoDisplay printerId="My X1 Carbon" />);
 
     await waitFor(() => {
-      // Component shows the model and printer_name from response
+      // Component shows the model from status and name from config
       expect(screen.getByText('X1 Carbon')).toBeInTheDocument();
-      expect(screen.getByText('Bambu Lab X1 Carbon')).toBeInTheDocument();
+      expect(screen.getByText('My X1 Carbon')).toBeInTheDocument();
     });
   });
 
   it('renders with partial metadata', async () => {
-    const mockResponse = {
+    const mockStatusResponse = {
       success: true,
       message: 'Success',
       printer_model: 'P1P',
-      // printer_name missing
     };
 
-    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-      ok: true,
-      json: async () => mockResponse,
-    });
+    const mockConfigResponse = {
+      printers: [
+        {
+          name: 'My P1P',
+          ip: '192.168.1.101',
+          has_access_code: true,
+          has_serial_number: true,
+        },
+      ],
+    };
+
+    (global.fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockStatusResponse,
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockConfigResponse,
+      });
 
     render(<PrinterInfoDisplay printerId="My P1P" />);
 
     await waitFor(() => {
-      // Component shows "Detecting..." when printer_name is missing
-      expect(screen.getByText('Detecting...')).toBeInTheDocument();
+      // Component shows model from status and name from config
       expect(screen.getByText('P1P')).toBeInTheDocument();
+      expect(screen.getByText('My P1P')).toBeInTheDocument();
     });
   });
 
@@ -110,48 +141,101 @@ describe('PrinterInfoDisplay Component', () => {
       // No printer info
     };
 
-    // Mock the status endpoint with no metadata
-    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-      ok: true,
-      json: async () => mockResponse,
-    });
+    const mockConfigResponse = {
+      printers: [
+        {
+          name: 'My Printer',
+          ip: '192.168.1.100',
+          has_access_code: true,
+          has_serial_number: true,
+        },
+      ],
+    };
 
-    // Mock the config endpoint as fallback
-    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        printers: [
-          {
-            name: 'My Printer',
-            ip: '192.168.1.100',
-            has_access_code: true,
-            has_serial_number: true,
-          },
-        ],
-      }),
-    });
+    // Mock the status endpoint with no metadata
+    (global.fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockResponse,
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockConfigResponse,
+      });
 
     render(<PrinterInfoDisplay printerId="My Printer" />);
 
     await waitFor(() => {
       expect(screen.getByText('My Printer')).toBeInTheDocument();
-      // When there's no printer_model from status, it falls back to config
+      // When there's no printer_model from status, show "Unknown"
+      expect(screen.getByText('Unknown')).toBeInTheDocument();
       expect(screen.getByText('192.168.1.100')).toBeInTheDocument();
     });
   });
 
   it('handles printer without name', async () => {
-    const mockResponse = {
+    const mockStatusResponse = {
+      success: false,
+    };
+
+    const mockConfigResponse = {
+      printers: [
+        {
+          name: 'Default Printer',
+          ip: '192.168.1.102',
+          has_access_code: false,
+          has_serial_number: false,
+        },
+      ],
+    };
+
+    (global.fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockStatusResponse,
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockConfigResponse,
+      });
+
+    render(<PrinterInfoDisplay printerId="Default Printer" />);
+
+    await waitFor(() => {
+      // When status fails but config succeeds, show config info
+      expect(screen.getByText('Default Printer')).toBeInTheDocument();
+      expect(screen.getByText('192.168.1.102')).toBeInTheDocument();
+    });
+  });
+
+  it('handles long printer names gracefully', async () => {
+    const longName = 'A'.repeat(50);
+    const mockStatusResponse = {
       success: true,
       message: 'Success',
       printer_model: 'X1C',
-      printer_name: 'Bambu Lab X1 Carbon',
     };
 
-    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-      ok: true,
-      json: async () => mockResponse,
-    });
+    const mockConfigResponse = {
+      printers: [
+        {
+          name: longName,
+          ip: '192.168.1.103',
+          has_access_code: true,
+          has_serial_number: true,
+        },
+      ],
+    };
+
+    (global.fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockStatusResponse,
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockConfigResponse,
+      });
 
     render(<PrinterInfoDisplay printerId="" />);
 
