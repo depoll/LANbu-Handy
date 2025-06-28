@@ -53,7 +53,6 @@ function SliceAndPrint() {
   const [showOperationProgress] = useState(false);
 
   // Model URL for quick slice and print
-  const [modelUrl, setModelUrl] = useState('');
 
   // Current printer management
   const {
@@ -246,7 +245,6 @@ function SliceAndPrint() {
     filamentRequirements: FilamentRequirement | null;
     plates: PlateInfo[];
     hasMultiplePlates: boolean;
-    modelUrl: string;
   }) => {
     setCurrentFileId(data.fileId);
     setOriginalFilename(data.originalFilename);
@@ -255,7 +253,6 @@ function SliceAndPrint() {
     // Always treat models as multi-plate for consistent UI experience
     setHasMultiplePlates(data.plates.length > 0);
     setModelSubmitted(true);
-    setModelUrl(data.modelUrl); // Store the model URL for later use
 
     // Auto-select first plate if any plates are available
     if (data.plates.length > 0) {
@@ -331,7 +328,6 @@ function SliceAndPrint() {
           originalFilename={originalFilename}
           onPlatesUpdate={setPlates}
           hasMultiplePlates={hasMultiplePlates}
-          modelUrl={modelUrl}
           onProcessingChange={setIsProcessing}
           onStatusMessage={addStatusMessage}
           printerModel={printerMetadata?.printer_model}
