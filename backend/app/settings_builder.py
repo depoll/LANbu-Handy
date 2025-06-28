@@ -57,6 +57,12 @@ class SettingsBuilder:
         "PA": "Bambu PA-CF",
         "TPU": "Bambu TPU 95A",
         "PVA": "Bambu Support W",
+        # Generic mappings (for basic jobs)
+        "Generic PLA": "Bambu PLA Basic",
+        "Generic PETG": "Bambu PETG Basic",
+        "Generic ABS": "Bambu ABS",
+        "Generic ASA": "Bambu ASA",
+        "Generic TPU": "Bambu TPU 95A",
     }
 
     def __init__(self, temp_dir: Optional[Path] = None):

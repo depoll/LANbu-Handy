@@ -2011,8 +2011,8 @@ async def start_basic_job(request: JobStartRequest):
 
         file_path = download_result["file_path"]
 
-        # Step 2: Slice model
-        slice_result = slice_model_step(file_path)
+        # Step 2: Slice model with printer configuration
+        slice_result = slice_model_step(file_path, printer_config)
         job_steps["slice"].update(
             {
                 "success": slice_result["success"],

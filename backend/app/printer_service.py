@@ -1396,22 +1396,12 @@ class PrinterService:
                 serial_number = print_data.get("sn", "") or response_data.get("sn", "")
 
             if serial_number and len(serial_number) >= 5:
-                # Extract model code from positions 3-4 (0-indexed)
-                model_code = serial_number[3:5]
+                # Use the utility function to get model from serial
+                from app.utils import get_printer_model_from_serial
 
-                # Map model codes according to Bambu Lab wiki
-                serial_model_map = {
-                    "09": "X1C",  # X1 Carbon
-                    "07": "X1",  # X1
-                    "08": "X1E",  # X1E
-                    "03": "P1P",  # P1P
-                    "04": "P1S",  # P1S
-                    "01": "A1 mini",  # A1 mini
-                    "02": "A1",  # A1
-                }
-
-                if model_code in serial_model_map:
-                    printer_model = serial_model_map[model_code]
+                detected_model = get_printer_model_from_serial(serial_number)
+                if detected_model != "Unknown":
+                    printer_model = detected_model
                     logger.info(
                         f"Detected printer model '{printer_model}' from "
                         f"serial number: {serial_number}"
@@ -1422,8 +1412,9 @@ class PrinterService:
                 module = print_data.get("module", "")
                 if module:
                     # Module field contains model info like "BL-P001" for X1C
+                    # Use the exact names as they appear in the profile files
                     model_map = {
-                        "BL-P001": "X1C",
+                        "BL-P001": "X1 Carbon",
                         "BL-P002": "X1",
                         "BL-P003": "P1P",
                         "BL-P004": "P1S",

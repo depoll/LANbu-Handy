@@ -14,7 +14,13 @@ from app.model_service import ModelDownloadError, ModelService, ModelValidationE
 from app.printer_service import PrinterService
 from app.slicer_service import slice_model
 from app.upload_progress_service import upload_progress_service
-from app.utils import find_gcode_file, get_default_slicing_options, get_gcode_output_dir
+from app.utils import (
+    build_slicing_options_from_config,
+    find_gcode_file,
+    get_default_slicing_options,
+    get_gcode_output_dir,
+    get_printer_model_from_serial,
+)
 
 
 async def download_model_step(
@@ -64,22 +70,42 @@ async def download_model_step(
         }
 
 
-def slice_model_step(file_path: Path) -> Dict[str, Any]:
+def slice_model_step(file_path: Path, printer_config=None) -> Dict[str, Any]:
     """
     Execute the model slicing step of a print job.
 
     Args:
         file_path: Path to the model file to slice
+        printer_config: Optional printer configuration for model-specific slicing
 
     Returns:
         Dict containing step results with 'success', 'gcode_path', 'message', 'details'
     """
     try:
         output_dir = get_gcode_output_dir()
-        default_options = get_default_slicing_options()
+
+        # If we have a printer config, detect the model and use appropriate settings
+        if printer_config and printer_config.serial_number:
+            printer_model = get_printer_model_from_serial(printer_config.serial_number)
+
+            # Build options with printer model information
+            # Using default filament type (Generic PLA) and build plate (textured_plate)
+            slicing_options = build_slicing_options_from_config(
+                filament_mappings=[],  # Empty for basic slicing
+                build_plate_type="textured_plate",
+                selected_plate_index=None,
+                printer_model=printer_model,
+                nozzle_diameter=0.4,  # Default nozzle
+                print_quality=None,
+                filament_types=["Generic PLA"],  # Default filament
+                filament_colors=None,
+            )
+        else:
+            # Fall back to default options if no printer config
+            slicing_options = get_default_slicing_options()
 
         result = slice_model(
-            input_path=file_path, output_dir=output_dir, options=default_options
+            input_path=file_path, output_dir=output_dir, options=slicing_options
         )
 
         if result.success:
