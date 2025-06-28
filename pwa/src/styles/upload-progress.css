@@ -1,0 +1,150 @@
+.upload-progress {
+  background: var(--surface-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 1rem;
+  margin: 1rem 0;
+}
+
+.upload-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.upload-icon {
+  font-size: 1.5rem;
+}
+
+.upload-title {
+  font-weight: 600;
+  font-size: 1.1rem;
+}
+
+.upload-info {
+  margin-bottom: 1rem;
+}
+
+.filename {
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 0.25rem;
+}
+
+.file-size {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.progress-bar-container {
+  position: relative;
+  height: 24px;
+  background: var(--input-bg);
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 1rem;
+}
+
+.progress-bar-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: linear-gradient(90deg, #4caf50, #45a049);
+  transition: width 0.3s ease;
+}
+
+.progress-percent {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.upload-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.stat {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem;
+  background: var(--input-bg);
+  border-radius: 6px;
+}
+
+.stat-label {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.stat-value {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.upload-success,
+.upload-error {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem;
+  border-radius: 6px;
+  margin-top: 1rem;
+}
+
+.upload-success {
+  background: rgba(76, 175, 80, 0.1);
+  border: 1px solid rgba(76, 175, 80, 0.3);
+  color: #4caf50;
+}
+
+.upload-error {
+  background: rgba(244, 67, 54, 0.1);
+  border: 1px solid rgba(244, 67, 54, 0.3);
+  color: #f44336;
+}
+
+.success-icon,
+.error-icon {
+  font-size: 1.25rem;
+}
+
+.upload-message {
+  flex: 1;
+}
+
+.upload-message-title {
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+.upload-message-text {
+  font-size: 0.9rem;
+  opacity: 0.9;
+}
+
+/* Animation for progress bar */
+@keyframes progress-pulse {
+  0% {
+    opacity: 0.8;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.8;
+  }
+}
+
+.progress-bar-fill {
+  animation: progress-pulse 2s ease-in-out infinite;
+}

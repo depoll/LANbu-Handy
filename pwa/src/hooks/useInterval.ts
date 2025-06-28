@@ -9,7 +9,7 @@ export function useInterval(
   callback: () => void | Promise<void>,
   delay: number | null
 ) {
-  const savedCallback = useRef<() => void | Promise<void>>();
+  const savedCallback = useRef<() => void | Promise<void>>(callback);
 
   // Remember the latest callback
   useEffect(() => {
