@@ -27,7 +27,7 @@ _last_disconnect_time: Dict[str, float] = {}
 _disconnect_lock = threading.Lock()
 
 # Minimum time to wait between disconnecting and reconnecting to the same printer
-MIN_RECONNECT_DELAY = 1.0  # seconds
+MIN_RECONNECT_DELAY = 0.2  # seconds (reduced since cleanup is now non-blocking)
 
 # Track active MQTT clients to ensure proper cleanup
 _active_mqtt_clients: Dict[str, object] = {}
@@ -83,29 +83,42 @@ def cancel_printer_mqtt_operations(printer_ip: str):
     with _clients_lock:
         if printer_ip in _active_mqtt_clients:
             client = _active_mqtt_clients[printer_ip]
-            try:
-                logger.debug(f"Force disconnecting MQTT client for {printer_ip}")
+            # Remove from tracking immediately
+            del _active_mqtt_clients[printer_ip]
 
-                # Set a very short socket timeout to force quick failure
-                # This helps when the client is stuck in a blocking network operation
+            # Do the actual cleanup in a background thread to avoid blocking
+            def cleanup_client():
                 try:
-                    if hasattr(client, "_sock") and client._sock:
-                        client._sock.settimeout(0.1)
-                    if hasattr(client, "_ssl") and client._ssl:
-                        client._ssl.settimeout(0.1)
-                except Exception:
-                    pass  # Ignore errors setting timeout
+                    logger.debug(f"Force disconnecting MQTT client for {printer_ip}")
 
-                # Force stop the network loop
-                client.loop_stop(force=True)
-                # Force disconnect
-                client.disconnect()
-                logger.info(f"Force disconnected MQTT client for {printer_ip}")
-            except Exception as e:
-                logger.debug(f"Error force disconnecting MQTT client: {e}")
-            finally:
-                # Remove from active clients
-                del _active_mqtt_clients[printer_ip]
+                    # Immediately stop the network loop - don't wait
+                    client.loop_stop(force=True)
+
+                    # Set a very short socket timeout to force quick failure
+                    try:
+                        if hasattr(client, "_sock") and client._sock:
+                            client._sock.settimeout(0.001)
+                        if hasattr(client, "_ssl") and client._ssl:
+                            client._ssl.settimeout(0.001)
+                    except Exception:
+                        pass  # Ignore errors setting timeout
+
+                    # Force disconnect with minimal waiting
+                    client.disconnect()
+
+                    # Force close the socket if it's still open
+                    try:
+                        if hasattr(client, "_sock") and client._sock:
+                            client._sock.close()
+                    except Exception:
+                        pass
+
+                    logger.info(f"Force disconnected MQTT client for {printer_ip}")
+                except Exception as e:
+                    logger.debug(f"Error force disconnecting MQTT client: {e}")
+
+            # Run cleanup in background to avoid blocking
+            threading.Thread(target=cleanup_client, daemon=True).start()
 
     # Then cancel any pending futures
     with _futures_lock:
@@ -326,12 +339,40 @@ def add_async_support_to_printer_service():
                         "forcing cleanup before creating new one"
                     )
                     old_client = _active_mqtt_clients[printer_config.ip]
-                    try:
-                        old_client.loop_stop(force=True)
-                        old_client.disconnect()
-                    except Exception as e:
-                        logger.debug(f"Error cleaning up old client: {e}")
+                    # Remove from tracking immediately to avoid blocking
                     del _active_mqtt_clients[printer_config.ip]
+
+                    # Do the actual cleanup in a background thread
+                    def cleanup_old_client():
+                        try:
+                            # Immediately stop the network loop - don't wait
+                            old_client.loop_stop(force=True)
+
+                            # Set a very short timeout on the socket to make
+                            # disconnect fast
+                            if hasattr(old_client, "_sock") and old_client._sock:
+                                old_client._sock.settimeout(0.001)
+                            if hasattr(old_client, "_ssl") and old_client._ssl:
+                                old_client._ssl.settimeout(0.001)
+
+                            # Disconnect with minimal waiting
+                            old_client.disconnect()
+
+                            # Force close the socket if it's still open
+                            if hasattr(old_client, "_sock") and old_client._sock:
+                                try:
+                                    old_client._sock.close()
+                                except Exception:
+                                    pass
+                        except Exception as e:
+                            logger.debug(f"Error cleaning up old client: {e}")
+
+                    # Start cleanup in background
+                    threading.Thread(target=cleanup_old_client, daemon=True).start()
+
+                    # Add a small delay to give the cleanup a head start
+                    # This is much shorter than waiting for the full cleanup
+                    time.sleep(0.1)
 
             client = original_create_mqtt_client(self, printer_config)
 
