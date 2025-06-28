@@ -11,6 +11,12 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
+# Check for --restart parameter
+RESTART_MODE=false
+if [ "$1" = "--restart" ]; then
+    RESTART_MODE=true
+fi
+
 echo -e "${GREEN}Starting LANbu Handy development servers...${NC}"
 
 # Check if start-dev.sh is already running
@@ -32,10 +38,20 @@ done
 EXISTING_PIDS=$(echo "$EXISTING_PIDS" | xargs)
 
 if [ -n "$EXISTING_PIDS" ]; then
-    echo -e "${RED}Error: start-dev.sh is already running!${NC}"
-    echo -e "${YELLOW}Existing PIDs: $EXISTING_PIDS${NC}"
-    echo -e "${YELLOW}Use './scripts/stop-dev.sh' to stop the existing servers first.${NC}"
-    exit 1
+    if [ "$RESTART_MODE" = true ]; then
+        echo -e "${YELLOW}start-dev.sh is already running. Stopping existing servers...${NC}"
+        # Store the original directory
+        SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+        "$SCRIPT_DIR/stop-dev.sh"
+        # Give it a moment to clean up
+        sleep 2
+    else
+        echo -e "${RED}Error: start-dev.sh is already running!${NC}"
+        echo -e "${YELLOW}Existing PIDs: $EXISTING_PIDS${NC}"
+        echo -e "${YELLOW}Use './scripts/stop-dev.sh' to stop the existing servers first.${NC}"
+        echo -e "${YELLOW}Or use './scripts/start-dev.sh --restart' to automatically stop and restart.${NC}"
+        exit 1
+    fi
 fi
 
 # Store PIDs of all processes we start
@@ -123,15 +139,35 @@ check_port() {
 
 # Check if servers are already running on expected ports
 if check_port 8000; then
-    echo -e "${RED}Backend server already running on port 8000!${NC}"
-    echo -e "${YELLOW}Please stop it first or use './scripts/stop-dev.sh'.${NC}"
-    exit 1
+    if [ "$RESTART_MODE" = true ]; then
+        echo -e "${YELLOW}Backend server already running on port 8000. Stopping it...${NC}"
+        # Store the original directory
+        SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+        "$SCRIPT_DIR/stop-dev.sh"
+        # Give it a moment to clean up
+        sleep 2
+    else
+        echo -e "${RED}Backend server already running on port 8000!${NC}"
+        echo -e "${YELLOW}Please stop it first or use './scripts/stop-dev.sh'.${NC}"
+        echo -e "${YELLOW}Or use './scripts/start-dev.sh --restart' to automatically stop and restart.${NC}"
+        exit 1
+    fi
 fi
 
 if check_port 5173; then
-    echo -e "${RED}PWA dev server already running on port 5173!${NC}"
-    echo -e "${YELLOW}Please stop it first or use './scripts/stop-dev.sh'.${NC}"
-    exit 1
+    if [ "$RESTART_MODE" = true ]; then
+        echo -e "${YELLOW}PWA dev server already running on port 5173. Stopping it...${NC}"
+        # Store the original directory if not already done
+        SCRIPT_DIR="${SCRIPT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
+        "$SCRIPT_DIR/stop-dev.sh"
+        # Give it a moment to clean up
+        sleep 2
+    else
+        echo -e "${RED}PWA dev server already running on port 5173!${NC}"
+        echo -e "${YELLOW}Please stop it first or use './scripts/stop-dev.sh'.${NC}"
+        echo -e "${YELLOW}Or use './scripts/start-dev.sh --restart' to automatically stop and restart.${NC}"
+        exit 1
+    fi
 fi
 
 # Also check for port 3000/3001 which vite might use as fallback
@@ -141,15 +177,35 @@ fi
 
 # Check if backend or frontend processes are already running
 if pgrep -f "uvicorn app.main:app" >/dev/null 2>&1; then
-    echo -e "${RED}Backend server process already running!${NC}"
-    echo -e "${YELLOW}Use './scripts/stop-dev.sh' to stop it first.${NC}"
-    exit 1
+    if [ "$RESTART_MODE" = true ]; then
+        echo -e "${YELLOW}Backend server process already running. Stopping it...${NC}"
+        # Store the original directory if not already done
+        SCRIPT_DIR="${SCRIPT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
+        "$SCRIPT_DIR/stop-dev.sh"
+        # Give it a moment to clean up
+        sleep 2
+    else
+        echo -e "${RED}Backend server process already running!${NC}"
+        echo -e "${YELLOW}Use './scripts/stop-dev.sh' to stop it first.${NC}"
+        echo -e "${YELLOW}Or use './scripts/start-dev.sh --restart' to automatically stop and restart.${NC}"
+        exit 1
+    fi
 fi
 
 if pgrep -f "vite.*pwa" >/dev/null 2>&1; then
-    echo -e "${RED}PWA dev server process already running!${NC}"
-    echo -e "${YELLOW}Use './scripts/stop-dev.sh' to stop it first.${NC}"
-    exit 1
+    if [ "$RESTART_MODE" = true ]; then
+        echo -e "${YELLOW}PWA dev server process already running. Stopping it...${NC}"
+        # Store the original directory if not already done
+        SCRIPT_DIR="${SCRIPT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
+        "$SCRIPT_DIR/stop-dev.sh"
+        # Give it a moment to clean up
+        sleep 2
+    else
+        echo -e "${RED}PWA dev server process already running!${NC}"
+        echo -e "${YELLOW}Use './scripts/stop-dev.sh' to stop it first.${NC}"
+        echo -e "${YELLOW}Or use './scripts/start-dev.sh --restart' to automatically stop and restart.${NC}"
+        exit 1
+    fi
 fi
 
 # Start backend server in background
