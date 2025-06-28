@@ -280,17 +280,32 @@ describe('PrinterInfoDisplay Component', () => {
   });
 
   it('applies correct CSS classes', async () => {
-    const mockResponse = {
+    const mockStatusResponse = {
       success: true,
       message: 'Success',
       printer_model: 'X1C',
-      printer_name: 'Bambu Lab X1 Carbon',
     };
 
-    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-      ok: true,
-      json: async () => mockResponse,
-    });
+    const mockConfigResponse = {
+      printers: [
+        {
+          name: 'My X1C',
+          ip: '192.168.1.104',
+          has_access_code: true,
+          has_serial_number: true,
+        },
+      ],
+    };
+
+    (global.fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockStatusResponse,
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockConfigResponse,
+      });
 
     const { container } = render(<PrinterInfoDisplay printerId="My X1C" />);
 
@@ -306,19 +321,34 @@ describe('PrinterInfoDisplay Component', () => {
   it('handles long printer names gracefully', async () => {
     const longName =
       'This is a very long printer name that might cause layout issues';
-    const mockResponse = {
+    const mockStatusResponse = {
       success: true,
       message: 'Success',
       printer_model: 'P1S',
-      printer_name: longName, // Use the long name as printer_name
     };
 
-    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-      ok: true,
-      json: async () => mockResponse,
-    });
+    const mockConfigResponse = {
+      printers: [
+        {
+          name: longName,
+          ip: '192.168.1.105',
+          has_access_code: true,
+          has_serial_number: true,
+        },
+      ],
+    };
 
-    render(<PrinterInfoDisplay printerId="test-printer" />);
+    (global.fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockStatusResponse,
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockConfigResponse,
+      });
+
+    render(<PrinterInfoDisplay printerId={longName} />);
 
     await waitFor(() => {
       expect(screen.getByText(longName)).toBeInTheDocument();
@@ -326,6 +356,41 @@ describe('PrinterInfoDisplay Component', () => {
   });
 
   it('handles missing model display name', async () => {
+    const mockStatusResponse = {
+      success: true,
+      message: 'Success',
+      printer_model: 'UNKNOWN',
+    };
+
+    const mockConfigResponse = {
+      printers: [
+        {
+          name: 'My Printer',
+          ip: '192.168.1.106',
+          has_access_code: true,
+          has_serial_number: true,
+        },
+      ],
+    };
+
+    (global.fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockStatusResponse,
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockConfigResponse,
+      });
+
+    render(<PrinterInfoDisplay printerId="My Printer" />);
+
+    await waitFor(() => {
+      expect(screen.getByText('UNKNOWN')).toBeInTheDocument();
+    });
+  });
+
+  it('handles all missing optional fields', async () => {
     const mockResponse = {
       success: true,
       message: 'Success',

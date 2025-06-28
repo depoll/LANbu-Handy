@@ -198,7 +198,8 @@ describe('PrintTab Component', () => {
     (global.fetch as vi.MockedFunction<typeof fetch>).mockResolvedValueOnce({
       ok: false,
       text: async () => 'Slice failed',
-    });
+      status: 500,
+    } as Response);
 
     renderWithToast(<PrintTab {...mockProps} />);
 
@@ -207,7 +208,7 @@ describe('PrintTab Component', () => {
 
     await waitFor(() => {
       expect(mockProps.onStatusMessage).toHaveBeenCalledWith(
-        expect.stringContaining('error')
+        expect.stringContaining('HTTP 500')
       );
     });
   });
