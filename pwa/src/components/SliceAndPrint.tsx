@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { TabSystem, Tab } from './TabSystem';
 import { ModelTab } from './ModelTab';
 import { ConfigureAndPrintTab } from './ConfigureAndPrintTab';
@@ -22,6 +22,9 @@ function SliceAndPrint() {
     useState<FilamentRequirement | null>(null);
   const [amsStatus, setAmsStatus] = useState<AMSStatusResponse | null>(null);
   const [currentFileId, setCurrentFileId] = useState<string>('');
+  const [originalFilename, setOriginalFilename] = useState<
+    string | undefined
+  >();
 
   // Plate selection state
   const [plates, setPlates] = useState<PlateInfo[]>([]);
@@ -50,7 +53,6 @@ function SliceAndPrint() {
   const [showOperationProgress] = useState(false);
 
   // Model URL for quick slice and print
-  const [modelUrl, setModelUrl] = useState('');
 
   // Current printer management
   const {
@@ -67,36 +69,65 @@ function SliceAndPrint() {
 
   const addStatusMessage = useCallback((message: string) => {
     setStatusMessages(prev => [
-      ...prev,
       `${new Date().toLocaleTimeString()}: ${message}`,
+      ...prev,
     ]);
   }, []);
+
+  // Track previous AMS status to detect changes
+  const prevAmsStatusRef = useRef<AMSStatusResponse | null>(null);
 
   // AMS status update handler
   const handleAMSStatusUpdate = useCallback(
     (status: AMSStatusResponse) => {
+      const prevStatus = prevAmsStatusRef.current;
+      const isInitialFetch = prevStatus === null;
+
+      // Check if status actually changed
+      const statusChanged =
+        !prevStatus ||
+        prevStatus.success !== status.success ||
+        JSON.stringify(prevStatus.ams_units) !==
+          JSON.stringify(status.ams_units) ||
+        JSON.stringify(prevStatus.external_spool) !==
+          JSON.stringify(status.external_spool);
+
       setAmsStatus(status);
-      if (status.success) {
-        addStatusMessage('✅ AMS status retrieved successfully');
-        if (status.ams_units && status.ams_units.length > 0) {
-          const totalFilaments = status.ams_units.reduce(
-            (total, unit) => total + unit.filaments.length,
-            0
-          );
-          addStatusMessage(
-            `📊 Found ${status.ams_units.length} AMS unit(s) with ${totalFilaments} loaded filament(s)`
-          );
-          showSuccess(
-            `Found ${status.ams_units.length} AMS unit(s) with ${totalFilaments} loaded filament(s)`,
-            'AMS Connected'
-          );
+      prevAmsStatusRef.current = status;
+
+      // Only show notifications if this is the first fetch or something changed
+      if (isInitialFetch || statusChanged) {
+        if (status.success) {
+          addStatusMessage('✅ AMS status retrieved successfully');
+          if (status.ams_units && status.ams_units.length > 0) {
+            const totalFilaments = status.ams_units.reduce(
+              (total, unit) => total + unit.filaments.length,
+              0
+            );
+            addStatusMessage(
+              `📊 Found ${status.ams_units.length} AMS unit(s) with ${totalFilaments} loaded filament(s)`
+            );
+            // Only show toast notification on initial fetch or if units/filaments changed
+            if (isInitialFetch) {
+              showSuccess(
+                `Found ${status.ams_units.length} AMS unit(s) with ${totalFilaments} loaded filament(s)`,
+                'AMS Connected'
+              );
+            }
+          } else {
+            addStatusMessage('⚠ No AMS units or filaments detected');
+            // Only show warning on initial fetch
+            if (isInitialFetch) {
+              showWarning('No AMS units or filaments detected', 'AMS Status');
+            }
+          }
         } else {
-          addStatusMessage('⚠ No AMS units or filaments detected');
-          showWarning('No AMS units or filaments detected', 'AMS Status');
+          addStatusMessage('❌ Failed to retrieve AMS status');
+          showError(
+            status.message || 'AMS status retrieval failed',
+            'AMS Error'
+          );
         }
-      } else {
-        addStatusMessage('❌ Failed to retrieve AMS status');
-        showError(status.message || 'AMS status retrieval failed', 'AMS Error');
       }
     },
     [addStatusMessage, showSuccess, showWarning, showError]
@@ -210,18 +241,18 @@ function SliceAndPrint() {
 
   const handleModelAnalyzed = (data: {
     fileId: string;
+    originalFilename?: string;
     filamentRequirements: FilamentRequirement | null;
     plates: PlateInfo[];
     hasMultiplePlates: boolean;
-    modelUrl: string;
   }) => {
     setCurrentFileId(data.fileId);
+    setOriginalFilename(data.originalFilename);
     setFilamentRequirements(data.filamentRequirements);
     setPlates(data.plates);
     // Always treat models as multi-plate for consistent UI experience
     setHasMultiplePlates(data.plates.length > 0);
     setModelSubmitted(true);
-    setModelUrl(data.modelUrl); // Store the model URL for later use
 
     // Auto-select first plate if any plates are available
     if (data.plates.length > 0) {
@@ -294,9 +325,9 @@ function SliceAndPrint() {
           onPlateSelect={handlePlateSelection}
           isProcessing={isProcessing}
           currentFileId={currentFileId}
+          originalFilename={originalFilename}
           onPlatesUpdate={setPlates}
           hasMultiplePlates={hasMultiplePlates}
-          modelUrl={modelUrl}
           onProcessingChange={setIsProcessing}
           onStatusMessage={addStatusMessage}
           printerModel={printerMetadata?.printer_model}

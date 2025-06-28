@@ -63,6 +63,7 @@ export interface ModelSubmissionResponse {
   success: boolean;
   message: string;
   file_id?: string;
+  original_filename?: string;
   file_info?: Record<string, unknown>;
   filament_requirements?: FilamentRequirement;
   plates?: PlateInfo[];
@@ -82,6 +83,7 @@ export interface SliceRequest {
 
 export interface ConfiguredSliceRequest {
   file_id: string;
+  original_filename?: string; // Original model filename
   filament_mappings: FilamentMapping[];
   build_plate_type: string;
   selected_plate_index?: number | null; // null means all plates

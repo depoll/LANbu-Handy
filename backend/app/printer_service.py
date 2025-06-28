@@ -5,7 +5,6 @@ Handles FTP communication with Bambu Lab printers in LAN-only mode,
 including G-code file uploads and basic error handling.
 """
 
-import ftplib
 import json
 import logging
 import ssl
@@ -16,6 +15,7 @@ from pathlib import Path
 from typing import List, Optional
 
 import paho.mqtt.client as mqtt
+from app.ftp_curl_wrapper import CurlFTPSClient
 from app.printer_config import PrinterConfig
 
 logger = logging.getLogger(__name__)
@@ -130,7 +130,7 @@ class PrinterService:
     # Default FTP settings for Bambu Lab printers
     DEFAULT_FTP_PORT = 990  # Bambu Lab uses FTPS on port 990
     DEFAULT_FTP_TIMEOUT = 30
-    DEFAULT_UPLOAD_PATH = "/upload"  # Common path for Bambu printers
+    DEFAULT_UPLOAD_PATH = "models"  # Upload to models directory
 
     # Default MQTT settings for Bambu Lab printers
     DEFAULT_MQTT_PORT = 8883  # Bambu Lab uses secure MQTT on port 8883
@@ -221,6 +221,7 @@ class PrinterService:
         gcode_file_path: Path,
         remote_filename: Optional[str] = None,
         remote_path: str = DEFAULT_UPLOAD_PATH,
+        progress_callback: Optional[callable] = None,
     ) -> FTPUploadResult:
         """Upload a G-code file to the printer via FTP.
 
@@ -254,117 +255,46 @@ class PrinterService:
             f"Uploading G-code to printer {printer_config.name} "
             f"({printer_config.ip}): {gcode_file_path.name}"
         )
-        ftp = None
+
+        # Always use curl-based FTP client for implicit FTPS support
+        logger.info("Using curl-based FTP client for implicit FTPS")
         try:
-            # Connect to the printer's FTPS server
-            # Bambu Lab printers use FTPS (FTP over TLS) on port 990
-            ftp = ftplib.FTP_TLS()
-            ftp.connect(printer_config.ip, self.DEFAULT_FTP_PORT, self.timeout)
-
-            # Bambu printers require authentication with username "bblp"
-            # and the access code as password
-            try:
-                ftp.login("bblp", printer_config.access_code)
-                logger.debug(
-                    f"Connected to printer {printer_config.ip} "
-                    f"via FTPS using access code authentication"
-                )
-                # Enable protection level for data transfer
-                ftp.prot_p()
-            except ftplib.error_perm as e:
-                raise PrinterAuthenticationError(
-                    f"FTPS authentication failed for printer "
-                    f"{printer_config.name}: {str(e)}"
-                )
-            # Change to the target directory (create if needed)
-            try:
-                ftp.cwd(remote_path)
-            except ftplib.error_perm:
-                # Directory might not exist, try to create it
-                try:
-                    ftp.mkd(remote_path)
-                    ftp.cwd(remote_path)
-                    logger.debug(f"Created remote directory: {remote_path}")
-                except ftplib.error_perm as e:
-                    logger.warning(
-                        f"Could not create/access directory " f"{remote_path}: {e}"
-                    )
-                    # Continue anyway, upload to current directory
-
-            # Upload the file in binary mode
-            with open(gcode_file_path, "rb") as file:
-                upload_command = f"STOR {remote_filename}"
-                ftp.storbinary(upload_command, file)
-
-            # Verify the upload by checking file size
-            try:
-                remote_size = ftp.size(remote_filename)
-                local_size = gcode_file_path.stat().st_size
-
-                if remote_size == local_size:
-                    logger.info(
-                        f"Successfully uploaded "
-                        f"{gcode_file_path.name} to printer "
-                        f"{printer_config.name} ({local_size} bytes)"
-                    )
-                else:
-                    logger.warning(
-                        f"File size mismatch after upload: "
-                        f"local={local_size}, "
-                        f"remote={remote_size}"
-                    )
-            except (ftplib.error_perm, OSError):
-                # Size verification failed, but upload might still be OK
-                logger.debug("Could not verify upload file size")
-            return FTPUploadResult(
-                success=True,
-                message=f"G-code uploaded successfully to " f"{printer_config.name}",
-                remote_path=full_remote_path,
+            client = CurlFTPSClient(
+                host=printer_config.ip,
+                password=printer_config.access_code,
+                timeout=self.timeout,
             )
 
-        except PrinterAuthenticationError:
-            # Re-raise our custom authentication errors
-            raise
+            # Test connection first
+            if not client.test_connection():
+                raise PrinterConnectionError(
+                    f"Failed to connect to printer {printer_config.name}"
+                )
 
-        except PrinterFileTransferError:
-            # Re-raise our custom file transfer errors
-            raise
+            # Upload the file with progress callback
+            success, message = client.upload_file(
+                gcode_file_path,
+                remote_filename,
+                remote_dir=remote_path.rstrip("/"),
+                progress_callback=progress_callback,
+            )
 
-        except PrinterConnectionError:
-            # Re-raise our custom connection errors
-            raise
-
-        except ftplib.error_perm as e:
-            error_msg = f"FTP permission error: {str(e)}"
-            logger.error(f"Upload failed to {printer_config.name}: " f"{error_msg}")
-            raise PrinterAuthenticationError(error_msg)
-
-        except ftplib.error_temp as e:
-            error_msg = f"FTP temporary error: {str(e)}"
-            logger.error(f"Upload failed to {printer_config.name}: " f"{error_msg}")
-            raise PrinterFileTransferError(error_msg)
-
-        except (ftplib.error_proto, ConnectionError, OSError) as e:
-            error_msg = f"FTP connection error: {str(e)}"
-            logger.error(f"Upload failed to {printer_config.name}: " f"{error_msg}")
-            raise PrinterConnectionError(error_msg)
+            if success:
+                logger.info(f"Successfully uploaded {gcode_file_path.name} to printer")
+                return FTPUploadResult(
+                    success=True,
+                    message=message,
+                    remote_path=full_remote_path,
+                )
+            else:
+                raise PrinterFileTransferError(message)
 
         except Exception as e:
-            error_msg = f"Unexpected error during FTP upload: {str(e)}"
-            logger.error(f"Upload failed to {printer_config.name}: " f"{error_msg}")
+            if isinstance(e, (PrinterConnectionError, PrinterFileTransferError)):
+                raise
+            error_msg = f"FTP upload error: {str(e)}"
+            logger.error(f"Upload failed to {printer_config.name}: {error_msg}")
             raise PrinterCommunicationError(error_msg)
-        finally:
-            # Always close the FTP connection
-            if ftp:
-                try:
-                    ftp.quit()
-                    logger.debug(f"Closed FTP connection to " f"{printer_config.ip}")
-                except Exception:
-                    # If quit fails, try close
-                    try:
-                        ftp.close()
-                    except Exception:
-                        pass
 
     def start_print(
         self,
@@ -488,14 +418,93 @@ class PrinterService:
             # Publish the message
             msg_info = client.publish(device_topic, message, qos=1)
 
-            # Wait for publish to complete
+            # Check if publish failed immediately
+            if msg_info.rc != mqtt.MQTT_ERR_SUCCESS:
+                raise PrinterMQTTError(f"MQTT publish failed with code {msg_info.rc}")
+
+            # Wait for publish to complete using wait_for_publish with timeout
             start_time = time.time()
-            while not msg_info.is_published() and publish_error is None:
-                if time.time() - start_time > timeout:
-                    raise PrinterMQTTError(
-                        f"MQTT publish timeout after {timeout} seconds"
-                    )
-                time.sleep(0.1)
+            remaining_timeout = timeout
+
+            logger.debug(
+                f"Waiting for MQTT publish to complete for {printer_config.name}"
+            )
+
+            # Add a maximum iteration count as a failsafe
+            max_iterations = int(timeout * 2)  # 2 iterations per second
+            iteration_count = 0
+
+            while (
+                remaining_timeout > 0
+                and publish_error is None
+                and iteration_count < max_iterations
+            ):
+                # Check if cancelled - is client still tracked
+                from app.mqtt_async_patch_v3 import (
+                    _active_mqtt_clients,
+                    _clients_lock,
+                    _switching_lock,
+                    _switching_printers,
+                )
+
+                # First check if we're switching printers - fail immediately
+                with _switching_lock:
+                    if _switching_printers:
+                        logger.debug(
+                            "Printer switching in progress - cancelling operation"
+                        )
+                        raise PrinterMQTTError(
+                            "Operation cancelled - switching printers"
+                        )
+
+                with _clients_lock:
+                    if printer_config.ip not in _active_mqtt_clients:
+                        logger.debug(
+                            f"MQTT client no longer active for {printer_config.ip}"
+                        )
+                        raise PrinterMQTTError("Operation cancelled")
+
+                try:
+                    # Try to check if client is still connected
+                    if not client.is_connected():
+                        logger.warning(
+                            f"MQTT client disconnected for {printer_config.ip}"
+                        )
+                        raise PrinterMQTTError("MQTT client disconnected")
+
+                    # Use wait_for_publish with a short timeout
+                    msg_info.wait_for_publish(timeout=min(0.5, remaining_timeout))
+                    # If we get here, publish completed successfully
+                    logger.debug(f"MQTT publish completed for {printer_config.name}")
+                    break
+                except Exception as e:
+                    # Log the specific error
+                    logger.debug(f"wait_for_publish error: {type(e).__name__}: {e}")
+
+                    # Timeout or other error - check if we should continue
+                    elapsed = time.time() - start_time
+                    remaining_timeout = timeout - elapsed
+                    if remaining_timeout <= 0:
+                        logger.error(
+                            f"MQTT publish timeout for {printer_config.name} "
+                            f"after {elapsed:.1f}s"
+                        )
+                        raise PrinterMQTTError(
+                            f"MQTT publish timeout after {timeout} seconds"
+                        )
+
+                # Increment iteration counter
+                iteration_count += 1
+
+            # Check if we exited due to iteration limit
+            if iteration_count >= max_iterations:
+                logger.error(
+                    f"MQTT publish exceeded max iterations for "
+                    f"{printer_config.name}"
+                )
+                raise PrinterMQTTError(
+                    "MQTT publish operation stuck - operation cancelled"
+                )
 
             if publish_error:
                 raise PrinterMQTTError(publish_error)
@@ -526,7 +535,7 @@ class PrinterService:
             # Cleanup now handled by async wrapper
             if client:
                 try:
-                    client.loop_stop()
+                    client.loop_stop(force=True)
                     client.disconnect()
                 except Exception as e:
                     logger.debug(f"Error during MQTT cleanup: {e}")
@@ -612,7 +621,7 @@ class PrinterService:
                     messages_received += 1
 
                     # Log the raw response for debugging
-                    logger.info(
+                    logger.debug(
                         f"Raw MQTT response for AMS query "
                         f"(message #{messages_received}): "
                         f"{json.dumps(response_json, indent=2)}"
@@ -748,14 +757,93 @@ class PrinterService:
             # Publish the query message
             msg_info = client.publish(device_topic, message, qos=1)
 
-            # Wait for publish to complete
+            # Check if publish failed immediately
+            if msg_info.rc != mqtt.MQTT_ERR_SUCCESS:
+                raise PrinterMQTTError(f"MQTT publish failed with code {msg_info.rc}")
+
+            # Wait for publish to complete using wait_for_publish with timeout
             start_time = time.time()
-            while not msg_info.is_published() and publish_error is None:
-                if time.time() - start_time > timeout:
-                    raise PrinterMQTTError(
-                        f"MQTT publish timeout after {timeout} seconds"
-                    )
-                time.sleep(0.1)
+            remaining_timeout = timeout
+
+            logger.debug(
+                f"Waiting for MQTT publish to complete for {printer_config.name}"
+            )
+
+            # Add a maximum iteration count as a failsafe
+            max_iterations = int(timeout * 2)  # 2 iterations per second
+            iteration_count = 0
+
+            while (
+                remaining_timeout > 0
+                and publish_error is None
+                and iteration_count < max_iterations
+            ):
+                # Check if cancelled - is client still tracked
+                from app.mqtt_async_patch_v3 import (
+                    _active_mqtt_clients,
+                    _clients_lock,
+                    _switching_lock,
+                    _switching_printers,
+                )
+
+                # First check if we're switching printers - fail immediately
+                with _switching_lock:
+                    if _switching_printers:
+                        logger.debug(
+                            "Printer switching in progress - cancelling operation"
+                        )
+                        raise PrinterMQTTError(
+                            "Operation cancelled - switching printers"
+                        )
+
+                with _clients_lock:
+                    if printer_config.ip not in _active_mqtt_clients:
+                        logger.debug(
+                            f"MQTT client no longer active for {printer_config.ip}"
+                        )
+                        raise PrinterMQTTError("Operation cancelled")
+
+                try:
+                    # Try to check if client is still connected
+                    if not client.is_connected():
+                        logger.warning(
+                            f"MQTT client disconnected for {printer_config.ip}"
+                        )
+                        raise PrinterMQTTError("MQTT client disconnected")
+
+                    # Use wait_for_publish with a short timeout
+                    msg_info.wait_for_publish(timeout=min(0.5, remaining_timeout))
+                    # If we get here, publish completed successfully
+                    logger.debug(f"MQTT publish completed for {printer_config.name}")
+                    break
+                except Exception as e:
+                    # Log the specific error
+                    logger.debug(f"wait_for_publish error: {type(e).__name__}: {e}")
+
+                    # Timeout or other error - check if we should continue
+                    elapsed = time.time() - start_time
+                    remaining_timeout = timeout - elapsed
+                    if remaining_timeout <= 0:
+                        logger.error(
+                            f"MQTT publish timeout for {printer_config.name} "
+                            f"after {elapsed:.1f}s"
+                        )
+                        raise PrinterMQTTError(
+                            f"MQTT publish timeout after {timeout} seconds"
+                        )
+
+                # Increment iteration counter
+                iteration_count += 1
+
+            # Check if we exited due to iteration limit
+            if iteration_count >= max_iterations:
+                logger.error(
+                    f"MQTT publish exceeded max iterations for "
+                    f"{printer_config.name}"
+                )
+                raise PrinterMQTTError(
+                    "MQTT publish operation stuck - operation cancelled"
+                )
 
             if publish_error:
                 raise PrinterMQTTError(publish_error)
@@ -856,7 +944,7 @@ class PrinterService:
             # Cleanup now handled by async wrapper
             if client:
                 try:
-                    client.loop_stop()
+                    client.loop_stop(force=True)
                     client.disconnect()
                 except Exception as e:
                     logger.debug(f"Error during MQTT cleanup: {e}")
@@ -1035,7 +1123,7 @@ class PrinterService:
                     response_json = json.loads(payload)
 
                     # Log the raw response for debugging
-                    logger.info(
+                    logger.debug(
                         f"Raw MQTT response from printer: "
                         f"{json.dumps(response_json, indent=2)}"
                     )
@@ -1119,14 +1207,93 @@ class PrinterService:
             # Publish the query message
             msg_info = client.publish(device_topic, message, qos=1)
 
-            # Wait for publish to complete
+            # Check if publish failed immediately
+            if msg_info.rc != mqtt.MQTT_ERR_SUCCESS:
+                raise PrinterMQTTError(f"MQTT publish failed with code {msg_info.rc}")
+
+            # Wait for publish to complete using wait_for_publish with timeout
             start_time = time.time()
-            while not msg_info.is_published() and publish_error is None:
-                if time.time() - start_time > timeout:
-                    raise PrinterMQTTError(
-                        f"MQTT publish timeout after {timeout} seconds"
-                    )
-                time.sleep(0.1)
+            remaining_timeout = timeout
+
+            logger.debug(
+                f"Waiting for MQTT publish to complete for {printer_config.name}"
+            )
+
+            # Add a maximum iteration count as a failsafe
+            max_iterations = int(timeout * 2)  # 2 iterations per second
+            iteration_count = 0
+
+            while (
+                remaining_timeout > 0
+                and publish_error is None
+                and iteration_count < max_iterations
+            ):
+                # Check if cancelled - is client still tracked
+                from app.mqtt_async_patch_v3 import (
+                    _active_mqtt_clients,
+                    _clients_lock,
+                    _switching_lock,
+                    _switching_printers,
+                )
+
+                # First check if we're switching printers - fail immediately
+                with _switching_lock:
+                    if _switching_printers:
+                        logger.debug(
+                            "Printer switching in progress - cancelling operation"
+                        )
+                        raise PrinterMQTTError(
+                            "Operation cancelled - switching printers"
+                        )
+
+                with _clients_lock:
+                    if printer_config.ip not in _active_mqtt_clients:
+                        logger.debug(
+                            f"MQTT client no longer active for {printer_config.ip}"
+                        )
+                        raise PrinterMQTTError("Operation cancelled")
+
+                try:
+                    # Try to check if client is still connected
+                    if not client.is_connected():
+                        logger.warning(
+                            f"MQTT client disconnected for {printer_config.ip}"
+                        )
+                        raise PrinterMQTTError("MQTT client disconnected")
+
+                    # Use wait_for_publish with a short timeout
+                    msg_info.wait_for_publish(timeout=min(0.5, remaining_timeout))
+                    # If we get here, publish completed successfully
+                    logger.debug(f"MQTT publish completed for {printer_config.name}")
+                    break
+                except Exception as e:
+                    # Log the specific error
+                    logger.debug(f"wait_for_publish error: {type(e).__name__}: {e}")
+
+                    # Timeout or other error - check if we should continue
+                    elapsed = time.time() - start_time
+                    remaining_timeout = timeout - elapsed
+                    if remaining_timeout <= 0:
+                        logger.error(
+                            f"MQTT publish timeout for {printer_config.name} "
+                            f"after {elapsed:.1f}s"
+                        )
+                        raise PrinterMQTTError(
+                            f"MQTT publish timeout after {timeout} seconds"
+                        )
+
+                # Increment iteration counter
+                iteration_count += 1
+
+            # Check if we exited due to iteration limit
+            if iteration_count >= max_iterations:
+                logger.error(
+                    f"MQTT publish exceeded max iterations for "
+                    f"{printer_config.name}"
+                )
+                raise PrinterMQTTError(
+                    "MQTT publish operation stuck - operation cancelled"
+                )
 
             if publish_error:
                 raise PrinterMQTTError(publish_error)
@@ -1134,6 +1301,12 @@ class PrinterService:
             # Wait for response with printer status data
             start_time = time.time()
             while not response_received and time.time() - start_time < timeout:
+                # Check if cancelled - is client still tracked
+                from app.mqtt_async_patch_v3 import _active_mqtt_clients, _clients_lock
+
+                with _clients_lock:
+                    if printer_config.ip not in _active_mqtt_clients:
+                        raise PrinterMQTTError("Operation cancelled")
                 time.sleep(0.1)
 
             if not response_received:
@@ -1184,7 +1357,7 @@ class PrinterService:
             # Cleanup now handled by async wrapper
             if client:
                 try:
-                    client.loop_stop()
+                    client.loop_stop(force=True)
                     client.disconnect()
                 except Exception as e:
                     logger.debug(f"Error during MQTT cleanup: {e}")
@@ -1351,41 +1524,27 @@ class PrinterService:
         Returns:
             bool: True if connection successful, False otherwise
         """
-        ftp = None
         try:
             logger.info(
                 f"Testing FTP connection to printer "
                 f"{printer_config.name} ({printer_config.ip})"
             )
 
-            ftp = ftplib.FTP_TLS()
-            ftp.connect(printer_config.ip, self.DEFAULT_FTP_PORT, self.timeout)
+            # Use curl-based FTP client for implicit FTPS
+            client = CurlFTPSClient(
+                host=printer_config.ip,
+                password=printer_config.access_code,
+                timeout=self.timeout,
+            )
 
-            # Authenticate with "bblp" username and access code
-            try:
-                ftp.login("bblp", printer_config.access_code)
-                logger.debug("FTPS access code authentication successful")
-                # Enable protection level for data transfer
-                ftp.prot_p()
-            except ftplib.error_perm as e:
-                logger.error(f"FTPS authentication failed: {e}")
-                raise
-
-            logger.info(f"FTP connection test successful for " f"{printer_config.name}")
-            return True
+            # Test connection
+            if client.test_connection():
+                logger.info(f"FTP connection test successful for {printer_config.name}")
+                return True
+            else:
+                logger.warning(f"FTP connection test failed for {printer_config.name}")
+                return False
 
         except Exception as e:
-            logger.warning(
-                f"FTP connection test failed for " f"{printer_config.name}: {e}"
-            )
+            logger.warning(f"FTP connection test failed for {printer_config.name}: {e}")
             return False
-
-        finally:
-            if ftp:
-                try:
-                    ftp.quit()
-                except Exception:
-                    try:
-                        ftp.close()
-                    except Exception:
-                        pass

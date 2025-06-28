@@ -10,6 +10,7 @@ import {
 interface ModelTabProps {
   onModelAnalyzed: (data: {
     fileId: string;
+    originalFilename?: string;
     filamentRequirements: FilamentRequirement | null;
     plates: PlateInfo[];
     hasMultiplePlates: boolean;
@@ -152,6 +153,7 @@ export function ModelTab({
         // Notify parent component with model URL
         onModelAnalyzed({
           fileId: result.file_id || '',
+          originalFilename: result.original_filename,
           filamentRequirements: result.filament_requirements || null,
           plates,
           hasMultiplePlates,
@@ -281,13 +283,15 @@ export function ModelTab({
         setModelSubmitted(true);
         setCurrentWorkflowStep('');
 
-        // Notify parent component with file name as fallback URL
+        // Notify parent component - for file uploads, pass the filename
+        // This helps distinguish file uploads from URLs in downstream components
         onModelAnalyzed({
           fileId: result.file_id || '',
+          originalFilename: result.original_filename,
           filamentRequirements: result.filament_requirements || null,
           plates,
           hasMultiplePlates,
-          modelUrl: selectedFile.name,
+          modelUrl: selectedFile.name, // Filename for display purposes
         });
       } else {
         updateOperationStep(2, 'error', 'Analysis failed', result.message);

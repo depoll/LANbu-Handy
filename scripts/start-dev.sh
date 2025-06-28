@@ -13,6 +13,31 @@ NC='\033[0m' # No Color
 
 echo -e "${GREEN}Starting LANbu Handy development servers...${NC}"
 
+# Check if start-dev.sh is already running
+# Get all PIDs matching start-dev.sh except the current script and its parent
+SCRIPT_NAME=$(basename "$0")
+EXISTING_PIDS=""
+for pid in $(pgrep -f "$SCRIPT_NAME" || true); do
+    # Skip current process and its parent
+    if [ "$pid" != "$$" ] && [ "$pid" != "$PPID" ]; then
+        # Check if it's actually a bash script running start-dev.sh
+        if ps -p "$pid" -o comm= 2>/dev/null | grep -qE "(bash|sh)" && \
+           ps -p "$pid" -o args= 2>/dev/null | grep -q "$SCRIPT_NAME"; then
+            EXISTING_PIDS="$EXISTING_PIDS $pid"
+        fi
+    fi
+done
+
+# Trim whitespace
+EXISTING_PIDS=$(echo "$EXISTING_PIDS" | xargs)
+
+if [ -n "$EXISTING_PIDS" ]; then
+    echo -e "${RED}Error: start-dev.sh is already running!${NC}"
+    echo -e "${YELLOW}Existing PIDs: $EXISTING_PIDS${NC}"
+    echo -e "${YELLOW}Use './scripts/stop-dev.sh' to stop the existing servers first.${NC}"
+    exit 1
+fi
+
 # Store PIDs of all processes we start
 BACKEND_PID=""
 PWA_PID=""
@@ -62,7 +87,13 @@ cleanup() {
     pkill -f "uvicorn app.main:app" 2>/dev/null || true
 
     # Kill npm/node processes running on port 5173
-    lsof -ti:5173 | xargs -r kill -9 2>/dev/null || true
+    # Use netstat as a fallback if lsof is not available
+    if command -v lsof >/dev/null 2>&1; then
+        lsof -ti:5173 | xargs -r kill -9 2>/dev/null || true
+    else
+        # Find processes using port 5173 with netstat
+        netstat -tlnp 2>/dev/null | grep ':5173' | awk '{print $7}' | cut -d'/' -f1 | xargs -r kill -9 2>/dev/null || true
+    fi
 
     # Kill npm/node processes for the PWA dev server
     pkill -f "npm run dev.*pwa" 2>/dev/null || true
@@ -79,16 +110,45 @@ trap cleanup SIGINT SIGTERM EXIT
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
+# Function to check if a port is in use
+check_port() {
+    local port=$1
+    if command -v lsof >/dev/null 2>&1; then
+        lsof -i:$port >/dev/null 2>&1
+    else
+        # Use netstat as fallback
+        netstat -tln 2>/dev/null | grep -q ":$port "
+    fi
+}
+
 # Check if servers are already running on expected ports
-if lsof -i:8000 >/dev/null 2>&1; then
+if check_port 8000; then
     echo -e "${RED}Backend server already running on port 8000!${NC}"
-    echo -e "${YELLOW}Please stop it first or use a different port.${NC}"
+    echo -e "${YELLOW}Please stop it first or use './scripts/stop-dev.sh'.${NC}"
     exit 1
 fi
 
-if lsof -i:5173 >/dev/null 2>&1; then
+if check_port 5173; then
     echo -e "${RED}PWA dev server already running on port 5173!${NC}"
-    echo -e "${YELLOW}Please stop it first or use a different port.${NC}"
+    echo -e "${YELLOW}Please stop it first or use './scripts/stop-dev.sh'.${NC}"
+    exit 1
+fi
+
+# Also check for port 3000/3001 which vite might use as fallback
+if check_port 3000; then
+    echo -e "${YELLOW}Warning: Port 3000 is in use. Vite may use a different port.${NC}"
+fi
+
+# Check if backend or frontend processes are already running
+if pgrep -f "uvicorn app.main:app" >/dev/null 2>&1; then
+    echo -e "${RED}Backend server process already running!${NC}"
+    echo -e "${YELLOW}Use './scripts/stop-dev.sh' to stop it first.${NC}"
+    exit 1
+fi
+
+if pgrep -f "vite.*pwa" >/dev/null 2>&1; then
+    echo -e "${RED}PWA dev server process already running!${NC}"
+    echo -e "${YELLOW}Use './scripts/stop-dev.sh' to stop it first.${NC}"
     exit 1
 fi
 

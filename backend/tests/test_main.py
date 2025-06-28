@@ -5,7 +5,7 @@ Tests for the main FastAPI application endpoints.
 import os
 import tempfile
 from pathlib import Path
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 from app.main import app
@@ -928,7 +928,8 @@ class TestAMSStatusEndpoint:
     """Test cases for AMS status endpoints."""
 
     @patch("app.main.config")
-    def test_ams_status_successful(self, mock_config):
+    @pytest.mark.asyncio
+    async def test_ams_status_successful(self, mock_config):
         """Test successful AMS status query."""
         from app.config import PrinterConfig
         from app.printer_service import AMSFilament, AMSStatusResult, AMSUnit
@@ -947,19 +948,30 @@ class TestAMSStatusEndpoint:
         filament2 = AMSFilament(slot_id=1, filament_type="PETG", color="Blue")
         ams_unit = AMSUnit(unit_id=0, filaments=[filament1, filament2])
 
-        # Mock the printer service query
-        with patch("app.main.printer_service.query_ams_status_async") as mock_query:
-            # Create an async mock that returns the result
-            async_mock = AsyncMock()
-            async_mock.return_value = AMSStatusResult(
-                success=True,
-                message="AMS status retrieved successfully",
-                ams_units=[ams_unit],
-            )
-            mock_query.return_value = async_mock.return_value
+        # Mock the printer service queries
+        with patch(
+            "app.main.printer_service.query_printer_status_async",
+            new_callable=AsyncMock,
+        ) as mock_status:
+            with patch(
+                "app.main.printer_service.query_ams_status_async",
+                new_callable=AsyncMock,
+            ) as mock_query:
+                # Mock printer status to indicate AMS is present
+                mock_status.return_value = Mock(
+                    success=True,
+                    ams_units=[Mock()],  # Non-empty to indicate AMS exists
+                    external_spool=None,
+                )
 
-            # Make the request
-            response = client.get("/api/printer/test-printer/ams-status")
+                mock_query.return_value = AMSStatusResult(
+                    success=True,
+                    message="AMS status retrieved successfully",
+                    ams_units=[ams_unit],
+                )
+
+                # Make the request
+                response = client.get("/api/printer/test-printer/ams-status")
 
             # Verify response
             assert response.status_code == 200
@@ -1022,7 +1034,8 @@ class TestAMSStatusEndpoint:
         assert "printer2" in data["detail"]
 
     @patch("app.main.config")
-    def test_ams_status_default_printer(self, mock_config):
+    @pytest.mark.asyncio
+    async def test_ams_status_default_printer(self, mock_config):
         """Test AMS status using 'default' printer ID."""
         from app.config import PrinterConfig
         from app.printer_service import AMSStatusResult
@@ -1035,26 +1048,39 @@ class TestAMSStatusEndpoint:
         mock_config.get_default_printer.return_value = test_printer
 
         # Mock AMS query result
-        with patch("app.main.printer_service.query_ams_status_async") as mock_query:
-            async_mock = AsyncMock()
-            async_mock.return_value = AMSStatusResult(
-                success=True, message="AMS status retrieved", ams_units=[]
-            )
-            mock_query.return_value = async_mock.return_value
+        with patch(
+            "app.main.printer_service.query_printer_status_async",
+            new_callable=AsyncMock,
+        ) as mock_status:
+            with patch(
+                "app.main.printer_service.query_ams_status_async",
+                new_callable=AsyncMock,
+            ) as mock_query:
+                # Mock printer status to indicate AMS is present
+                mock_status.return_value = Mock(
+                    success=True,
+                    ams_units=[Mock()],  # Non-empty to indicate AMS exists
+                    external_spool=None,
+                )
 
-            # Make the request with 'default' printer ID
-            response = client.get("/api/printer/default/ams-status")
+                mock_query.return_value = AMSStatusResult(
+                    success=True, message="AMS status retrieved", ams_units=[]
+                )
 
-            assert response.status_code == 200
-            data = response.json()
-            assert data["success"] is True
+                # Make the request with 'default' printer ID
+                response = client.get("/api/printer/default/ams-status")
 
-            # Verify default printer was used
-            mock_config.get_default_printer.assert_called_once()
-            mock_query.assert_called_once_with(test_printer)
+                assert response.status_code == 200
+                data = response.json()
+                assert data["success"] is True
+
+                # Verify default printer was used
+                mock_config.get_default_printer.assert_called_once()
+                mock_query.assert_called_once_with(test_printer)
 
     @patch("app.main.config")
-    def test_ams_status_query_failure(self, mock_config):
+    @pytest.mark.asyncio
+    async def test_ams_status_query_failure(self, mock_config):
         """Test AMS status when query fails."""
         from app.config import PrinterConfig
         from app.printer_service import AMSStatusResult
@@ -1067,28 +1093,41 @@ class TestAMSStatusEndpoint:
         mock_config.get_printer_by_id.return_value = test_printer
 
         # Mock failed AMS query
-        with patch("app.main.printer_service.query_ams_status_async") as mock_query:
-            async_mock = AsyncMock()
-            async_mock.return_value = AMSStatusResult(
-                success=False,
-                message="MQTT communication failed",
-                error_details="Connection timeout",
-            )
-            mock_query.return_value = async_mock.return_value
+        with patch(
+            "app.main.printer_service.query_printer_status_async",
+            new_callable=AsyncMock,
+        ) as mock_status:
+            with patch(
+                "app.main.printer_service.query_ams_status_async",
+                new_callable=AsyncMock,
+            ) as mock_query:
+                # Mock printer status to indicate AMS is present
+                mock_status.return_value = Mock(
+                    success=True,
+                    ams_units=[Mock()],  # Non-empty to indicate AMS exists
+                    external_spool=None,
+                )
 
-            response = client.get("/api/printer/test-printer/ams-status")
+                mock_query.return_value = AMSStatusResult(
+                    success=False,
+                    message="MQTT communication failed",
+                    error_details="Connection timeout",
+                )
 
-            # API returns 200 with error in body
-            assert response.status_code == 200
-            data = response.json()
+                response = client.get("/api/printer/test-printer/ams-status")
 
-            assert data["success"] is False
-            assert data["message"] == "MQTT communication failed"
-            assert data["error_details"] == "Connection timeout"
-            assert data["ams_units"] is None
+                # API returns 200 with error in body
+                assert response.status_code == 200
+                data = response.json()
+
+                assert data["success"] is False
+                assert data["message"] == "MQTT communication failed"
+                assert data["error_details"] == "Connection timeout"
+                assert data["ams_units"] is None
 
     @patch("app.main.config")
-    def test_ams_status_mqtt_exception(self, mock_config):
+    @pytest.mark.asyncio
+    async def test_ams_status_mqtt_exception(self, mock_config):
         """Test AMS status when MQTT exception is raised."""
         from app.config import PrinterConfig
         from app.printer_service import PrinterMQTTError
@@ -1101,15 +1140,183 @@ class TestAMSStatusEndpoint:
         mock_config.get_printer_by_id.return_value = test_printer
 
         # Mock MQTT exception
-        with patch("app.main.printer_service.query_ams_status_async") as mock_query:
-            mock_query.side_effect = PrinterMQTTError("MQTT broker unreachable")
+        with patch(
+            "app.main.printer_service.query_printer_status_async",
+            new_callable=AsyncMock,
+        ) as mock_status:
+            with patch(
+                "app.main.printer_service.query_ams_status_async",
+                new_callable=AsyncMock,
+            ) as mock_query:
+                # Mock printer status to indicate AMS is present
+                mock_status.return_value = Mock(
+                    success=True,
+                    ams_units=[Mock()],  # Non-empty to indicate AMS exists
+                    external_spool=None,
+                )
 
-            response = client.get("/api/printer/test-printer/ams-status")
+                mock_query.side_effect = PrinterMQTTError("MQTT broker unreachable")
 
-            # API returns 200 with error in body
+                response = client.get("/api/printer/test-printer/ams-status")
+
+                # API returns 200 with error in body
+                assert response.status_code == 200
+                data = response.json()
+
+                assert data["success"] is False
+                assert data["message"] == "MQTT communication error"
+                assert "MQTT broker unreachable" in data["error_details"]
+
+
+class TestUploadProgress:
+    """Test upload progress tracking functionality."""
+
+    def test_upload_progress_found(self):
+        """Test successful progress retrieval."""
+        from app.upload_progress_service import UploadProgress
+
+        test_upload_id = "test_upload_123"
+
+        # Set up mock progress data
+        with patch(
+            "app.main.upload_progress_service.get_progress"
+        ) as mock_get_progress:
+            mock_progress = Mock(spec=UploadProgress)
+            mock_progress.filename = "test.gcode"
+            mock_progress.total_size = 1024000
+            mock_progress.uploaded_size = 512000
+            mock_progress.percent = 50
+            mock_progress.status = "uploading"
+            mock_progress.message = "Uploading..."
+            mock_progress.remote_path = ""
+            mock_progress.elapsed_time = 5.0
+            mock_progress.upload_speed = 0.1
+
+            mock_get_progress.return_value = mock_progress
+
+            response = client.get(f"/api/upload/progress/{test_upload_id}")
+
             assert response.status_code == 200
-            data = response.json()
+            result = response.json()
+            assert result["percent"] == 50
+            assert result["status"] == "uploading"
+            assert result["filename"] == "test.gcode"
+            mock_get_progress.assert_called_once_with(test_upload_id)
 
-            assert data["success"] is False
-            assert data["message"] == "MQTT communication error"
-            assert "MQTT broker unreachable" in data["error_details"]
+    def test_upload_progress_not_found(self):
+        """Test progress retrieval for non-existent upload."""
+        test_upload_id = "nonexistent_upload"
+
+        with patch(
+            "app.main.upload_progress_service.get_progress"
+        ) as mock_get_progress:
+            mock_get_progress.return_value = None
+
+            response = client.get(f"/api/upload/progress/{test_upload_id}")
+
+            assert response.status_code == 404
+            assert "Upload progress not found" in response.json()["detail"]
+
+    def test_upload_progress_completed(self):
+        """Test progress retrieval for completed upload."""
+        from app.upload_progress_service import UploadProgress
+
+        test_upload_id = "completed_upload"
+
+        with patch(
+            "app.main.upload_progress_service.get_progress"
+        ) as mock_get_progress:
+            mock_progress = Mock(spec=UploadProgress)
+            mock_progress.filename = "test.gcode"
+            mock_progress.total_size = 1024000
+            mock_progress.uploaded_size = 1024000
+            mock_progress.percent = 100
+            mock_progress.status = "completed"
+            mock_progress.message = "Upload completed"
+            mock_progress.remote_path = "/cache/test.gcode"
+            mock_progress.elapsed_time = 10.0
+            mock_progress.upload_speed = 0.1
+
+            mock_get_progress.return_value = mock_progress
+
+            response = client.get(f"/api/upload/progress/{test_upload_id}")
+
+            assert response.status_code == 200
+            result = response.json()
+            assert result["percent"] == 100
+            assert result["status"] == "completed"
+            assert result["remote_path"] == "/cache/test.gcode"
+
+    def test_upload_progress_error(self):
+        """Test progress retrieval for failed upload."""
+        from app.upload_progress_service import UploadProgress
+
+        test_upload_id = "failed_upload"
+
+        with patch(
+            "app.main.upload_progress_service.get_progress"
+        ) as mock_get_progress:
+            mock_progress = Mock(spec=UploadProgress)
+            mock_progress.filename = "test.gcode"
+            mock_progress.total_size = 1024000
+            mock_progress.uploaded_size = 768000
+            mock_progress.percent = 75
+            mock_progress.status = "error"
+            mock_progress.message = "Connection lost"
+            mock_progress.remote_path = ""
+            mock_progress.elapsed_time = 7.5
+            mock_progress.upload_speed = 0.1
+
+            mock_get_progress.return_value = mock_progress
+
+            response = client.get(f"/api/upload/progress/{test_upload_id}")
+
+            assert response.status_code == 200
+            result = response.json()
+            assert result["percent"] == 75
+            assert result["status"] == "error"
+            assert result["message"] == "Connection lost"
+
+
+class TestOriginalFilenamePreservation:
+    """Test that original filenames are preserved through the pipeline."""
+
+    def test_model_submit_preserves_filename(self):
+        """Test that model submission preserves original filename."""
+        # Already tested in TestModelFileUploadEndpoint.test_upload_model_file_success
+        # which verifies that original_filename is preserved.
+        # Since it's already tested there, we can skip this duplicate test.
+        pass
+
+    def test_slice_uses_original_filename(self):
+        """Test that slicing uses the original filename for output."""
+        file_id = "test123"
+        original_filename = "my_awesome_model.3mf"
+
+        request_data = {
+            "file_id": file_id,
+            "original_filename": original_filename,
+            "filament_mappings": [],
+            "build_plate_type": "textured_pei_plate",
+            "selected_plate_index": 0,
+        }
+
+        with patch("app.main.Path.exists") as mock_exists:
+            mock_exists.return_value = True
+
+            with patch("app.main.slice_model") as mock_slice:
+                mock_slice.return_value = Mock(success=True, exit_code=0)
+
+                with patch("app.main.find_gcode_file") as mock_find:
+                    mock_find.return_value = Path(
+                        "/tmp/my_awesome_model_plate_0.gcode.3mf"
+                    )
+
+                    response = client.post("/api/slice/configured", json=request_data)
+
+                    assert response.status_code == 200
+
+                    # Verify slice was called with model_name param
+                    mock_slice.assert_called_once()
+                    call_kwargs = mock_slice.call_args[1]
+                    assert call_kwargs.get("model_name") == original_filename

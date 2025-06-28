@@ -159,6 +159,7 @@ class BambuStudioCLIWrapper:
         options: Optional[Dict[str, str]] = None,
         plate_index: Optional[int] = None,
         export_3mf: bool = True,
+        model_name: Optional[str] = None,
     ) -> CLIResult:
         """
         Slice a 3D model using Bambu Studio CLI.
@@ -206,11 +207,20 @@ class BambuStudioCLIWrapper:
 
         # Add export-3mf option if requested
         if export_3mf:
-            # Generate filename based on plate index
-            if plate_index is not None:
-                export_filename = f"plate_{plate_index}.gcode.3mf"
+            # Generate filename based on model name and plate index
+            if model_name:
+                # Remove extension from model name if present
+                base_name = Path(model_name).stem
+                if plate_index is not None:
+                    export_filename = f"{base_name}_plate_{plate_index}.gcode.3mf"
+                else:
+                    export_filename = f"{base_name}.gcode.3mf"
             else:
-                export_filename = "output.gcode.3mf"
+                # Fall back to generic names
+                if plate_index is not None:
+                    export_filename = f"plate_{plate_index}.gcode.3mf"
+                else:
+                    export_filename = "output.gcode.3mf"
             # Just use the filename, not the full path
             # The CLI will save it in the output directory
             args.extend(["--export-3mf", export_filename])
@@ -326,6 +336,7 @@ def slice_model(
     options: Optional[Dict[str, str]] = None,
     plate_index: Optional[int] = None,
     export_3mf: bool = True,
+    model_name: Optional[str] = None,
 ) -> CLIResult:
     """
     Slice a 3D model using Bambu Studio CLI.
@@ -347,5 +358,5 @@ def slice_model(
 
     wrapper = BambuStudioCLIWrapper()
     return wrapper.slice_model(
-        cleaned_path, output_dir, options, plate_index, export_3mf
+        cleaned_path, output_dir, options, plate_index, export_3mf, model_name
     )

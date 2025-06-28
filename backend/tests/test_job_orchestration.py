@@ -214,87 +214,134 @@ class TestSliceModelStep:
 class TestUploadGcodeStep:
     """Test cases for the upload_gcode_step function."""
 
-    def test_upload_gcode_step_success(self):
+    @pytest.mark.asyncio
+    async def test_upload_gcode_step_success(self):
         """Test successful G-code upload."""
         mock_printer_service = Mock()
         mock_printer_config = Mock()
-        mock_gcode_path = Path("/tmp/gcode/test.gcode")
+        mock_gcode_path = Mock(spec=Path)
+        mock_gcode_path.name = "test.gcode"
+        mock_gcode_path.stat.return_value.st_size = 1024
 
         mock_upload_result = Mock()
         mock_upload_result.success = True
         mock_upload_result.message = "Upload successful"
         mock_upload_result.remote_path = "/cache/test.gcode"
-        mock_printer_service.upload_gcode.return_value = mock_upload_result
+        mock_upload_result.upload_id = "test_upload_123"
+        mock_printer_service.upload_gcode = Mock(return_value=mock_upload_result)
 
-        result = upload_gcode_step(
-            mock_printer_service, mock_printer_config, mock_gcode_path
-        )
+        with patch("app.job_orchestration.upload_progress_service") as mock_progress:
+            with patch("app.job_orchestration.uuid.uuid4") as mock_uuid:
+                mock_uuid.return_value = "test_upload_123"
+                mock_progress.start_upload = AsyncMock()
+                mock_progress.update_progress = AsyncMock()
+                mock_progress.set_completed = AsyncMock()
+                mock_progress.set_error = AsyncMock()
 
-        assert result["success"] is True
-        assert result["message"] == "Upload successful"
-        assert "/cache/test.gcode" in result["details"]
-        assert result["gcode_filename"] == "test.gcode"
-        mock_printer_service.upload_gcode.assert_called_once_with(
-            printer_config=mock_printer_config, gcode_file_path=mock_gcode_path
-        )
+                result = await upload_gcode_step(
+                    mock_printer_service, mock_printer_config, mock_gcode_path
+                )
 
-    def test_upload_gcode_step_failure(self):
+                assert result["success"] is True
+                assert result["message"] == "Upload successful"
+                assert "/cache/test.gcode" in result["details"]
+                assert result["gcode_filename"] == "test.gcode"
+                assert result["upload_id"] == "test_upload_123"
+                mock_printer_service.upload_gcode.assert_called_once()
+                call_kwargs = mock_printer_service.upload_gcode.call_args[1]
+                assert call_kwargs["printer_config"] == mock_printer_config
+                assert call_kwargs["gcode_file_path"] == mock_gcode_path
+                assert "progress_callback" in call_kwargs
+
+    @pytest.mark.asyncio
+    async def test_upload_gcode_step_failure(self):
         """Test failed G-code upload."""
         mock_printer_service = Mock()
         mock_printer_config = Mock()
-        mock_gcode_path = Path("/tmp/gcode/test.gcode")
+        mock_gcode_path = Mock(spec=Path)
+        mock_gcode_path.name = "test.gcode"
+        mock_gcode_path.stat.return_value.st_size = 1024
 
         mock_upload_result = Mock()
         mock_upload_result.success = False
         mock_upload_result.message = "Upload failed"
         mock_upload_result.error_details = "Network timeout"
-        mock_printer_service.upload_gcode.return_value = mock_upload_result
+        mock_printer_service.upload_gcode = Mock(return_value=mock_upload_result)
 
-        result = upload_gcode_step(
-            mock_printer_service, mock_printer_config, mock_gcode_path
-        )
+        with patch("app.job_orchestration.upload_progress_service") as mock_progress:
+            with patch("app.job_orchestration.uuid.uuid4") as mock_uuid:
+                mock_uuid.return_value = "test_upload_123"
+                mock_progress.start_upload = AsyncMock()
+                mock_progress.update_progress = AsyncMock()
+                mock_progress.set_error = AsyncMock()
 
-        assert result["success"] is False
-        assert result["message"] == "G-code upload failed"
-        assert "Network timeout" in result["details"]
+                result = await upload_gcode_step(
+                    mock_printer_service, mock_printer_config, mock_gcode_path
+                )
 
-    def test_upload_gcode_step_failure_no_error_details(self):
+                assert result["success"] is False
+                assert result["message"] == "G-code upload failed"
+                assert "Network timeout" in result["details"]
+                assert result["upload_id"] == "test_upload_123"
+
+    @pytest.mark.asyncio
+    async def test_upload_gcode_step_failure_no_error_details(self):
         """Test failed G-code upload without error details."""
         mock_printer_service = Mock()
         mock_printer_config = Mock()
-        mock_gcode_path = Path("/tmp/gcode/test.gcode")
+        mock_gcode_path = Mock(spec=Path)
+        mock_gcode_path.name = "test.gcode"
+        mock_gcode_path.stat.return_value.st_size = 1024
 
         mock_upload_result = Mock()
         mock_upload_result.success = False
         mock_upload_result.message = "Upload failed"
         mock_upload_result.error_details = None
-        mock_printer_service.upload_gcode.return_value = mock_upload_result
+        mock_printer_service.upload_gcode = Mock(return_value=mock_upload_result)
 
-        result = upload_gcode_step(
-            mock_printer_service, mock_printer_config, mock_gcode_path
-        )
+        with patch("app.job_orchestration.upload_progress_service") as mock_progress:
+            with patch("app.job_orchestration.uuid.uuid4") as mock_uuid:
+                mock_uuid.return_value = "test_upload_123"
+                mock_progress.start_upload = AsyncMock()
+                mock_progress.update_progress = AsyncMock()
+                mock_progress.set_error = AsyncMock()
 
-        assert result["success"] is False
-        assert result["message"] == "G-code upload failed"
-        assert "Upload failed" in result["details"]
+                result = await upload_gcode_step(
+                    mock_printer_service, mock_printer_config, mock_gcode_path
+                )
 
-    def test_upload_gcode_step_exception(self):
+                assert result["success"] is False
+                assert result["message"] == "G-code upload failed"
+                assert "Upload failed" in result["details"]
+                assert result["upload_id"] == "test_upload_123"
+
+    @pytest.mark.asyncio
+    async def test_upload_gcode_step_exception(self):
         """Test G-code upload with unexpected exception."""
         mock_printer_service = Mock()
         mock_printer_config = Mock()
-        mock_gcode_path = Path("/tmp/gcode/test.gcode")
+        mock_gcode_path = Mock(spec=Path)
+        mock_gcode_path.name = "test.gcode"
+        mock_gcode_path.stat.return_value.st_size = 1024
 
         unexpected_error = Exception("Connection error")
-        mock_printer_service.upload_gcode.side_effect = unexpected_error
+        mock_printer_service.upload_gcode = Mock(side_effect=unexpected_error)
 
-        result = upload_gcode_step(
-            mock_printer_service, mock_printer_config, mock_gcode_path
-        )
+        with patch("app.job_orchestration.upload_progress_service") as mock_progress:
+            with patch("app.job_orchestration.uuid.uuid4") as mock_uuid:
+                mock_uuid.return_value = "test_upload_123"
+                mock_progress.start_upload = AsyncMock()
+                mock_progress.set_error = AsyncMock()
 
-        assert result["success"] is False
-        assert result["message"] == "Upload error"
-        assert "Connection error" in result["details"]
-        assert result["error"] == unexpected_error
+                result = await upload_gcode_step(
+                    mock_printer_service, mock_printer_config, mock_gcode_path
+                )
+
+                assert result["success"] is False
+                assert result["message"] == "Upload error"
+                assert "Connection error" in result["details"]
+                assert result["error"] == unexpected_error
+                assert result["upload_id"] == "test_upload_123"
 
 
 class TestStartPrintStep:

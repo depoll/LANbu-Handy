@@ -5,12 +5,15 @@ This module provides utilities for orchestrating complex print jobs
 that involve multiple steps like downloading, slicing, and printing.
 """
 
+import asyncio
+import uuid
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from app.model_service import ModelDownloadError, ModelService, ModelValidationError
 from app.printer_service import PrinterService
 from app.slicer_service import slice_model
+from app.upload_progress_service import upload_progress_service
 from app.utils import find_gcode_file, get_default_slicing_options, get_gcode_output_dir
 
 
@@ -115,44 +118,92 @@ def slice_model_step(file_path: Path) -> Dict[str, Any]:
         }
 
 
-def upload_gcode_step(
-    printer_service: PrinterService, printer_config, gcode_path: Path
+async def upload_gcode_step(
+    printer_service: PrinterService,
+    printer_config,
+    gcode_path: Path,
+    upload_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
-    Execute the G-code upload step of a print job.
+    Execute the G-code upload step of a print job with progress tracking.
 
     Args:
         printer_service: The printer service instance
         printer_config: Printer configuration object
         gcode_path: Path to the G-code file to upload
+        upload_id: Optional upload ID for progress tracking
 
     Returns:
-        Dict containing step results with 'success', 'message', 'details'
+        Dict containing step results with 'success', 'message', 'details', 'upload_id'
     """
     try:
+        # Generate upload ID if not provided
+        if not upload_id:
+            upload_id = str(uuid.uuid4())
+
+        # Get file size for progress tracking
+        file_size = gcode_path.stat().st_size
+
+        # Start progress tracking
+        await upload_progress_service.start_upload(
+            upload_id=upload_id, filename=gcode_path.name, total_size=file_size
+        )
+
+        # Create progress callback
+        async def progress_callback(percent: int, message: str):
+            await upload_progress_service.update_progress(upload_id, percent, message)
+
+        # Convert async callback to sync for the printer service
+        def sync_progress_callback(percent: int, message: str):
+            asyncio.create_task(progress_callback(percent, message))
+
+        # Upload with progress tracking
         upload_result = printer_service.upload_gcode(
-            printer_config=printer_config, gcode_file_path=gcode_path
+            printer_config=printer_config,
+            gcode_file_path=gcode_path,
+            progress_callback=sync_progress_callback,
         )
 
         if upload_result.success:
+            # Mark as completed
+            await upload_progress_service.set_completed(
+                upload_id=upload_id, remote_path=upload_result.remote_path
+            )
+
             return {
                 "success": True,
                 "message": upload_result.message,
                 "details": f"Remote path: {upload_result.remote_path}",
                 "gcode_filename": gcode_path.name,
+                "upload_id": upload_id,
+                "remote_path": upload_result.remote_path,
             }
         else:
+            # Mark as failed
+            await upload_progress_service.set_error(
+                upload_id=upload_id,
+                error_message=upload_result.error_details or upload_result.message,
+            )
+
             return {
                 "success": False,
                 "message": "G-code upload failed",
                 "details": upload_result.error_details or upload_result.message,
+                "upload_id": upload_id,
             }
     except Exception as e:
+        # Mark as failed if we have an upload_id
+        if upload_id:
+            await upload_progress_service.set_error(
+                upload_id=upload_id, error_message=str(e)
+            )
+
         return {
             "success": False,
             "message": "Upload error",
             "details": str(e),
             "error": e,
+            "upload_id": upload_id,
         }
 
 

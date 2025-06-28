@@ -15,8 +15,18 @@ echo -e "${YELLOW}Stopping LANbu Handy development servers...${NC}"
 
 # First, kill any running start-dev.sh scripts
 echo -e "${YELLOW}Stopping start-dev.sh scripts...${NC}"
-# Be more specific - only kill start-dev.sh processes that are in the scripts directory
-START_DEV_PIDS=$(pgrep -f "bash.*/workspace/scripts/start-dev\.sh" || true)
+# Look for start-dev.sh processes using multiple patterns
+START_DEV_PIDS=""
+# Pattern 1: Full path with /workspace
+START_DEV_PIDS="$START_DEV_PIDS $(pgrep -f "bash.*/workspace/scripts/start-dev\.sh" 2>/dev/null || true)"
+# Pattern 2: Relative path ./scripts/start-dev.sh
+START_DEV_PIDS="$START_DEV_PIDS $(pgrep -f "bash.*\./scripts/start-dev\.sh" 2>/dev/null || true)"
+# Pattern 3: Just the script name
+START_DEV_PIDS="$START_DEV_PIDS $(pgrep -f "start-dev\.sh" 2>/dev/null || true)"
+
+# Remove duplicates and empty entries
+START_DEV_PIDS=$(echo "$START_DEV_PIDS" | tr ' ' '\n' | sort -u | grep -v '^$' | tr '\n' ' ')
+
 if [ -n "$START_DEV_PIDS" ]; then
     echo "$START_DEV_PIDS" | xargs -r kill 2>/dev/null || true
     echo -e "${GREEN}start-dev.sh scripts stopped.${NC}"
@@ -30,14 +40,46 @@ fi
 echo -e "${YELLOW}Stopping backend server...${NC}"
 # Try multiple patterns to catch different ways the backend might be running
 BACKEND_KILLED=false
-# Look for uvicorn running specifically with our app module
-if pgrep -f "uvicorn.*app\.main:app" > /dev/null; then
-    pkill -f "uvicorn.*app\.main:app"
+
+# Pattern 1: Look for uvicorn running specifically with our app module
+UVICORN_PIDS=$(pgrep -f "uvicorn.*app\.main:app" 2>/dev/null || true)
+if [ -n "$UVICORN_PIDS" ]; then
+    echo "$UVICORN_PIDS" | xargs -r kill -TERM 2>/dev/null || true
+    sleep 0.5
+    # Force kill if still running
+    for pid in $UVICORN_PIDS; do
+        if kill -0 "$pid" 2>/dev/null; then
+            kill -KILL "$pid" 2>/dev/null || true
+        fi
+    done
     BACKEND_KILLED=true
 fi
-# Also check for the specific command used by start-dev.sh
-if pgrep -f "python.*-m.*uvicorn.*app\.main:app" > /dev/null; then
-    pkill -f "python.*-m.*uvicorn.*app\.main:app"
+
+# Pattern 2: Also check for the specific command used by start-dev.sh
+PYTHON_UVICORN_PIDS=$(pgrep -f "python.*-m.*uvicorn.*app\.main:app" 2>/dev/null || true)
+if [ -n "$PYTHON_UVICORN_PIDS" ]; then
+    echo "$PYTHON_UVICORN_PIDS" | xargs -r kill -TERM 2>/dev/null || true
+    sleep 0.5
+    # Force kill if still running
+    for pid in $PYTHON_UVICORN_PIDS; do
+        if kill -0 "$pid" 2>/dev/null; then
+            kill -KILL "$pid" 2>/dev/null || true
+        fi
+    done
+    BACKEND_KILLED=true
+fi
+
+# Pattern 3: Check for any python process running uvicorn on our app
+PYTHON_PIDS=$(pgrep -f "python.*uvicorn.*app\.main" 2>/dev/null || true)
+if [ -n "$PYTHON_PIDS" ]; then
+    echo "$PYTHON_PIDS" | xargs -r kill -TERM 2>/dev/null || true
+    sleep 0.5
+    # Force kill if still running
+    for pid in $PYTHON_PIDS; do
+        if kill -0 "$pid" 2>/dev/null; then
+            kill -KILL "$pid" 2>/dev/null || true
+        fi
+    done
     BACKEND_KILLED=true
 fi
 
@@ -115,6 +157,17 @@ VITE_PIDS=$(pgrep -f "node.*vite" | while read pid; do
     fi
 done)
 
+# Also look for esbuild processes from our pwa directory
+ESBUILD_PIDS=$(pgrep -f "esbuild.*service" | while read pid; do
+    if [ -e "/proc/$pid/cwd" ]; then
+        CWD=$(readlink /proc/$pid/cwd 2>/dev/null)
+        # Check if it's related to our pwa directory
+        if [[ "$CWD" == *"/workspace/pwa"* ]] || [[ "$CWD" == *"node_modules"* ]]; then
+            echo "$pid"
+        fi
+    fi
+done)
+
 # Also check for vite processes listening on port 3000
 if command -v lsof >/dev/null 2>&1; then
     PORT_3000_PIDS=$(lsof -ti:3000 2>/dev/null || true)
@@ -123,8 +176,18 @@ if command -v lsof >/dev/null 2>&1; then
     fi
 fi
 
-if [ -n "$VITE_PIDS" ]; then
-    echo "$VITE_PIDS" | sort -u | xargs -r kill 2>/dev/null || true
+# Combine all PIDs
+ALL_VITE_PIDS="${VITE_PIDS}${VITE_PIDS:+$'\n'}${ESBUILD_PIDS}"
+
+if [ -n "$ALL_VITE_PIDS" ]; then
+    echo "$ALL_VITE_PIDS" | sort -u | xargs -r kill -TERM 2>/dev/null || true
+    sleep 0.5
+    # Force kill if still running
+    echo "$ALL_VITE_PIDS" | sort -u | while read pid; do
+        if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+            kill -KILL "$pid" 2>/dev/null || true
+        fi
+    done
     VITE_KILLED=true
 fi
 
@@ -173,6 +236,21 @@ fi
 
 # Final targeted cleanup for any missed LANbu Handy processes
 echo -e "${YELLOW}Final cleanup...${NC}"
+
+# Kill any remaining python processes running uvicorn with our app
+REMAINING_UVICORN=$(ps aux | grep -E "python.*uvicorn.*app\.main" | grep -v grep | awk '{print $2}' || true)
+if [ -n "$REMAINING_UVICORN" ]; then
+    echo -e "${YELLOW}Found remaining uvicorn processes, cleaning up...${NC}"
+    echo "$REMAINING_UVICORN" | xargs -r kill -9 2>/dev/null || true
+fi
+
+# Kill any remaining esbuild processes from our workspace
+REMAINING_ESBUILD=$(ps aux | grep -E "esbuild.*service" | grep -v grep | grep "/workspace" | awk '{print $2}' || true)
+if [ -n "$REMAINING_ESBUILD" ]; then
+    echo -e "${YELLOW}Found remaining esbuild processes, cleaning up...${NC}"
+    echo "$REMAINING_ESBUILD" | xargs -r kill -9 2>/dev/null || true
+fi
+
 # Only clean up processes that are definitely ours, not VSCode's
 # Check for any remaining processes on our dev ports
 if command -v lsof >/dev/null 2>&1; then
@@ -188,6 +266,21 @@ if command -v lsof >/dev/null 2>&1; then
     if [ -n "$PORT_8000_REMAINING" ]; then
         echo -e "${YELLOW}Found remaining processes on port 8000, cleaning up...${NC}"
         echo "$PORT_8000_REMAINING" | xargs -r kill -9 2>/dev/null || true
+    fi
+else
+    # Use ps and grep as fallback since lsof is not available
+    # Find processes listening on port 8000
+    PORT_8000_PIDS=$(netstat -tlnp 2>/dev/null | grep :8000 | awk '{print $7}' | cut -d'/' -f1 | grep -E '^[0-9]+$' || true)
+    if [ -n "$PORT_8000_PIDS" ]; then
+        echo -e "${YELLOW}Found processes on port 8000, cleaning up...${NC}"
+        echo "$PORT_8000_PIDS" | xargs -r kill -9 2>/dev/null || true
+    fi
+
+    # Find processes listening on port 3000
+    PORT_3000_PIDS=$(netstat -tlnp 2>/dev/null | grep :3000 | awk '{print $7}' | cut -d'/' -f1 | grep -E '^[0-9]+$' || true)
+    if [ -n "$PORT_3000_PIDS" ]; then
+        echo -e "${YELLOW}Found processes on port 3000, cleaning up...${NC}"
+        echo "$PORT_3000_PIDS" | xargs -r kill -9 2>/dev/null || true
     fi
 fi
 

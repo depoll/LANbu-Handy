@@ -12,6 +12,7 @@ import {
 
 interface PrinterInfo {
   name: string;
+  canonical_id: string;
   ip: string;
   has_access_code: boolean;
   has_serial_number: boolean;
@@ -166,7 +167,7 @@ function PrinterSelector({
 
   // Fetch real printer metadata
   const { metadata: printerMetadata } = usePrinterMetadata(
-    currentPrinter?.ip || null
+    currentPrinter?.canonical_id || null
   );
 
   // Load current printer configuration on component mount
@@ -273,6 +274,7 @@ function PrinterSelector({
           const model = detectPrinterModel(config.active_printer.name);
           setCurrentPrinter({
             name: config.active_printer.name,
+            canonical_id: config.active_printer.canonical_id,
             ip: config.active_printer.ip,
             has_access_code: config.active_printer.has_access_code,
             has_serial_number: config.active_printer.has_serial_number,
@@ -286,6 +288,7 @@ function PrinterSelector({
           const model = detectPrinterModel(firstPrinter.name);
           setCurrentPrinter({
             name: firstPrinter.name,
+            canonical_id: firstPrinter.canonical_id,
             ip: firstPrinter.ip,
             has_access_code: firstPrinter.has_access_code,
             has_serial_number: firstPrinter.has_serial_number,
@@ -315,6 +318,7 @@ function PrinterSelector({
           setAllPrinters(
             config.printers.map(printer => ({
               name: printer.name,
+              canonical_id: printer.canonical_id,
               ip: printer.ip,
               has_access_code: printer.has_access_code,
               has_serial_number: printer.has_serial_number,
@@ -510,22 +514,21 @@ function PrinterSelector({
             request.serial_number
           );
 
-          setCurrentPrinter({
+          const newPrinter: PrinterInfo = {
             ...result.printer_info,
+            canonical_id: result.printer_info.ip, // Use IP as canonical_id for new printers
             is_runtime_set: true,
             model: model,
-            // Real model/name will be populated by the metadata hook
-          });
+          };
+
+          setCurrentPrinter(newPrinter);
 
           // Save IP to Local Storage for future use
           saveIP(result.printer_info.ip);
 
           // Notify parent component
           if (onPrinterChange) {
-            onPrinterChange({
-              ...result.printer_info,
-              model: model,
-            });
+            onPrinterChange(newPrinter);
           }
         }
 

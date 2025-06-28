@@ -17,6 +17,11 @@ logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 
+# Disable MQTT debug logging
+logging.getLogger("paho.mqtt").setLevel(logging.WARNING)
+logging.getLogger("paho.mqtt.client").setLevel(logging.WARNING)
+logging.getLogger("paho.mqtt.publish").setLevel(logging.WARNING)
+
 # Import and apply async MQTT patch before other imports
 from app.mqtt_async_patch_v3 import add_async_support_to_printer_service  # noqa: E402
 
@@ -47,6 +52,7 @@ from app.thumbnail_service import (  # noqa: E402
     ThumbnailGenerationError,
     ThumbnailService,
 )
+from app.upload_progress_service import upload_progress_service  # noqa: E402
 from app.utils import (  # noqa: E402
     build_slicing_options_from_config,
     find_gcode_file,
@@ -260,6 +266,7 @@ class ModelSubmissionResponse(BaseModel):
     success: bool
     message: str
     file_id: str = None
+    original_filename: str = None
     file_info: dict = None
     filament_requirements: Optional[FilamentRequirementResponse] = None
     plates: Optional[List[PlateInfoResponse]] = None
@@ -336,6 +343,7 @@ class FilamentMapping(BaseModel):
 
 class ConfiguredSliceRequest(BaseModel):
     file_id: str
+    original_filename: Optional[str] = None  # Original model filename
     filament_mappings: List[FilamentMapping]
     build_plate_type: str
     selected_plate_index: Optional[int] = None  # None means all plates
@@ -505,10 +513,15 @@ async def submit_model_url(request: ModelURLRequest):
         # Generate file ID (using the actual filename after any conversion)
         file_id = file_path.name
 
+        # Extract original filename (remove UUID prefix)
+        # Format is: {uuid}_{original_filename}
+        original_filename = file_id.split("_", 1)[1] if "_" in file_id else file_id
+
         return ModelSubmissionResponse(
             success=True,
             message="Model downloaded and validated successfully",
             file_id=file_id,
+            original_filename=original_filename,
             file_info=file_info,
             filament_requirements=filament_requirements_response,
             plates=plates_response if plates_response else None,
@@ -608,6 +621,7 @@ async def upload_model_file(file: UploadFile = File(...)):
             success=True,
             message="Model uploaded and validated successfully",
             file_id=file_id,
+            original_filename=file.filename,
             file_info=file_info,
             filament_requirements=filament_requirements_response,
             plates=plates_response if plates_response else None,
@@ -1250,19 +1264,40 @@ async def slice_model_with_configuration(request: ConfiguredSliceRequest):
             f"{request.selected_plate_index} (None means all plates)"
         )
 
-        # Determine the expected output filename
-        if request.selected_plate_index is not None:
-            expected_filename = f"plate_{request.selected_plate_index}.gcode.3mf"
+        # Determine the expected output filename based on model name
+        # Use original_filename if provided, otherwise extract from file_id
+        if request.original_filename:
+            model_base_name = Path(request.original_filename).stem
+        elif "_" in request.file_id:
+            # Extract original filename from file_id (remove UUID prefix)
+            original_name = request.file_id.split("_", 1)[1]
+            model_base_name = Path(original_name).stem
         else:
-            expected_filename = "output.gcode.3mf"
+            model_base_name = Path(request.file_id).stem
+
+        if request.selected_plate_index is not None:
+            expected_filename = (
+                f"{model_base_name}_plate_{request.selected_plate_index}.gcode.3mf"
+            )
+        else:
+            expected_filename = f"{model_base_name}.gcode.3mf"
         expected_output_path = output_dir / expected_filename
 
-        # Slice the model
+        # Slice the model (pass the original filename for output naming)
+        # Use original_filename if provided, otherwise extract from file_id
+        model_name = request.original_filename
+        if not model_name and "_" in request.file_id:
+            # Extract original filename from file_id (remove UUID prefix)
+            model_name = request.file_id.split("_", 1)[1]
+        elif not model_name:
+            model_name = request.file_id
+
         result = slice_model(
             input_path=model_file_path,
             output_dir=output_dir,
             options=slicing_options,
             plate_index=request.selected_plate_index,
+            model_name=model_name,
         )
 
         if result.success:
@@ -1874,6 +1909,41 @@ async def get_slice_progress_status(session_id: str):
         raise HTTPException(status_code=500, detail=msg)
 
 
+@app.get("/api/upload/progress/{upload_id}")
+async def get_upload_progress(upload_id: str):
+    """
+    Get the current progress of a file upload.
+
+    Args:
+        upload_id: The upload ID returned from the print job
+
+    Returns:
+        Upload progress information including percent, status, and file location
+
+    Raises:
+        HTTPException: If upload ID is not found
+    """
+    progress = await upload_progress_service.get_progress(upload_id)
+
+    if not progress:
+        raise HTTPException(
+            status_code=404, detail=f"Upload progress not found for ID: {upload_id}"
+        )
+
+    return {
+        "upload_id": upload_id,
+        "filename": progress.filename,
+        "total_size": progress.total_size,
+        "uploaded_size": progress.uploaded_size,
+        "percent": progress.percent,
+        "status": progress.status,
+        "message": progress.message,
+        "remote_path": progress.remote_path,
+        "elapsed_time": progress.elapsed_time,
+        "upload_speed_mbps": progress.upload_speed,
+    }
+
+
 @app.post("/api/job/start-basic", response_model=JobStartResponse)
 async def start_basic_job(request: JobStartRequest):
     """
@@ -1909,9 +1979,17 @@ async def start_basic_job(request: JobStartRequest):
                 detail="No printer configured. Please configure a printer " "first.",
             )
 
-        # Get the first configured printer
-        printers = config.get_printers()
-        printer_config = printers[0]
+        # Get the active printer
+        printer_config = config.get_active_printer()
+        if not printer_config:
+            # Fall back to first configured printer if no active printer
+            printers = config.get_printers()
+            if not printers:
+                raise HTTPException(
+                    status_code=400,
+                    detail="No printer configured. Please configure a printer first.",
+                )
+            printer_config = printers[0]
 
         # Step 1: Download model
         download_result = await download_model_step(model_service, request.model_url)
@@ -1966,7 +2044,9 @@ async def start_basic_job(request: JobStartRequest):
                 # Don't fail the job if estimate extraction fails
 
         # Step 3: Upload G-code to printer
-        upload_result = upload_gcode_step(printer_service, printer_config, gcode_path)
+        upload_result = await upload_gcode_step(
+            printer_service, printer_config, gcode_path
+        )
         job_steps["upload"].update(
             {
                 "success": upload_result["success"],
@@ -2061,9 +2141,17 @@ async def start_print_job(request: dict = Body(...)):
                 detail="No printer configured. Please configure a printer first.",
             )
 
-        # Get the first configured printer
-        printers = config.get_printers()
-        printer_config = printers[0]
+        # Get the active printer
+        printer_config = config.get_active_printer()
+        if not printer_config:
+            # Fall back to first configured printer if no active printer
+            printers = config.get_printers()
+            if not printers:
+                raise HTTPException(
+                    status_code=400,
+                    detail="No printer configured. Please configure a printer first.",
+                )
+            printer_config = printers[0]
 
         # Initialize response tracking
         job_steps = {
@@ -2083,12 +2171,16 @@ async def start_print_job(request: dict = Body(...)):
             )
 
         # Step 1: Upload G-code to printer
-        upload_result = upload_gcode_step(printer_service, printer_config, gcode_path)
+        upload_result = await upload_gcode_step(
+            printer_service, printer_config, gcode_path
+        )
         job_steps["upload"].update(
             {
                 "success": upload_result["success"],
                 "message": upload_result["message"],
                 "details": upload_result["details"],
+                "upload_id": upload_result.get("upload_id"),
+                "remote_path": upload_result.get("remote_path"),
             }
         )
 
@@ -2128,6 +2220,84 @@ async def start_print_job(request: dict = Body(...)):
         raise
     except Exception as e:
         logger.error(f"Error starting print job: {e}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
+@app.post("/api/job/send-to-printer")
+async def send_to_printer(request: dict = Body(...)):
+    """
+    Send a G-code file to the printer's storage without starting a print.
+
+    This endpoint uploads the G-code file to the printer's SD card/storage
+    but does not initiate printing. The file can be printed later from the
+    printer's control panel or via a separate print command.
+
+    Args:
+        request: JSON body containing:
+            - gcode_filename: Name of the G-code file to send (from slice output)
+
+    Returns:
+        JSON response with upload status and details
+    """
+    try:
+        gcode_filename = request.get("gcode_filename")
+        if not gcode_filename:
+            raise HTTPException(status_code=400, detail="gcode_filename is required")
+
+        # Check if printer is configured
+        if not config.is_printer_configured():
+            raise HTTPException(
+                status_code=400,
+                detail="No printer configured. Please configure a printer first.",
+            )
+
+        # Get the active printer
+        printer_config = config.get_active_printer()
+        if not printer_config:
+            # Fall back to first configured printer if no active printer
+            printers = config.get_printers()
+            if not printers:
+                raise HTTPException(
+                    status_code=400,
+                    detail="No printer configured. Please configure a printer first.",
+                )
+            printer_config = printers[0]
+
+        # Get the G-code file path
+        gcode_dir = get_gcode_output_dir()
+        gcode_path = gcode_dir / gcode_filename
+
+        if not gcode_path.exists():
+            return {
+                "success": False,
+                "message": f"G-code file not found: {gcode_filename}",
+                "error_details": "The sliced file could not be found on the server",
+            }
+
+        # Upload G-code to printer (without starting print)
+        upload_result = await upload_gcode_step(
+            printer_service, printer_config, gcode_path
+        )
+
+        if upload_result["success"]:
+            return {
+                "success": True,
+                "message": f"Successfully sent {gcode_filename} to printer storage",
+                "details": upload_result["details"],
+                "printer": printer_config.name,
+                "upload_id": upload_result.get("upload_id"),
+            }
+        else:
+            return {
+                "success": False,
+                "message": "Failed to send G-code to printer",
+                "error_details": upload_result["details"],
+            }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error sending file to printer: {e}")
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
@@ -2257,8 +2427,44 @@ async def get_ams_status(printer_id: str):
                 ),
             )
 
-        # Query AMS status
+        # First, query printer status to check if it has AMS
         try:
+            # Get printer status first to check if AMS exists
+            status_result = await printer_service.query_printer_status_async(
+                printer_config, timeout=10
+            )
+
+            # Check if printer has AMS
+            if status_result.success and (
+                not status_result.ams_units or len(status_result.ams_units) == 0
+            ):
+                # No AMS present - return empty response immediately
+                logger.info(
+                    f"Printer {printer_config.name} has no AMS, skipping AMS query"
+                )
+
+                # Include external spool info if available
+                external_spool_response = None
+                if (
+                    status_result.external_spool
+                    and status_result.external_spool.available
+                ):
+                    external_spool_response = ExternalSpoolResponse(
+                        slot_id=status_result.external_spool.slot_id,
+                        filament_type=status_result.external_spool.filament_type,
+                        color=status_result.external_spool.color,
+                        material_id=status_result.external_spool.material_id,
+                        available=status_result.external_spool.available,
+                    )
+
+                return AMSStatusResponse(
+                    success=True,
+                    message=f"No AMS detected on printer {printer_config.name}",
+                    ams_units=[],
+                    external_spool=external_spool_response,
+                )
+
+            # If we get here, printer has AMS, so query for detailed status
             # Use async MQTT query that supports cancellation
             ams_result = await printer_service.query_ams_status_async(printer_config)
 
@@ -2688,19 +2894,36 @@ async def set_active_printer(request: SetActivePrinterRequest):
         HTTPException: If the printer configuration is invalid
     """
     logger.info(f"Setting active printer: {request.name} ({request.ip})")
-    try:
-        # Get the current active printer before switching
-        current_active = config.get_active_printer()
 
-        # IMPORTANT: Cancel any active MQTT operations for the OLD printer
-        # before switching. This prevents hanging issues when switching
-        # between printers
-        if current_active and current_active.ip != request.ip:
-            logger.debug(
-                f"Cancelling active MQTT operations for old printer: "
-                f"{current_active.ip}"
-            )
-            printer_service.cancel_printer_operations(current_active.ip)
+    # Wrap the entire operation in a timeout to prevent hanging
+    try:
+        # First, immediately cancel ALL MQTT operations before even starting
+        # This ensures we don't wait for any ongoing operations
+        from app.mqtt_async_patch_v3 import cancel_all_mqtt_operations
+
+        logger.debug("Pre-emptively cancelling all MQTT operations")
+        cancel_all_mqtt_operations()
+
+        # Use asyncio.wait_for for Python 3.10 compatibility
+        return await asyncio.wait_for(_set_active_printer_impl(request), timeout=10)
+    except asyncio.TimeoutError:
+        logger.error(f"Timeout while setting active printer: {request.ip}")
+        # Force cleanup of any pending operations
+        printer_service.cancel_printer_operations(request.ip)
+        raise HTTPException(
+            status_code=504,
+            detail="Operation timed out while switching printer. Please try again.",
+        )
+    except Exception as e:
+        logger.error(f"Error setting active printer: {e}")
+        raise
+
+
+async def _set_active_printer_impl(request: SetActivePrinterRequest):
+    """Implementation of set_active_printer with timeout protection."""
+    try:
+        # The cancellation is already done in set_active_printer before calling this
+        # So we don't need to do it again here
 
         # Validate IP address or hostname format
         ip = validate_ip_or_hostname(request.ip)
