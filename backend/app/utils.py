@@ -278,6 +278,14 @@ def build_slicing_options_from_config(
 
     # If we have printer info, generate settings files
     if printer_model and filament_types:
+        import logging
+
+        logger = logging.getLogger(__name__)
+
+        logger.info(
+            f"Building slicing options with printer_model={printer_model}, "
+            f"filament_types={filament_types}"
+        )
         settings_builder = SettingsBuilder()
 
         # Build settings files using the provided filament types and colors
@@ -293,9 +301,11 @@ def build_slicing_options_from_config(
         # Add settings file paths to CLI options
         if machine_settings_path:
             options["load-settings"] = str(machine_settings_path)
+            logger.info(f"Added machine settings: {machine_settings_path}")
 
         if filament_settings_path:
             options["load-filaments"] = str(filament_settings_path)
+            logger.info(f"Added filament settings: {filament_settings_path}")
 
     return options
 

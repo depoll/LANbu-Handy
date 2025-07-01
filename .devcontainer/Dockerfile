@@ -15,6 +15,7 @@ RUN apt-get update && \
         python3-pip \
         python3-dev \
         # Basic development tools
+        bash \
         git \
         curl \
         wget \
@@ -92,6 +93,9 @@ RUN apt-get update && \
     && update-alternatives --install /usr/bin/python python /usr/bin/python3 1 \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
+# Ensure bash is the default shell for devcontainer features compatibility
+RUN ln -sf /bin/bash /bin/sh
+
 # Install Docker Compose V2 plugin (latest stable version)
 RUN DOCKER_COMPOSE_VERSION="v2.32.1" \
     && mkdir -p /usr/local/lib/docker/cli-plugins \
@@ -106,11 +110,6 @@ RUN echo "en_US.UTF-8 UTF-8" > /etc/locale.gen && \
 
 ENV LANG=en_US.UTF-8
 ENV LC_ALL=en_US.UTF-8
-
-# Install Node.js 22.x from NodeSource repository
-RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
-    && apt-get install -y nodejs \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Create the user
 RUN groupadd --gid $USER_GID $USERNAME \
@@ -139,16 +138,6 @@ RUN python3 -m pip install --trusted-host pypi.org --trusted-host pypi.python.or
 
 # Bambu Studio CLI is already available in the base image, no need to install it again
 
-# Install global npm packages for development
-RUN npm config set strict-ssl false && \
-    npm install -g typescript@5.8.3 @types/node@22.15.29 playwright@1.53.0
-
-# Install Playwright browsers as root before switching to non-root user
-# Install all supported browsers and their dependencies
-RUN npx playwright install --with-deps chromium firefox webkit && \
-    # Also run playwright install-deps to ensure all system dependencies are installed
-    npx playwright install-deps
-
 # Switch to non-root user
 USER $USERNAME
 
@@ -158,10 +147,6 @@ WORKDIR /workspace
 # Set environment variables for development
 ENV PYTHONPATH=/workspace/backend
 ENV NODE_ENV=development
-
-# Install Playwright browsers for the non-root user as well
-# This ensures they're available in the user's home directory
-RUN npx playwright install chromium firefox webkit
 
 # Default command
 CMD ["sleep", "infinity"]

@@ -80,6 +80,15 @@ setup_pwa() {
 # Main setup
 echo "📁 Working directory: $REPO_ROOT"
 
+sudo chown -R $(whoami) $(npm config get prefix)/{lib/node_modules,bin,share}
+# Install global npm packages for development
+npm config set strict-ssl false && \
+    npm install -g typescript@5.8.3 @types/node@22.15.29 playwright@1.53.0
+# Install all supported browsers and their dependencies
+npx playwright install --with-deps chromium firefox webkit && \
+    # Also run playwright install-deps to ensure all system dependencies are installed
+    npx playwright install-deps
+
 # Check if running in devcontainer mode
 DEVCONTAINER_MODE=false
 if [[ "$1" == "--devcontainer" ]]; then
@@ -127,8 +136,6 @@ ln -sf /claude/.claude /home/vscode/.claude
 ln -sf /claude/.claude.json /home/vscode/.claude.json
 sudo chown -R vscode:vscode /claude
 echo "🔗 Symlinks created for Claude configuration"
-sudo npm i -g @anthropic-ai/claude-code
-echo "Claude Code CLI Updated"
 
 sudo chown -R vscode:vscode ~/.gemini
 
@@ -146,8 +153,8 @@ else
 fi
 
 go install github.com/isaacphi/mcp-language-server@latest
-sudo npm install -g pyright
-sudo npm install -g typescript typescript-language-server
+npm install -g pyright
+npm install -g typescript typescript-language-server
 
 echo ""
 echo "🎉 Development environment setup complete!"

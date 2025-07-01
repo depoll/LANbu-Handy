@@ -1065,43 +1065,262 @@ class ModelService:
         self, file_path: Path, plate_index: int
     ) -> Optional[FilamentRequirement]:
         """
-        Get filament requirements for a specific plate from 3MF data.
+        Get actual filament requirements for a specific plate from 3MF data.
 
-        For better user experience with multi-color models, this method returns
-        ALL configured filaments from the project settings, even if the plate
-        only uses a subset. This allows users to properly configure AMS mappings
-        for all colors that might be used in painting or multi-material printing.
+        This method attempts to extract filament requirements from the 3MF file
+        using the most appropriate metadata source:
+        1. First tries model_settings.config (preferred for accurate extruder mapping)
+        2. Falls back to slice_info.config (for files with detailed usage data)
+        3. Finally falls back to full model requirements
 
         Args:
             file_path: Path to the .3mf file
             plate_index: Index of the plate to get requirements for
 
         Returns:
-            FilamentRequirement object with all configured filaments,
-            or None if parsing fails or file is not .3mf
+            FilamentRequirement object with actual requirements for the plate,
+            or None if parsing fails, file is not .3mf, or plate not found
         """
         # Only process .3mf files
         if file_path.suffix.lower() != ".3mf":
             return None
 
         try:
-            # First check if the plate index is valid
-            model_info, _ = self.parse_3mf_model_info(file_path)
-            if model_info.plates:
-                # Validate plate index
-                plate_indices = [plate.index for plate in model_info.plates]
-                if plate_index not in plate_indices:
-                    return None
-            else:
-                # Single plate model - only plate 1 is valid
-                if plate_index != 1:
-                    return None
+            import xml.etree.ElementTree as ET
 
-            # For plate-specific requirements, we always return the full model
-            # requirements to ensure all configured filaments are available
-            # for AMS mapping, even if the plate doesn't use all of them
+            with zipfile.ZipFile(file_path, "r") as zip_file:
+                # First try model_settings.config (preferred method)
+                model_settings_path = "Metadata/model_settings.config"
+                if model_settings_path in zip_file.namelist():
+                    result = self._get_requirements_from_model_settings(
+                        zip_file, plate_index
+                    )
+                    if result is not None:
+                        return result
+
+                # Fallback to slice_info.config
+                slice_info_path = "Metadata/slice_info.config"
+                if slice_info_path in zip_file.namelist():
+                    result = self._get_requirements_from_slice_info(
+                        zip_file, plate_index
+                    )
+                    if result is not None:
+                        return result
+
+                # If we get here, the plate wasn't found in any metadata
+                return None
+
+        except (zipfile.BadZipFile, ET.ParseError, ValueError, OSError):
+            # If there's any error in parsing, fallback to full model requirements
             return self.parse_3mf_filament_requirements(file_path)
-
         except Exception:
-            # If there's any error, return None
+            # Catch any other unexpected errors
             return None
+
+    def _get_requirements_from_model_settings(
+        self, zip_file: zipfile.ZipFile, plate_index: int
+    ) -> Optional[FilamentRequirement]:
+        """Extract filament requirements from model_settings.config."""
+        import xml.etree.ElementTree as ET
+
+        with zip_file.open("Metadata/model_settings.config") as settings_file:
+            content = settings_file.read().decode("utf-8")
+            root = ET.fromstring(content)
+
+        # Find the plate with the specified index
+        target_plate = None
+        for plate_elem in root.findall(".//plate"):
+            for metadata in plate_elem.findall("metadata"):
+                if (
+                    metadata.get("key") == "plater_id"
+                    and int(metadata.get("value")) == plate_index
+                ):
+                    target_plate = plate_elem
+                    break
+            if target_plate is not None:
+                break
+
+        if target_plate is None:
+            # Plate not found
+            return None
+
+        # Get all object_ids assigned to this plate
+        object_ids = []
+        for model_instance in target_plate.findall("model_instance"):
+            for metadata in model_instance.findall("metadata"):
+                if metadata.get("key") == "object_id":
+                    object_ids.append(metadata.get("value"))
+
+        if not object_ids:
+            # No objects assigned to this plate
+            return FilamentRequirement(
+                filament_count=1,
+                filament_types=["PLA"],
+                filament_colors=["#000000"],
+            )
+
+        # Find all objects with these IDs and collect all extruders used
+        extruders_used = set()
+        for object_id in object_ids:
+            for obj_elem in root.findall(f".//object[@id='{object_id}']"):
+                # First, check object-level extruder
+                obj_extruder = None
+
+                # Check object-level extruder attribute
+                if obj_elem.get("extruder"):
+                    obj_extruder = int(obj_elem.get("extruder"))
+
+                # Check object-level extruder metadata (takes precedence)
+                for metadata in obj_elem.findall("metadata"):
+                    if metadata.get("key") == "extruder":
+                        extruder_id = metadata.get("value")
+                        if extruder_id:
+                            obj_extruder = int(extruder_id)
+                            break
+
+                # Check part-level extruders
+                parts = obj_elem.findall(".//part")
+                part_extruders = []
+                parts_with_extruder_count = 0
+
+                for part in parts:
+                    for metadata in part.findall("metadata"):
+                        if metadata.get("key") == "extruder":
+                            extruder_id = metadata.get("value")
+                            if extruder_id:
+                                part_ext = int(extruder_id)
+                                part_extruders.append(part_ext)
+                                parts_with_extruder_count += 1
+                                break
+
+                # Determine which extruders are actually used
+                if parts and parts_with_extruder_count == len(parts):
+                    # All parts have explicit extruders, so only use those
+                    extruders_used.update(part_extruders)
+                else:
+                    # Not all parts have extruders, so include object extruder
+                    if obj_extruder:
+                        extruders_used.add(obj_extruder)
+                    extruders_used.update(part_extruders)
+
+        # If no extruders found, default to extruder 1
+        if not extruders_used:
+            extruders_used.add(1)
+
+        # Get filament information from the project settings
+        try:
+            with zip_file.open("Metadata/project_settings.config") as project_file:
+                project_data = json.load(project_file)
+                filament_types = project_data.get("filament_type", ["PLA"] * 4)
+                filament_colors = project_data.get("filament_colour", ["#000000"] * 4)
+        except (FileNotFoundError, json.JSONDecodeError, KeyError):
+            # Default filament data
+            filament_types = ["PLA"] * 4
+            filament_colors = ["#000000"] * 4
+
+        # Filter the filament data to only include the extruders needed for this plate
+        sorted_extruders = sorted(extruders_used)
+        plate_types = []
+        plate_colors = []
+
+        for extruder_id in sorted_extruders:
+            # Extruder IDs are 1-based, but arrays are 0-based
+            array_index = extruder_id - 1
+
+            if array_index < len(filament_types):
+                plate_types.append(filament_types[array_index])
+                if array_index < len(filament_colors):
+                    plate_colors.append(filament_colors[array_index])
+                else:
+                    plate_colors.append("#000000")
+            else:
+                # Default for missing data
+                plate_types.append("PLA")
+                plate_colors.append("#000000")
+
+        return FilamentRequirement(
+            filament_count=len(plate_types),
+            filament_types=plate_types,
+            filament_colors=plate_colors,
+        )
+
+    def _get_requirements_from_slice_info(
+        self, zip_file: zipfile.ZipFile, plate_index: int
+    ) -> Optional[FilamentRequirement]:
+        """Extract filament requirements from slice_info.config."""
+        import xml.etree.ElementTree as ET
+
+        with zip_file.open("Metadata/slice_info.config") as slice_file:
+            content = slice_file.read().decode("utf-8")
+            root = ET.fromstring(content)
+
+        # Find the specific plate by index
+        target_plate_elem = None
+        for plate_elem in root.findall(".//plate"):
+            for metadata in plate_elem.findall("metadata"):
+                if (
+                    metadata.get("key") == "index"
+                    and int(metadata.get("value")) == plate_index
+                ):
+                    target_plate_elem = plate_elem
+                    break
+            if target_plate_elem is not None:
+                break
+
+        if target_plate_elem is None:
+            # Plate not found
+            return None
+
+        # Extract filament information from this plate
+        filament_elements = target_plate_elem.findall("filament")
+        if not filament_elements:
+            # No filament data, fallback to single filament assumption
+            return FilamentRequirement(
+                filament_count=1,
+                filament_types=["PLA"],
+                filament_colors=["#000000"],
+            )
+
+        # Extract filament types and colors from the plate data
+        plate_types = []
+        plate_colors = []
+
+        # Sort filaments by ID to maintain consistent ordering
+        filament_elements.sort(key=lambda f: int(f.get("id", "0")))
+
+        for filament_elem in filament_elements:
+            filament_type = filament_elem.get("type", "PLA")
+            filament_color = filament_elem.get("color", "#000000")
+
+            # Only include filaments that are actually used (have usage data)
+            used_m = filament_elem.get("used_m")
+            used_g = filament_elem.get("used_g")
+
+            if used_m and used_g:
+                try:
+                    # Check if usage is greater than 0
+                    if float(used_m) > 0 or float(used_g) > 0:
+                        plate_types.append(filament_type)
+                        plate_colors.append(filament_color)
+                except (ValueError, TypeError):
+                    # If we can't parse usage, include the filament anyway
+                    plate_types.append(filament_type)
+                    plate_colors.append(filament_color)
+            else:
+                # No usage data, include the filament
+                plate_types.append(filament_type)
+                plate_colors.append(filament_color)
+
+        if not plate_types:
+            # No valid filaments found, return basic requirement
+            return FilamentRequirement(
+                filament_count=1,
+                filament_types=["PLA"],
+                filament_colors=["#000000"],
+            )
+
+        return FilamentRequirement(
+            filament_count=len(plate_types),
+            filament_types=plate_types,
+            filament_colors=plate_colors,
+        )

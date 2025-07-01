@@ -27,6 +27,8 @@ class SettingsBuilder:
     # Mapping of printer models to profile names
     PRINTER_MODEL_MAP = {
         "X1C": "Bambu Lab X1 Carbon",
+        # Added for consistency with get_printer_model_from_serial
+        "X1 Carbon": "Bambu Lab X1 Carbon",
         "X1": "Bambu Lab X1",
         "X1E": "Bambu Lab X1E",
         "P1P": "Bambu Lab P1P",
@@ -130,6 +132,10 @@ class SettingsBuilder:
         try:
             # Map printer model to profile name
             profile_name = self.PRINTER_MODEL_MAP.get(printer_model, printer_model)
+            logger.info(
+                f"Building machine settings for printer_model={printer_model}, "
+                f"mapped to profile_name={profile_name}"
+            )
 
             # Determine nozzle size suffix
             nozzle_size = nozzle_diameter or 0.4
@@ -175,6 +181,10 @@ class SettingsBuilder:
                 with open(settings_file, "w") as f:
                     json.dump(machine_settings, f, indent=2)
                 logger.info(f"Generated machine settings: {settings_file}")
+                # Log the first few keys for debugging
+                logger.info(
+                    f"Machine settings keys: {list(machine_settings.keys())[:10]}"
+                )
                 return settings_file
 
             logger.warning(f"No machine settings found for {printer_model}")

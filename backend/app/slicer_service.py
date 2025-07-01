@@ -60,7 +60,9 @@ class BambuStudioCLIWrapper:
             CLIResult object containing execution results
         """
         command = [self.cli_command] + args
-        logger.debug(f"Executing CLI command: {' '.join(command)}")
+        # Always log at INFO level for debugging
+        logger.info(f"Executing CLI command: {' '.join(command)}")
+        logger.info(f"Working directory: {self.temp_dir}")
 
         try:
             result = subprocess.run(
@@ -71,9 +73,10 @@ class BambuStudioCLIWrapper:
                 cwd=self.temp_dir,
             )
 
-            logger.debug(f"CLI command completed with exit code: {result.returncode}")
+            logger.info(f"CLI command completed with exit code: {result.returncode}")
             if result.returncode != 0:
                 logger.warning(f"CLI command failed: {result.stderr}")
+                logger.warning(f"CLI stdout: {result.stdout}")
 
             return CLIResult(
                 exit_code=result.returncode,
@@ -230,11 +233,21 @@ class BambuStudioCLIWrapper:
             for key, value in options.items():
                 args.extend([f"--{key}", value])
 
-        # Log the full command for debugging
+        # Log the full command and all parameters for debugging
         full_command = [self.cli_command] + args
-        logger.info(
-            f"Executing slice command: {' '.join(str(arg) for arg in full_command)}"
-        )
+        logger.info("=" * 80)
+        logger.info("SLICE COMMAND DETAILS:")
+        logger.info(f"Full command: {' '.join(str(arg) for arg in full_command)}")
+        logger.info(f"Input file: {input_path}")
+        logger.info(f"Output directory: {output_dir}")
+        logger.info(f"Plate index: {plate_index}")
+        logger.info(f"Export 3MF: {export_3mf}")
+        logger.info(f"Model name: {model_name}")
+        if options:
+            logger.info("Additional options:")
+            for key, value in options.items():
+                logger.info(f"  --{key}: {value}")
+        logger.info("=" * 80)
 
         # 5 minute timeout for slicing
         return self._run_command(args, timeout=300)

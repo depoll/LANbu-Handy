@@ -17,7 +17,7 @@ class TestPlateSpecificFilamentRequirementsIntegration(unittest.TestCase):
         self.test_files_dir = Path(__file__).parent.parent.parent / "test_files"
 
     def test_multiplate_filament_requirements_filtering(self):
-        """Test that all filaments are returned for each plate (design decision)."""
+        """Test that plates return only the filaments they actually use."""
         multiplate_file = self.test_files_dir / "multiplate separated filaments.3mf"
 
         if not multiplate_file.exists():
@@ -36,10 +36,8 @@ class TestPlateSpecificFilamentRequirementsIntegration(unittest.TestCase):
         self.assertGreater(len(plates), 1)
         self.assertEqual(len(plates), 4)  # Should have 4 plates
 
-        # Per design decision, all plates return all configured filaments
-        # to support proper AMS mapping for multi-color models
-
         # Test plate-specific requirements for each plate
+        # Each plate should only return the filaments it actually uses
         for plate in plates:
             plate_requirements = (
                 self.model_service.get_plate_specific_filament_requirements(
@@ -50,44 +48,37 @@ class TestPlateSpecificFilamentRequirementsIntegration(unittest.TestCase):
             # Should return valid requirements
             self.assertIsNotNone(plate_requirements)
 
-            # Plate requirements should equal full requirements (design decision)
-            self.assertEqual(
+            # Plate requirements should be <= full requirements
+            self.assertLessEqual(
                 plate_requirements.filament_count,
                 full_requirements.filament_count,
-                f"Plate {plate.index} should return all "
+                f"Plate {plate.index} should have <= "
                 f"{full_requirements.filament_count} filaments",
             )
 
-            # Should have all filaments
-            self.assertEqual(plate_requirements.filament_count, 13)
+            # Should have at least 1 filament
+            self.assertGreaterEqual(plate_requirements.filament_count, 1)
 
-            # Filament types should match full model types
-            self.assertEqual(
-                plate_requirements.filament_types,
-                full_requirements.filament_types,
-                f"Plate {plate.index} types should match full model types",
-            )
-
-            # Filament colors should match full model colors
-            self.assertEqual(
-                plate_requirements.filament_colors,
-                full_requirements.filament_colors,
-                f"Plate {plate.index} colors should match full model colors",
-            )
+            # Filament types should be a subset of full model types
+            for ftype in plate_requirements.filament_types:
+                self.assertIn(
+                    ftype,
+                    full_requirements.filament_types,
+                    f"Plate {plate.index} type {ftype} should be in full model types",
+                )
 
             print(
                 f"Plate {plate.index}: {plate_requirements.filament_count} filaments "
-                f"(same as full model)"
+                f"(filtered from {full_requirements.filament_count} total)"
             )
 
     def test_specific_filament_types_per_plate(self):
-        """Test that all filaments are returned for each plate (design decision)."""
+        """Test that plates return only their specific filament types."""
         multiplate_file = self.test_files_dir / "multiplate separated filaments.3mf"
 
         if not multiplate_file.exists():
             self.skipTest("multiplate separated filaments.3mf not available")
 
-        # Per design decision, all plates return all configured filaments
         # Get full model requirements for comparison
         full_requirements = self.model_service.parse_3mf_filament_requirements(
             multiplate_file
@@ -95,7 +86,8 @@ class TestPlateSpecificFilamentRequirementsIntegration(unittest.TestCase):
         self.assertIsNotNone(full_requirements)
         self.assertEqual(full_requirements.filament_count, 13)
 
-        # Test each plate returns all filaments
+        # Test each plate returns only its used filaments
+        total_unique_filaments = set()
         for plate_index in [1, 2, 3, 4]:
             plate_requirements = (
                 self.model_service.get_plate_specific_filament_requirements(
@@ -104,23 +96,26 @@ class TestPlateSpecificFilamentRequirementsIntegration(unittest.TestCase):
             )
 
             self.assertIsNotNone(plate_requirements)
-            self.assertEqual(
-                plate_requirements.filament_types,
-                full_requirements.filament_types,
-                f"Plate {plate_index} should have all filament types",
-            )
-            self.assertEqual(
-                plate_requirements.filament_colors,
-                full_requirements.filament_colors,
-                f"Plate {plate_index} should have all colors",
-            )
-            self.assertEqual(
+
+            # Each plate should have fewer filaments than total
+            self.assertLessEqual(
                 plate_requirements.filament_count,
-                13,
-                f"Plate {plate_index} should have all 13 filaments",
+                full_requirements.filament_count,
+                f"Plate {plate_index} should have <= 13 filaments",
             )
 
-        print("All plates return full filament requirements as per design")
+            # Track all unique filaments used across plates
+            for i in range(plate_requirements.filament_count):
+                filament_key = (
+                    plate_requirements.filament_types[i],
+                    plate_requirements.filament_colors[i],
+                )
+                total_unique_filaments.add(filament_key)
+
+        print(
+            f"Plates use filtered filament requirements, "
+            f"total unique filaments across all plates: {len(total_unique_filaments)}"
+        )
 
     def test_original_multiplate_file_behavior(self):
         """Test original multiplate-test.3mf with correct requirements per plate."""

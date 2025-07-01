@@ -287,6 +287,7 @@ class SliceResponse(BaseModel):
 
 class JobStartRequest(BaseModel):
     model_url: str
+    printer_id: Optional[str] = None
 
 
 class JobStartResponse(BaseModel):
@@ -1246,13 +1247,40 @@ async def slice_model_with_configuration(request: ConfiguredSliceRequest):
             shutil.rmtree(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
 
+        # Determine printer model - use request value or detect from printer config
+        printer_model = request.printer_model
+        nozzle_diameter = request.nozzle_diameter
+
+        # If printer model not provided or is "Unknown", try to detect it
+        if not printer_model or printer_model == "Unknown":
+            # Try to get the current printer config
+            printer_config = config.get_active_printer()
+            if not printer_config:
+                # Fall back to first configured printer
+                printers = config.get_printers()
+                if printers:
+                    printer_config = printers[0]
+
+            if printer_config and printer_config.serial_number:
+                from app.utils import get_printer_model_from_serial
+
+                detected_model = get_printer_model_from_serial(
+                    printer_config.serial_number
+                )
+                if detected_model != "Unknown":
+                    printer_model = detected_model
+                    logger.info(
+                        f"Detected printer model '{printer_model}' from serial "
+                        f"number: {printer_config.serial_number}"
+                    )
+
         # Build slicing options from the configuration
         slicing_options = build_slicing_options_from_config(
             request.filament_mappings,
             request.build_plate_type,
             request.selected_plate_index,
-            request.printer_model,
-            request.nozzle_diameter,
+            printer_model,
+            nozzle_diameter,
             request.print_quality,
             request.filament_types,
             request.filament_colors,
@@ -1419,13 +1447,40 @@ async def slice_model_sequential_plates(request: ConfiguredSliceRequest):
         # Create output directory for G-code
         output_dir = get_gcode_output_dir()
 
+        # Determine printer model - use request value or detect from printer config
+        printer_model = request.printer_model
+        nozzle_diameter = request.nozzle_diameter
+
+        # If printer model not provided or is "Unknown", try to detect it
+        if not printer_model or printer_model == "Unknown":
+            # Try to get the current printer config
+            printer_config = config.get_active_printer()
+            if not printer_config:
+                # Fall back to first configured printer
+                printers = config.get_printers()
+                if printers:
+                    printer_config = printers[0]
+
+            if printer_config and printer_config.serial_number:
+                from app.utils import get_printer_model_from_serial
+
+                detected_model = get_printer_model_from_serial(
+                    printer_config.serial_number
+                )
+                if detected_model != "Unknown":
+                    printer_model = detected_model
+                    logger.info(
+                        f"Detected printer model '{printer_model}' from serial "
+                        f"number: {printer_config.serial_number}"
+                    )
+
         # Build slicing options from the configuration
         slicing_options = build_slicing_options_from_config(
             request.filament_mappings,
             request.build_plate_type,
             request.selected_plate_index,
-            request.printer_model,
-            request.nozzle_diameter,
+            printer_model,
+            nozzle_diameter,
             request.print_quality,
             request.filament_types,
             request.filament_colors,
@@ -1979,17 +2034,36 @@ async def start_basic_job(request: JobStartRequest):
                 detail="No printer configured. Please configure a printer " "first.",
             )
 
-        # Get the active printer
-        printer_config = config.get_active_printer()
-        if not printer_config:
-            # Fall back to first configured printer if no active printer
-            printers = config.get_printers()
-            if not printers:
+        # Get the specified printer or active/default printer
+        if request.printer_id:
+            # Use the specified printer
+            printer_config = config.get_printer_by_id(request.printer_id)
+            if not printer_config:
                 raise HTTPException(
-                    status_code=400,
-                    detail="No printer configured. Please configure a printer first.",
+                    status_code=404,
+                    detail=f"Printer not found: {request.printer_id}",
                 )
-            printer_config = printers[0]
+            logger.info(
+                f"Using specified printer: {printer_config.name} "
+                f"({printer_config.canonical_id})"
+            )
+        else:
+            # Get the active printer or fall back to first configured
+            printer_config = config.get_active_printer()
+            if not printer_config:
+                # Fall back to first configured printer if no active printer
+                printers = config.get_printers()
+                if not printers:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=(
+                            "No printer configured. Please configure a printer first."
+                        ),
+                    )
+                printer_config = printers[0]
+                logger.info(f"Using default printer: {printer_config.name}")
+            else:
+                logger.info(f"Using active printer: {printer_config.name}")
 
         # Step 1: Download model
         download_result = await download_model_step(model_service, request.model_url)
@@ -2125,6 +2199,7 @@ async def start_print_job(request: dict = Body(...)):
     Args:
         request: JSON body containing:
             - gcode_filename: Name of the G-code file to print (from slice output)
+            - printer_id: Optional printer ID to print to specific printer
 
     Returns:
         JobStartResponse with upload and print status
@@ -2134,6 +2209,8 @@ async def start_print_job(request: dict = Body(...)):
         if not gcode_filename:
             raise HTTPException(status_code=400, detail="gcode_filename is required")
 
+        printer_id = request.get("printer_id")
+
         # Check if printer is configured
         if not config.is_printer_configured():
             raise HTTPException(
@@ -2141,17 +2218,36 @@ async def start_print_job(request: dict = Body(...)):
                 detail="No printer configured. Please configure a printer first.",
             )
 
-        # Get the active printer
-        printer_config = config.get_active_printer()
-        if not printer_config:
-            # Fall back to first configured printer if no active printer
-            printers = config.get_printers()
-            if not printers:
+        # Get the specified printer or active/default printer
+        if printer_id:
+            # Use the specified printer
+            printer_config = config.get_printer_by_id(printer_id)
+            if not printer_config:
                 raise HTTPException(
-                    status_code=400,
-                    detail="No printer configured. Please configure a printer first.",
+                    status_code=404,
+                    detail=f"Printer not found: {printer_id}",
                 )
-            printer_config = printers[0]
+            logger.info(
+                f"Starting print on specified printer: {printer_config.name} "
+                f"({printer_config.canonical_id})"
+            )
+        else:
+            # Get the active printer or fall back to first configured
+            printer_config = config.get_active_printer()
+            if not printer_config:
+                # Fall back to first configured printer if no active printer
+                printers = config.get_printers()
+                if not printers:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=(
+                            "No printer configured. Please configure a printer first."
+                        ),
+                    )
+                printer_config = printers[0]
+                logger.info(f"Starting print on default printer: {printer_config.name}")
+            else:
+                logger.info(f"Starting print on active printer: {printer_config.name}")
 
         # Initialize response tracking
         job_steps = {
@@ -2235,6 +2331,7 @@ async def send_to_printer(request: dict = Body(...)):
     Args:
         request: JSON body containing:
             - gcode_filename: Name of the G-code file to send (from slice output)
+            - printer_id: Optional printer ID to send to specific printer
 
     Returns:
         JSON response with upload status and details
@@ -2244,6 +2341,8 @@ async def send_to_printer(request: dict = Body(...)):
         if not gcode_filename:
             raise HTTPException(status_code=400, detail="gcode_filename is required")
 
+        printer_id = request.get("printer_id")
+
         # Check if printer is configured
         if not config.is_printer_configured():
             raise HTTPException(
@@ -2251,17 +2350,36 @@ async def send_to_printer(request: dict = Body(...)):
                 detail="No printer configured. Please configure a printer first.",
             )
 
-        # Get the active printer
-        printer_config = config.get_active_printer()
-        if not printer_config:
-            # Fall back to first configured printer if no active printer
-            printers = config.get_printers()
-            if not printers:
+        # Get the specified printer or active/default printer
+        if printer_id:
+            # Use the specified printer
+            printer_config = config.get_printer_by_id(printer_id)
+            if not printer_config:
                 raise HTTPException(
-                    status_code=400,
-                    detail="No printer configured. Please configure a printer first.",
+                    status_code=404,
+                    detail=f"Printer not found: {printer_id}",
                 )
-            printer_config = printers[0]
+            logger.info(
+                f"Sending to specified printer: {printer_config.name} "
+                f"({printer_config.canonical_id})"
+            )
+        else:
+            # Get the active printer or fall back to first configured
+            printer_config = config.get_active_printer()
+            if not printer_config:
+                # Fall back to first configured printer if no active printer
+                printers = config.get_printers()
+                if not printers:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=(
+                            "No printer configured. Please configure a printer first."
+                        ),
+                    )
+                printer_config = printers[0]
+                logger.info(f"Sending to default printer: {printer_config.name}")
+            else:
+                logger.info(f"Sending to active printer: {printer_config.name}")
 
         # Get the G-code file path
         gcode_dir = get_gcode_output_dir()

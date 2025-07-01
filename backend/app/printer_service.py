@@ -1395,21 +1395,37 @@ class PrinterService:
                 # Also check in other possible locations
                 serial_number = print_data.get("sn", "") or response_data.get("sn", "")
 
+            logger.info(f"Looking for serial number - found: '{serial_number}'")
+            logger.info(f"Available keys in print_data: {list(print_data.keys())[:20]}")
+            if "upgrade_state" in print_data:
+                logger.info(
+                    f"upgrade_state keys: {list(print_data['upgrade_state'].keys())}"
+                )
+
             if serial_number and len(serial_number) >= 5:
                 # Use the utility function to get model from serial
                 from app.utils import get_printer_model_from_serial
 
                 detected_model = get_printer_model_from_serial(serial_number)
+                logger.info(
+                    f"get_printer_model_from_serial('{serial_number}') "
+                    f"returned: '{detected_model}'"
+                )
                 if detected_model != "Unknown":
                     printer_model = detected_model
                     logger.info(
                         f"Detected printer model '{printer_model}' from "
                         f"serial number: {serial_number}"
                     )
+            else:
+                logger.warning(
+                    f"Serial number not found or too short: '{serial_number}'"
+                )
 
             # According to OpenBambuAPI, check module field as fallback
             if printer_model == "Unknown":
                 module = print_data.get("module", "")
+                logger.info(f"Checking module field: '{module}'")
                 if module:
                     # Module field contains model info like "BL-P001" for X1C
                     # Use the exact names as they appear in the profile files
@@ -1422,6 +1438,9 @@ class PrinterService:
                         "BL-A002": "A1 mini",
                     }
                     printer_model = model_map.get(module, module)
+                    logger.info(
+                        f"Module '{module}' mapped to printer model: '{printer_model}'"
+                    )
 
             # Check nozzle info for model hints and diameter
             nozzle_info = print_data.get("device", {}).get("nozzle", {}).get("info", [])

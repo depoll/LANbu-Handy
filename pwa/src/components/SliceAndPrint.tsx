@@ -332,6 +332,7 @@ function SliceAndPrint() {
           onStatusMessage={addStatusMessage}
           printerModel={printerMetadata?.printer_model}
           nozzleDiameter={printerMetadata?.nozzle_diameter}
+          currentPrinterId={currentPrinterId}
         />
       ),
     },

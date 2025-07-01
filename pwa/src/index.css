@@ -65,6 +65,7 @@
 
   --color-shadow: rgba(0, 0, 0, 0.1);
   --color-shadow-strong: rgba(0, 0, 0, 0.15);
+  --color-accent: var(--color-primary);
 
   /* Set text and background colors for light theme */
   color: var(--color-text-primary);

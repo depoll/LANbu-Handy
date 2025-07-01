@@ -6,6 +6,7 @@ that involve multiple steps like downloading, slicing, and printing.
 """
 
 import asyncio
+import logging
 import uuid
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -21,6 +22,8 @@ from app.utils import (
     get_gcode_output_dir,
     get_printer_model_from_serial,
 )
+
+logger = logging.getLogger(__name__)
 
 
 async def download_model_step(
@@ -87,6 +90,10 @@ def slice_model_step(file_path: Path, printer_config=None) -> Dict[str, Any]:
         # If we have a printer config, detect the model and use appropriate settings
         if printer_config and printer_config.serial_number:
             printer_model = get_printer_model_from_serial(printer_config.serial_number)
+            logger.info(
+                f"Detected printer model from serial "
+                f"{printer_config.serial_number}: {printer_model}"
+            )
 
             # Build options with printer model information
             # Using default filament type (Generic PLA) and build plate (textured_plate)
