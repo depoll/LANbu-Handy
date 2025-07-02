@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { usePrinterIPPersistence } from '../hooks/usePrinterIPPersistence';
 import { usePrinterMetadata } from '../hooks/usePrinterMetadata';
+import { useBackgroundPrinterStatus } from '../hooks/useBackgroundPrinterStatus';
 import { printerEvents } from '../utils/printerEvents';
 import {
   AddPrinterRequest,
@@ -170,6 +171,9 @@ function PrinterSelector({
     currentPrinter?.canonical_id || null
   );
 
+  // Use background printer status for all printers
+  const { statuses: backgroundStatuses } = useBackgroundPrinterStatus(5000);
+
   // Load current printer configuration on component mount
   useEffect(() => {
     loadCurrentPrinter();
@@ -208,6 +212,41 @@ function PrinterSelector({
       );
     }
   }, [printerMetadata]);
+
+  // Update all printers with background status data
+  useEffect(() => {
+    if (Object.keys(backgroundStatuses).length > 0) {
+      setAllPrinters(prev =>
+        prev.map(printer => {
+          const statusData =
+            backgroundStatuses[printer.canonical_id] ||
+            backgroundStatuses[printer.ip];
+          if (statusData && statusData.status) {
+            return {
+              ...printer,
+              real_model: statusData.status.printer_model || printer.real_model,
+              real_name: statusData.status.printer_name || printer.real_name,
+            };
+          }
+          return printer;
+        })
+      );
+
+      // Also update current printer if it has new data
+      if (currentPrinter) {
+        const statusData =
+          backgroundStatuses[currentPrinter.canonical_id] ||
+          backgroundStatuses[currentPrinter.ip];
+        if (statusData && statusData.status) {
+          setCurrentPrinter(prev => ({
+            ...prev!,
+            real_model: statusData.status.printer_model || prev!.real_model,
+            real_name: statusData.status.printer_name || prev!.real_name,
+          }));
+        }
+      }
+    }
+  }, [backgroundStatuses]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Handle click outside dropdown to close it
   useEffect(() => {

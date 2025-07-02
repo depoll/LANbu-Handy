@@ -9,6 +9,7 @@ import asyncio
 import json
 import logging
 import time
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -23,9 +24,13 @@ logging.getLogger("paho.mqtt.client").setLevel(logging.WARNING)
 logging.getLogger("paho.mqtt.publish").setLevel(logging.WARNING)
 
 # Import and apply async MQTT patch before other imports
-from app.mqtt_async_patch_v3 import add_async_support_to_printer_service  # noqa: E402
+from app.mqtt_async_patch_v4 import (  # noqa: E402
+    add_connection_pool_support_to_printer_service,
+    start_mqtt_connection_pool,
+    stop_mqtt_connection_pool,
+)
 
-add_async_support_to_printer_service()
+add_connection_pool_support_to_printer_service()
 
 from app.config import get_config  # noqa: E402
 from app.filament_matching_service import FilamentMatchingService  # noqa: E402
@@ -46,6 +51,7 @@ from app.printer_service import (  # noqa: E402
     PrinterMQTTError,
     PrinterService,
 )
+from app.printer_status_monitor import printer_status_monitor  # noqa: E402
 from app.slice_progress_service import slice_progress_service  # noqa: E402
 from app.slicer_service import slice_model  # noqa: E402
 from app.thumbnail_service import (  # noqa: E402
@@ -97,6 +103,17 @@ async def startup_event():
     """Initialize services and clean up old files on startup."""
     logger.info("LANbu Handy backend starting up...")
 
+    # Set dependencies for printer status monitor
+    printer_status_monitor.set_dependencies(config, printer_service)
+
+    # Start the MQTT connection pool
+    await start_mqtt_connection_pool()
+    logger.info("MQTT connection pool started")
+
+    # Start the printer status monitor
+    await printer_status_monitor.start()
+    logger.info("Printer status monitor started")
+
     # Clean up old thumbnail files
     try:
         thumbnail_service.cleanup_old_thumbnails(max_age_hours=24)
@@ -109,6 +126,14 @@ async def startup_event():
 async def shutdown_event():
     """Clean up resources on shutdown."""
     logger.info("LANbu Handy backend shutting down...")
+
+    # Stop the printer status monitor
+    await printer_status_monitor.stop()
+
+    # Stop the MQTT connection pool
+    await stop_mqtt_connection_pool()
+    logger.info("MQTT connection pool stopped")
+    logger.info("Printer status monitor stopped")
 
     # MQTT cleanup now handled automatically by async cancellation
 
@@ -2955,6 +2980,137 @@ async def get_printer_status(printer_id: str):
         raise HTTPException(status_code=500, detail=msg)
 
 
+@app.get("/api/printers/all-status")
+async def get_all_printer_statuses():
+    """
+    Get cached status for all configured printers.
+
+    Returns status information that has been collected in the background
+    for all printers with serial numbers configured. This endpoint returns
+    immediately with cached data rather than querying printers.
+
+    Returns:
+        Dict with printer IDs as keys and status information as values
+    """
+    statuses = await printer_status_monitor.get_all_statuses()
+
+    # Format response
+    response = {}
+    for printer_id, status_data in statuses.items():
+        response[printer_id] = {
+            "status": status_data.get("data", {}),
+            "timestamp": status_data.get("timestamp"),
+            "query_time_ms": status_data.get("query_time_ms"),
+            "printer_info": {
+                "name": status_data.get("printer_info", {}).get("name"),
+                "ip": status_data.get("printer_info", {}).get("ip"),
+                "has_serial_number": status_data.get("printer_info", {}).get(
+                    "has_serial_number"
+                ),
+            },
+        }
+
+    return response
+
+
+@app.get("/api/printer/{printer_id}/cached-status")
+async def get_cached_printer_status(printer_id: str):
+    """
+    Get cached status for a specific printer.
+
+    Returns immediately with cached status data rather than querying the printer.
+    Use this for fast status checks when real-time data is not critical.
+
+    Args:
+        printer_id: Canonical ID or IP of the printer
+
+    Returns:
+        Cached status data or 404 if not available
+    """
+    status = await printer_status_monitor.get_status(printer_id)
+
+    if not status:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No cached status available for printer '{printer_id}'",
+        )
+
+    return {
+        "status": status.get("data", {}),
+        "timestamp": status.get("timestamp"),
+        "query_time_ms": status.get("query_time_ms"),
+        "is_stale": printer_status_monitor.is_stale(printer_id),
+        "printer_info": {
+            "name": status.get("printer_info", {}).get("name"),
+            "ip": status.get("printer_info", {}).get("ip"),
+            "has_serial_number": status.get("printer_info", {}).get(
+                "has_serial_number"
+            ),
+        },
+    }
+
+
+@app.post("/api/printer/{printer_id}/refresh-status")
+async def refresh_printer_status(printer_id: str):
+    """
+    Force a refresh of the cached status for a specific printer.
+
+    Triggers an immediate status update for the specified printer.
+    This is an async operation - the endpoint returns immediately
+    and the update happens in the background.
+
+    Args:
+        printer_id: Canonical ID or IP of the printer
+
+    Returns:
+        Success message
+    """
+    await printer_status_monitor.force_update(printer_id)
+
+    return {
+        "success": True,
+        "message": f"Status refresh triggered for printer '{printer_id}'",
+    }
+
+
+@app.get("/api/printers/connection-metrics")
+async def get_connection_metrics():
+    """
+    Get MQTT connection metrics for all printers.
+
+    Returns detailed connection state and health metrics for monitoring
+    the MQTT connection pool performance.
+
+    Returns:
+        Dictionary with connection metrics for each printer including:
+        - Connection state (connected, offline, etc.)
+        - Last successful connection time
+        - Consecutive failure count
+        - Next retry time for failed connections
+    """
+    from app.mqtt_connection_pool import mqtt_connection_pool
+
+    metrics = mqtt_connection_pool.get_connection_metrics()
+
+    return {
+        "success": True,
+        "timestamp": datetime.utcnow().isoformat(),
+        "printers": metrics,
+        "summary": {
+            "total_printers": len(metrics),
+            "connected": sum(1 for m in metrics.values() if m["state"] == "connected"),
+            "offline": sum(1 for m in metrics.values() if m["state"] == "offline"),
+            "disconnected": sum(
+                1 for m in metrics.values() if m["state"] == "disconnected"
+            ),
+            "connecting": sum(
+                1 for m in metrics.values() if m["state"] == "connecting"
+            ),
+            "failed": sum(1 for m in metrics.values() if m["state"] == "failed"),
+        },
+    }
+
+
 @app.post("/api/filament/match", response_model=FilamentMatchResponse)
 async def match_filaments(request: FilamentMatchRequest):
     """
@@ -3082,12 +3238,8 @@ async def set_active_printer(request: SetActivePrinterRequest):
 
     # Wrap the entire operation in a timeout to prevent hanging
     try:
-        # First, immediately cancel ALL MQTT operations before even starting
-        # This ensures we don't wait for any ongoing operations
-        from app.mqtt_async_patch_v3 import cancel_all_mqtt_operations
-
-        logger.debug("Pre-emptively cancelling all MQTT operations")
-        cancel_all_mqtt_operations()
+        # With background status monitoring, we don't need to cancel MQTT operations
+        # The status monitor will continue updating all printers in parallel
 
         # Use asyncio.wait_for for Python 3.10 compatibility
         return await asyncio.wait_for(_set_active_printer_impl(request), timeout=10)
