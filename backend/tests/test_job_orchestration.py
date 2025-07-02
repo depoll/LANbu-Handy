@@ -116,7 +116,10 @@ class TestSliceModelStep:
         assert "output.gcode" in result["details"]
 
         mock_slice.assert_called_once_with(
-            input_path=input_path, output_dir=mock_output_dir, options=mock_options
+            input_path=input_path,
+            output_dir=mock_output_dir,
+            options=mock_options,
+            printer_model_id=None,
         )
 
     @patch("app.job_orchestration.find_gcode_file")

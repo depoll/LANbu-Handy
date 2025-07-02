@@ -88,3 +88,6 @@ backend/data/printers.json
 
 # Bambu Studio resources symlink
 bambu-studio-resources
+
+# Scratch files for AI
+scratch/

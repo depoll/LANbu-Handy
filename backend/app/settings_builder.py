@@ -153,6 +153,8 @@ class SettingsBuilder:
                 with open(base_machine_path, "r") as f:
                     machine_settings = json.load(f)
                 logger.info(f"Loaded base machine profile: {machine_file}")
+            else:
+                logger.warning(f"Base machine profile not found: {base_machine_path}")
 
             # Try to load nozzle-specific machine profile
             nozzle_machine_path = MACHINE_PROFILES_PATH / machine_nozzle_file
@@ -164,14 +166,38 @@ class SettingsBuilder:
                 logger.info(
                     f"Loaded nozzle-specific machine profile: {machine_nozzle_file}"
                 )
+            else:
+                logger.warning(
+                    f"Nozzle-specific machine profile not found: {nozzle_machine_path}"
+                )
 
             # Load process profile
             process_settings = self._load_process_profile(
                 printer_model, nozzle_size, print_quality
             )
             if process_settings:
-                # Merge process settings
+                # Merge process settings, but keep as process type for CLI
                 machine_settings.update(process_settings)
+                # CLI expects "process" type, not "machine_model"
+                machine_settings["type"] = "process"
+                # Ensure critical machine fields are present
+                machine_settings["printer_model"] = profile_name
+                machine_settings["printer_variant"] = f"{nozzle_size}"
+
+            # Add model_id to settings (used by Bambu Studio CLI)
+            if machine_settings and printer_model:
+                from app.utils import get_printer_model_id
+
+                model_id = get_printer_model_id(printer_model)
+                if model_id:
+                    # Ensure model_id is set (this is what CLI uses)
+                    machine_settings["model_id"] = model_id
+                    # Also add printer_model_id for completeness
+                    machine_settings["printer_model_id"] = model_id
+                    logger.info(
+                        f"Added model_id and printer_model_id: {model_id} "
+                        "to machine settings"
+                    )
 
             # Save combined settings to temp file
             if machine_settings:

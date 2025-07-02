@@ -352,3 +352,26 @@ def get_printer_model_from_serial(serial_number: str) -> str:
         return "A1 mini"
 
     return serial_model_map.get(model_code, "Unknown")
+
+
+def get_printer_model_id(printer_model: str) -> str:
+    """
+    Get the Bambu model ID for a printer model.
+
+    Args:
+        printer_model: The printer model name (e.g., "X1 Carbon", "P1P")
+
+    Returns:
+        str: The model ID (e.g., "BL-P001", "C11")
+    """
+    model_id_map = {
+        "X1 Carbon": "BL-P001",
+        "X1": "BL-P002",
+        "X1E": "C13",
+        "P1P": "C11",
+        "P1S": "C12",
+        "A1": "N2S",
+        "A1 mini": "N1",
+    }
+
+    return model_id_map.get(printer_model, "")

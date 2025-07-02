@@ -21,6 +21,7 @@ from app.utils import (
     get_default_slicing_options,
     get_gcode_output_dir,
     get_printer_model_from_serial,
+    get_printer_model_id,
 )
 
 logger = logging.getLogger(__name__)
@@ -88,12 +89,17 @@ def slice_model_step(file_path: Path, printer_config=None) -> Dict[str, Any]:
         output_dir = get_gcode_output_dir()
 
         # If we have a printer config, detect the model and use appropriate settings
+        printer_model_id = None
         if printer_config and printer_config.serial_number:
             printer_model = get_printer_model_from_serial(printer_config.serial_number)
             logger.info(
                 f"Detected printer model from serial "
                 f"{printer_config.serial_number}: {printer_model}"
             )
+
+            # Get the model ID for metadata
+            printer_model_id = get_printer_model_id(printer_model)
+            logger.info(f"Printer model ID: {printer_model_id}")
 
             # Build options with printer model information
             # Using default filament type (Generic PLA) and build plate (textured_plate)
@@ -107,12 +113,23 @@ def slice_model_step(file_path: Path, printer_config=None) -> Dict[str, Any]:
                 filament_types=["Generic PLA"],  # Default filament
                 filament_colors=None,
             )
+            logger.info(f"Built slicing options with printer model: {printer_model}")
         else:
             # Fall back to default options if no printer config
+            logger.warning(
+                "No printer config or serial number available, using default options"
+            )
+            if printer_config:
+                logger.warning(
+                    f"Printer config exists but no serial: {printer_config.name}"
+                )
             slicing_options = get_default_slicing_options()
 
         result = slice_model(
-            input_path=file_path, output_dir=output_dir, options=slicing_options
+            input_path=file_path,
+            output_dir=output_dir,
+            options=slicing_options,
+            printer_model_id=printer_model_id,
         )
 
         if result.success:

@@ -1447,20 +1447,53 @@ class PrinterService:
             if nozzle_info and len(nozzle_info) > 0:
                 nozzle_type = nozzle_info[0].get("type", "")
 
-                # Extract nozzle diameter from type string
-                # Nozzle types are typically like "HX-stainless steel-0.4" or similar
-                if nozzle_type:
-                    # Try to extract diameter from the nozzle type string
+                # Nozzle type mapping based on Bambu Lab codes
+                # HX01 = 0.4mm hardened steel (default)
+                # HX02 = 0.2mm hardened steel
+                # HX06 = 0.6mm hardened steel
+                # HX08 = 0.8mm hardened steel
+                nozzle_type_map = {
+                    "HX01": 0.4,  # 0.4mm hardened steel
+                    "HX02": 0.2,  # 0.2mm hardened steel
+                    "HX04": 0.4,  # 0.4mm variant
+                    "HX06": 0.6,  # 0.6mm hardened steel
+                    "HX08": 0.8,  # 0.8mm hardened steel
+                    "H01": 0.4,  # 0.4mm standard
+                    "H02": 0.2,  # 0.2mm standard
+                    "H06": 0.6,  # 0.6mm standard
+                    "H08": 0.8,  # 0.8mm standard
+                }
+
+                # Check if we have a known nozzle type code
+                if nozzle_type in nozzle_type_map:
+                    nozzle_diameter = nozzle_type_map[nozzle_type]
+                    logger.info(
+                        f"Detected nozzle diameter: {nozzle_diameter}mm "
+                        f"from type: {nozzle_type}"
+                    )
+                elif nozzle_type:
+                    # Fall back to regex extraction for other formats
+                    # Nozzle types might be like "HX-stainless steel-0.4" or similar
                     import re
 
                     diameter_match = re.search(r"(\d+\.?\d*)", nozzle_type)
                     if diameter_match:
                         try:
-                            nozzle_diameter = float(diameter_match.group(1))
-                            logger.info(
-                                f"Detected nozzle diameter: {nozzle_diameter}mm "
-                                f"from type: {nozzle_type}"
-                            )
+                            extracted_value = float(diameter_match.group(1))
+                            # Sanity check - nozzle diameters are typically < 2mm
+                            if extracted_value < 2.0:
+                                nozzle_diameter = extracted_value
+                                logger.info(
+                                    f"Detected nozzle diameter: {nozzle_diameter}mm "
+                                    f"from type: {nozzle_type}"
+                                )
+                            else:
+                                logger.warning(
+                                    f"Extracted nozzle diameter {extracted_value}mm "
+                                    f"seems invalid from type: {nozzle_type}, "
+                                    f"using default 0.4mm"
+                                )
+                                nozzle_diameter = 0.4
                         except ValueError:
                             logger.warning(
                                 f"Could not parse nozzle diameter from: {nozzle_type}"

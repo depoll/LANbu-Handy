@@ -24,12 +24,12 @@ LINT_OUTPUT=$(./scripts/lint.sh 2>&1) || LINT_EXIT_CODE=$?
 
 # If linting failed, report the errors
 if [ "${LINT_EXIT_CODE:-0}" -ne 0 ]; then
-    echo "❗ Found linting issues that need manual fixing:"
-    echo ""
-    echo "$LINT_OUTPUT"
-    echo ""
-    echo "These are linting errors that the auto-formatter cannot fix."
-    echo "Please fix the above linting errors."
+    echo "❗ Found linting issues that need manual fixing:" >&2
+    echo "" >&2
+    echo "$LINT_OUTPUT" >&2
+    echo "" >&2
+    echo "These are linting errors that the auto-formatter cannot fix." >&2
+    echo "Please fix the above linting errors." >&2
     exit 2
 else
     echo "✅ All linting issues resolved!"

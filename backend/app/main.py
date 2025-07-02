@@ -1274,6 +1274,14 @@ async def slice_model_with_configuration(request: ConfiguredSliceRequest):
                         f"number: {printer_config.serial_number}"
                     )
 
+        # Get printer model ID for metadata
+        printer_model_id = None
+        if printer_model and printer_model != "Unknown":
+            from app.utils import get_printer_model_id
+
+            printer_model_id = get_printer_model_id(printer_model)
+            logger.info(f"Printer model ID for metadata: {printer_model_id}")
+
         # Build slicing options from the configuration
         slicing_options = build_slicing_options_from_config(
             request.filament_mappings,
@@ -1326,6 +1334,7 @@ async def slice_model_with_configuration(request: ConfiguredSliceRequest):
             options=slicing_options,
             plate_index=request.selected_plate_index,
             model_name=model_name,
+            printer_model_id=printer_model_id,
         )
 
         if result.success:
@@ -1474,6 +1483,14 @@ async def slice_model_sequential_plates(request: ConfiguredSliceRequest):
                         f"number: {printer_config.serial_number}"
                     )
 
+        # Get printer model ID for metadata
+        printer_model_id = None
+        if printer_model and printer_model != "Unknown":
+            from app.utils import get_printer_model_id
+
+            printer_model_id = get_printer_model_id(printer_model)
+            logger.info(f"Printer model ID for metadata: {printer_model_id}")
+
         # Build slicing options from the configuration
         slicing_options = build_slicing_options_from_config(
             request.filament_mappings,
@@ -1503,6 +1520,7 @@ async def slice_model_sequential_plates(request: ConfiguredSliceRequest):
                 output_dir=plate_output_dir,
                 options=slicing_options,
                 plate_index=plate.index,
+                printer_model_id=printer_model_id,
             )
 
             if not result.success:
@@ -1624,6 +1642,41 @@ async def start_slice_with_progress(request: StartProgressSliceRequest):
                 detail=f"Plate {request.selected_plate_index} not found in model",
             )
 
+        # Determine printer model - use request value or detect from printer config
+        printer_model = request.printer_model
+        nozzle_diameter = request.nozzle_diameter
+        printer_model_id = None
+
+        # If printer model not provided or is "Unknown", try to detect it
+        if not printer_model or printer_model == "Unknown":
+            # Try to get the current printer config
+            printer_config = config.get_active_printer()
+            if not printer_config:
+                # Fall back to first configured printer
+                printers = config.get_printers()
+                if printers:
+                    printer_config = printers[0]
+
+            if printer_config and printer_config.serial_number:
+                from app.utils import get_printer_model_from_serial
+
+                detected_model = get_printer_model_from_serial(
+                    printer_config.serial_number
+                )
+                if detected_model != "Unknown":
+                    printer_model = detected_model
+                    logger.info(
+                        f"Detected printer model '{printer_model}' from serial "
+                        f"number: {printer_config.serial_number}"
+                    )
+
+        # Get printer model ID for metadata
+        if printer_model and printer_model != "Unknown":
+            from app.utils import get_printer_model_id
+
+            printer_model_id = get_printer_model_id(printer_model)
+            logger.info(f"Printer model ID for metadata: {printer_model_id}")
+
         # Create progress session
         session_id = slice_progress_service.create_session(
             file_id=request.file_id, plate_indices=plates_to_slice
@@ -1635,6 +1688,12 @@ async def start_slice_with_progress(request: StartProgressSliceRequest):
             "filament_mappings": request.filament_mappings,
             "build_plate_type": request.build_plate_type,
             "selected_plate_index": request.selected_plate_index,
+            "printer_model": printer_model,
+            "nozzle_diameter": nozzle_diameter,
+            "print_quality": request.print_quality,
+            "filament_types": request.filament_types,
+            "filament_colors": request.filament_colors,
+            "printer_model_id": printer_model_id,
         }
 
         return StartProgressSliceResponse(
@@ -1705,6 +1764,7 @@ async def stream_slice_progress(session_id: str):
                 output_dir = get_gcode_output_dir() / f"session_{session_id}"
 
                 # Get slicing options from stored configuration
+                printer_model_id = None
                 if hasattr(session, "config") and session.config:
                     from app.utils import build_slicing_options_from_config
 
@@ -1712,7 +1772,13 @@ async def stream_slice_progress(session_id: str):
                         session.config["filament_mappings"],
                         session.config["build_plate_type"],
                         session.config["selected_plate_index"],
+                        session.config.get("printer_model"),
+                        session.config.get("nozzle_diameter"),
+                        session.config.get("print_quality"),
+                        session.config.get("filament_types"),
+                        session.config.get("filament_colors"),
                     )
+                    printer_model_id = session.config.get("printer_model_id")
                 else:
                     # Fallback to defaults
                     from app.utils import get_default_slicing_options
@@ -1783,6 +1849,7 @@ async def stream_slice_progress(session_id: str):
                                 output_dir=plate_output_dir,
                                 options=slicing_options,
                                 plate_index=plate_index,
+                                printer_model_id=printer_model_id,
                             )
 
                             # Wait for completion while allowing other async tasks
