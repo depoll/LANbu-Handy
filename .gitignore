@@ -49,7 +49,11 @@ dist/
 .eslintcache
 
 # IDEs
-.vscode/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/tasks.json
 .idea/
 *.swp
 *.swo
@@ -84,3 +88,6 @@ backend/data/printers.json
 
 # Bambu Studio resources symlink
 bambu-studio-resources
+
+# Scratch files for AI
+scratch/

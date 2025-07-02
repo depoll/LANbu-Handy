@@ -1,0 +1,16 @@
+{
+  "additionalDirectories": ["/opt/bambu-studio-resources", "/tmp"],
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit|mcp__filesystem__write_file|mcp__filesystem__edit_file",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/workspace/scripts/autofix-lint.sh"
+          }
+        ]
+      }
+    ]
+  }
+}

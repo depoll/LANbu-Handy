@@ -27,6 +27,8 @@ class SettingsBuilder:
     # Mapping of printer models to profile names
     PRINTER_MODEL_MAP = {
         "X1C": "Bambu Lab X1 Carbon",
+        # Added for consistency with get_printer_model_from_serial
+        "X1 Carbon": "Bambu Lab X1 Carbon",
         "X1": "Bambu Lab X1",
         "X1E": "Bambu Lab X1E",
         "P1P": "Bambu Lab P1P",
@@ -57,6 +59,12 @@ class SettingsBuilder:
         "PA": "Bambu PA-CF",
         "TPU": "Bambu TPU 95A",
         "PVA": "Bambu Support W",
+        # Generic mappings (for basic jobs)
+        "Generic PLA": "Bambu PLA Basic",
+        "Generic PETG": "Bambu PETG Basic",
+        "Generic ABS": "Bambu ABS",
+        "Generic ASA": "Bambu ASA",
+        "Generic TPU": "Bambu TPU 95A",
     }
 
     def __init__(self, temp_dir: Optional[Path] = None):
@@ -124,6 +132,10 @@ class SettingsBuilder:
         try:
             # Map printer model to profile name
             profile_name = self.PRINTER_MODEL_MAP.get(printer_model, printer_model)
+            logger.info(
+                f"Building machine settings for printer_model={printer_model}, "
+                f"mapped to profile_name={profile_name}"
+            )
 
             # Determine nozzle size suffix
             nozzle_size = nozzle_diameter or 0.4
@@ -141,6 +153,8 @@ class SettingsBuilder:
                 with open(base_machine_path, "r") as f:
                     machine_settings = json.load(f)
                 logger.info(f"Loaded base machine profile: {machine_file}")
+            else:
+                logger.warning(f"Base machine profile not found: {base_machine_path}")
 
             # Try to load nozzle-specific machine profile
             nozzle_machine_path = MACHINE_PROFILES_PATH / machine_nozzle_file
@@ -152,14 +166,38 @@ class SettingsBuilder:
                 logger.info(
                     f"Loaded nozzle-specific machine profile: {machine_nozzle_file}"
                 )
+            else:
+                logger.warning(
+                    f"Nozzle-specific machine profile not found: {nozzle_machine_path}"
+                )
 
             # Load process profile
             process_settings = self._load_process_profile(
                 printer_model, nozzle_size, print_quality
             )
             if process_settings:
-                # Merge process settings
+                # Merge process settings, but keep as process type for CLI
                 machine_settings.update(process_settings)
+                # CLI expects "process" type, not "machine_model"
+                machine_settings["type"] = "process"
+                # Ensure critical machine fields are present
+                machine_settings["printer_model"] = profile_name
+                machine_settings["printer_variant"] = f"{nozzle_size}"
+
+            # Add model_id to settings (used by Bambu Studio CLI)
+            if machine_settings and printer_model:
+                from app.utils import get_printer_model_id
+
+                model_id = get_printer_model_id(printer_model)
+                if model_id:
+                    # Ensure model_id is set (this is what CLI uses)
+                    machine_settings["model_id"] = model_id
+                    # Also add printer_model_id for completeness
+                    machine_settings["printer_model_id"] = model_id
+                    logger.info(
+                        f"Added model_id and printer_model_id: {model_id} "
+                        "to machine settings"
+                    )
 
             # Save combined settings to temp file
             if machine_settings:
@@ -169,6 +207,10 @@ class SettingsBuilder:
                 with open(settings_file, "w") as f:
                     json.dump(machine_settings, f, indent=2)
                 logger.info(f"Generated machine settings: {settings_file}")
+                # Log the first few keys for debugging
+                logger.info(
+                    f"Machine settings keys: {list(machine_settings.keys())[:10]}"
+                )
                 return settings_file
 
             logger.warning(f"No machine settings found for {printer_model}")

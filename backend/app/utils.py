@@ -278,6 +278,14 @@ def build_slicing_options_from_config(
 
     # If we have printer info, generate settings files
     if printer_model and filament_types:
+        import logging
+
+        logger = logging.getLogger(__name__)
+
+        logger.info(
+            f"Building slicing options with printer_model={printer_model}, "
+            f"filament_types={filament_types}"
+        )
         settings_builder = SettingsBuilder()
 
         # Build settings files using the provided filament types and colors
@@ -293,8 +301,77 @@ def build_slicing_options_from_config(
         # Add settings file paths to CLI options
         if machine_settings_path:
             options["load-settings"] = str(machine_settings_path)
+            logger.info(f"Added machine settings: {machine_settings_path}")
 
         if filament_settings_path:
             options["load-filaments"] = str(filament_settings_path)
+            logger.info(f"Added filament settings: {filament_settings_path}")
 
     return options
+
+
+def get_printer_model_from_serial(serial_number: str) -> str:
+    """
+    Get the printer model from the serial number.
+
+    Bambu Lab serial numbers follow two formats:
+    1. New format: 00MXXAYYLLSSSSS where XX is the model code (positions 3-4)
+    2. Old format: XXYYXXXXXXX where XX is the model code (positions 0-1)
+
+    Args:
+        serial_number: The printer's serial number
+
+    Returns:
+        str: The printer model (e.g., "X1 Carbon", "P1P", "A1 mini")
+    """
+    if not serial_number or len(serial_number) < 5:
+        return "Unknown"
+
+    # Check if it's the new format (starts with "00M")
+    if serial_number.startswith("00M") and len(serial_number) >= 5:
+        # Extract model code from positions 3-4 (0-indexed)
+        model_code = serial_number[3:5]
+    else:
+        # Old format - extract from positions 0-1
+        model_code = serial_number[0:2]
+
+    # Map model codes according to Bambu Lab wiki
+    # Use the exact names as they appear in the profile files
+    serial_model_map = {
+        "09": "X1 Carbon",  # X1 Carbon
+        "07": "X1",  # X1
+        "08": "X1E",  # X1E
+        "03": "P1P",  # P1P (or A1 mini in old format)
+        "04": "P1S",  # P1S
+        "01": "A1 mini",  # A1 mini
+        "02": "A1",  # A1
+    }
+
+    # Special handling for A1 mini which uses "03" in old format
+    if model_code == "03" and not serial_number.startswith("00M"):
+        return "A1 mini"
+
+    return serial_model_map.get(model_code, "Unknown")
+
+
+def get_printer_model_id(printer_model: str) -> str:
+    """
+    Get the Bambu model ID for a printer model.
+
+    Args:
+        printer_model: The printer model name (e.g., "X1 Carbon", "P1P")
+
+    Returns:
+        str: The model ID (e.g., "BL-P001", "C11")
+    """
+    model_id_map = {
+        "X1 Carbon": "BL-P001",
+        "X1": "BL-P002",
+        "X1E": "C13",
+        "P1P": "C11",
+        "P1S": "C12",
+        "A1": "N2S",
+        "A1 mini": "N1",
+    }
+
+    return model_id_map.get(printer_model, "")

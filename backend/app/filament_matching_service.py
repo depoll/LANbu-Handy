@@ -405,11 +405,14 @@ class FilamentMatchingService:
 
         color = color.strip().lower()
 
-        # Check if it's already a hex code
-        if color.startswith("#") and len(color) == 7:
-            # Validate hex format
-            if re.match(r"^#[0-9a-f]{6}$", color):
+        # Check if it's already a hex code (6 or 8 chars, with or without alpha)
+        if color.startswith("#"):
+            if len(color) == 7 and re.match(r"^#[0-9a-f]{6}$", color):
+                # 6-char hex code without alpha
                 return color.upper()
+            elif len(color) == 9 and re.match(r"^#[0-9a-f]{8}$", color):
+                # 8-char hex code with alpha - strip alpha channel
+                return color[:7].upper()
 
         # Try to map color name to hex
         return self.COLOR_NAME_MAP.get(color)

@@ -239,6 +239,44 @@ class TestColorMatching:
         assert service._normalize_color_to_hex("invalid") is None
         assert service._normalize_color_to_hex("#GGGGGG") is None
 
+    def test_normalize_color_to_hex_with_alpha(self, service):
+        """Test color normalization with 8-character hex codes (with alpha)."""
+        # 8-char hex codes should strip alpha channel
+        assert service._normalize_color_to_hex("#FF0000FF") == "#FF0000"
+        assert service._normalize_color_to_hex("#00FF00FF") == "#00FF00"
+        assert service._normalize_color_to_hex("#0000FFFF") == "#0000FF"
+        assert service._normalize_color_to_hex("#3F8E43FF") == "#3F8E43"  # Hunter Green
+        assert service._normalize_color_to_hex("#000000FF") == "#000000"  # Black
+
+        # Invalid 8-char codes should return None
+        assert service._normalize_color_to_hex("#GGGGGGFF") is None
+        assert (
+            service._normalize_color_to_hex("#FF0000G") is None
+        )  # 7 chars with invalid
+
+    def test_color_similarity_with_alpha_codes(self, service):
+        """Test color similarity calculation with 8-character hex codes."""
+        # Exact match with alpha codes
+        similarity = service._calculate_color_similarity("#FF0000FF", "#FF0000FF")
+        assert similarity == 1.0
+
+        # Match between 6-char and 8-char codes
+        similarity = service._calculate_color_similarity("#FF0000", "#FF0000FF")
+        assert similarity == 1.0
+
+        # Different colors with alpha
+        similarity = service._calculate_color_similarity("#FF0000FF", "#00FF00FF")
+        assert similarity < 0.5
+
+        # Real AMS colors from the bug report
+        # Green PLA vs Black requirement
+        similarity = service._calculate_color_similarity("#000000", "#3F8E43FF")
+        assert similarity < 0.7  # Should not be very similar
+
+        # Black PLA vs Black requirement
+        similarity = service._calculate_color_similarity("#000000", "#000000FF")
+        assert similarity == 1.0
+
 
 class TestErrorHandling:
     """Test error handling and edge cases."""
@@ -698,3 +736,133 @@ class TestCloseTypeMatching:
 
         # PETG should match to PETG-HF (close match)
         assert petg_match.ams_filament.filament_type == "PETG-HF"
+
+
+class TestBugFixes:
+    """Test specific bug fixes and regression tests."""
+
+    def test_valentine_night_fury_bug_fix(self, service):
+        """Test fix for Valentine's Night Fury model color matching bug.
+
+        This tests the specific bug where AMS colors with alpha channel
+        were not being parsed correctly, causing wrong filament mappings.
+        """
+        # Simulate the exact AMS configuration from the bug report
+        filaments_unit0 = [
+            # Hunter Green
+            AMSFilament(slot_id=0, filament_type="PLA", color="#3F8E43FF"),
+            # Gray
+            AMSFilament(slot_id=1, filament_type="PETG", color="#898989FF"),
+            # Black
+            AMSFilament(slot_id=2, filament_type="PETG", color="#000000FF"),
+            # Black PLA
+            AMSFilament(slot_id=3, filament_type="PLA", color="#000000FF"),
+        ]
+        filaments_unit1 = [
+            # White
+            AMSFilament(slot_id=0, filament_type="PETG", color="#FFFFFFFF"),
+            # Chocolate Brown
+            AMSFilament(slot_id=1, filament_type="PLA", color="#7C4B00FF"),
+            # Peach
+            AMSFilament(slot_id=2, filament_type="PETG", color="#F9DFB9FF"),
+            # Army Green
+            AMSFilament(slot_id=3, filament_type="PETG", color="#39541AFF"),
+        ]
+        filaments_unit2 = [
+            # Empty (support)
+            AMSFilament(slot_id=0, filament_type="PLA-S", color=""),
+            # Crimson
+            AMSFilament(slot_id=1, filament_type="PLA", color="#F72323FF"),
+            # Forest Green
+            AMSFilament(slot_id=2, filament_type="PETG", color="#00AE42FF"),
+            # Safety Orange
+            AMSFilament(slot_id=3, filament_type="PETG", color="#F75403FF"),
+        ]
+
+        ams_status = AMSStatusResult(
+            success=True,
+            message="AMS status retrieved",
+            ams_units=[
+                AMSUnit(unit_id=0, filaments=filaments_unit0),
+                AMSUnit(unit_id=1, filaments=filaments_unit1),
+                AMSUnit(unit_id=2, filaments=filaments_unit2),
+            ],
+        )
+
+        # Valentine's Night Fury model requirements
+        requirements = FilamentRequirement(
+            filament_count=3,
+            filament_types=["PLA", "PLA", "PLA"],
+            filament_colors=["#000000", "#00FF00", "#FF0006"],  # Black, Green, Red
+            has_multicolor=True,
+        )
+
+        result = service.match_filaments(requirements, ams_status)
+
+        assert result.success is True
+        assert len(result.matches) == 3
+
+        # Find matches by requirement index
+        black_match = next(m for m in result.matches if m.requirement_index == 0)
+        green_match = next(m for m in result.matches if m.requirement_index == 1)
+        red_match = next(m for m in result.matches if m.requirement_index == 2)
+
+        # Verify correct mappings
+        # Black should map to AMS 0-3 (Black PLA), NOT to green
+        assert black_match.ams_unit_id == 0
+        assert black_match.ams_slot_id == 3
+        assert black_match.ams_filament.color == "#000000FF"
+
+        # Green should NOT map to black PLA
+        # It should map to Hunter Green (0-0) or Forest Green PETG (2-2)
+        # Hunter Green PLA is the best match as it's PLA and greenish
+        assert green_match.ams_unit_id == 0
+        assert green_match.ams_slot_id == 0
+        assert green_match.ams_filament.color == "#3F8E43FF"
+
+        # Red should map to Crimson PLA (2-1)
+        assert red_match.ams_unit_id == 2
+        assert red_match.ams_slot_id == 1
+        assert red_match.ams_filament.color == "#F72323FF"
+
+    def test_ams_colors_with_alpha_matching(self, service):
+        """Test that AMS colors with alpha channel are matched correctly."""
+        # Create AMS with 8-char hex colors (typical from real AMS)
+        filaments = [
+            # Red with alpha
+            AMSFilament(slot_id=0, filament_type="PLA", color="#FF0000FF"),
+            # Green with alpha
+            AMSFilament(slot_id=1, filament_type="PLA", color="#00FF00FF"),
+            # Blue with alpha
+            AMSFilament(slot_id=2, filament_type="PLA", color="#0000FFFF"),
+        ]
+        ams_unit = AMSUnit(unit_id=0, filaments=filaments)
+        ams_status = AMSStatusResult(
+            success=True, message="AMS status retrieved", ams_units=[ams_unit]
+        )
+
+        # Model requirements with 6-char hex colors (typical from 3MF files)
+        requirements = FilamentRequirement(
+            filament_count=3,
+            filament_types=["PLA", "PLA", "PLA"],
+            filament_colors=["#FF0000", "#00FF00", "#0000FF"],  # Red, Green, Blue
+        )
+
+        result = service.match_filaments(requirements, ams_status)
+
+        assert result.success is True
+        assert len(result.matches) == 3
+
+        # All should be perfect matches
+        for match in result.matches:
+            assert match.match_quality == "perfect"
+            assert match.confidence > 0.95
+
+        # Verify specific color matches
+        red_match = next(m for m in result.matches if m.requirement_index == 0)
+        green_match = next(m for m in result.matches if m.requirement_index == 1)
+        blue_match = next(m for m in result.matches if m.requirement_index == 2)
+
+        assert red_match.ams_slot_id == 0
+        assert green_match.ams_slot_id == 1
+        assert blue_match.ams_slot_id == 2

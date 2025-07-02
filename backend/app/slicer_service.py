@@ -13,6 +13,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional, Union
 
+from app.post_process_3mf import add_printer_model_id_to_3mf
+
 logger = logging.getLogger(__name__)
 
 
@@ -60,7 +62,9 @@ class BambuStudioCLIWrapper:
             CLIResult object containing execution results
         """
         command = [self.cli_command] + args
-        logger.debug(f"Executing CLI command: {' '.join(command)}")
+        # Always log at INFO level for debugging
+        logger.info(f"Executing CLI command: {' '.join(command)}")
+        logger.info(f"Working directory: {self.temp_dir}")
 
         try:
             result = subprocess.run(
@@ -71,9 +75,10 @@ class BambuStudioCLIWrapper:
                 cwd=self.temp_dir,
             )
 
-            logger.debug(f"CLI command completed with exit code: {result.returncode}")
+            logger.info(f"CLI command completed with exit code: {result.returncode}")
             if result.returncode != 0:
                 logger.warning(f"CLI command failed: {result.stderr}")
+                logger.warning(f"CLI stdout: {result.stdout}")
 
             return CLIResult(
                 exit_code=result.returncode,
@@ -160,6 +165,7 @@ class BambuStudioCLIWrapper:
         plate_index: Optional[int] = None,
         export_3mf: bool = True,
         model_name: Optional[str] = None,
+        printer_model_id: Optional[str] = None,
     ) -> CLIResult:
         """
         Slice a 3D model using Bambu Studio CLI.
@@ -225,19 +231,48 @@ class BambuStudioCLIWrapper:
             # The CLI will save it in the output directory
             args.extend(["--export-3mf", export_filename])
 
+        # Note: printer_model_id is handled via the loaded machine settings file
+        # The --metadata-name/value flags don't affect slice_info.config
+
         # Add any additional options
         if options:
             for key, value in options.items():
                 args.extend([f"--{key}", value])
 
-        # Log the full command for debugging
+        # Log the full command and all parameters for debugging
         full_command = [self.cli_command] + args
-        logger.info(
-            f"Executing slice command: {' '.join(str(arg) for arg in full_command)}"
-        )
+        logger.info("=" * 80)
+        logger.info("SLICE COMMAND DETAILS:")
+        logger.info(f"Full command: {' '.join(str(arg) for arg in full_command)}")
+        logger.info(f"Input file: {input_path}")
+        logger.info(f"Output directory: {output_dir}")
+        logger.info(f"Plate index: {plate_index}")
+        logger.info(f"Export 3MF: {export_3mf}")
+        logger.info(f"Model name: {model_name}")
+        if options:
+            logger.info("Additional options:")
+            for key, value in options.items():
+                logger.info(f"  --{key}: {value}")
+        logger.info("=" * 80)
 
         # 5 minute timeout for slicing
-        return self._run_command(args, timeout=300)
+        result = self._run_command(args, timeout=300)
+
+        # Post-process the 3MF file to add printer_model_id if needed
+        if result.success and export_3mf and printer_model_id:
+            output_file = output_dir / export_filename
+            if output_file.exists():
+                try:
+                    add_printer_model_id_to_3mf(output_file, printer_model_id)
+                    logger.info(
+                        f"Post-processed {output_file} to add printer_model_id: "
+                        f"{printer_model_id}"
+                    )
+                except Exception as e:
+                    logger.error(f"Failed to post-process {output_file}: {e}")
+                    # Don't fail the whole operation, just log the error
+
+        return result
 
     def check_availability(self) -> CLIResult:
         """
@@ -337,6 +372,7 @@ def slice_model(
     plate_index: Optional[int] = None,
     export_3mf: bool = True,
     model_name: Optional[str] = None,
+    printer_model_id: Optional[str] = None,
 ) -> CLIResult:
     """
     Slice a 3D model using Bambu Studio CLI.
@@ -358,5 +394,11 @@ def slice_model(
 
     wrapper = BambuStudioCLIWrapper()
     return wrapper.slice_model(
-        cleaned_path, output_dir, options, plate_index, export_3mf, model_name
+        cleaned_path,
+        output_dir,
+        options,
+        plate_index,
+        export_3mf,
+        model_name,
+        printer_model_id,
     )

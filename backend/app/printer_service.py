@@ -1395,35 +1395,42 @@ class PrinterService:
                 # Also check in other possible locations
                 serial_number = print_data.get("sn", "") or response_data.get("sn", "")
 
+            logger.info(f"Looking for serial number - found: '{serial_number}'")
+            logger.info(f"Available keys in print_data: {list(print_data.keys())[:20]}")
+            if "upgrade_state" in print_data:
+                logger.info(
+                    f"upgrade_state keys: {list(print_data['upgrade_state'].keys())}"
+                )
+
             if serial_number and len(serial_number) >= 5:
-                # Extract model code from positions 3-4 (0-indexed)
-                model_code = serial_number[3:5]
+                # Use the utility function to get model from serial
+                from app.utils import get_printer_model_from_serial
 
-                # Map model codes according to Bambu Lab wiki
-                serial_model_map = {
-                    "09": "X1C",  # X1 Carbon
-                    "07": "X1",  # X1
-                    "08": "X1E",  # X1E
-                    "03": "P1P",  # P1P
-                    "04": "P1S",  # P1S
-                    "01": "A1 mini",  # A1 mini
-                    "02": "A1",  # A1
-                }
-
-                if model_code in serial_model_map:
-                    printer_model = serial_model_map[model_code]
+                detected_model = get_printer_model_from_serial(serial_number)
+                logger.info(
+                    f"get_printer_model_from_serial('{serial_number}') "
+                    f"returned: '{detected_model}'"
+                )
+                if detected_model != "Unknown":
+                    printer_model = detected_model
                     logger.info(
                         f"Detected printer model '{printer_model}' from "
                         f"serial number: {serial_number}"
                     )
+            else:
+                logger.warning(
+                    f"Serial number not found or too short: '{serial_number}'"
+                )
 
             # According to OpenBambuAPI, check module field as fallback
             if printer_model == "Unknown":
                 module = print_data.get("module", "")
+                logger.info(f"Checking module field: '{module}'")
                 if module:
                     # Module field contains model info like "BL-P001" for X1C
+                    # Use the exact names as they appear in the profile files
                     model_map = {
-                        "BL-P001": "X1C",
+                        "BL-P001": "X1 Carbon",
                         "BL-P002": "X1",
                         "BL-P003": "P1P",
                         "BL-P004": "P1S",
@@ -1431,26 +1438,62 @@ class PrinterService:
                         "BL-A002": "A1 mini",
                     }
                     printer_model = model_map.get(module, module)
+                    logger.info(
+                        f"Module '{module}' mapped to printer model: '{printer_model}'"
+                    )
 
             # Check nozzle info for model hints and diameter
             nozzle_info = print_data.get("device", {}).get("nozzle", {}).get("info", [])
             if nozzle_info and len(nozzle_info) > 0:
                 nozzle_type = nozzle_info[0].get("type", "")
 
-                # Extract nozzle diameter from type string
-                # Nozzle types are typically like "HX-stainless steel-0.4" or similar
-                if nozzle_type:
-                    # Try to extract diameter from the nozzle type string
+                # Nozzle type mapping based on Bambu Lab codes
+                # HX01 = 0.4mm hardened steel (default)
+                # HX02 = 0.2mm hardened steel
+                # HX06 = 0.6mm hardened steel
+                # HX08 = 0.8mm hardened steel
+                nozzle_type_map = {
+                    "HX01": 0.4,  # 0.4mm hardened steel
+                    "HX02": 0.2,  # 0.2mm hardened steel
+                    "HX04": 0.4,  # 0.4mm variant
+                    "HX06": 0.6,  # 0.6mm hardened steel
+                    "HX08": 0.8,  # 0.8mm hardened steel
+                    "H01": 0.4,  # 0.4mm standard
+                    "H02": 0.2,  # 0.2mm standard
+                    "H06": 0.6,  # 0.6mm standard
+                    "H08": 0.8,  # 0.8mm standard
+                }
+
+                # Check if we have a known nozzle type code
+                if nozzle_type in nozzle_type_map:
+                    nozzle_diameter = nozzle_type_map[nozzle_type]
+                    logger.info(
+                        f"Detected nozzle diameter: {nozzle_diameter}mm "
+                        f"from type: {nozzle_type}"
+                    )
+                elif nozzle_type:
+                    # Fall back to regex extraction for other formats
+                    # Nozzle types might be like "HX-stainless steel-0.4" or similar
                     import re
 
                     diameter_match = re.search(r"(\d+\.?\d*)", nozzle_type)
                     if diameter_match:
                         try:
-                            nozzle_diameter = float(diameter_match.group(1))
-                            logger.info(
-                                f"Detected nozzle diameter: {nozzle_diameter}mm "
-                                f"from type: {nozzle_type}"
-                            )
+                            extracted_value = float(diameter_match.group(1))
+                            # Sanity check - nozzle diameters are typically < 2mm
+                            if extracted_value < 2.0:
+                                nozzle_diameter = extracted_value
+                                logger.info(
+                                    f"Detected nozzle diameter: {nozzle_diameter}mm "
+                                    f"from type: {nozzle_type}"
+                                )
+                            else:
+                                logger.warning(
+                                    f"Extracted nozzle diameter {extracted_value}mm "
+                                    f"seems invalid from type: {nozzle_type}, "
+                                    f"using default 0.4mm"
+                                )
+                                nozzle_diameter = 0.4
                         except ValueError:
                             logger.warning(
                                 f"Could not parse nozzle diameter from: {nozzle_type}"

@@ -15,6 +15,7 @@ from app.utils import (
     find_gcode_file,
     get_default_slicing_options,
     get_gcode_output_dir,
+    get_printer_model_from_serial,
     handle_model_errors,
     handle_printer_errors,
     validate_ip_address,
@@ -421,3 +422,83 @@ class TestIPOrHostnameValidation:
 
         # Should remove the trailing dot
         assert result == "printer.local."
+
+
+class TestPrinterModelFromSerial:
+    """Test cases for printer model detection from serial number."""
+
+    def test_get_printer_model_x1_carbon(self):
+        """Test X1 Carbon model detection."""
+        serial = "00M09C441702234"  # X1C serial from printers.json
+        model = get_printer_model_from_serial(serial)
+        assert model == "X1 Carbon"
+
+    def test_get_printer_model_x1(self):
+        """Test X1 model detection."""
+        serial = "00M07C123456789"  # X1 serial
+        model = get_printer_model_from_serial(serial)
+        assert model == "X1"
+
+    def test_get_printer_model_x1e(self):
+        """Test X1E model detection."""
+        serial = "00M08E123456789"  # X1E serial
+        model = get_printer_model_from_serial(serial)
+        assert model == "X1E"
+
+    def test_get_printer_model_p1p(self):
+        """Test P1P model detection."""
+        serial = "00M03P123456789"  # P1P serial
+        model = get_printer_model_from_serial(serial)
+        assert model == "P1P"
+
+    def test_get_printer_model_p1s(self):
+        """Test P1S model detection."""
+        serial = "00M04S123456789"  # P1S serial
+        model = get_printer_model_from_serial(serial)
+        assert model == "P1S"
+
+    def test_get_printer_model_a1_mini(self):
+        """Test A1 mini model detection."""
+        serial = "00M01A123456789"  # A1 mini serial
+        model = get_printer_model_from_serial(serial)
+        assert model == "A1 mini"
+
+    def test_get_printer_model_a1(self):
+        """Test A1 model detection."""
+        serial = "00M02A123456789"  # A1 serial
+        model = get_printer_model_from_serial(serial)
+        assert model == "A1"
+
+    def test_get_printer_model_unknown_code(self):
+        """Test unknown model code."""
+        serial = "00M99X123456789"  # Unknown code
+        model = get_printer_model_from_serial(serial)
+        assert model == "Unknown"
+
+    def test_get_printer_model_invalid_serial_short(self):
+        """Test with short serial number."""
+        serial = "123"  # Too short
+        model = get_printer_model_from_serial(serial)
+        assert model == "Unknown"
+
+    def test_get_printer_model_invalid_serial_empty(self):
+        """Test with empty serial number."""
+        serial = ""
+        model = get_printer_model_from_serial(serial)
+        assert model == "Unknown"
+
+    def test_get_printer_model_invalid_serial_none(self):
+        """Test with None serial number."""
+        serial = None
+        model = get_printer_model_from_serial(serial)
+        assert model == "Unknown"
+
+    def test_get_printer_model_a1_mini_real_serial(self):
+        """Test A1 mini with actual serial from printers.json.
+
+        This uses the old serial format where A1 mini starts with '03'.
+        """
+        serial = "0309CA4A0804016"  # Real A1 mini serial from printers.json
+        model = get_printer_model_from_serial(serial)
+        # Old format A1 mini uses '03' at the start
+        assert model == "A1 mini"

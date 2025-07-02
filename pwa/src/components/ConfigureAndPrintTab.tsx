@@ -54,6 +54,7 @@ interface ConfigureAndPrintTabProps {
   onStatusMessage: (message: string) => void;
   printerModel?: string;
   nozzleDiameter?: number;
+  currentPrinterId?: string | null;
 }
 
 export function ConfigureAndPrintTab({
@@ -77,6 +78,7 @@ export function ConfigureAndPrintTab({
   onStatusMessage,
   printerModel,
   nozzleDiameter,
+  currentPrinterId,
 }: ConfigureAndPrintTabProps) {
   const [isSliced, setIsSliced] = useState(false);
   const [sliceResponse, setSliceResponse] = useState<SliceResponse | null>(
@@ -390,7 +392,10 @@ export function ConfigureAndPrintTab({
       const gcode_filename = sliceResponse.gcode_path.split('/').pop() || '';
       onStatusMessage(`📄 Sending G-code file: ${gcode_filename}`);
 
-      const requestBody = { gcode_filename };
+      const requestBody = {
+        gcode_filename,
+        printer_id: currentPrinterId,
+      };
 
       const response = await fetch('/api/job/send-to-printer', {
         method: 'POST',
@@ -466,7 +471,10 @@ export function ConfigureAndPrintTab({
       const gcode_filename = sliceResponse.gcode_path.split('/').pop() || '';
       onStatusMessage(`📄 Sending G-code file: ${gcode_filename}`);
 
-      const requestBody = { gcode_filename };
+      const requestBody = {
+        gcode_filename,
+        printer_id: currentPrinterId,
+      };
 
       const response = await fetch('/api/job/start-print', {
         method: 'POST',

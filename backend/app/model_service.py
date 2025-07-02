@@ -1163,25 +1163,45 @@ class ModelService:
         extruders_used = set()
         for object_id in object_ids:
             for obj_elem in root.findall(f".//object[@id='{object_id}']"):
-                # Check object-level extruder attribute
-                obj_extruder = obj_elem.get("extruder")
-                if obj_extruder:
-                    extruders_used.add(int(obj_extruder))
+                # First, check object-level extruder
+                obj_extruder = None
 
-                # Check object-level extruder metadata
+                # Check object-level extruder attribute
+                if obj_elem.get("extruder"):
+                    obj_extruder = int(obj_elem.get("extruder"))
+
+                # Check object-level extruder metadata (takes precedence)
                 for metadata in obj_elem.findall("metadata"):
                     if metadata.get("key") == "extruder":
                         extruder_id = metadata.get("value")
                         if extruder_id:
-                            extruders_used.add(int(extruder_id))
+                            obj_extruder = int(extruder_id)
+                            break
 
                 # Check part-level extruders
-                for part in obj_elem.findall(".//part"):
+                parts = obj_elem.findall(".//part")
+                part_extruders = []
+                parts_with_extruder_count = 0
+
+                for part in parts:
                     for metadata in part.findall("metadata"):
                         if metadata.get("key") == "extruder":
                             extruder_id = metadata.get("value")
                             if extruder_id:
-                                extruders_used.add(int(extruder_id))
+                                part_ext = int(extruder_id)
+                                part_extruders.append(part_ext)
+                                parts_with_extruder_count += 1
+                                break
+
+                # Determine which extruders are actually used
+                if parts and parts_with_extruder_count == len(parts):
+                    # All parts have explicit extruders, so only use those
+                    extruders_used.update(part_extruders)
+                else:
+                    # Not all parts have extruders, so include object extruder
+                    if obj_extruder:
+                        extruders_used.add(obj_extruder)
+                    extruders_used.update(part_extruders)
 
         # If no extruders found, default to extruder 1
         if not extruders_used:
