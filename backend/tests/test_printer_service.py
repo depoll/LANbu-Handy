@@ -1081,7 +1081,7 @@ class TestStartPrint:
         "app.mqtt_async_patch_v3._switching_lock",
         Mock(__enter__=Mock(return_value=None), __exit__=Mock(return_value=None)),
     )
-    @patch("paho.mqtt.client.Client")
+    @patch("app.printer_service.mqtt.Client")
     def test_start_print_successful(
         self, mock_mqtt_client_class, printer_service, test_printer_config
     ):
@@ -1140,7 +1140,7 @@ class TestStartPrint:
         assert "test_model.gcode" in message
         assert "project_file" in message
 
-    @patch("paho.mqtt.client.Client")
+    @patch("app.printer_service.mqtt.Client")
     def test_start_print_connection_failure(
         self, mock_mqtt_client_class, printer_service, test_printer_config
     ):
@@ -1172,7 +1172,7 @@ class TestStartPrint:
         "app.mqtt_async_patch_v3._switching_lock",
         Mock(__enter__=Mock(return_value=None), __exit__=Mock(return_value=None)),
     )
-    @patch("paho.mqtt.client.Client")
+    @patch("app.printer_service.mqtt.Client")
     def test_start_print_publish_failure(
         self, mock_mqtt_client_class, printer_service, test_printer_config
     ):
@@ -1216,7 +1216,7 @@ class TestStartPrint:
         "app.mqtt_async_patch_v3._switching_lock",
         Mock(__enter__=Mock(return_value=None), __exit__=Mock(return_value=None)),
     )
-    @patch("paho.mqtt.client.Client")
+    @patch("app.printer_service.mqtt.Client")
     def test_start_print_timeout(
         self, mock_mqtt_client_class, printer_service, test_printer_config
     ):
@@ -1248,7 +1248,17 @@ class TestStartPrint:
 
         assert "Unexpected error during MQTT operation" in str(exc_info.value)
 
-    @patch("paho.mqtt.client.Client")
+    @patch("app.mqtt_async_patch_v3._active_mqtt_clients", {"192.168.1.100": Mock()})
+    @patch("app.mqtt_async_patch_v3._switching_printers", False)
+    @patch(
+        "app.mqtt_async_patch_v3._clients_lock",
+        Mock(__enter__=Mock(return_value=None), __exit__=Mock(return_value=None)),
+    )
+    @patch(
+        "app.mqtt_async_patch_v3._switching_lock",
+        Mock(__enter__=Mock(return_value=None), __exit__=Mock(return_value=None)),
+    )
+    @patch("app.printer_service.mqtt.Client")
     def test_start_print_cleanup_on_error(
         self, mock_mqtt_client_class, printer_service, test_printer_config
     ):
@@ -1258,7 +1268,7 @@ class TestStartPrint:
         mock_mqtt_client_class.return_value = mock_client
 
         # Mock connection that raises an exception
-        mock_client.connect.side_effect = Exception("Connection error")
+        mock_client.connect_async.side_effect = Exception("Connection error")
 
         with pytest.raises(PrinterMQTTError):
             printer_service.start_print(test_printer_config, "test_model.gcode")
@@ -1296,7 +1306,7 @@ class TestAMSQuery:
         "app.mqtt_async_patch_v3._switching_lock",
         Mock(__enter__=Mock(return_value=None), __exit__=Mock(return_value=None)),
     )
-    @patch("paho.mqtt.client.Client")
+    @patch("app.printer_service.mqtt.Client")
     def test_query_ams_status_successful(
         self, mock_mqtt_client_class, printer_service, test_printer_config
     ):
@@ -1358,7 +1368,7 @@ class TestAMSQuery:
         mock_client.loop_stop.assert_called_once()
         mock_client.disconnect.assert_called_once()
 
-    @patch("paho.mqtt.client.Client")
+    @patch("app.printer_service.mqtt.Client")
     def test_query_ams_status_connection_failure(
         self, mock_mqtt_client_class, printer_service, test_printer_config
     ):
@@ -1389,7 +1399,7 @@ class TestAMSQuery:
         "app.mqtt_async_patch_v3._switching_lock",
         Mock(__enter__=Mock(return_value=None), __exit__=Mock(return_value=None)),
     )
-    @patch("paho.mqtt.client.Client")
+    @patch("app.printer_service.mqtt.Client")
     def test_query_ams_status_timeout(
         self, mock_mqtt_client_class, printer_service, test_printer_config
     ):
@@ -1607,7 +1617,7 @@ class TestMQTTIntegration:
         "app.mqtt_async_patch_v3._switching_lock",
         Mock(__enter__=Mock(return_value=None), __exit__=Mock(return_value=None)),
     )
-    @patch("paho.mqtt.client.Client")
+    @patch("app.printer_service.mqtt.Client")
     def test_mqtt_print_initiation_workflow(
         self, mock_mqtt_client_class, printer_service, test_printer_config
     ):
