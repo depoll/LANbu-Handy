@@ -16,7 +16,8 @@ from typing import Dict, Optional
 logger = logging.getLogger(__name__)
 
 # Global thread pool for MQTT operations
-_mqtt_executor = ThreadPoolExecutor(max_workers=3, thread_name_prefix="mqtt")
+# Increased workers to handle multiple printers querying in parallel
+_mqtt_executor = ThreadPoolExecutor(max_workers=10, thread_name_prefix="mqtt")
 
 # Track active futures by printer IP
 _active_futures: Dict[str, Dict[str, Future]] = {}
@@ -218,8 +219,8 @@ async def run_mqtt_query_async(
         _active_futures[printer_config.ip][operation_id] = future
 
     try:
-        # Wait for the result with timeout
-        result = await asyncio.wait_for(future, timeout=timeout if timeout else 30)
+        # Wait for the result with timeout (reduced default timeout to prevent blocking)
+        result = await asyncio.wait_for(future, timeout=timeout if timeout else 10)
         return result
 
     except asyncio.CancelledError:

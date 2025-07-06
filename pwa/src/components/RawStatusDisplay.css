@@ -1,0 +1,251 @@
+.raw-status-display {
+  margin-top: 1.5rem;
+  border: 1px solid var(--color-border-primary);
+  border-radius: 8px;
+  background: var(--color-bg-secondary);
+  overflow: hidden;
+}
+
+.raw-status-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  cursor: pointer;
+  background: var(--color-bg-primary);
+  transition: background-color 0.2s;
+}
+
+.raw-status-header:hover {
+  background: var(--color-bg-tertiary);
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.header-left h4 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.last-update {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+}
+
+.refresh-button {
+  padding: 0.375rem;
+  background: transparent;
+  border: 1px solid var(--color-border-primary);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.refresh-button:hover:not(:disabled) {
+  background: var(--color-bg-tertiary);
+  border-color: var(--color-primary);
+}
+
+.refresh-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.refresh-button .spinning {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.raw-status-content {
+  padding: 1rem;
+}
+
+.loading,
+.error {
+  padding: 1rem;
+  text-align: center;
+}
+
+.error {
+  color: var(--color-error);
+}
+
+/* Useful fields section */
+.useful-fields-section {
+  margin-bottom: 2rem;
+}
+
+.useful-fields-section > h5 {
+  margin: 0 0 1rem 0;
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+  font-weight: 600;
+}
+
+.useful-field-category {
+  margin-bottom: 1.5rem;
+}
+
+.useful-field-category > h5 {
+  margin: 0 0 0.75rem 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.useful-field-item {
+  background: var(--color-bg-primary);
+  padding: 0.75rem;
+  border-radius: 6px;
+  margin-bottom: 0.5rem;
+}
+
+.useful-field {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.25rem 0;
+}
+
+.field-key {
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+}
+
+.field-value {
+  font-weight: 600;
+  color: var(--color-text-primary);
+  font-size: 0.875rem;
+}
+
+/* Raw JSON section */
+.raw-json-section {
+  margin-top: 2rem;
+  padding-top: 2rem;
+  border-top: 1px solid var(--color-border-primary);
+}
+
+.raw-json-section > h5 {
+  margin: 0 0 1rem 0;
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+  font-weight: 600;
+}
+
+.raw-json-container {
+  max-height: 600px;
+  overflow-y: auto;
+  background: var(--color-bg-primary);
+  padding: 1rem;
+  border-radius: 6px;
+  border: 1px solid var(--color-border-primary);
+}
+
+.raw-message {
+  margin-bottom: 1.5rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid var(--color-border-primary);
+}
+
+.raw-message:last-child {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.message-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.topic {
+  font-weight: 600;
+  color: var(--color-primary);
+  font-size: 0.875rem;
+}
+
+.timestamp {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+}
+
+.json-content {
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
+  padding: 1rem;
+  border-radius: 4px;
+  overflow-x: auto;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  margin: 0;
+  white-space: pre;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  border: 1px solid var(--color-border-muted);
+}
+
+/* Dark mode specific adjustments */
+:root.theme-dark .json-content {
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
+}
+
+/* Mobile responsiveness */
+@media (max-width: 640px) {
+  .raw-status-header {
+    padding: 0.75rem;
+  }
+
+  .header-left h4 {
+    font-size: 0.875rem;
+  }
+
+  .last-update {
+    display: none;
+  }
+
+  .raw-status-content {
+    padding: 0.75rem;
+  }
+
+  .useful-field {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+  }
+
+  .field-key,
+  .field-value {
+    font-size: 0.8125rem;
+  }
+
+  .raw-json-container {
+    max-height: 400px;
+  }
+}

@@ -211,3 +211,5 @@ BAMBU_PRINTERS='[{"name":"X1C","ip":"192.168.1.100","access_code":"12345678"}]'
 - ensuring tests pass should also include ensuring there are no build failures
 - Always start and stop the development servers with scripts/start-dev.sh and scripts/stop-dev.sh. Never start them yourself manually unless absolutely necessary, and ask me before you do that if you really believe it to be the case.
 - When working on a PR, if there's an issue attached to it, keep that issue up to date with latest status as you work on it. If you're working on an issue, generally, keep enough information in the issue's details to be able to resume work on it and get context back by reading the issue.
+- Python code should have lines less than 88 characters long
+- When changing UI, make sure everything properly considers light/dark themes

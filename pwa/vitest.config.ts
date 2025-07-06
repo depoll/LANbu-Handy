@@ -18,5 +18,7 @@ export default defineConfig({
       '**/tests-playwright/**', // Exclude Playwright tests
       '**/*.spec.ts', // Exclude .spec.ts files (Playwright convention)
     ],
+    testTimeout: 10000, // 10 second timeout for individual tests
+    hookTimeout: 10000, // 10 second timeout for hooks
   },
 });

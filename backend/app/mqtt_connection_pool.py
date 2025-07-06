@@ -203,8 +203,17 @@ class MQTTConnectionPool:
 
             conn_info = self.connections[printer_ip]
 
-            # If connected and healthy, reuse the connection
-            if conn_info.state == ConnectionState.CONNECTED and conn_info.client:
+            # If we have a client that's either connected or connecting, reuse it
+            if conn_info.client and conn_info.state in (
+                ConnectionState.CONNECTED,
+                ConnectionState.CONNECTING,
+            ):
+                # For CONNECTING state, return client for printer_service to connect
+                if conn_info.state == ConnectionState.CONNECTING:
+                    logger.debug(f"Returning connecting client for {printer_ip}")
+                    return conn_info.client
+
+                # For CONNECTED state, check if it's healthy
                 if self._is_connection_healthy(conn_info.client):
                     conn_info.last_used = datetime.utcnow()
                     # Update callbacks if provided
@@ -255,27 +264,35 @@ class MQTTConnectionPool:
             if on_message:
                 client.on_message = on_message
 
-            # Wrap disconnect callback to update our state
+            # Wrap callbacks to update our state
+            def wrapped_on_connect(client, userdata, flags, rc):
+                if rc == 0:
+                    with conn_info.lock:
+                        conn_info.state = ConnectionState.CONNECTED
+                        conn_info.consecutive_failures = 0
+                        conn_info.last_error = None
+                    logger.debug(f"Connection to {printer_config.ip} established")
+
             def wrapped_on_disconnect(client, userdata, rc):
                 self._handle_disconnect(printer_config.ip, rc)
                 if on_disconnect:
                     on_disconnect(client, userdata, rc)
 
+            client.on_connect = wrapped_on_connect
             client.on_disconnect = wrapped_on_disconnect
 
-            # Store the client
+            # Store the client but don't mark as connected yet
             conn_info.client = client
-            conn_info.state = ConnectionState.CONNECTED
+            # Keep state as CONNECTING - printer_service will connect
             conn_info.last_used = datetime.utcnow()
-            conn_info.consecutive_failures = 0
-            conn_info.last_error = None
-            conn_info.next_retry_time = None
 
-            logger.info(f"Created new MQTT connection to {printer_config.ip}")
+            logger.info(
+                f"Created new MQTT client for {printer_config.ip} (not connected yet)"
+            )
             return client
 
         except Exception as e:
-            logger.error(f"Failed to create connection to {printer_config.ip}: {e}")
+            logger.error(f"Failed to create client for {printer_config.ip}: {e}")
             self._handle_connection_failure(conn_info, str(e))
             return None
 

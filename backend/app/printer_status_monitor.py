@@ -65,6 +65,9 @@ class PrinterStatusMonitor:
 
     async def _monitor_loop(self):
         """Main monitoring loop that updates all printer statuses."""
+        # Wait a bit before first update to let the server fully start
+        await asyncio.sleep(2)
+
         while self._running:
             try:
                 await self._update_all_statuses()
@@ -72,7 +75,7 @@ class PrinterStatusMonitor:
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                logger.error(f"Error in printer status monitor loop: {e}")
+                logger.error(f"Error in monitor loop: {e}")
                 await asyncio.sleep(self.update_interval)
 
     async def _update_all_statuses(self):
@@ -120,19 +123,27 @@ class PrinterStatusMonitor:
         try:
             start_time = time.time()
 
-            # Query printer status and AMS status in parallel
+            # Query printer status and AMS status in parallel with timeout
             status_task = asyncio.create_task(
-                self.printer_service.query_printer_status_async(printer_config)
+                self.printer_service.query_printer_status_async(
+                    printer_config, timeout=10
+                )
             )
 
             ams_task = asyncio.create_task(
-                self.printer_service.query_ams_status_async(printer_config)
+                self.printer_service.query_ams_status_async(printer_config, timeout=10)
             )
 
             # Wait for both with timeout
-            status_result, ams_result = await asyncio.gather(
-                status_task, ams_task, return_exceptions=True
-            )
+            try:
+                status_result, ams_result = await asyncio.wait_for(
+                    asyncio.gather(status_task, ams_task, return_exceptions=True),
+                    timeout=12.0,  # Allow enough time for MQTT operations
+                )
+            except asyncio.TimeoutError:
+                logger.warning(f"Timeout updating status for {printer_id}")
+                status_result = Exception("Timeout")
+                ams_result = Exception("Timeout")
 
             elapsed = time.time() - start_time
 
@@ -140,14 +151,17 @@ class PrinterStatusMonitor:
             status_data = {}
 
             if isinstance(status_result, Exception):
-                logger.warning(
-                    f"Failed to get status for {printer_id}: {status_result}"
+                error_msg = (
+                    str(status_result) if str(status_result) else "Unknown error"
                 )
-                status_data["error"] = str(status_result)
+                logger.warning(f"Failed to get status for {printer_id}: {error_msg}")
+                status_data["error"] = error_msg
             elif hasattr(status_result, "success") and status_result.success:
                 status_data["printer_model"] = status_result.printer_model
                 status_data["printer_name"] = status_result.printer_name
                 status_data["nozzle_diameter"] = status_result.nozzle_diameter
+                if hasattr(status_result, "raw_data") and status_result.raw_data:
+                    status_data["raw_status_data"] = status_result.raw_data
 
             if isinstance(ams_result, Exception):
                 logger.warning(
@@ -186,6 +200,8 @@ class PrinterStatusMonitor:
                         else None
                     ),
                 }
+                if hasattr(ams_result, "raw_data") and ams_result.raw_data:
+                    status_data["raw_ams_data"] = ams_result.raw_data
 
             # Update cache
             async with self._lock:
