@@ -2821,9 +2821,14 @@ async def get_printer_status_debug(printer_id: str):
 
         # Add raw status data if available
         if "raw_status_data" in status_data:
+            topic = (
+                f"device/{printer_config.serial_number}/report"
+                if printer_config.serial_number
+                else f"device/{printer_config.ip}/report"
+            )
             raw_responses.append(
                 {
-                    "topic": f"device/{printer_config.serial_number}/report",
+                    "topic": topic,
                     "data": status_data["raw_status_data"],
                     "timestamp": cached_status.get(
                         "timestamp", datetime.utcnow()
@@ -2833,9 +2838,14 @@ async def get_printer_status_debug(printer_id: str):
 
         # Add raw AMS data if available
         if "raw_ams_data" in status_data:
+            topic = (
+                f"device/{printer_config.serial_number}/report"
+                if printer_config.serial_number
+                else f"device/{printer_config.ip}/report"
+            )
             raw_responses.append(
                 {
-                    "topic": f"device/{printer_config.serial_number}/report",
+                    "topic": topic,
                     "data": status_data["raw_ams_data"],
                     "timestamp": cached_status.get(
                         "timestamp", datetime.utcnow()

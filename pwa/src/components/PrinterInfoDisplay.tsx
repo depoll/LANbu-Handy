@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { useSinglePrinterStatus } from '../hooks/useBackgroundPrinterStatus';
+import RawStatusDisplay from './RawStatusDisplay';
 import '../styles/printer-info-display.css';
 
 interface PrinterMetadata {
@@ -8,25 +10,6 @@ interface PrinterMetadata {
   serial_number?: string;
   has_access_code?: boolean;
   has_serial_number?: boolean;
-}
-
-interface AMSUnit {
-  unit_id: number;
-  filaments: Array<{
-    slot_id: number;
-    filament_type: string;
-    color: string;
-    material_id?: string;
-  }>;
-}
-
-interface PrinterStatusResponse {
-  success: boolean;
-  message: string;
-  printer_model?: string;
-  printer_name?: string;
-  ams_units?: AMSUnit[];
-  error_details?: string;
 }
 
 interface PrinterInfoDisplayProps {
@@ -43,47 +26,68 @@ function PrinterInfoDisplay({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Use the background status hook for real-time updates
+  const { status: backgroundStatus } = useSinglePrinterStatus(printerId, 5000);
+
+  // Update printer metadata when background status changes
+  useEffect(() => {
+    if (backgroundStatus && backgroundStatus.status) {
+      setPrinterMetadata(prev => {
+        // Get printer info from background status
+        const updatedMetadata: PrinterMetadata = {
+          printer_model:
+            backgroundStatus.status.printer_model ||
+            prev?.printer_model ||
+            'Unknown',
+          printer_name:
+            backgroundStatus.status.printer_name ||
+            backgroundStatus.printer_info?.name ||
+            prev?.printer_name ||
+            printerId,
+          ip: backgroundStatus.printer_info?.ip || prev?.ip,
+          has_access_code:
+            prev?.has_access_code ||
+            backgroundStatus.printer_info?.has_serial_number,
+          has_serial_number:
+            backgroundStatus.printer_info?.has_serial_number ||
+            prev?.has_serial_number,
+        };
+
+        // Notify parent component if callback provided
+        if (onMetadataFetched) {
+          onMetadataFetched(updatedMetadata);
+        }
+
+        return updatedMetadata;
+      });
+    }
+  }, [backgroundStatus, printerId, onMetadataFetched]);
+
   useEffect(() => {
     if (!printerId) {
       setPrinterMetadata(null);
       return;
     }
 
-    const fetchPrinterStatus = async () => {
+    const fetchPrinterConfig = async () => {
       setIsLoading(true);
       setError(null);
 
       try {
-        // Fetch full printer status which includes model and name
-        // Note: printerId is the printer name, not IP address
-        // Properly encode the printer name for the URL
-        const encodedPrinterId = encodeURIComponent(printerId);
-        const response = await fetch(`/api/printer/${encodedPrinterId}/status`);
-
-        if (!response.ok) {
-          throw new Error(
-            `Failed to fetch printer status: ${response.statusText}`
+        // Fetch printer config to get initial metadata
+        const configResponse = await fetch('/api/config');
+        if (configResponse.ok) {
+          const config = await configResponse.json();
+          const currentPrinter = config.printers?.find(
+            (p: { name: string }) => p.name === printerId
           );
-        }
 
-        const data: PrinterStatusResponse = await response.json();
-
-        if (data.success) {
-          // Always fetch printer config to get the configured name and IP
-          const configResponse = await fetch('/api/config');
-          if (configResponse.ok) {
-            const config = await configResponse.json();
-            // Note: printerId is the printer name, not IP
-            const currentPrinter = config.printers?.find(
-              (p: { name: string }) => p.name === printerId
-            );
-
+          if (currentPrinter) {
             const metadata: PrinterMetadata = {
-              printer_model: data.printer_model || 'Unknown',
-              printer_name: currentPrinter?.name || printerId, // Use configured name
-              ip: currentPrinter?.ip,
-              has_access_code: currentPrinter?.has_access_code,
-              has_serial_number: currentPrinter?.has_serial_number,
+              printer_name: currentPrinter.name,
+              ip: currentPrinter.ip,
+              has_access_code: currentPrinter.has_access_code,
+              has_serial_number: currentPrinter.has_serial_number,
             };
 
             setPrinterMetadata(metadata);
@@ -93,38 +97,21 @@ function PrinterInfoDisplay({
               onMetadataFetched(metadata);
             }
           }
-        } else {
-          // Status query failed, still try to show configured info
-          const configResponse = await fetch('/api/config');
-          if (configResponse.ok) {
-            const config = await configResponse.json();
-            const currentPrinter = config.printers?.find(
-              (p: { name: string }) => p.name === printerId
-            );
-            if (currentPrinter) {
-              setPrinterMetadata({
-                printer_name: currentPrinter.name,
-                ip: currentPrinter.ip,
-                has_access_code: currentPrinter.has_access_code,
-                has_serial_number: currentPrinter.has_serial_number,
-              });
-            }
-          }
         }
       } catch (err) {
-        console.error('Error fetching printer metadata:', err);
+        console.error('Error fetching printer config:', err);
         setError(
           err instanceof Error
             ? err.message
-            : 'Failed to fetch printer information'
+            : 'Failed to fetch printer configuration'
         );
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchPrinterStatus();
-  }, [printerId, onMetadataFetched]);
+    fetchPrinterConfig();
+  }, [printerId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!printerId) {
     return null;
@@ -258,15 +245,11 @@ function PrinterInfoDisplay({
             </span>
           </div>
         </div>
+      </div>
 
-        {(showUnknownModel || showUnknownName) && (
-          <div className="info-note">
-            <small>
-              ℹ️ Printer metadata requires proper serial number configuration.
-              Check printer settings → Device → Serial Number.
-            </small>
-          </div>
-        )}
+      {/* Diagnostic Raw Status Section */}
+      <div className="diagnostic-section">
+        <RawStatusDisplay printerId={printerId} />
       </div>
     </div>
   );

@@ -124,14 +124,21 @@ class PrinterStatusMonitor:
             start_time = time.time()
 
             # Query printer status and AMS status in parallel with timeout
-            status_task = asyncio.create_task(
-                self.printer_service.query_printer_status_async(
-                    printer_config, timeout=10
-                )
+            # Use run_in_executor to call synchronous methods asynchronously
+            loop = asyncio.get_event_loop()
+
+            status_task = loop.run_in_executor(
+                None,
+                self.printer_service.query_printer_status,
+                printer_config,
+                10,  # timeout
             )
 
-            ams_task = asyncio.create_task(
-                self.printer_service.query_ams_status_async(printer_config, timeout=10)
+            ams_task = loop.run_in_executor(
+                None,
+                self.printer_service.query_ams_status,
+                printer_config,
+                10,  # timeout
             )
 
             # Wait for both with timeout
@@ -158,7 +165,13 @@ class PrinterStatusMonitor:
                 status_data["error"] = error_msg
             elif hasattr(status_result, "success") and status_result.success:
                 status_data["printer_model"] = status_result.printer_model
-                status_data["printer_name"] = status_result.printer_name
+                # Only add printer_name if it's not "Unknown"
+                if (
+                    hasattr(status_result, "printer_name")
+                    and status_result.printer_name
+                    and status_result.printer_name.strip().lower() != "unknown"
+                ):
+                    status_data["printer_name"] = status_result.printer_name
                 status_data["nozzle_diameter"] = status_result.nozzle_diameter
                 if hasattr(status_result, "raw_data") and status_result.raw_data:
                     status_data["raw_status_data"] = status_result.raw_data

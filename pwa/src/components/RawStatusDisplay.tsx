@@ -73,7 +73,6 @@ export default function RawStatusDisplay({ printerId }: RawStatusDisplayProps) {
   const [rawStatus, setRawStatus] = useState<RawStatusData[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
 
   const fetchRawStatus = async () => {
     if (!printerId) return;
@@ -89,7 +88,6 @@ export default function RawStatusDisplay({ printerId }: RawStatusDisplayProps) {
       }
       const data = await response.json();
       setRawStatus(data);
-      setLastUpdate(new Date());
     } catch (err) {
       setError(
         err instanceof Error ? err.message : 'Failed to fetch raw status'
@@ -110,7 +108,7 @@ export default function RawStatusDisplay({ printerId }: RawStatusDisplayProps) {
   const extractUsefulFields = (data: RawStatusData[]) => {
     const useful: Record<
       string,
-      Record<string, string | Record<string, string>[]>
+      Record<string, string> | Record<string, string>[]
     > = {};
 
     data.forEach(item => {
@@ -215,7 +213,7 @@ export default function RawStatusDisplay({ printerId }: RawStatusDisplayProps) {
   };
 
   const renderUsefulFields = (
-    useful: Record<string, Record<string, string | Record<string, string>[]>>
+    useful: Record<string, Record<string, string> | Record<string, string>[]>
   ) => {
     return Object.entries(useful).map(([category, fields]) => (
       <div key={category} className="useful-field-category">
@@ -246,35 +244,35 @@ export default function RawStatusDisplay({ printerId }: RawStatusDisplayProps) {
   };
 
   return (
-    <div className="raw-status-display">
+    <div className="raw-status-display inline">
       <div
         className="raw-status-header"
         onClick={() => setIsExpanded(!isExpanded)}
       >
         <div className="header-left">
-          {isExpanded ? <ChevronDown size={20} /> : <ChevronRight size={20} />}
-          <h4>Diagnostic Information</h4>
+          <span className="section-label">
+            {isExpanded ? (
+              <ChevronDown size={14} />
+            ) : (
+              <ChevronRight size={14} />
+            )}
+            Diagnostics
+          </span>
         </div>
-        <div className="header-right">
-          {lastUpdate && (
-            <span className="last-update">
-              Last updated: {lastUpdate.toLocaleTimeString()}
-            </span>
-          )}
-          {isExpanded && (
-            <button
-              className="refresh-button"
-              onClick={e => {
-                e.stopPropagation();
-                fetchRawStatus();
-              }}
-              disabled={loading}
-              title="Refresh status"
-            >
-              <RefreshCw size={16} className={loading ? 'spinning' : ''} />
-            </button>
-          )}
-        </div>
+        {isExpanded && (
+          <button
+            className="refresh-button"
+            onClick={e => {
+              e.stopPropagation();
+              fetchRawStatus();
+            }}
+            disabled={loading}
+            title="Refresh diagnostics"
+          >
+            <RefreshCw size={14} className={loading ? 'spinning' : ''} />
+            <span style={{ marginLeft: '0.25rem' }}>Refresh</span>
+          </button>
+        )}
       </div>
 
       {isExpanded && (
@@ -285,7 +283,6 @@ export default function RawStatusDisplay({ printerId }: RawStatusDisplayProps) {
             <>
               {/* Useful fields section */}
               <div className="useful-fields-section">
-                <h5>Key Information</h5>
                 {renderUsefulFields(extractUsefulFields(rawStatus))}
               </div>
 

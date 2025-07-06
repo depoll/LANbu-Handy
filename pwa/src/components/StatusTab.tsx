@@ -1,7 +1,6 @@
 import AMSStatusDisplay from './AMSStatusDisplay';
 import OperationProgress, { OperationStep } from './OperationProgress';
 import PrinterInfoDisplay from './PrinterInfoDisplay';
-import RawStatusDisplay from './RawStatusDisplay';
 import { AMSStatusResponse } from '../types/api';
 
 interface StatusTabProps {
@@ -39,11 +38,6 @@ export function StatusTab({
           printerId={printerId}
           onStatusUpdate={onAMSStatusUpdate}
         />
-      </div>
-
-      {/* Raw Status Display - Diagnostic Information */}
-      <div className="status-section">
-        <RawStatusDisplay printerId={printerId} />
       </div>
 
       {/* Enhanced Operation Progress */}
