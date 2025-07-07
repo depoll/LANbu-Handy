@@ -37,7 +37,11 @@ class CurlFTPSClient:
             raise RuntimeError("curl command not found. Please install curl.")
 
     def _build_curl_cmd(
-        self, operation: str, remote_path: str = "", local_file: Optional[str] = None
+        self,
+        operation: str,
+        remote_path: str = "",
+        local_file: Optional[str] = None,
+        detailed_list: bool = False,
     ) -> list:
         """Build curl command for FTPS operations."""
         # Base curl command with implicit FTPS
@@ -62,7 +66,8 @@ class CurlFTPSClient:
         if operation == "upload" and local_file:
             cmd.extend(["-T", local_file])  # Upload file
         elif operation == "list":
-            cmd.extend(["-l"])  # List directory
+            if not detailed_list:
+                cmd.extend(["-l"])  # List directory (names only)
         elif operation == "download":
             cmd.extend(["-o", local_file] if local_file else ["-O"])  # Download
         elif operation == "delete":
@@ -287,6 +292,159 @@ class CurlFTPSClient:
         except Exception as e:
             logger.error(f"List error: {e}")
             return False, []
+
+    def list_directory_details(self, remote_dir: str = "") -> Tuple[bool, list]:
+        """
+        List files in a directory with full details (size, date, permissions).
+
+        Returns:
+            Tuple of (success, list of file info dictionaries)
+        """
+        try:
+            cmd = self._build_curl_cmd("list", remote_dir, detailed_list=True)
+            result = subprocess.run(
+                cmd, capture_output=True, text=True, timeout=self.timeout
+            )
+
+            if result.returncode == 0:
+                # Parse the detailed listing output (Unix-style ls -l format)
+                files = []
+                for line in result.stdout.strip().split("\n"):
+                    if not line.strip():
+                        continue
+
+                    # Parse Unix ls -l format
+                    # Example: drwxr-xr-x 2 user group 4096 Jan 15 10:30 dirname
+                    #          -rw-r--r-- 1 user group 1234 Jan 15 10:30 filename
+                    parts = line.split(None, 8)
+                    if len(parts) >= 9:
+                        permissions = parts[0]
+                        size = parts[4]
+                        month = parts[5]
+                        day = parts[6]
+                        time_or_year = parts[7]
+                        name = parts[8]
+
+                        # Determine if it's a directory
+                        is_dir = permissions.startswith("d")
+
+                        # Parse size (directories might show different)
+                        try:
+                            size_bytes = int(size)
+                        except ValueError:
+                            size_bytes = 0
+
+                        files.append(
+                            {
+                                "name": name,
+                                "type": "directory" if is_dir else "file",
+                                "size": size_bytes,
+                                "permissions": permissions,
+                                "modified": f"{month} {day} {time_or_year}",
+                            }
+                        )
+
+                return True, files
+            else:
+                logger.error(f"Detailed list failed: {result.stderr}")
+                return False, []
+
+        except Exception as e:
+            logger.error(f"Detailed list error: {e}")
+            return False, []
+
+    def download_file(
+        self,
+        remote_path: str,
+        local_path: str,
+        progress_callback: Optional[callable] = None,
+    ) -> Tuple[bool, str]:
+        """
+        Download a file from the FTP server.
+
+        Args:
+            remote_path: Remote file path
+            local_path: Local file path to save to
+            progress_callback: Optional callback for progress updates (percent, message)
+
+        Returns:
+            Tuple of (success, message)
+        """
+        try:
+            # Create parent directory if it doesn't exist
+            local_file = Path(local_path)
+            local_file.parent.mkdir(parents=True, exist_ok=True)
+
+            # Build download command with progress
+            cmd = self._build_curl_cmd("download", remote_path, str(local_file))
+
+            # Add progress meter option
+            cmd.insert(1, "-#")
+
+            logger.info(f"Downloading {remote_path} to {local_path}")
+
+            # Report initial progress
+            if progress_callback:
+                progress_callback(0, f"Starting download of {remote_path}")
+
+            # Run curl command with real-time output parsing
+            process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                bufsize=1,
+                universal_newlines=True,
+            )
+
+            # Parse curl's progress output
+            last_percent = 0
+            stderr_lines = []
+
+            while True:
+                line = process.stderr.readline()
+                if not line and process.poll() is not None:
+                    break
+
+                if line:
+                    stderr_lines.append(line.strip())
+                    # Parse curl progress meter output
+                    if "%" in line and "#" in line:
+                        try:
+                            # Extract percentage from end of line
+                            percent_str = line.strip().split()[-1]
+                            if percent_str.endswith("%"):
+                                percent = int(float(percent_str[:-1]))
+                                if percent != last_percent and progress_callback:
+                                    progress_callback(
+                                        percent, f"Downloading... {percent}%"
+                                    )
+                                    last_percent = percent
+                        except (ValueError, IndexError):
+                            pass
+
+            # Get the return code
+            return_code = process.wait()
+            stderr_output = "".join(stderr_lines)
+
+            if return_code == 0:
+                logger.info(f"Successfully downloaded {remote_path} to {local_path}")
+                if progress_callback:
+                    progress_callback(100, f"Download complete: {local_path}")
+                return True, f"File downloaded successfully to {local_path}"
+            else:
+                error_msg = stderr_output
+                logger.error(f"Download failed: {error_msg}")
+                # Clean up partial download
+                if local_file.exists():
+                    local_file.unlink()
+                return False, f"Download failed: {error_msg}"
+
+        except subprocess.TimeoutExpired:
+            return False, "Download timed out"
+        except Exception as e:
+            logger.error(f"Download error: {e}")
+            return False, f"Download error: {str(e)}"
 
 
 def upload_gcode_to_x1c(

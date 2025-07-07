@@ -1,0 +1,144 @@
+.file-browser {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.browser-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem;
+  background: var(--background-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  margin-bottom: 1rem;
+}
+
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.breadcrumb .separator {
+  color: var(--text-secondary);
+  margin: 0 0.25rem;
+}
+
+.breadcrumb-link {
+  background: none;
+  border: none;
+  color: var(--primary-color);
+  cursor: pointer;
+  font-size: 0.95rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+
+.breadcrumb-link:hover:not(:disabled) {
+  background: var(--primary-color-light);
+}
+
+.breadcrumb-link:disabled {
+  color: var(--text-primary);
+  cursor: default;
+  font-weight: 500;
+}
+
+.view-toggle {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.view-button {
+  padding: 0.5rem;
+  background: var(--background-primary);
+  border: 1px solid var(--border-color);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.view-button:first-child {
+  border-radius: 4px 0 0 4px;
+}
+
+.view-button:last-child {
+  border-radius: 0 4px 4px 0;
+  border-left: none;
+}
+
+.view-button.active {
+  background: var(--primary-color);
+  color: white;
+}
+
+.view-button:hover:not(.active) {
+  background: var(--background-secondary);
+}
+
+.view-button .icon {
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.loading-state {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--border-color);
+  border-top-color: var(--primary-color);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.spinner-small {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--border-color);
+  border-top-color: var(--primary-color);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.empty-state {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+}
+
+/* Mobile responsive adjustments */
+@media (max-width: 768px) {
+  .browser-toolbar {
+    flex-direction: column;
+    gap: 0.75rem;
+    align-items: stretch;
+  }
+
+  .breadcrumb {
+    font-size: 0.9rem;
+  }
+
+  .view-toggle {
+    align-self: flex-end;
+  }
+}

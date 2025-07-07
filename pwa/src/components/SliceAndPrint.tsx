@@ -3,6 +3,7 @@ import { TabSystem, Tab } from './TabSystem';
 import { ModelTab } from './ModelTab';
 import { ConfigureAndPrintTab } from './ConfigureAndPrintTab';
 import { StatusTab } from './StatusTab';
+import { PrinterFilesTab } from './PrinterFilesTab';
 import { useToast } from '../hooks/useToast';
 import { useCurrentPrinter } from '../hooks/useCurrentPrinter';
 import { useProactiveAMSStatus } from '../hooks/useProactiveAMSStatus';
@@ -351,6 +352,13 @@ function SliceAndPrint() {
           statusMessages={statusMessages}
         />
       ),
+    },
+    {
+      id: 'printer-files',
+      label: 'Printer Files',
+      icon: '📁',
+      disabled: !currentPrinterId,
+      content: <PrinterFilesTab />,
     },
   ];
 

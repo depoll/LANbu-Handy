@@ -1,0 +1,146 @@
+.file-list {
+  flex: 1;
+  overflow: auto;
+  padding: 0 1rem;
+}
+
+.file-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--background-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.file-table th {
+  background: var(--background-primary);
+  padding: 0.75rem 1rem;
+  text-align: left;
+  font-weight: 500;
+  color: var(--text-primary);
+  border-bottom: 2px solid var(--border-color);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.file-table th.sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.file-table th.sortable:hover {
+  background: var(--background-secondary);
+}
+
+.file-table td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.file-row {
+  transition: background 0.2s;
+}
+
+.file-row:hover {
+  background: var(--background-hover);
+}
+
+.file-row.directory {
+  cursor: pointer;
+}
+
+.file-name {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.file-icon {
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
+
+.name-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-type {
+  text-transform: capitalize;
+  color: var(--text-secondary);
+}
+
+.file-size {
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+}
+
+.file-modified {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.file-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.action-button {
+  padding: 0.25rem 0.5rem;
+  background: var(--background-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: all 0.2s;
+}
+
+.action-button:hover {
+  transform: scale(1.1);
+}
+
+.action-button.download:hover {
+  background: var(--success-color);
+  border-color: var(--success-color);
+}
+
+.action-button.print:hover {
+  background: var(--primary-color);
+  border-color: var(--primary-color);
+}
+
+/* Mobile responsive adjustments */
+@media (max-width: 768px) {
+  .file-list {
+    padding: 0;
+  }
+
+  .file-table {
+    font-size: 0.9rem;
+  }
+
+  .file-table th,
+  .file-table td {
+    padding: 0.5rem;
+  }
+
+  /* Hide some columns on mobile */
+  .file-table th:nth-child(2),
+  .file-table td:nth-child(2),
+  .file-table th:nth-child(4),
+  .file-table td:nth-child(4) {
+    display: none;
+  }
+
+  .file-icon {
+    font-size: 1.1rem;
+  }
+
+  .action-button {
+    padding: 0.25rem;
+    font-size: 0.9rem;
+  }
+}

@@ -6,8 +6,10 @@ printing 3D models to Bambu Lab printers in LAN-only mode.
 """
 
 import asyncio
+import io
 import json
 import logging
+import mimetypes
 import time
 from datetime import datetime
 from pathlib import Path
@@ -49,6 +51,7 @@ add_simple_async_support_to_printer_service()
 
 from app.config import get_config  # noqa: E402
 from app.filament_matching_service import FilamentMatchingService  # noqa: E402
+from app.ftp_browser_service import FTPBrowserService  # noqa: E402
 from app.job_orchestration import (  # noqa: E402
     download_model_step,
     slice_model_step,
@@ -108,6 +111,9 @@ printer_service = PrinterService()
 
 # Initialize filament matching service
 filament_matching_service = FilamentMatchingService()
+
+# Initialize FTP browser service
+ftp_browser_service = FTPBrowserService(upload_progress_service)
 
 # Global config instance - will be initialized during startup
 config = None
@@ -3646,3 +3652,236 @@ async def get_persistent_printers():
         msg = f"Internal server error while retrieving persistent printers: {str(e)}"
         logger.error(msg)
         raise HTTPException(status_code=500, detail=msg)
+
+
+# FTP Browser Endpoints
+
+
+class FileListResponse(BaseModel):
+    success: bool
+    files: List[Dict]
+    current_path: str
+    message: Optional[str] = None
+
+
+@app.get("/api/printer/{printer_id}/files/{path:path}")
+async def list_printer_files(printer_id: str, path: str = ""):
+    """
+    List files and directories on the printer's SD card.
+
+    Args:
+        printer_id: The printer ID or name
+        path: Directory path on the SD card (empty for root)
+
+    Returns:
+        FileListResponse: List of files and directories with metadata
+
+    Raises:
+        HTTPException: If printer not found or listing fails
+    """
+    try:
+        # Get printer configuration
+        printer_config = config.get_printer_by_id(printer_id)
+        if not printer_config:
+            raise HTTPException(
+                status_code=404, detail=f"Printer '{printer_id}' not found"
+            )
+
+        # List files
+        success, files, error = ftp_browser_service.list_files(printer_config, path)
+
+        if not success:
+            return FileListResponse(
+                success=False,
+                files=[],
+                current_path=path,
+                message=error or "Failed to list files",
+            )
+
+        # Convert FileInfo objects to dicts
+        file_dicts = []
+        for file_info in files:
+            file_dicts.append(
+                {
+                    "name": file_info.name,
+                    "path": file_info.path,
+                    "type": file_info.type,
+                    "size": file_info.size,
+                    "modified": file_info.modified,
+                    "mime_type": file_info.mime_type,
+                    "is_printable": file_info.is_printable,
+                    "has_thumbnail": file_info.has_thumbnail,
+                }
+            )
+
+        return FileListResponse(
+            success=True,
+            files=file_dicts,
+            current_path=path,
+            message=f"Found {len(file_dicts)} items",
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error listing printer files: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/printer/{printer_id}/download/{path:path}")
+async def download_printer_file(printer_id: str, path: str):
+    """
+    Download a file from the printer's SD card.
+
+    Args:
+        printer_id: The printer ID or name
+        path: File path on the SD card
+
+    Returns:
+        StreamingResponse: The file content
+
+    Raises:
+        HTTPException: If printer not found or download fails
+    """
+    try:
+        # Get printer configuration
+        printer_config = config.get_printer_by_id(printer_id)
+        if not printer_config:
+            raise HTTPException(
+                status_code=404, detail=f"Printer '{printer_id}' not found"
+            )
+
+        # Generate session ID for progress tracking
+        session_id = f"download_{printer_id}_{int(time.time())}"
+
+        # Download the file
+        success, local_path, error = ftp_browser_service.download_file(
+            printer_config, path, session_id
+        )
+
+        if not success:
+            raise HTTPException(
+                status_code=500, detail=error or "Failed to download file"
+            )
+
+        # Determine MIME type
+        mime_type, _ = mimetypes.guess_type(path)
+        if not mime_type:
+            mime_type = "application/octet-stream"
+
+        # Return the file
+        return FileResponse(
+            path=str(local_path),
+            media_type=mime_type,
+            filename=Path(path).name,
+            headers={
+                "Content-Disposition": f'attachment; filename="{Path(path).name}"',
+                "X-Session-Id": session_id,
+            },
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error downloading printer file: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/printer/{printer_id}/thumbnail/{path:path}")
+async def get_file_thumbnail(printer_id: str, path: str):
+    """
+    Get thumbnail for a 3MF file on the printer.
+
+    Args:
+        printer_id: The printer ID or name
+        path: File path on the SD card (must be a .3mf file)
+
+    Returns:
+        StreamingResponse: The thumbnail image
+
+    Raises:
+        HTTPException: If printer not found or thumbnail extraction fails
+    """
+    try:
+        # Get printer configuration
+        printer_config = config.get_printer_by_id(printer_id)
+        if not printer_config:
+            raise HTTPException(
+                status_code=404, detail=f"Printer '{printer_id}' not found"
+            )
+
+        # Generate session ID for progress tracking
+        session_id = f"thumbnail_{printer_id}_{int(time.time())}"
+
+        # Get the thumbnail
+        success, thumbnail_data, error = ftp_browser_service.get_file_thumbnail(
+            printer_config, path, session_id
+        )
+
+        if not success:
+            raise HTTPException(
+                status_code=500, detail=error or "Failed to get thumbnail"
+            )
+
+        # Return the thumbnail as a streaming response
+        return StreamingResponse(
+            io.BytesIO(thumbnail_data),
+            media_type="image/png",
+            headers={
+                "Content-Type": "image/png",
+                "Cache-Control": "public, max-age=3600",
+                "X-Session-Id": session_id,
+            },
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting file thumbnail: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class PrintFromSDRequest(BaseModel):
+    file_path: str
+
+
+class PrintFromSDResponse(BaseModel):
+    success: bool
+    message: str
+
+
+@app.post("/api/printer/{printer_id}/print-from-sd")
+async def print_from_sd_card(printer_id: str, request: PrintFromSDRequest):
+    """
+    Start printing a file from the printer's SD card.
+
+    Args:
+        printer_id: The printer ID or name
+        request: Contains the file_path to print
+
+    Returns:
+        PrintFromSDResponse: Success status and message
+
+    Raises:
+        HTTPException: If printer not found or print initiation fails
+    """
+    try:
+        # Get printer configuration
+        printer_config = config.get_printer_by_id(printer_id)
+        if not printer_config:
+            raise HTTPException(
+                status_code=404, detail=f"Printer '{printer_id}' not found"
+            )
+
+        # Initiate print
+        success, message = ftp_browser_service.initiate_print_from_sd(
+            printer_config, request.file_path
+        )
+
+        return PrintFromSDResponse(success=success, message=message)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error initiating print from SD: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
