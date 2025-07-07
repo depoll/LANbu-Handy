@@ -71,8 +71,11 @@ class FTPBrowserService:
             lower_name = name.lower()
             if lower_name.endswith((".gcode", ".3mf")):
                 is_printable = True
-            if lower_name.endswith(".3mf"):
-                has_thumbnail = True
+            if lower_name.endswith((".3mf", ".gcode")):
+                has_thumbnail = True  # We'll try to extract thumbnail
+            # Check for video files that might have thumbnails
+            if lower_name.endswith((".mp4", ".avi")):
+                has_thumbnail = True  # We'll check for thumbnail in nested folder
 
         return FileInfo(
             name=name,
@@ -223,6 +226,61 @@ class FTPBrowserService:
             logger.error(f"Error extracting thumbnail: {e}")
             return False, None, str(e)
 
+    def extract_gcode_thumbnail(
+        self, file_path: Path
+    ) -> Tuple[bool, Optional[bytes], Optional[str]]:
+        """
+        Extract thumbnail from a G-code file.
+
+        Bambu Studio embeds base64-encoded thumbnails in gcode comments.
+
+        Args:
+            file_path: Path to G-code file
+
+        Returns:
+            Tuple of (success, thumbnail_bytes, error_message)
+        """
+        try:
+            import base64
+            import re
+
+            # Read the first part of the gcode file (thumbnails are at the beginning)
+            with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+                # Read first 100KB which should contain thumbnail
+                content = f.read(102400)
+
+            # Look for thumbnail patterns
+            # Bambu Studio format: ; thumbnail begin 96x96 size_in_bytes
+            thumbnail_pattern = r"; thumbnail begin \d+x\d+ \d+\n(.*?)\n; thumbnail end"
+            matches = re.findall(thumbnail_pattern, content, re.DOTALL)
+
+            if matches:
+                # Get the largest thumbnail (usually the last one)
+                thumbnail_data = matches[-1]
+
+                # Remove comment semicolons and join lines
+                lines = thumbnail_data.strip().split("\n")
+                base64_data = "".join(line.strip().lstrip("; ") for line in lines)
+
+                # Decode base64
+                image_data = base64.b64decode(base64_data)
+
+                # Resize if needed
+                img = Image.open(io.BytesIO(image_data))
+                if img.width > 400 or img.height > 400:
+                    img.thumbnail((400, 400), Image.Resampling.LANCZOS)
+                    output = io.BytesIO()
+                    img.save(output, format="PNG")
+                    image_data = output.getvalue()
+
+                return True, image_data, None
+
+            return False, None, "No thumbnail found in G-code file"
+
+        except Exception as e:
+            logger.error(f"Error extracting G-code thumbnail: {e}")
+            return False, None, str(e)
+
     def get_file_thumbnail(
         self,
         printer_config: PrinterConfig,
@@ -230,7 +288,7 @@ class FTPBrowserService:
         session_id: str,
     ) -> Tuple[bool, Optional[bytes], Optional[str]]:
         """
-        Get thumbnail for a file (currently only supports 3MF).
+        Get thumbnail for a file (supports 3MF and video files).
 
         Args:
             printer_config: Printer configuration
@@ -241,26 +299,84 @@ class FTPBrowserService:
             Tuple of (success, thumbnail_bytes, error_message)
         """
         try:
-            # Only support 3MF files for now
-            if not remote_path.lower().endswith(".3mf"):
-                return False, None, "Thumbnails only supported for 3MF files"
+            lower_path = remote_path.lower()
 
-            # Download the file first
-            success, local_path, error = self.download_file(
-                printer_config, remote_path, session_id
-            )
+            # Handle 3MF and G-code files
+            if lower_path.endswith((".3mf", ".gcode")):
+                # Download the file first
+                success, local_path, error = self.download_file(
+                    printer_config, remote_path, session_id
+                )
 
-            if not success:
-                return False, None, error
+                if not success:
+                    return False, None, error
 
-            try:
-                # Extract thumbnail
-                success, thumbnail, error = self.extract_3mf_thumbnail(local_path)
-                return success, thumbnail, error
-            finally:
-                # Clean up temporary file
-                if local_path and local_path.exists():
-                    local_path.unlink()
+                try:
+                    # Extract thumbnail based on file type
+                    if lower_path.endswith(".3mf"):
+                        success, thumbnail, error = self.extract_3mf_thumbnail(
+                            local_path
+                        )
+                    else:  # .gcode
+                        success, thumbnail, error = self.extract_gcode_thumbnail(
+                            local_path
+                        )
+                    return success, thumbnail, error
+                finally:
+                    # Clean up temporary file
+                    if local_path and local_path.exists():
+                        local_path.unlink()
+
+            # Handle video files - look for thumbnail in nested folder
+            elif lower_path.endswith((".mp4", ".avi")):
+                # Get the directory and filename
+                path_parts = remote_path.split("/")
+                if len(path_parts) > 1:
+                    directory = "/".join(path_parts[:-1])
+                    filename = path_parts[-1]
+                else:
+                    directory = ""
+                    filename = remote_path
+
+                # Remove extension and look for thumbnail
+                base_name = filename.rsplit(".", 1)[0]
+                thumbnail_path = f"{directory}/thumbnails/{base_name}.jpg"
+
+                logger.info(f"Looking for video thumbnail at: {thumbnail_path}")
+
+                # Try to download the thumbnail
+                success, local_path, error = self.download_file(
+                    printer_config, thumbnail_path, session_id
+                )
+
+                if success and local_path:
+                    try:
+                        # Read the thumbnail file
+                        with open(local_path, "rb") as f:
+                            thumbnail_data = f.read()
+
+                        # Optionally resize if too large
+                        img = Image.open(io.BytesIO(thumbnail_data))
+                        if img.width > 400 or img.height > 400:
+                            img.thumbnail((400, 400), Image.Resampling.LANCZOS)
+                            output = io.BytesIO()
+                            img.save(output, format="JPEG")
+                            thumbnail_data = output.getvalue()
+
+                        return True, thumbnail_data, None
+                    finally:
+                        # Clean up
+                        if local_path.exists():
+                            local_path.unlink()
+                else:
+                    return False, None, f"No thumbnail found for video: {filename}"
+
+            else:
+                return (
+                    False,
+                    None,
+                    f"Thumbnails not supported for file type: {remote_path}",
+                )
 
         except Exception as e:
             logger.error(f"Error getting thumbnail: {e}")
