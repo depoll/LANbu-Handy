@@ -3664,6 +3664,12 @@ class FileListResponse(BaseModel):
     message: Optional[str] = None
 
 
+@app.get("/api/printer/{printer_id}/files")
+async def list_printer_files_root(printer_id: str):
+    """List files in the root directory."""
+    return await list_printer_files(printer_id, "")
+
+
 @app.get("/api/printer/{printer_id}/files/{path:path}")
 async def list_printer_files(printer_id: str, path: str = ""):
     """

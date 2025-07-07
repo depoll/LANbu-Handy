@@ -41,9 +41,12 @@ export function PrinterFilesTab() {
       setError(null);
 
       try {
-        const response = await fetch(
-          `/api/printer/${currentPrinterId}/files/${encodeURIComponent(path)}`
-        );
+        // Construct URL properly for root vs nested paths
+        const url = path
+          ? `/api/printer/${currentPrinterId}/files/${encodeURIComponent(path)}`
+          : `/api/printer/${currentPrinterId}/files`;
+
+        const response = await fetch(url);
 
         if (!response.ok) {
           throw new Error(`Failed to load files: ${response.statusText}`);

@@ -57,7 +57,13 @@ class FTPBrowserService:
     def _determine_file_info(self, file_dict: dict, base_path: str) -> FileInfo:
         """Convert raw file info to FileInfo object with additional metadata."""
         name = file_dict["name"]
-        full_path = f"{base_path.rstrip('/')}/{name}" if base_path else name
+        # Ensure consistent path construction
+        if base_path and base_path != "/":
+            # Remove trailing slash from base_path and add single separator
+            full_path = f"{base_path.rstrip('/')}/{name}"
+        else:
+            # For root directory, just use the name
+            full_path = name
 
         # Determine MIME type
         mime_type = None
