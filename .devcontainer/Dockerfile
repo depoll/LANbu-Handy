@@ -16,6 +16,7 @@ RUN apt-get update && \
         python3-dev \
         # Basic development tools
         bash \
+        bash-completion \
         git \
         curl \
         wget \
@@ -89,6 +90,8 @@ RUN apt-get update && \
         libfontconfig1 \
         libfreetype6 \
         libwayland-client0 \
+        # Powerline fonts for terminal
+        fonts-powerline \
     && python3 -m pip install --upgrade pip \
     && update-alternatives --install /usr/bin/python python /usr/bin/python3 1 \
     && apt-get clean && rm -rf /var/lib/apt/lists/*

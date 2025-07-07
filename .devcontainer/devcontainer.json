@@ -20,7 +20,8 @@
         "esbenp.prettier-vscode",
         "ms-vscode.vscode-typescript-next",
         "ms-vscode.vscode-eslint",
-        "vitest.explorer"
+        "vitest.explorer",
+        "ms-azuretools.vscode-docker"
       ],
       "settings": {
         "python.defaultInterpreterPath": "/usr/local/bin/python",
