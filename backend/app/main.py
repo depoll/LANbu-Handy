@@ -9,6 +9,7 @@ import asyncio
 import json
 import logging
 import time
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -22,10 +23,29 @@ logging.getLogger("paho.mqtt").setLevel(logging.WARNING)
 logging.getLogger("paho.mqtt.client").setLevel(logging.WARNING)
 logging.getLogger("paho.mqtt.publish").setLevel(logging.WARNING)
 
-# Import and apply async MQTT patch before other imports
-from app.mqtt_async_patch_v3 import add_async_support_to_printer_service  # noqa: E402
+# Disable the v3 patch executor to prevent interference
+import sys  # noqa: E402
 
-add_async_support_to_printer_service()
+if "app.mqtt_async_patch_v3" in sys.modules:
+    del sys.modules["app.mqtt_async_patch_v3"]
+if "app.mqtt_async_patch_v4" in sys.modules:
+    del sys.modules["app.mqtt_async_patch_v4"]
+
+# Import and apply async MQTT patch before other imports
+# TEMPORARILY USING SIMPLE ASYNC IMPLEMENTATION TO FIX BLOCKING
+from app.mqtt_async_simple import (  # noqa: E402
+    add_simple_async_support_to_printer_service,
+)
+
+add_simple_async_support_to_printer_service()
+
+# Original imports commented out for debugging
+# from app.mqtt_async_patch_v4 import (  # noqa: E402
+#     add_connection_pool_support_to_printer_service,
+#     start_mqtt_connection_pool,
+#     stop_mqtt_connection_pool,
+# )
+# add_connection_pool_support_to_printer_service()
 
 from app.config import get_config  # noqa: E402
 from app.filament_matching_service import FilamentMatchingService  # noqa: E402
@@ -46,6 +66,7 @@ from app.printer_service import (  # noqa: E402
     PrinterMQTTError,
     PrinterService,
 )
+from app.printer_status_monitor import printer_status_monitor  # noqa: E402
 from app.slice_progress_service import slice_progress_service  # noqa: E402
 from app.slicer_service import slice_model  # noqa: E402
 from app.thumbnail_service import (  # noqa: E402
@@ -88,27 +109,54 @@ printer_service = PrinterService()
 # Initialize filament matching service
 filament_matching_service = FilamentMatchingService()
 
-# Initialize configuration (for testing compatibility)
-config = get_config()
+# Global config instance - will be initialized during startup
+config = None
 
 
 @app.on_event("startup")
 async def startup_event():
     """Initialize services and clean up old files on startup."""
+    global config
     logger.info("LANbu Handy backend starting up...")
 
-    # Clean up old thumbnail files
     try:
-        thumbnail_service.cleanup_old_thumbnails(max_age_hours=24)
-        logger.info("Cleaned up old thumbnail files")
+        # Initialize configuration
+        config = get_config()
+
+        # Set dependencies for printer status monitor
+        printer_status_monitor.set_dependencies(config, printer_service)
+
+        # Start the MQTT connection pool - SKIPPED when using simple async
+        # await start_mqtt_connection_pool()
+
+        # Start the printer status monitor in the background without blocking
+        # This prevents the server from hanging on startup if printers are unreachable
+        asyncio.create_task(printer_status_monitor.start())
+
+        # Clean up old thumbnail files
+        try:
+            thumbnail_service.cleanup_old_thumbnails(max_age_hours=24)
+        except Exception as e:
+            logger.warning(f"Error during thumbnail cleanup: {e}")
+
+        logger.info("Startup complete!")
     except Exception as e:
-        logger.warning(f"Error during thumbnail cleanup: {e}")
+        logger.error(f"Error during startup: {e}", exc_info=True)
+        raise
 
 
 @app.on_event("shutdown")
 async def shutdown_event():
     """Clean up resources on shutdown."""
     logger.info("LANbu Handy backend shutting down...")
+
+    # Stop the printer status monitor
+    await printer_status_monitor.stop()
+
+    # Stop the MQTT connection pool - SKIPPED when using simple async
+    # await stop_mqtt_connection_pool()
+    logger.info("MQTT connection pool not used (simple async implementation)")
+    logger.info("Printer status monitor stopped")
 
     # MQTT cleanup now handled automatically by async cancellation
 
@@ -192,6 +240,11 @@ async def get_app_config():
 
     Returns information about printer configuration and other settings.
     """
+    if config is None:
+        raise HTTPException(
+            status_code=503, detail="Service starting up, please try again in a moment"
+        )
+
     printers = config.get_printers()
     persistent_printers = config.get_persistent_printers()
     persistent_ips = {p.ip for p in persistent_printers}
@@ -331,6 +384,7 @@ class PrinterStatusResponse(BaseModel):
     message: str
     printer_model: Optional[str] = None
     printer_name: Optional[str] = None
+    nozzle_diameter: Optional[float] = None
     ams_units: Optional[List[AMSUnitResponse]] = None
     external_spool: Optional[ExternalSpoolResponse] = None
     error_details: Optional[str] = None
@@ -2720,9 +2774,10 @@ async def get_ams_status(printer_id: str):
 @app.get("/api/printer/{printer_id}/status-debug")
 async def get_printer_status_debug(printer_id: str):
     """
-    Get raw printer status data for debugging.
+    Get cached raw printer status data for debugging.
 
-    This endpoint returns the raw MQTT response without processing.
+    This endpoint returns the last cached raw MQTT responses from the printer
+    status monitor, avoiding any blocking MQTT queries.
     """
     try:
         # Check if any printers are configured
@@ -2737,7 +2792,8 @@ async def get_printer_status_debug(printer_id: str):
         if printer_id.lower() == "default":
             printer_config = config.get_default_printer()
         else:
-            printer_config = config.get_printer_by_name(printer_id)
+            # Try to get printer by canonical ID or name
+            printer_config = config.get_printer_by_id(printer_id)
 
         if not printer_config:
             available_printers = [p.name for p in config.get_printers()]
@@ -2749,84 +2805,71 @@ async def get_printer_status_debug(printer_id: str):
                 ),
             )
 
-        # Create a custom printer service that captures raw data
-        from app.printer_service import mqtt, ssl
+        # Get cached status from printer status monitor
+        canonical_id = printer_config.canonical_id
+        cached_status = await printer_status_monitor.get_status(canonical_id)
 
+        if not cached_status:
+            raise HTTPException(
+                status_code=503,
+                detail=f"No cached status available for printer '{printer_id}'",
+            )
+
+        # Extract raw MQTT data from cache
+        status_data = cached_status.get("data", {})
         raw_responses = []
 
-        def capture_raw_message(client, userdata, msg):
-            try:
-                payload = msg.payload.decode("utf-8")
-                data = json.loads(payload)
-                raw_responses.append(
-                    {"topic": msg.topic, "data": data, "timestamp": time.time()}
-                )
-            except Exception as e:
-                logger.error(f"Error capturing raw message: {e}")
+        # Add raw status data if available
+        if "raw_status_data" in status_data:
+            topic = (
+                f"device/{printer_config.serial_number}/report"
+                if printer_config.serial_number
+                else f"device/{printer_config.ip}/report"
+            )
+            raw_responses.append(
+                {
+                    "topic": topic,
+                    "data": status_data["raw_status_data"],
+                    "timestamp": cached_status.get(
+                        "timestamp", datetime.utcnow()
+                    ).timestamp(),
+                }
+            )
 
-        # Create MQTT client with custom handler
-        client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
-
-        if printer_config.access_code:
-            client.username_pw_set("bblp", printer_config.access_code)
-
-        ssl_context = ssl.create_default_context()
-        ssl_context.check_hostname = False
-        ssl_context.verify_mode = ssl.CERT_NONE
-        client.tls_set_context(ssl_context)
-
-        client.on_message = capture_raw_message
-
-        # Connect and subscribe
-        client.connect(printer_config.ip, 8883, 60)
-        client.loop_start()
-
-        # Subscribe to response topic
-        response_topic = f"device/{printer_config.serial_number}/report"
-        client.subscribe(response_topic, qos=1)
-
-        # Send status query
-        device_topic = f"device/{printer_config.serial_number}/request"
-        # Try info command first to get printer details
-        info_query = {"info": {"sequence_id": "0"}}
-        client.publish(device_topic, json.dumps(info_query), qos=1)
-
-        # Wait a bit for info response
-        time.sleep(2)
-
-        # Then send pushall for full status
-        status_query = {"pushing": {"sequence_id": "1", "command": "pushall"}}
-        client.publish(device_topic, json.dumps(status_query), qos=1)
-
-        # Wait for responses
-        import time
-
-        start_time = time.time()
-        while len(raw_responses) < 2 and time.time() - start_time < 10:
-            time.sleep(0.1)
-
-        client.loop_stop()
-        client.disconnect()
+        # Add raw AMS data if available
+        if "raw_ams_data" in status_data:
+            topic = (
+                f"device/{printer_config.serial_number}/report"
+                if printer_config.serial_number
+                else f"device/{printer_config.ip}/report"
+            )
+            raw_responses.append(
+                {
+                    "topic": topic,
+                    "data": status_data["raw_ams_data"],
+                    "timestamp": cached_status.get(
+                        "timestamp", datetime.utcnow()
+                    ).timestamp(),
+                }
+            )
 
         if raw_responses:
-            # Look for info response
-            info_response = None
-            status_response = None
-
-            for resp in raw_responses:
-                if "info" in resp["data"]:
-                    info_response = resp["data"]["info"]
-                if "print" in resp["data"]:
-                    status_response = resp["data"]
-
-            return {
-                "success": True,
-                "info_response": info_response,
-                "status_response": status_response,
-                "all_responses": raw_responses,
-            }
+            # Return in the same format as before for compatibility
+            return raw_responses
         else:
-            return {"success": False, "error": "No response received from printer"}
+            # Return error information if no raw data available
+            return [
+                {
+                    "topic": "error",
+                    "data": {
+                        "error": status_data.get("error", "No raw data available"),
+                        "cached_status": status_data,
+                    },
+                    "timestamp": cached_status.get(
+                        "timestamp", datetime.utcnow()
+                    ).timestamp(),
+                }
+            ]
 
     except HTTPException:
         raise
@@ -2838,10 +2881,10 @@ async def get_printer_status_debug(printer_id: str):
 @app.get("/api/printer/{printer_id}/status", response_model=PrinterStatusResponse)
 async def get_printer_status(printer_id: str):
     """
-    Query the printer's full status including model information.
+    Get the printer's status from cache (no direct MQTT query).
 
-    Retrieves the current status of the printer including model type, name,
-    and AMS information from the specified printer via MQTT.
+    This endpoint returns cached status data to avoid blocking the event loop.
+    Status is updated in the background by the printer status monitor.
 
     Args:
         printer_id: The name of the printer to query (NOT the IP address)
@@ -2851,7 +2894,7 @@ async def get_printer_status(printer_id: str):
         PrinterStatusResponse: Printer status with model, name, and AMS information
 
     Raises:
-        HTTPException: If printer is not found, not configured, or query fails
+        HTTPException: If printer is not found or no cached data is available
     """
     try:
         # Check if any printers are configured
@@ -2885,9 +2928,66 @@ async def get_printer_status(printer_id: str):
                 ),
             )
 
-        # Query printer status
+        # Get cached status instead of querying
+        canonical_id = printer_config.canonical_id
+        cached_status = await printer_status_monitor.get_status(canonical_id)
+
+        if not cached_status or "error" in cached_status.get("data", {}):
+            raise HTTPException(
+                status_code=503,
+                detail=f"No cached status available for printer '{printer_id}'",
+            )
+
+        # Extract status data
+        status_data = cached_status.get("data", {})
+
+        # Convert to PrinterStatusResult format for compatibility
+        from app.printer_service import (
+            AMSFilament,
+            AMSUnit,
+            ExternalSpool,
+            PrinterStatusResult,
+        )
+
+        status_result = PrinterStatusResult(
+            success=True,
+            message="Status retrieved from cache",
+            printer_model=status_data.get("printer_model"),
+            printer_name=status_data.get("printer_name"),
+            nozzle_diameter=status_data.get("nozzle_diameter"),
+        )
+
+        # Convert AMS data if present
+        if "ams_status" in status_data:
+            ams_status = status_data["ams_status"]
+            if ams_status.get("ams_units"):
+                status_result.ams_units = []
+                for unit in ams_status["ams_units"]:
+                    filaments = []
+                    for f in unit["filaments"]:
+                        filaments.append(
+                            AMSFilament(
+                                slot_id=f["slot_id"],
+                                filament_type=f["filament_type"],
+                                color=f["color"],
+                                material_id=f.get("material_id"),
+                            )
+                        )
+                    status_result.ams_units.append(
+                        AMSUnit(unit_id=unit["unit_id"], filaments=filaments)
+                    )
+
+            if ams_status.get("external_spool"):
+                ext = ams_status["external_spool"]
+                status_result.external_spool = ExternalSpool(
+                    slot_id=ext["slot_id"],
+                    filament_type=ext["filament_type"],
+                    color=ext["color"],
+                    material_id=ext.get("material_id"),
+                    available=ext.get("available", False),
+                )
+
         try:
-            status_result = printer_service.query_printer_status(printer_config)
 
             if status_result.success:
                 # Convert internal data structures to API response format
@@ -2925,6 +3025,7 @@ async def get_printer_status(printer_id: str):
                     message=status_result.message,
                     printer_model=status_result.printer_model,
                     printer_name=status_result.printer_name,
+                    nozzle_diameter=status_result.nozzle_diameter,
                     ams_units=ams_units_response,
                     external_spool=external_spool_response,
                 )
@@ -2953,6 +3054,137 @@ async def get_printer_status(printer_id: str):
     except Exception as e:
         msg = f"Internal server error during printer status query: {str(e)}"
         raise HTTPException(status_code=500, detail=msg)
+
+
+@app.get("/api/printers/all-status")
+async def get_all_printer_statuses():
+    """
+    Get cached status for all configured printers.
+
+    Returns status information that has been collected in the background
+    for all printers with serial numbers configured. This endpoint returns
+    immediately with cached data rather than querying printers.
+
+    Returns:
+        Dict with printer IDs as keys and status information as values
+    """
+    statuses = await printer_status_monitor.get_all_statuses()
+
+    # Format response
+    response = {}
+    for printer_id, status_data in statuses.items():
+        response[printer_id] = {
+            "status": status_data.get("data", {}),
+            "timestamp": status_data.get("timestamp"),
+            "query_time_ms": status_data.get("query_time_ms"),
+            "printer_info": {
+                "name": status_data.get("printer_info", {}).get("name"),
+                "ip": status_data.get("printer_info", {}).get("ip"),
+                "has_serial_number": status_data.get("printer_info", {}).get(
+                    "has_serial_number"
+                ),
+            },
+        }
+
+    return response
+
+
+@app.get("/api/printer/{printer_id}/cached-status")
+async def get_cached_printer_status(printer_id: str):
+    """
+    Get cached status for a specific printer.
+
+    Returns immediately with cached status data rather than querying the printer.
+    Use this for fast status checks when real-time data is not critical.
+
+    Args:
+        printer_id: Canonical ID or IP of the printer
+
+    Returns:
+        Cached status data or 404 if not available
+    """
+    status = await printer_status_monitor.get_status(printer_id)
+
+    if not status:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No cached status available for printer '{printer_id}'",
+        )
+
+    return {
+        "status": status.get("data", {}),
+        "timestamp": status.get("timestamp"),
+        "query_time_ms": status.get("query_time_ms"),
+        "is_stale": printer_status_monitor.is_stale(printer_id),
+        "printer_info": {
+            "name": status.get("printer_info", {}).get("name"),
+            "ip": status.get("printer_info", {}).get("ip"),
+            "has_serial_number": status.get("printer_info", {}).get(
+                "has_serial_number"
+            ),
+        },
+    }
+
+
+@app.post("/api/printer/{printer_id}/refresh-status")
+async def refresh_printer_status(printer_id: str):
+    """
+    Force a refresh of the cached status for a specific printer.
+
+    Triggers an immediate status update for the specified printer.
+    This is an async operation - the endpoint returns immediately
+    and the update happens in the background.
+
+    Args:
+        printer_id: Canonical ID or IP of the printer
+
+    Returns:
+        Success message
+    """
+    await printer_status_monitor.force_update(printer_id)
+
+    return {
+        "success": True,
+        "message": f"Status refresh triggered for printer '{printer_id}'",
+    }
+
+
+@app.get("/api/printers/connection-metrics")
+async def get_connection_metrics():
+    """
+    Get MQTT connection metrics for all printers.
+
+    Returns detailed connection state and health metrics for monitoring
+    the MQTT connection pool performance.
+
+    Returns:
+        Dictionary with connection metrics for each printer including:
+        - Connection state (connected, offline, etc.)
+        - Last successful connection time
+        - Consecutive failure count
+        - Next retry time for failed connections
+    """
+    from app.mqtt_connection_pool import mqtt_connection_pool
+
+    metrics = mqtt_connection_pool.get_connection_metrics()
+
+    return {
+        "success": True,
+        "timestamp": datetime.utcnow().isoformat(),
+        "printers": metrics,
+        "summary": {
+            "total_printers": len(metrics),
+            "connected": sum(1 for m in metrics.values() if m["state"] == "connected"),
+            "offline": sum(1 for m in metrics.values() if m["state"] == "offline"),
+            "disconnected": sum(
+                1 for m in metrics.values() if m["state"] == "disconnected"
+            ),
+            "connecting": sum(
+                1 for m in metrics.values() if m["state"] == "connecting"
+            ),
+            "failed": sum(1 for m in metrics.values() if m["state"] == "failed"),
+        },
+    }
 
 
 @app.post("/api/filament/match", response_model=FilamentMatchResponse)
@@ -3082,12 +3314,8 @@ async def set_active_printer(request: SetActivePrinterRequest):
 
     # Wrap the entire operation in a timeout to prevent hanging
     try:
-        # First, immediately cancel ALL MQTT operations before even starting
-        # This ensures we don't wait for any ongoing operations
-        from app.mqtt_async_patch_v3 import cancel_all_mqtt_operations
-
-        logger.debug("Pre-emptively cancelling all MQTT operations")
-        cancel_all_mqtt_operations()
+        # With background status monitoring, we don't need to cancel MQTT operations
+        # The status monitor will continue updating all printers in parallel
 
         # Use asyncio.wait_for for Python 3.10 compatibility
         return await asyncio.wait_for(_set_active_printer_impl(request), timeout=10)
@@ -3106,6 +3334,11 @@ async def set_active_printer(request: SetActivePrinterRequest):
 
 async def _set_active_printer_impl(request: SetActivePrinterRequest):
     """Implementation of set_active_printer with timeout protection."""
+    if config is None:
+        raise HTTPException(
+            status_code=503, detail="Service starting up, please try again in a moment"
+        )
+
     try:
         # The cancellation is already done in set_active_printer before calling this
         # So we don't need to do it again here

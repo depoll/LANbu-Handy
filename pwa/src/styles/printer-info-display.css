@@ -245,3 +245,9 @@
     font-size: 0.8rem;
   }
 }
+
+/* Diagnostic section styles */
+.diagnostic-section {
+  margin-top: 0;
+  padding: 0 1rem 1rem 1rem;
+}

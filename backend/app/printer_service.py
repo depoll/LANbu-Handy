@@ -111,6 +111,7 @@ class PrinterStatusResult:
     external_spool: ExternalSpool = None
     nozzle_diameter: float = None
     error_details: str = None
+    raw_data: dict = None  # Raw MQTT response data
 
 
 @dataclass
@@ -122,6 +123,7 @@ class AMSStatusResult:
     ams_units: List[AMSUnit] = None
     external_spool: ExternalSpool = None
     error_details: str = None
+    raw_data: dict = None  # Raw MQTT response data
 
 
 class PrinterService:
@@ -440,29 +442,9 @@ class PrinterService:
                 and iteration_count < max_iterations
             ):
                 # Check if cancelled - is client still tracked
-                from app.mqtt_async_patch_v3 import (
-                    _active_mqtt_clients,
-                    _clients_lock,
-                    _switching_lock,
-                    _switching_printers,
-                )
+                # DISABLED: v3 async patch check
 
-                # First check if we're switching printers - fail immediately
-                with _switching_lock:
-                    if _switching_printers:
-                        logger.debug(
-                            "Printer switching in progress - cancelling operation"
-                        )
-                        raise PrinterMQTTError(
-                            "Operation cancelled - switching printers"
-                        )
-
-                with _clients_lock:
-                    if printer_config.ip not in _active_mqtt_clients:
-                        logger.debug(
-                            f"MQTT client no longer active for {printer_config.ip}"
-                        )
-                        raise PrinterMQTTError("Operation cancelled")
+                # raise PrinterMQTTError("Operation cancelled")
 
                 try:
                     # Try to check if client is still connected
@@ -503,7 +485,7 @@ class PrinterService:
                     f"{printer_config.name}"
                 )
                 raise PrinterMQTTError(
-                    "MQTT publish operation stuck - operation cancelled"
+                    "MQTT publish operation exceeded maximum retry attempts"
                 )
 
             if publish_error:
@@ -535,7 +517,7 @@ class PrinterService:
             # Cleanup now handled by async wrapper
             if client:
                 try:
-                    client.loop_stop(force=True)
+                    client.loop_stop()
                     client.disconnect()
                 except Exception as e:
                     logger.debug(f"Error during MQTT cleanup: {e}")
@@ -779,29 +761,9 @@ class PrinterService:
                 and iteration_count < max_iterations
             ):
                 # Check if cancelled - is client still tracked
-                from app.mqtt_async_patch_v3 import (
-                    _active_mqtt_clients,
-                    _clients_lock,
-                    _switching_lock,
-                    _switching_printers,
-                )
+                # DISABLED: v3 async patch check
 
-                # First check if we're switching printers - fail immediately
-                with _switching_lock:
-                    if _switching_printers:
-                        logger.debug(
-                            "Printer switching in progress - cancelling operation"
-                        )
-                        raise PrinterMQTTError(
-                            "Operation cancelled - switching printers"
-                        )
-
-                with _clients_lock:
-                    if printer_config.ip not in _active_mqtt_clients:
-                        logger.debug(
-                            f"MQTT client no longer active for {printer_config.ip}"
-                        )
-                        raise PrinterMQTTError("Operation cancelled")
+                # raise PrinterMQTTError("Operation cancelled")
 
                 try:
                     # Try to check if client is still connected
@@ -842,7 +804,7 @@ class PrinterService:
                     f"{printer_config.name}"
                 )
                 raise PrinterMQTTError(
-                    "MQTT publish operation stuck - operation cancelled"
+                    "MQTT publish operation exceeded maximum retry attempts"
                 )
 
             if publish_error:
@@ -929,6 +891,7 @@ class PrinterService:
                 f"{printer_config.name}",
                 ams_units=ams_units,
                 external_spool=external_spool,
+                raw_data=response_data,  # Include raw MQTT response
             )
 
         except PrinterMQTTError:
@@ -944,7 +907,7 @@ class PrinterService:
             # Cleanup now handled by async wrapper
             if client:
                 try:
-                    client.loop_stop(force=True)
+                    client.loop_stop()
                     client.disconnect()
                 except Exception as e:
                     logger.debug(f"Error during MQTT cleanup: {e}")
@@ -1118,9 +1081,12 @@ class PrinterService:
                 try:
                     # Parse the JSON response
                     payload = msg.payload.decode("utf-8")
-                    logger.debug(f"Received MQTT message: {payload}")
+                    logger.info(f"MQTT message on {msg.topic}")
 
                     response_json = json.loads(payload)
+
+                    # Log what keys we got
+                    logger.info(f"Message keys: {list(response_json.keys())}")
 
                     # Log the raw response for debugging
                     logger.debug(
@@ -1133,7 +1099,12 @@ class PrinterService:
                     if "print" in response_json:
                         response_data = response_json
                         response_received = True
-                        logger.debug("Printer status data received")
+                        logger.info("Printer status data received with 'print' key")
+                    else:
+                        logger.info(
+                            f"Message without 'print' key, has: "
+                            f"{list(response_json.keys())}"
+                        )
 
                 except json.JSONDecodeError as e:
                     logger.warning(f"Failed to parse MQTT message: {e}")
@@ -1229,29 +1200,9 @@ class PrinterService:
                 and iteration_count < max_iterations
             ):
                 # Check if cancelled - is client still tracked
-                from app.mqtt_async_patch_v3 import (
-                    _active_mqtt_clients,
-                    _clients_lock,
-                    _switching_lock,
-                    _switching_printers,
-                )
+                # DISABLED: v3 async patch check
 
-                # First check if we're switching printers - fail immediately
-                with _switching_lock:
-                    if _switching_printers:
-                        logger.debug(
-                            "Printer switching in progress - cancelling operation"
-                        )
-                        raise PrinterMQTTError(
-                            "Operation cancelled - switching printers"
-                        )
-
-                with _clients_lock:
-                    if printer_config.ip not in _active_mqtt_clients:
-                        logger.debug(
-                            f"MQTT client no longer active for {printer_config.ip}"
-                        )
-                        raise PrinterMQTTError("Operation cancelled")
+                # raise PrinterMQTTError("Operation cancelled")
 
                 try:
                     # Try to check if client is still connected
@@ -1292,7 +1243,7 @@ class PrinterService:
                     f"{printer_config.name}"
                 )
                 raise PrinterMQTTError(
-                    "MQTT publish operation stuck - operation cancelled"
+                    "MQTT publish operation exceeded maximum retry attempts"
                 )
 
             if publish_error:
@@ -1301,12 +1252,13 @@ class PrinterService:
             # Wait for response with printer status data
             start_time = time.time()
             while not response_received and time.time() - start_time < timeout:
-                # Check if cancelled - is client still tracked
-                from app.mqtt_async_patch_v3 import _active_mqtt_clients, _clients_lock
-
-                with _clients_lock:
-                    if printer_config.ip not in _active_mqtt_clients:
-                        raise PrinterMQTTError("Operation cancelled")
+                # Check if cancelled - DISABLED when using simple async
+                # DISABLED: from app.mqtt_async_patch_v3 import
+                # _active_mqtt_clients, _clients_lock
+                #
+                # with _clients_lock:
+                #     if printer_config.ip not in _active_mqtt_clients:
+                #         raise PrinterMQTTError("Operation cancelled")
                 time.sleep(0.1)
 
             if not response_received:
@@ -1339,6 +1291,7 @@ class PrinterService:
                 ams_units=ams_units,
                 external_spool=external_spool,
                 nozzle_diameter=nozzle_diameter,
+                raw_data=response_data,  # Include raw MQTT response
             )
 
         except PrinterMQTTError:
@@ -1357,7 +1310,7 @@ class PrinterService:
             # Cleanup now handled by async wrapper
             if client:
                 try:
-                    client.loop_stop(force=True)
+                    client.loop_stop()
                     client.disconnect()
                 except Exception as e:
                     logger.debug(f"Error during MQTT cleanup: {e}")
