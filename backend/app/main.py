@@ -3686,6 +3686,10 @@ async def list_printer_files(printer_id: str, path: str = ""):
         HTTPException: If printer not found or listing fails
     """
     try:
+        logger.info(
+            f"list_printer_files called with printer_id='{printer_id}', path='{path}'"
+        )
+
         # Get printer configuration
         printer_config = config.get_printer_by_id(printer_id)
         if not printer_config:

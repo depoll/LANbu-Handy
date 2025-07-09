@@ -1,9 +1,11 @@
 .file-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 1.5rem;
+  gap: 1rem;
   padding: 1rem;
   overflow-y: auto;
+  flex: 1;
+  align-content: start;
 }
 
 .file-card {
@@ -53,7 +55,7 @@
 
 .file-preview {
   width: 100%;
-  height: 200px;
+  height: 160px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -96,10 +98,10 @@
 }
 
 .file-info {
-  padding: 1.25rem;
+  padding: 1rem;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.25rem;
   background: rgba(255, 255, 255, 0.02);
 }
 
@@ -129,20 +131,20 @@
 
 .file-actions {
   display: flex;
-  gap: 0.75rem;
-  padding: 0 1.25rem 1.25rem;
+  gap: 0.5rem;
+  padding: 0 1rem 1rem;
   background: rgba(255, 255, 255, 0.02);
 }
 
 .action-button {
   flex: 1;
-  padding: 0.75rem;
+  padding: 0.625rem;
   background: rgba(255, 255, 255, 0.05);
   backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 10px;
+  border-radius: 8px;
   cursor: pointer;
-  font-size: 1.25rem;
+  font-size: 1.125rem;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   overflow: hidden;

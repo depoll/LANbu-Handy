@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useCurrentPrinter } from '../hooks/useCurrentPrinter';
 import { useToast } from '../hooks/useToast';
 import { FileBrowser } from './FileBrowser';
@@ -29,6 +29,7 @@ export function PrinterFilesTab() {
   const [error, setError] = useState<string | null>(null);
   const { currentPrinterId, currentPrinterName } = useCurrentPrinter();
   const { showError, showInfo } = useToast();
+  const previousPrinterIdRef = useRef<string | null>(null);
 
   const loadFiles = useCallback(
     async (path: string = '') => {
@@ -71,9 +72,10 @@ export function PrinterFilesTab() {
     [currentPrinterId, showError]
   );
 
-  // Load files when printer changes or component mounts
+  // Load files when printer changes
   useEffect(() => {
-    if (currentPrinterId) {
+    if (currentPrinterId && currentPrinterId !== previousPrinterIdRef.current) {
+      previousPrinterIdRef.current = currentPrinterId;
       loadFiles(''); // Always start at root when printer changes
     }
   }, [currentPrinterId, loadFiles]);

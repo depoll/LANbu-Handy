@@ -61,12 +61,20 @@ class CurlFTPSClient:
         # Build URL - for implicit FTPS, use ftps:// protocol
         # URL-encode the remote path to handle special characters and spaces
         encoded_path = urllib.parse.quote(remote_path, safe="/") if remote_path else ""
+
+        # For directory listing operations, ensure path ends with / if it's not empty
+        if operation == "list" and encoded_path and not encoded_path.endswith("/"):
+            encoded_path += "/"
+
         url = f"ftps://{self.host}:{self.port}/{encoded_path}"
 
         if operation == "upload" and local_file:
             cmd.extend(["-T", local_file])  # Upload file
         elif operation == "list":
-            if not detailed_list:
+            if detailed_list:
+                # No additional flags needed for detailed listing
+                pass
+            else:
                 cmd.extend(["-l"])  # List directory (names only)
         elif operation == "download":
             cmd.extend(["-o", local_file] if local_file else ["-O"])  # Download
@@ -302,6 +310,9 @@ class CurlFTPSClient:
         """
         try:
             cmd = self._build_curl_cmd("list", remote_dir, detailed_list=True)
+            logger.info(f"Listing directory: {remote_dir}")
+            logger.debug(f"Command: {' '.join(cmd[:-2] + ['***'])}")
+
             result = subprocess.run(
                 cmd, capture_output=True, text=True, timeout=self.timeout
             )
@@ -346,7 +357,11 @@ class CurlFTPSClient:
 
                 return True, files
             else:
-                logger.error(f"Detailed list failed: {result.stderr}")
+                logger.error(
+                    f"Detailed list failed for '{remote_dir}': {result.stderr}"
+                )
+                logger.error(f"Return code: {result.returncode}")
+                logger.debug(f"stdout: {result.stdout}")
                 return False, []
 
         except Exception as e:

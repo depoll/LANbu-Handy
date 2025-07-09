@@ -108,6 +108,7 @@ class FTPBrowserService:
             Tuple of (success, list of FileInfo, error_message)
         """
         try:
+            logger.info(f"FTPBrowserService.list_files called with path='{path}'")
             client = self._get_ftp_client(printer_config)
 
             # Get detailed file listing
@@ -160,14 +161,10 @@ class FTPBrowserService:
             with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_file:
                 local_path = Path(temp_file.name)
 
-            # Progress callback
+            # Progress callback - skip for now due to async/sync mismatch
             def progress_callback(percent: int, message: str):
-                self.upload_progress_service.update_progress(
-                    session_id,
-                    percent,
-                    message,
-                    current_file=Path(remote_path).name,
-                )
+                # TODO: Fix async progress updates
+                logger.debug(f"Download progress: {percent}% - {message}")
 
             # Download the file
             success, message = client.download_file(
