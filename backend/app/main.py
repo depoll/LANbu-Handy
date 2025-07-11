@@ -415,6 +415,7 @@ class ConfiguredSliceRequest(BaseModel):
         None  # Material types for each filament mapping
     )
     filament_colors: Optional[List[str]] = None  # Colors for each filament mapping
+    preview_image: Optional[str] = None  # Base64 PNG preview image
 
 
 class SetActivePrinterRequest(BaseModel):
@@ -1378,6 +1379,29 @@ async def slice_model_with_configuration(request: ConfiguredSliceRequest):
         else:
             expected_filename = f"{model_base_name}.gcode.3mf"
         expected_output_path = output_dir / expected_filename
+
+        # Save preview image if provided
+        preview_path = None
+        if request.preview_image:
+            try:
+                # Decode base64 image
+                import base64
+
+                if request.preview_image.startswith("data:image/png;base64,"):
+                    image_data = request.preview_image.split(",", 1)[1]
+                else:
+                    image_data = request.preview_image
+
+                preview_bytes = base64.b64decode(image_data)
+
+                # Save preview image to temp directory
+                preview_filename = f"{model_base_name}_preview.png"
+                preview_path = output_dir / preview_filename
+                preview_path.write_bytes(preview_bytes)
+                logger.info(f"Saved preview image: {preview_path}")
+            except Exception as e:
+                logger.warning(f"Failed to save preview image: {e}")
+                # Continue without preview - it's not critical
 
         # Slice the model (pass the original filename for output naming)
         # Use original_filename if provided, otherwise extract from file_id

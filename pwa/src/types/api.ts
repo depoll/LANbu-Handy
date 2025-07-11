@@ -92,6 +92,7 @@ export interface ConfiguredSliceRequest {
   print_quality?: string; // Optional quality override
   filament_types?: string[]; // Material types for each filament mapping
   filament_colors?: string[]; // Colors for each filament mapping
+  preview_image?: string; // Base64 PNG preview image
 }
 
 export interface StartProgressSliceRequest {

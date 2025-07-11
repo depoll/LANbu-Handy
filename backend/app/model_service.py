@@ -1146,7 +1146,7 @@ class ModelService:
 
         # Get all object_ids assigned to this plate
         object_ids = []
-        for model_instance in target_plate.findall("model_instance"):
+        for model_instance in target_plate.findall(".//model_instance"):
             for metadata in model_instance.findall("metadata"):
                 if metadata.get("key") == "object_id":
                     object_ids.append(metadata.get("value"))

@@ -15,7 +15,10 @@
     "test:coverage": "vitest --coverage"
   },
   "dependencies": {
+    "@types/jszip": "^3.4.0",
     "@types/three": "^0.177.0",
+    "fast-xml-parser": "^5.2.5",
+    "jszip": "^3.10.1",
     "lucide-react": "^0.525.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",

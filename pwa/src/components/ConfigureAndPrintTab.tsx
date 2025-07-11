@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import PlateSelector from './PlateSelector';
 import OperationProgress, { OperationStep } from './OperationProgress';
 import { UploadProgress } from './UploadProgress';
 import { useToast } from '../hooks/useToast';
+import ModelPreviewEnhanced, { ModelPreviewRef } from './ModelPreviewEnhanced';
 import {
   FilamentRequirement,
   AMSStatusResponse,
@@ -88,6 +89,7 @@ export function ConfigureAndPrintTab({
   const [operationSteps, setOperationSteps] = useState<OperationStep[]>([]);
   const [showOperationProgress, setShowOperationProgress] = useState(false);
   const [uploadId, setUploadId] = useState<string | null>(null);
+  const modelPreviewRef = useRef<ModelPreviewRef>(null);
 
   const { showSuccess, showError, showWarning, showInfo } = useToast();
 
@@ -214,6 +216,18 @@ export function ConfigureAndPrintTab({
         }
       }
 
+      // Capture preview image with current configuration
+      let previewImage: string | undefined;
+      try {
+        if (modelPreviewRef.current) {
+          previewImage = await modelPreviewRef.current.capturePreview();
+          onStatusMessage('📸 Captured preview image with current colors');
+        }
+      } catch (error) {
+        console.warn('Failed to capture preview:', error);
+        // Continue without preview - it's not critical
+      }
+
       const request: ConfiguredSliceRequest = {
         file_id: currentFileId,
         original_filename: originalFilename,
@@ -224,6 +238,7 @@ export function ConfigureAndPrintTab({
         nozzle_diameter: nozzleDiameter,
         filament_types: filamentTypes.length > 0 ? filamentTypes : undefined,
         filament_colors: filamentColors.length > 0 ? filamentColors : undefined,
+        preview_image: previewImage,
       };
 
       console.log(
@@ -574,6 +589,20 @@ export function ConfigureAndPrintTab({
       <div className="configuration-header">
         <h3>Configuration & Print</h3>
         <p>Configure your settings and print your model</p>
+      </div>
+
+      {/* Model Preview with Real-time Updates */}
+      <div className="preview-section">
+        <ModelPreviewEnhanced
+          ref={modelPreviewRef}
+          fileId={currentFileId}
+          filamentRequirements={activeFilamentRequirements || undefined}
+          filamentMappings={filamentMappings}
+          amsStatus={amsStatus}
+          plates={plates}
+          selectedPlateIndex={selectedPlateIndex}
+          className="config-preview"
+        />
       </div>
 
       {/* Configuration Section */}
