@@ -13,6 +13,7 @@ interface PlateObject {
 interface PlateContents {
   plateIndex: number;
   objects: PlateObject[];
+  projectFilamentColors?: string[];
 }
 
 interface ParseRequest {
@@ -197,7 +198,6 @@ async function parse3MFPlate(
       textNodeName: '#text',
       parseAttributeValue: true,
       trimValues: true,
-      parseTrueNumberOnly: false,
       processEntities: true,
       allowBooleanAttributes: true,
     });
@@ -216,6 +216,36 @@ async function parse3MFPlate(
     const extruderMap = new Map<string, number>();
 
     sendProgress('Loading plate configuration...', 40);
+
+    // Load project settings to extract filament color configuration
+    const projectFilamentColors: string[] = [];
+    const projectSettingsFile = contents.file(
+      'Metadata/project_settings.config'
+    );
+    if (projectSettingsFile) {
+      try {
+        const projectContent = await projectSettingsFile.async('text');
+        console.log('Project settings content:', projectContent);
+
+        // Parse filament_colour from JSON project settings
+        const colorMatch = projectContent.match(
+          /"filament_colour"\s*:\s*\[(.*?)\]/s
+        );
+        if (colorMatch) {
+          const colorString = colorMatch[1];
+          const colors = colorString.match(/"([^"]+)"/g);
+          if (colors) {
+            colors.forEach(colorStr => {
+              const cleanColor = colorStr.replace(/"/g, '');
+              projectFilamentColors.push(cleanColor);
+              console.log('Found project filament color:', cleanColor);
+            });
+          }
+        }
+      } catch (error) {
+        console.log('Failed to parse project_settings.config:', error);
+      }
+    }
     // Check if there's a slice_info.config file with proper plate mapping
     const sliceInfoFile = contents.file('Metadata/slice_info.config');
     if (sliceInfoFile) {
@@ -228,10 +258,9 @@ async function parse3MFPlate(
           textNodeName: '#text',
           parseAttributeValue: true,
           trimValues: true,
-          parseTrueNumberOnly: false,
           processEntities: true,
           allowBooleanAttributes: true,
-          isArray: (name, jpath) => {
+          isArray: (_name, jpath) => {
             // Force certain elements to be arrays for consistent handling
             return [
               'config.plate',
@@ -337,6 +366,8 @@ async function parse3MFPlate(
             ? settingsDoc.config.plate
             : [settingsDoc.config.plate];
 
+          console.log(`Found ${plates.length} plates in model_settings.config`);
+
           // If we have slice_info.config data, use that for mapping
           if (plateMetadata.size > 0) {
             // Map identify_id from slice_info to object_id using model_settings plate mapping
@@ -407,6 +438,9 @@ async function parse3MFPlate(
                   }
                 }
               }
+              console.log(
+                `Checking plate: plater_id=${plateNum}, looking for plateIndex=${plateIndex}, match=${plateNum === plateIndex}`
+              );
               return plateNum === plateIndex;
             });
 
@@ -415,13 +449,43 @@ async function parse3MFPlate(
                 ? plateData.model_instance
                 : [plateData.model_instance];
 
+              console.log(
+                `Found plate data for plateIndex ${plateIndex} with ${instances.length} instances`
+              );
+
               instances.forEach((instance: ModelInstance) => {
                 const objectId =
                   instance['@_object_id'] || instance['@_objectid'];
-                if (objectId) {
-                  plateMetadata.set(objectId.toString(), plateIndex);
+                console.log(`Instance data:`, instance);
+                console.log(`Extracted objectId: ${objectId}`);
+
+                // Also check metadata for object_id (as per task analysis)
+                let metadataObjectId: string | undefined;
+                if (instance.metadata) {
+                  const metadataArray = Array.isArray(instance.metadata)
+                    ? instance.metadata
+                    : [instance.metadata];
+                  for (const meta of metadataArray) {
+                    if (meta['@_key'] === 'object_id' && meta['@_value']) {
+                      metadataObjectId = meta['@_value'];
+                      break;
+                    }
+                  }
+                }
+                console.log(`Metadata objectId: ${metadataObjectId}`);
+
+                const finalObjectId = objectId || metadataObjectId;
+                if (finalObjectId) {
+                  plateMetadata.set(finalObjectId.toString(), plateIndex);
+                  console.log(
+                    `Mapped object ${finalObjectId} to plate ${plateIndex}`
+                  );
+                } else {
+                  console.log(`No objectId found in instance:`, instance);
                 }
               });
+            } else {
+              console.log(`No plate data found for plateIndex ${plateIndex}`);
             }
           }
         }
@@ -479,6 +543,7 @@ async function parse3MFPlate(
 
     // Process each build item
     let processedItems = 0;
+
     for (const item of buildItems) {
       const objectId = item['@_objectid']?.toString();
       if (!objectId) continue;
@@ -536,13 +601,46 @@ async function parse3MFPlate(
             extruderMap
           );
 
-          plateObjects.push({
-            id: objectId,
-            vertices,
-            indices,
-            transform,
-            filamentIndex,
+          // Debug logging for multi-material detection
+          console.log('Multi-material mesh check:', {
+            projectFilamentColorsLength: projectFilamentColors.length,
+            extruderMapSize: extruderMap.size,
+            plateObjectsLength: plateObjects.length,
+            objectId,
           });
+
+          // Check if this is a single-mesh multi-material model
+          // (has more project colors than we'll have objects)
+          if (projectFilamentColors.length > 1 && plateObjects.length === 0) {
+            console.log('Creating multi-material objects for mesh:', objectId);
+            // Create separate objects for each filament color with slight offsets
+            for (let i = 0; i < projectFilamentColors.length; i++) {
+              // Create a copy of the transform and add a small offset so objects don't overlap completely
+              const offsetTransform = new Float32Array(transform);
+              // Add small X offset: 0.1mm per color index
+              offsetTransform[12] += i * 0.1;
+
+              plateObjects.push({
+                id: `${objectId}_filament_${i}`,
+                vertices,
+                indices,
+                transform: offsetTransform,
+                filamentIndex: i,
+              });
+              console.log(
+                `Created object for filament ${i} with color ${projectFilamentColors[i]} at offset ${i * 0.1}mm`
+              );
+            }
+          } else {
+            // Normal single-material or properly mapped multi-material object
+            plateObjects.push({
+              id: objectId,
+              vertices,
+              indices,
+              transform,
+              filamentIndex,
+            });
+          }
         }
       }
       // Check if object has components (references to other model files)
@@ -595,13 +693,59 @@ async function parse3MFPlate(
             componentFilamentIndex = extruder - 1; // Convert 1-based to 0-based
           }
 
-          plateObjects.push({
-            id: `${objectId}_component_${componentId}`,
-            vertices: componentMesh.vertices,
-            indices: componentMesh.indices,
-            transform: finalTransform,
-            filamentIndex: componentFilamentIndex,
+          // Debug logging for multi-material detection
+          console.log('Multi-material check:', {
+            projectFilamentColorsLength: projectFilamentColors.length,
+            extruderMapSize: extruderMap.size,
+            componentArrayLength: componentArray.length,
+            plateObjectsLength: plateObjects.length,
+            componentId,
+            objectId,
           });
+
+          // Check if this is a single-component multi-material model
+          // (has more project colors than we have objects, and this is the only component)
+          if (
+            projectFilamentColors.length > 1 &&
+            componentArray.length === 1 &&
+            plateObjects.length === 0
+          ) {
+            console.log(
+              'Creating multi-material objects for component:',
+              componentId
+            );
+            // Create separate objects for each filament color with slight offsets to make them visible
+            for (
+              let colorIndex = 0;
+              colorIndex < projectFilamentColors.length;
+              colorIndex++
+            ) {
+              // Create a copy of the transform and add a small offset so objects don't overlap completely
+              const offsetTransform = new Float32Array(finalTransform);
+              // Add small X offset: 0.1mm per color index
+              offsetTransform[12] += colorIndex * 0.1;
+
+              plateObjects.push({
+                id: `${objectId}_component_${componentId}_filament_${colorIndex}`,
+                vertices: componentMesh.vertices,
+                indices: componentMesh.indices,
+                transform: offsetTransform,
+                filamentIndex: colorIndex,
+              });
+              console.log(
+                `Created component object for filament ${colorIndex} with color ${projectFilamentColors[colorIndex]} at offset ${colorIndex * 0.1}mm`
+              );
+            }
+          } else {
+            // Normal single-material or properly mapped multi-material component
+            plateObjects.push({
+              id: `${objectId}_component_${componentId}`,
+              vertices: componentMesh.vertices,
+              indices: componentMesh.indices,
+              transform: finalTransform,
+              filamentIndex: componentFilamentIndex,
+            });
+          }
         }
       }
 
@@ -613,6 +757,8 @@ async function parse3MFPlate(
     return {
       plateIndex,
       objects: plateObjects,
+      projectFilamentColors:
+        projectFilamentColors.length > 0 ? projectFilamentColors : undefined,
     };
   } catch (error) {
     throw new Error(

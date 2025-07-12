@@ -3884,6 +3884,139 @@ class PrintFromSDResponse(BaseModel):
     message: str
 
 
+class BuildVolumeResponse(BaseModel):
+    success: bool
+    width: Optional[float] = None
+    depth: Optional[float] = None
+    height: Optional[float] = None
+    printer_model: Optional[str] = None
+    message: str
+
+
+@app.get("/api/printer/build-volume", response_model=BuildVolumeResponse)
+async def get_build_volume(printer_model: str):
+    """
+    Get build volume dimensions for a printer model by reading
+    from Bambu Studio machine definition files.
+
+    Args:
+        printer_model: The printer model name (e.g., "Bambu Lab A1 mini")
+
+    Returns:
+        BuildVolumeResponse: Build volume dimensions in mm
+
+    Raises:
+        HTTPException: If machine definition file not found or parsing fails
+    """
+    try:
+        import json
+
+        from app.settings_builder import MACHINE_PROFILES_PATH
+
+        # Try to find matching machine definition file
+        # Check both the direct model name and with nozzle variations
+        potential_files = [
+            f"{printer_model}.json",
+            f"{printer_model} 0.4 nozzle.json",
+            f"{printer_model} 0.2 nozzle.json",
+            f"{printer_model} 0.6 nozzle.json",
+            f"{printer_model} 0.8 nozzle.json",
+        ]
+
+        machine_data = None
+        used_file = None
+
+        for filename in potential_files:
+            file_path = MACHINE_PROFILES_PATH / filename
+            if file_path.exists():
+                try:
+                    with open(file_path, "r", encoding="utf-8") as f:
+                        machine_data = json.load(f)
+                        used_file = filename
+                        break
+                except Exception as e:
+                    logger.warning(f"Error reading {filename}: {e}")
+                    continue
+
+        if not machine_data:
+            return BuildVolumeResponse(
+                success=False,
+                message=f"Machine definition file not found for '{printer_model}'",
+            )
+
+        # Parse printable_area and printable_height from machine data
+        # Format: ["0x0", "256x0", "256x256", "0x256"] -> width=256, depth=256
+        printable_area = machine_data.get("printable_area")
+        printable_height = machine_data.get("printable_height")
+
+        if not printable_area or len(printable_area) < 4:
+            # Try to inherit from parent if this file inherits from another
+            inherits = machine_data.get("inherits")
+            if inherits:
+                parent_file = MACHINE_PROFILES_PATH / f"{inherits}.json"
+                if parent_file.exists():
+                    try:
+                        with open(parent_file, "r", encoding="utf-8") as f:
+                            parent_data = json.load(f)
+                            printable_area = printable_area or parent_data.get(
+                                "printable_area"
+                            )
+                            printable_height = printable_height or parent_data.get(
+                                "printable_height"
+                            )
+                    except Exception as e:
+                        logger.warning(
+                            f"Error reading parent file {inherits}.json: {e}"
+                        )
+
+        if not printable_area or len(printable_area) < 4:
+            return BuildVolumeResponse(
+                success=False,
+                message=(
+                    f"Invalid printable_area data in machine definition for "
+                    f"'{printer_model}'"
+                ),
+            )
+
+        # Parse dimensions from printable_area coordinates
+        # Format: ["0x0", "256x0", "256x256", "0x256"]
+        try:
+            # Get width from second coordinate: "256x0" -> 256
+            width_coord = printable_area[1]  # "256x0"
+            width = float(width_coord.split("x")[0])
+
+            # Get depth from third coordinate: "256x256" -> 256 (depth)
+            depth_coord = printable_area[2]  # "256x256"
+            depth = float(depth_coord.split("x")[1])
+
+            # Get height from printable_height field
+            height = float(printable_height) if printable_height else 250.0
+
+            logger.info(
+                f"Loaded build volume for {printer_model} from {used_file}: "
+                f"{width}x{depth}x{height}mm"
+            )
+
+            return BuildVolumeResponse(
+                success=True,
+                width=width,
+                depth=depth,
+                height=height,
+                printer_model=printer_model,
+                message=f"Build volume loaded from {used_file}",
+            )
+
+        except (ValueError, IndexError) as e:
+            return BuildVolumeResponse(
+                success=False,
+                message=f"Error parsing build volume data for '{printer_model}': {e}",
+            )
+
+    except Exception as e:
+        logger.error(f"Error getting build volume for {printer_model}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/api/printer/{printer_id}/print-from-sd")
 async def print_from_sd_card(printer_id: str, request: PrintFromSDRequest):
     """

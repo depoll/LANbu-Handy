@@ -27,6 +27,7 @@ interface PlateObject {
 interface PlateContents {
   plateIndex: number;
   objects: PlateObject[];
+  projectFilamentColors?: string[];
 }
 
 export interface ModelPreviewRef {
@@ -41,6 +42,7 @@ interface ModelPreviewProps {
   plates?: PlateInfo[];
   selectedPlateIndex?: number | null;
   className?: string;
+  printerModel?: string; // Add printer model for build volume sizing
 }
 
 const ModelPreviewEnhanced = forwardRef<ModelPreviewRef, ModelPreviewProps>(
@@ -53,6 +55,7 @@ const ModelPreviewEnhanced = forwardRef<ModelPreviewRef, ModelPreviewProps>(
       plates = [],
       selectedPlateIndex = null,
       className = '',
+      printerModel,
     },
     ref
   ) => {
@@ -64,6 +67,7 @@ const ModelPreviewEnhanced = forwardRef<ModelPreviewRef, ModelPreviewProps>(
     const animationRef = useRef<number | null>(null);
     const workerRef = useRef<Worker | null>(null);
     const currentPlateDataRef = useRef<PlateContents | null>(null);
+    const projectColorsRef = useRef<string[] | null>(null);
 
     const [isLoading, setIsLoading] = useState(true);
     const [loadingProgress, setLoadingProgress] = useState({
@@ -76,9 +80,58 @@ const ModelPreviewEnhanced = forwardRef<ModelPreviewRef, ModelPreviewProps>(
     const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
     const [isWebGLAvailable, setIsWebGLAvailable] = useState(true);
 
+    // State for build volume dimensions fetched from API
+    const [buildVolume, setBuildVolume] = useState({
+      width: 256,
+      depth: 256,
+      height: 250,
+    });
+
+    // Fetch build volume dimensions from API when printer model changes
+    useEffect(() => {
+      if (!printerModel) {
+        // Use default dimensions if no printer model specified
+        setBuildVolume({ width: 256, depth: 256, height: 250 });
+        return;
+      }
+
+      const fetchBuildVolume = async () => {
+        try {
+          const response = await fetch(
+            `/api/printer/build-volume?printer_model=${encodeURIComponent(printerModel)}`
+          );
+          const data = await response.json();
+
+          if (data.success && data.width && data.depth && data.height) {
+            setBuildVolume({
+              width: data.width,
+              depth: data.depth,
+              height: data.height,
+            });
+            console.log(
+              `Loaded build volume for ${printerModel}: ${data.width}x${data.depth}x${data.height}mm`
+            );
+          } else {
+            console.warn(
+              `Failed to load build volume for ${printerModel}: ${data.message}`
+            );
+            // Keep default dimensions
+          }
+        } catch (error) {
+          console.error(
+            `Error fetching build volume for ${printerModel}:`,
+            error
+          );
+          // Keep default dimensions
+        }
+      };
+
+      fetchBuildVolume();
+    }, [printerModel]);
+
     // Helper function to get filament color from AMS status
     const getFilamentColor = useCallback(
-      (filamentIndex: number): number => {
+      (filamentIndex: number, projectColors?: string[]): number => {
         const mapping = filamentMappings.find(
           m => m.filament_index === filamentIndex
         );
@@ -137,6 +190,21 @@ const ModelPreviewEnhanced = forwardRef<ModelPreviewRef, ModelPreviewProps>(
           }
         }
 
+        // Use project filament colors if available (from 3MF project_settings.config)
+        if (projectColors && projectColors.length > filamentIndex) {
+          const colorStr = projectColors[filamentIndex];
+          console.log(
+            `Using project color for index ${filamentIndex}: ${colorStr}`
+          );
+          if (colorStr && colorStr.startsWith('#')) {
+            const colorValue = parseInt(colorStr.substring(1), 16);
+            console.log(
+              `Returning project color: 0x${colorValue.toString(16)}`
+            );
+            return colorValue;
+          }
+        }
+
         // Use filament requirement color if available
         if (
           filamentRequirements &&
@@ -175,11 +243,11 @@ const ModelPreviewEnhanced = forwardRef<ModelPreviewRef, ModelPreviewProps>(
 
     // Helper function to create material with proper color
     const createFilamentMaterial = useCallback(
-      (filamentIndex: number): THREE.Material => {
+      (filamentIndex: number, projectColors?: string[]): THREE.Material => {
         const isMapped = filamentMappings.some(
           m => m.filament_index === filamentIndex
         );
-        const color = getFilamentColor(filamentIndex);
+        const color = getFilamentColor(filamentIndex, projectColors);
 
         if (!isMapped) {
           // Pulsing material for unmapped filaments
@@ -213,11 +281,16 @@ const ModelPreviewEnhanced = forwardRef<ModelPreviewRef, ModelPreviewProps>(
 
         console.log('renderPlateObjects called with:', plateContents);
 
-        // Clear ALL existing objects from the scene (except lights)
+        // Clear model objects from the scene (preserve lights, grid, and build plate)
         const objectsToRemove: THREE.Object3D[] = [];
         sceneRef.current.traverse(child => {
           if (child instanceof THREE.Mesh || child instanceof THREE.Group) {
-            if (!(child instanceof THREE.Light)) {
+            if (
+              !(child instanceof THREE.Light) &&
+              child.name !== 'build_plate_grid' &&
+              child.name !== 'build_plate_surface' &&
+              child.name !== 'build_plate_border'
+            ) {
               objectsToRemove.push(child);
             }
           }
@@ -239,10 +312,13 @@ const ModelPreviewEnhanced = forwardRef<ModelPreviewRef, ModelPreviewProps>(
 
         plateObjectsRef.current.clear();
 
-        // Create group for all objects
-        const group = new THREE.Group();
-        group.name = `plate_group_${plateContents.plateIndex}`;
+        // Create groups: one for models, one container for everything
+        const modelsGroup = new THREE.Group();
+        modelsGroup.name = `models_group_${plateContents.plateIndex}`;
         const boundingBox = new THREE.Box3();
+
+        // Store project colors for later use
+        projectColorsRef.current = plateContents.projectFilamentColors || null;
 
         // Process each object
         plateContents.objects.forEach(obj => {
@@ -256,7 +332,10 @@ const ModelPreviewEnhanced = forwardRef<ModelPreviewRef, ModelPreviewProps>(
           geometry.computeVertexNormals();
 
           // Create material with filament color
-          const material = createFilamentMaterial(obj.filamentIndex);
+          const material = createFilamentMaterial(
+            obj.filamentIndex,
+            plateContents.projectFilamentColors
+          );
 
           // Create mesh
           const mesh = new THREE.Mesh(geometry, material);
@@ -278,7 +357,7 @@ const ModelPreviewEnhanced = forwardRef<ModelPreviewRef, ModelPreviewProps>(
           mesh.castShadow = true;
           mesh.receiveShadow = true;
 
-          group.add(mesh);
+          modelsGroup.add(mesh);
           plateObjectsRef.current.set(mesh.name, mesh);
 
           // Update bounding box
@@ -288,52 +367,148 @@ const ModelPreviewEnhanced = forwardRef<ModelPreviewRef, ModelPreviewProps>(
           }
         });
 
-        // Center and scale the group
-        if (!boundingBox.isEmpty()) {
-          const center = boundingBox.getCenter(new THREE.Vector3());
-          const size = boundingBox.getSize(new THREE.Vector3());
+        // Step 1: Create a container that will hold both models and build plate
+        const sceneContainer = new THREE.Group();
+        sceneContainer.name = `scene_container_${plateContents.plateIndex}`;
 
-          console.log('Bounding box info:', {
-            center: { x: center.x, y: center.y, z: center.z },
-            size: { x: size.x, y: size.y, z: size.z },
+        // Step 2: Add models to container in their original 3MF positions
+        if (!boundingBox.isEmpty()) {
+          console.log('Original 3MF model bounds:', {
+            center: boundingBox.getCenter(new THREE.Vector3()),
+            size: boundingBox.getSize(new THREE.Vector3()),
             min: boundingBox.min,
             max: boundingBox.max,
           });
 
-          // Center the group
-          group.position.sub(center);
+          sceneContainer.add(modelsGroup);
 
-          // Scale to fit in view
-          const maxDim = Math.max(size.x, size.y, size.z);
-          // Use a more conservative scale for better visibility
-          const targetSize = 50; // Target size in scene units
-          const scale = targetSize / maxDim;
-          group.scale.setScalar(scale);
+          // Step 3: Create and add build plate at the right position relative to models
+          // Position build plate at bed level (Z=0 in 3MF coordinates)
+          const center = boundingBox.getCenter(new THREE.Vector3());
 
-          console.log('Scaling info:', {
-            maxDim,
-            scale,
-            targetSize,
+          // Create build plate group
+          const buildPlateGroup = new THREE.Group();
+          buildPlateGroup.name = 'build_plate_group';
+
+          // Create build plate elements (grid, surface, border) at the model's base
+          const plateWidth = buildVolume.width;
+          const plateDepth = buildVolume.depth;
+          const gridSize = Math.max(plateWidth, plateDepth);
+          const targetSpacing = 20;
+          const gridDivisions = Math.max(
+            8,
+            Math.floor(gridSize / targetSpacing)
+          );
+
+          // Build plate should be positioned at Z=0 (bed level) in 3MF coordinates
+          // This way, after rotation, it will be at the bottom of the scene
+          const plateZ = 0; // Place build plate at bed level (Z=0 in 3MF coordinates)
+
+          // Grid at bed level - in 3MF coordinates, build plate is XY plane at Z=0
+          // GridHelper creates XZ plane grid, so we need to rotate it to XY plane
+          const grid = new THREE.GridHelper(
+            gridSize,
+            gridDivisions,
+            0x666666,
+            0xcccccc
+          );
+          grid.rotation.x = Math.PI / 2; // Rotate to make it XY plane in 3MF coordinates
+          grid.position.set(center.x, center.y, plateZ); // Position in 3MF: X, Y at Z=0 (bed level)
+          buildPlateGroup.add(grid);
+
+          // Build plate surface on XY plane at Z=0 (bed level in 3MF coordinates)
+          const plateGeometry = new THREE.PlaneGeometry(plateWidth, plateDepth);
+          // PlaneGeometry is already on XY plane, perfect for 3MF coordinates
+          const plateMaterial = new THREE.MeshPhongMaterial({
+            color: 0xf8f8f8,
+            transparent: true,
+            opacity: 0.15,
+            side: THREE.DoubleSide,
+          });
+          const buildPlate = new THREE.Mesh(plateGeometry, plateMaterial);
+          buildPlate.position.set(center.x, center.y, plateZ - 0.1); // Slightly below grid at bed level
+          buildPlate.receiveShadow = true;
+          buildPlateGroup.add(buildPlate);
+
+          // Border on XY plane at grid level
+          const borderGeometry = new THREE.EdgesGeometry(plateGeometry);
+          const borderMaterial = new THREE.LineBasicMaterial({
+            color: 0x333333,
+            linewidth: 2,
+          });
+          const buildPlateBorder = new THREE.LineSegments(
+            borderGeometry,
+            borderMaterial
+          );
+          buildPlateBorder.position.set(center.x, center.y, plateZ); // Same level as grid at bed level
+          buildPlateGroup.add(buildPlateBorder);
+
+          sceneContainer.add(buildPlateGroup);
+
+          // Step 4: Apply global transformations to center and orient the entire scene
+          // In 3MF: Z=up, XY=build plate. In final view: Y=up, XZ=build plate
+          // Rotate the entire container -90° around X to transform coordinates:
+          // 3MF (X,Y,Z) → Final (X,-Z,Y) - this makes Z-up models lay flat on XZ plane
+          sceneContainer.rotation.x = -Math.PI / 2;
+
+          // After rotation, get the bounding box and center the entire scene
+          sceneContainer.updateMatrixWorld(true);
+          const containerBox = new THREE.Box3().setFromObject(sceneContainer);
+          const containerCenter = containerBox.getCenter(new THREE.Vector3());
+          const containerBottomY = containerBox.min.y;
+
+          // Center the container and place its bottom at Y=0
+          sceneContainer.position.set(
+            -containerCenter.x, // Center in X
+            -containerBottomY, // Bottom at Y=0
+            -containerCenter.z // Center in Z
+          );
+
+          // Step 5: Add the final container to the scene
+          sceneRef.current.add(sceneContainer);
+          console.log('Final scene layout:', {
+            modelsOriginalBounds: boundingBox,
+            buildPlateCenter: { x: center.x, y: plateZ, z: center.z },
+            sceneContainerRotation: sceneContainer.rotation,
+            sceneContainerPosition: sceneContainer.position,
+            finalContainerBounds: containerBox,
+            note: 'Models positioned according to 3MF bounds, build plate at Z=0 (bed level), then rotated and centered together',
           });
 
-          sceneRef.current.add(group);
-          console.log('Added group to scene, forcing render...');
-
-          // Adjust camera to fit the model
+          // Adjust camera to fit the model properly
           if (
             cameraRef.current &&
             cameraRef.current instanceof THREE.PerspectiveCamera
           ) {
-            // Set camera distance based on scaled size
-            const scaledSize = maxDim * scale;
-            const distance = scaledSize * 1.5;
-            cameraRef.current.position.set(
-              distance * 0.7,
-              distance * 0.5,
-              distance
+            // Calculate the size of the final scene after rotation and centering
+            sceneContainer.updateMatrixWorld(true);
+            const finalBox = new THREE.Box3().setFromObject(sceneContainer);
+            const finalSize = finalBox.getSize(new THREE.Vector3());
+            const maxDimension = Math.max(
+              finalSize.x,
+              finalSize.y,
+              finalSize.z
             );
+
+            // Calculate camera distance to fit the model nicely
+            const fov = cameraRef.current.fov * (Math.PI / 180); // Convert to radians
+            const cameraDistance = (maxDimension / 2 / Math.tan(fov / 2)) * 1.2; // 1.2 for some padding
+
+            // Position camera so front of build plate is parallel to viewport
+            const cameraHeight = cameraDistance * 0.6; // Slightly elevated view
+            const cameraX = 0; // Center on X axis
+            const cameraZ = cameraDistance; // Position directly in front
+
+            cameraRef.current.position.set(cameraX, cameraHeight, cameraZ);
             cameraRef.current.lookAt(0, 0, 0);
             cameraRef.current.updateProjectionMatrix();
+
+            console.log('Camera positioned for model:', {
+              modelSize: finalSize,
+              maxDimension,
+              cameraDistance,
+              cameraPosition: cameraRef.current.position,
+            });
           }
 
           // Force a render
@@ -356,7 +531,7 @@ const ModelPreviewEnhanced = forwardRef<ModelPreviewRef, ModelPreviewProps>(
           console.log('No objects to render or empty bounding box');
         }
       },
-      [createFilamentMaterial]
+      [createFilamentMaterial, buildVolume.width, buildVolume.depth]
     );
 
     // Standard model loading (fallback)
@@ -410,14 +585,24 @@ const ModelPreviewEnhanced = forwardRef<ModelPreviewRef, ModelPreviewProps>(
 
         // Camera
         const width = mount.clientWidth;
-        const height = mount.clientHeight || 300;
+        const height = mount.clientHeight || 500;
         const camera = new THREE.PerspectiveCamera(
           75,
           width / height,
           0.1,
-          1000
+          2000 // Increased far plane to handle very large models
         );
-        camera.position.set(0, 0, 50);
+        // Set initial camera position (will be adjusted when model loads)
+        const maxBuildDim = Math.max(
+          buildVolume.width,
+          buildVolume.depth,
+          buildVolume.height
+        );
+        const cameraDistance = maxBuildDim * 1.2; // More reasonable initial distance
+        const cameraHeight = maxBuildDim * 0.8;
+
+        camera.position.set(0, cameraHeight, cameraDistance); // Front-facing initial position
+        camera.lookAt(0, 0, 0);
         cameraRef.current = camera;
 
         // Renderer
@@ -441,21 +626,45 @@ const ModelPreviewEnhanced = forwardRef<ModelPreviewRef, ModelPreviewProps>(
         controls.dampingFactor = 0.05;
         controls.rotateSpeed = 0.5;
         controls.zoomSpeed = 0.8;
-        controls.minDistance = 10;
-        controls.maxDistance = 200;
+        controls.minDistance = 5;
+        controls.maxDistance = 1000; // Increased from 200 to allow zooming out much further
 
-        // Lighting
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        // Improved lighting setup for better visibility and stability
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
         scene.add(ambientLight);
 
-        const directionalLight1 = new THREE.DirectionalLight(0xffffff, 0.4);
-        directionalLight1.position.set(1, 1, 1);
-        directionalLight1.castShadow = true;
-        scene.add(directionalLight1);
+        // Main key light from front-right
+        const keyLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        keyLight.position.set(200, 200, 200);
+        keyLight.castShadow = true;
+        keyLight.shadow.mapSize.width = 2048;
+        keyLight.shadow.mapSize.height = 2048;
+        keyLight.shadow.camera.near = 0.5;
+        keyLight.shadow.camera.far = 1000;
+        keyLight.shadow.camera.left = -200;
+        keyLight.shadow.camera.right = 200;
+        keyLight.shadow.camera.top = 200;
+        keyLight.shadow.camera.bottom = -200;
+        scene.add(keyLight);
 
-        const directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.2);
-        directionalLight2.position.set(-1, 1, -1);
-        scene.add(directionalLight2);
+        // Fill light from back-left
+        const fillLight = new THREE.DirectionalLight(0xffffff, 0.3);
+        fillLight.position.set(-100, 150, -100);
+        scene.add(fillLight);
+
+        // Additional side light for better form definition
+        const sideLight = new THREE.DirectionalLight(0xffffff, 0.2);
+        sideLight.position.set(100, 50, -200);
+        scene.add(sideLight);
+
+        // Build plate is now created dynamically with each model to maintain proper 3MF layout
+        console.log(
+          'Three.js scene initialized. Build plate will be created with models.',
+          'Printer model:',
+          printerModel,
+          'Build volume:',
+          buildVolume
+        );
 
         // Animation loop with pulsing for unmapped materials
         const animate = () => {
@@ -480,7 +689,7 @@ const ModelPreviewEnhanced = forwardRef<ModelPreviewRef, ModelPreviewProps>(
         const handleResize = () => {
           if (!mount) return;
           const newWidth = mount.clientWidth;
-          const newHeight = mount.clientHeight || 300;
+          const newHeight = mount.clientHeight || 500;
 
           camera.aspect = newWidth / newHeight;
           camera.updateProjectionMatrix();
@@ -511,7 +720,7 @@ const ModelPreviewEnhanced = forwardRef<ModelPreviewRef, ModelPreviewProps>(
         setInitError(errorMessage);
         setIsWebGLAvailable(false);
       }
-    }, []);
+    }, [buildVolume, printerModel]);
 
     // Initialize Web Worker
     useEffect(() => {
@@ -544,8 +753,11 @@ const ModelPreviewEnhanced = forwardRef<ModelPreviewRef, ModelPreviewProps>(
 
         console.log(`Object ${name}: filamentIndex=${filamentIndex}`);
 
-        // Get new material with updated color
-        const newMaterial = createFilamentMaterial(filamentIndex);
+        // Get new material with updated color, using stored project colors
+        const newMaterial = createFilamentMaterial(
+          filamentIndex,
+          projectColorsRef.current
+        );
 
         // Dispose old material
         if (mesh.material && 'dispose' in mesh.material) {
@@ -782,7 +994,10 @@ const ModelPreviewEnhanced = forwardRef<ModelPreviewRef, ModelPreviewProps>(
           className="model-preview-container"
           style={{
             width: '100%',
-            height: '300px',
+            height: '500px',
+            aspectRatio: '1',
+            maxWidth: '500px',
+            margin: '0 auto',
             border: '1px solid #ddd',
             borderRadius: '8px',
             overflow: 'hidden',
@@ -829,7 +1044,7 @@ const ModelPreviewEnhanced = forwardRef<ModelPreviewRef, ModelPreviewProps>(
                 alt="Model Thumbnail"
                 style={{
                   maxWidth: '100%',
-                  maxHeight: '260px',
+                  maxHeight: '460px',
                   objectFit: 'contain',
                 }}
                 onError={() => {

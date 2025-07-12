@@ -1,5 +1,7 @@
 {
-  "additionalDirectories": ["/opt/bambu-studio-resources", "/tmp"],
+  "permissions": {
+    "additionalDirectories": ["/opt/bambu-studio-resources", "/tmp"]
+  },
   "hooks": {
     "PostToolUse": [
       {
