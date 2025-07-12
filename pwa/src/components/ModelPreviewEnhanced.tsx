@@ -22,6 +22,8 @@ interface PlateObject {
   indices: Uint32Array;
   transform: Float32Array;
   filamentIndex: number;
+  vertexColors?: Float32Array; // RGB colors per vertex (3 floats per vertex)
+  isPainted?: boolean; // Flag to indicate if this is a painted model
 }
 
 interface PlateContents {
@@ -243,7 +245,22 @@ const ModelPreviewEnhanced = forwardRef<ModelPreviewRef, ModelPreviewProps>(
 
     // Helper function to create material with proper color
     const createFilamentMaterial = useCallback(
-      (filamentIndex: number, projectColors?: string[]): THREE.Material => {
+      (
+        filamentIndex: number,
+        projectColors?: string[],
+        isPainted?: boolean
+      ): THREE.Material => {
+        // For painted models, use vertex colors
+        if (isPainted) {
+          const material = new THREE.MeshPhongMaterial({
+            vertexColors: true, // Enable vertex colors
+            side: THREE.DoubleSide,
+            shininess: 100,
+          });
+          material.userData.isPainted = true;
+          return material;
+        }
+
         const isMapped = filamentMappings.some(
           m => m.filament_index === filamentIndex
         );
@@ -331,16 +348,29 @@ const ModelPreviewEnhanced = forwardRef<ModelPreviewRef, ModelPreviewProps>(
           geometry.setIndex(new THREE.BufferAttribute(obj.indices, 1));
           geometry.computeVertexNormals();
 
+          // Add vertex colors if this is a painted model
+          if (obj.vertexColors && obj.isPainted) {
+            geometry.setAttribute(
+              'color',
+              new THREE.BufferAttribute(obj.vertexColors, 3)
+            );
+            console.log(`Added vertex colors to object ${obj.id}`);
+          }
+
           // Create material with filament color
           const material = createFilamentMaterial(
             obj.filamentIndex,
-            plateContents.projectFilamentColors
+            plateContents.projectFilamentColors,
+            obj.isPainted // Pass painted flag
           );
 
           // Create mesh
           const mesh = new THREE.Mesh(geometry, material);
           mesh.name = `plate_object_${obj.id}`;
-          mesh.userData = { filamentIndex: obj.filamentIndex };
+          mesh.userData = {
+            filamentIndex: obj.filamentIndex,
+            isPainted: obj.isPainted || false,
+          };
 
           // Apply transform
           const matrix = new THREE.Matrix4();
@@ -756,7 +786,8 @@ const ModelPreviewEnhanced = forwardRef<ModelPreviewRef, ModelPreviewProps>(
         // Get new material with updated color, using stored project colors
         const newMaterial = createFilamentMaterial(
           filamentIndex,
-          projectColorsRef.current
+          projectColorsRef.current,
+          mesh.userData.isPainted
         );
 
         // Dispose old material
