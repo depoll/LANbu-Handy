@@ -46,6 +46,7 @@ interface Triangle3MF {
   '@_v2': number;
   '@_v3': number;
   '@_paint_color'?: string; // Paint color index (e.g., "0C", "8")
+  '@_p:paint_color'?: string; // Paint color with namespace prefix
 }
 
 interface Vertices3MF {
@@ -203,7 +204,7 @@ async function parse3MFPlate(
       trimValues: true,
       processEntities: true,
       allowBooleanAttributes: true,
-      removeNSPrefix: true, // Remove namespace prefixes to handle p:paint_color
+      ignoreNameSpace: true, // Remove namespace prefixes to handle p:paint_color
     });
 
     const doc = parser.parse(modelXml) as Document3MF;
@@ -264,7 +265,7 @@ async function parse3MFPlate(
           trimValues: true,
           processEntities: true,
           allowBooleanAttributes: true,
-          removeNSPrefix: true,
+          ignoreNameSpace: true,
           isArray: (_name, jpath) => {
             // Force certain elements to be arrays for consistent handling
             return [
@@ -607,6 +608,8 @@ async function parse3MFPlate(
           );
 
           // Check for paint colors (Bambu Studio painted models)
+          console.log('Checking for paint colors in object:', objectId);
+          console.log('Project filament colors:', projectFilamentColors);
           const paintData = extractPaintColors(
             object.mesh,
             projectFilamentColors
@@ -920,7 +923,7 @@ function extractPaintColors(
 
   // Check if any triangles have paint colors
   const hasPaintColors = triangleArray.some(
-    t => t['@_paint_color'] !== undefined
+    t => t['@_paint_color'] !== undefined || t['@_p:paint_color'] !== undefined
   );
   if (!hasPaintColors) {
     return null;
@@ -940,10 +943,15 @@ function extractPaintColors(
   // Count paint colors for debugging
   const paintColorCounts: { [key: string]: number } = {};
   triangleArray.forEach(t => {
-    const pc = t['@_paint_color'] || 'default';
+    const pc = t['@_paint_color'] || t['@_p:paint_color'] || 'default';
     paintColorCounts[pc] = (paintColorCounts[pc] || 0) + 1;
   });
   console.log('Paint color distribution:', paintColorCounts);
+  console.log('Project colors:', projectColors);
+  console.log(
+    'Sample triangle with paint_color:',
+    triangleArray.find(t => t['@_paint_color'] || t['@_p:paint_color'])
+  );
 
   // Map paint color indices to RGB colors
   const paintColorMap = new Map<string, { r: number; g: number; b: number }>();
@@ -962,7 +970,7 @@ function extractPaintColors(
 
   // Apply triangle colors to vertices
   triangleArray.forEach((triangle: Triangle3MF) => {
-    const paintColor = triangle['@_paint_color'];
+    const paintColor = triangle['@_paint_color'] || triangle['@_p:paint_color'];
     if (paintColor) {
       // Get color for this paint index
       let color = paintColorMap.get(paintColor);
@@ -984,18 +992,8 @@ function extractPaintColors(
         vertexColors[vertexIndex * 3 + 1] = color!.g;
         vertexColors[vertexIndex * 3 + 2] = color!.b;
       });
-    } else {
-      // No paint color - use default (first filament color)
-      const v1 = triangle['@_v1'] || 0;
-      const v2 = triangle['@_v2'] || 0;
-      const v3 = triangle['@_v3'] || 0;
-
-      [v1, v2, v3].forEach(vertexIndex => {
-        vertexColors[vertexIndex * 3] = defaultColor.r;
-        vertexColors[vertexIndex * 3 + 1] = defaultColor.g;
-        vertexColors[vertexIndex * 3 + 2] = defaultColor.b;
-      });
     }
+    // Note: Triangles without paint_color keep their default color (already initialized above)
   });
 
   return { vertexColors, isPainted: true };
@@ -1041,7 +1039,7 @@ async function loadSingleComponentMesh(
       textNodeName: '#text',
       parseAttributeValue: true,
       trimValues: true,
-      removeNSPrefix: true,
+      ignoreNameSpace: true,
     });
 
     const doc = parser.parse(modelXml) as Document3MF;
