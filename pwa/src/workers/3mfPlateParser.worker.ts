@@ -700,6 +700,15 @@ async function parse3MFPlate(
 
           // Check for paint colors in component mesh (painted models like Valentine Dragon)
           console.log('Checking for paint colors in component:', componentId);
+          console.log('componentMesh structure:', {
+            hasTriangles: !!componentMesh.triangles,
+            hasVertices: !!componentMesh.vertices,
+            triangleType: typeof componentMesh.triangles,
+            triangleKeys: componentMesh.triangles
+              ? Object.keys(componentMesh.triangles)
+              : 'none',
+          });
+
           const componentPaintData = extractPaintColors(
             componentMesh,
             projectFilamentColors
@@ -900,7 +909,14 @@ function extractPaintColors(
   mesh: Mesh3MF,
   projectColors: string[]
 ): { vertexColors: Float32Array; isPainted: boolean } | null {
+  console.log('🔍 extractPaintColors called with mesh:', {
+    hasTriangles: !!mesh.triangles,
+    hasVertices: !!mesh.vertices,
+    projectColorsCount: projectColors.length,
+  });
+
   if (!mesh.triangles || !mesh.triangles.triangle || !mesh.vertices) {
+    console.log('❌ extractPaintColors returning null - missing data');
     return null;
   }
 
@@ -913,9 +929,31 @@ function extractPaintColors(
     : [mesh.vertices.vertex];
 
   // Check if any triangles have paint colors
+  // Support multiple attribute name formats that different XML parsers might use
   const hasPaintColors = triangleArray.some(
-    t => t['@_paint_color'] !== undefined || t['@_p:paint_color'] !== undefined
+    t => getPaintColor(t) !== undefined
   );
+
+  // Debug: Check what triangle attributes actually exist
+  if (triangleArray.length > 0) {
+    console.log('DEBUG Triangle attributes:', Object.keys(triangleArray[0]));
+    console.log('DEBUG First triangle with all attributes:', triangleArray[0]);
+
+    // Check for paint colors with different attribute names
+    const paintColorVariants = [
+      '@_paint_color',
+      '@_p:paint_color',
+      'paint_color',
+      'p:paint_color',
+      '@paint_color',
+      '@p:paint_color',
+    ];
+
+    paintColorVariants.forEach(variant => {
+      const found = triangleArray.some(t => t[variant] !== undefined);
+      console.log(`DEBUG ${variant}: ${found ? 'FOUND' : 'not found'}`);
+    });
+  }
 
   if (!hasPaintColors) {
     return null;
@@ -940,7 +978,7 @@ function extractPaintColors(
   // Count paint colors for debugging
   const paintColorCounts: { [key: string]: number } = {};
   triangleArray.forEach(t => {
-    const pc = t['@_paint_color'] || t['@_p:paint_color'] || 'default';
+    const pc = getPaintColor(t) || 'default';
     paintColorCounts[pc] = (paintColorCounts[pc] || 0) + 1;
   });
 
@@ -950,9 +988,7 @@ function extractPaintColors(
   // Get unique paint color indices from the model and sort them
   const uniquePaintColors = Array.from(
     new Set(
-      triangleArray
-        .map(t => t['@_paint_color'] || t['@_p:paint_color'])
-        .filter(pc => pc !== undefined)
+      triangleArray.map(t => getPaintColor(t)).filter(pc => pc !== undefined)
     )
   ).sort();
 
@@ -967,7 +1003,7 @@ function extractPaintColors(
 
   // Apply triangle colors to vertices
   triangleArray.forEach((triangle: Triangle3MF) => {
-    const paintColor = triangle['@_paint_color'] || triangle['@_p:paint_color'];
+    const paintColor = getPaintColor(triangle);
     if (paintColor) {
       // Get color for this paint index
       let color = paintColorMap.get(paintColor);
@@ -1019,9 +1055,7 @@ function createSeparateObjectsByPaintColor(
   // Get unique paint colors and create mapping
   const uniquePaintColors = Array.from(
     new Set(
-      triangleArray
-        .map(t => t['@_paint_color'] || t['@_p:paint_color'])
-        .filter(pc => pc !== undefined)
+      triangleArray.map(t => getPaintColor(t)).filter(pc => pc !== undefined)
     )
   ).sort();
 
@@ -1039,7 +1073,7 @@ function createSeparateObjectsByPaintColor(
   const defaultColorKey = 'unpainted';
 
   triangleArray.forEach(triangle => {
-    const paintColor = triangle['@_paint_color'] || triangle['@_p:paint_color'];
+    const paintColor = getPaintColor(triangle);
     const key = paintColor || defaultColorKey;
 
     if (!triangleGroups[key]) {
@@ -1116,6 +1150,16 @@ function createSeparateObjectsByPaintColor(
 
   console.log(`🎨 Created ${plateObjects.length} separate paint color objects`);
   return plateObjects;
+}
+
+// Helper function to get paint color from triangle with multiple attribute name support
+function getPaintColor(triangle: Triangle3MF): string | undefined {
+  return (
+    triangle['@_paint_color'] ||
+    triangle['@_p:paint_color'] ||
+    triangle['paint_color'] ||
+    triangle['p:paint_color']
+  );
 }
 
 // Helper function to convert hex color to RGB
