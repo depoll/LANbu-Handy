@@ -719,15 +719,19 @@ async function parse3MFPlate(
           // Check if this is a painted model first
           if (componentPaintData && componentPaintData.isPainted) {
             console.log('Found painted component model:', componentId);
-            plateObjects.push({
-              id: `${objectId}_component_${componentId}`,
-              vertices: componentMesh.vertices,
-              indices: componentMesh.indices,
-              transform: finalTransform,
-              filamentIndex: componentFilamentIndex,
-              vertexColors: componentPaintData.vertexColors,
-              isPainted: true,
-            });
+
+            // Create separate objects for each paint color region
+            const paintColorObjects = createSeparateObjectsByPaintColor(
+              componentMesh,
+              projectFilamentColors,
+              `${objectId}_component_${componentId}`,
+              finalTransform
+            );
+
+            console.log(
+              `Created ${paintColorObjects.length} separate paint color objects`
+            );
+            plateObjects.push(...paintColorObjects);
           } else {
             // Normal single-material or properly mapped multi-material component
             plateObjects.push({
@@ -912,6 +916,7 @@ function extractPaintColors(
   const hasPaintColors = triangleArray.some(
     t => t['@_paint_color'] !== undefined || t['@_p:paint_color'] !== undefined
   );
+
   if (!hasPaintColors) {
     return null;
   }
@@ -938,12 +943,6 @@ function extractPaintColors(
     const pc = t['@_paint_color'] || t['@_p:paint_color'] || 'default';
     paintColorCounts[pc] = (paintColorCounts[pc] || 0) + 1;
   });
-  console.log('Paint color distribution:', paintColorCounts);
-  console.log('Project colors:', projectColors);
-  console.log(
-    'Sample triangle with paint_color:',
-    triangleArray.find(t => t['@_paint_color'] || t['@_p:paint_color'])
-  );
 
   // Map paint color indices to RGB colors
   const paintColorMap = new Map<string, { r: number; g: number; b: number }>();
@@ -957,9 +956,6 @@ function extractPaintColors(
     )
   ).sort();
 
-  console.log('Unique paint colors found:', uniquePaintColors);
-  console.log('Available project colors:', projectColors);
-
   // Create dynamic mapping: first unique paint color -> first project color, etc.
   const paintIndexToExtruder: { [key: string]: number } = {};
   uniquePaintColors.forEach((paintColor, index) => {
@@ -968,8 +964,6 @@ function extractPaintColors(
       projectColors.length - 1
     );
   });
-
-  console.log('Dynamic paint color mapping:', paintIndexToExtruder);
 
   // Apply triangle colors to vertices
   triangleArray.forEach((triangle: Triangle3MF) => {
@@ -983,9 +977,6 @@ function extractPaintColors(
           projectColors[extruderIndex] || projectColors[0] || '#FF0000';
         color = hexToRgb(hexColor);
         paintColorMap.set(paintColor, color);
-        console.log(
-          `Mapped paint color "${paintColor}" to extruder ${extruderIndex} with color ${hexColor}`
-        );
       }
 
       // Apply color to all three vertices of the triangle
@@ -1004,6 +995,127 @@ function extractPaintColors(
   });
 
   return { vertexColors, isPainted: true };
+}
+
+// Create separate objects for each paint color region
+function createSeparateObjectsByPaintColor(
+  mesh: Mesh3MF,
+  projectColors: string[],
+  baseId: string,
+  transform: Float32Array
+): PlateObject[] {
+  if (!mesh.triangles || !mesh.triangles.triangle || !mesh.vertices) {
+    return [];
+  }
+
+  const triangleArray = Array.isArray(mesh.triangles.triangle)
+    ? mesh.triangles.triangle
+    : [mesh.triangles.triangle];
+
+  const vertexArray = Array.isArray(mesh.vertices.vertex)
+    ? mesh.vertices.vertex
+    : [mesh.vertices.vertex];
+
+  // Get unique paint colors and create mapping
+  const uniquePaintColors = Array.from(
+    new Set(
+      triangleArray
+        .map(t => t['@_paint_color'] || t['@_p:paint_color'])
+        .filter(pc => pc !== undefined)
+    )
+  ).sort();
+
+  // Create dynamic mapping: first unique paint color -> first project color, etc.
+  const paintIndexToExtruder: { [key: string]: number } = {};
+  uniquePaintColors.forEach((paintColor, index) => {
+    paintIndexToExtruder[paintColor] = Math.min(
+      index,
+      projectColors.length - 1
+    );
+  });
+
+  // Group triangles by paint color (including unpainted triangles)
+  const triangleGroups: { [key: string]: Triangle3MF[] } = {};
+  const defaultColorKey = 'unpainted';
+
+  triangleArray.forEach(triangle => {
+    const paintColor = triangle['@_paint_color'] || triangle['@_p:paint_color'];
+    const key = paintColor || defaultColorKey;
+
+    if (!triangleGroups[key]) {
+      triangleGroups[key] = [];
+    }
+    triangleGroups[key].push(triangle);
+  });
+
+  const plateObjects: PlateObject[] = [];
+
+  // Create separate object for each color group
+  Object.entries(triangleGroups).forEach(
+    ([colorKey, triangles], groupIndex) => {
+      if (triangles.length === 0) return;
+
+      // Collect unique vertices used by this color group
+      const usedVertexIndices = new Set<number>();
+      triangles.forEach(triangle => {
+        usedVertexIndices.add(triangle['@_v1'] || 0);
+        usedVertexIndices.add(triangle['@_v2'] || 0);
+        usedVertexIndices.add(triangle['@_v3'] || 0);
+      });
+
+      const usedVertices = Array.from(usedVertexIndices).sort((a, b) => a - b);
+
+      // Create vertex mapping from old indices to new indices
+      const vertexIndexMap = new Map<number, number>();
+      usedVertices.forEach((oldIndex, newIndex) => {
+        vertexIndexMap.set(oldIndex, newIndex);
+      });
+
+      // Create new vertex array for this color group
+      const newVertices = new Float32Array(usedVertices.length * 3);
+      usedVertices.forEach((oldIndex, newIndex) => {
+        if (oldIndex < vertexArray.length) {
+          const vertex = vertexArray[oldIndex];
+          newVertices[newIndex * 3] = vertex['@_x'] || 0;
+          newVertices[newIndex * 3 + 1] = vertex['@_y'] || 0;
+          newVertices[newIndex * 3 + 2] = vertex['@_z'] || 0;
+        }
+      });
+
+      // Create new index array for this color group
+      const newIndices = new Uint32Array(triangles.length * 3);
+      triangles.forEach((triangle, triangleIndex) => {
+        const v1 = triangle['@_v1'] || 0;
+        const v2 = triangle['@_v2'] || 0;
+        const v3 = triangle['@_v3'] || 0;
+
+        newIndices[triangleIndex * 3] = vertexIndexMap.get(v1) || 0;
+        newIndices[triangleIndex * 3 + 1] = vertexIndexMap.get(v2) || 0;
+        newIndices[triangleIndex * 3 + 2] = vertexIndexMap.get(v3) || 0;
+      });
+
+      // Determine filament index for this color group
+      let filamentIndex = 0; // Default for unpainted
+      if (colorKey !== defaultColorKey) {
+        filamentIndex = paintIndexToExtruder[colorKey] || 0;
+      }
+
+      // Create plate object for this color group
+      const objectId = `${baseId}_paint_${colorKey}_${groupIndex}`;
+
+      plateObjects.push({
+        id: objectId,
+        vertices: newVertices,
+        indices: newIndices,
+        transform: new Float32Array(transform), // Copy transform
+        filamentIndex: filamentIndex,
+        isPainted: false, // Each individual object is single-colored
+      });
+    }
+  );
+
+  console.log(`🎨 Created ${plateObjects.length} separate paint color objects`);
+  return plateObjects;
 }
 
 // Helper function to convert hex color to RGB
