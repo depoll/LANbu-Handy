@@ -698,6 +698,13 @@ async function parse3MFPlate(
             componentFilamentIndex = extruder - 1; // Convert 1-based to 0-based
           }
 
+          // Check for paint colors in component mesh (painted models like Valentine Dragon)
+          console.log('Checking for paint colors in component:', componentId);
+          const componentPaintData = extractPaintColors(
+            componentMesh,
+            projectFilamentColors
+          );
+
           // Debug logging for multi-material detection
           console.log('Multi-material check:', {
             projectFilamentColorsLength: projectFilamentColors.length,
@@ -706,41 +713,21 @@ async function parse3MFPlate(
             plateObjectsLength: plateObjects.length,
             componentId,
             objectId,
+            isPainted: componentPaintData?.isPainted,
           });
 
-          // Check if this is a single-component multi-material model
-          // (has more project colors than we have objects, and this is the only component)
-          if (
-            projectFilamentColors.length > 1 &&
-            componentArray.length === 1 &&
-            plateObjects.length === 0
-          ) {
-            console.log(
-              'Creating multi-material objects for component:',
-              componentId
-            );
-            // Create separate objects for each filament color with slight offsets to make them visible
-            for (
-              let colorIndex = 0;
-              colorIndex < projectFilamentColors.length;
-              colorIndex++
-            ) {
-              // Create a copy of the transform and add a small offset so objects don't overlap completely
-              const offsetTransform = new Float32Array(finalTransform);
-              // Add small X offset: 0.1mm per color index
-              offsetTransform[12] += colorIndex * 0.1;
-
-              plateObjects.push({
-                id: `${objectId}_component_${componentId}_filament_${colorIndex}`,
-                vertices: componentMesh.vertices,
-                indices: componentMesh.indices,
-                transform: offsetTransform,
-                filamentIndex: colorIndex,
-              });
-              console.log(
-                `Created component object for filament ${colorIndex} with color ${projectFilamentColors[colorIndex]} at offset ${colorIndex * 0.1}mm`
-              );
-            }
+          // Check if this is a painted model first
+          if (componentPaintData && componentPaintData.isPainted) {
+            console.log('Found painted component model:', componentId);
+            plateObjects.push({
+              id: `${objectId}_component_${componentId}`,
+              vertices: componentMesh.vertices,
+              indices: componentMesh.indices,
+              transform: finalTransform,
+              filamentIndex: componentFilamentIndex,
+              vertexColors: componentPaintData.vertexColors,
+              isPainted: true,
+            });
           } else {
             // Normal single-material or properly mapped multi-material component
             plateObjects.push({
@@ -932,8 +919,13 @@ function extractPaintColors(
   // Create vertex color array (RGB, 3 floats per vertex)
   const vertexColors = new Float32Array(vertexArray.length * 3);
 
-  // Initialize all vertices to default color (first project color or black)
-  const defaultColor = hexToRgb(projectColors[0] || '#000000');
+  // Initialize all vertices to default color (first project color, not black)
+  const defaultColor = hexToRgb(projectColors[0] || '#808080'); // Use gray instead of black as fallback
+  console.log(
+    'Default color for unpainted triangles:',
+    projectColors[0] || '#808080',
+    defaultColor
+  );
   for (let i = 0; i < vertexArray.length; i++) {
     vertexColors[i * 3] = defaultColor.r;
     vertexColors[i * 3 + 1] = defaultColor.g;
@@ -956,17 +948,28 @@ function extractPaintColors(
   // Map paint color indices to RGB colors
   const paintColorMap = new Map<string, { r: number; g: number; b: number }>();
 
-  // Paint color mappings based on Valentine Dragon analysis:
-  // No paint_color = default (first filament - Black)
-  // "0C" (hex 12) = second filament (Green) - 25,508 triangles
-  // "8" = third filament (Red) - 2,738 triangles
-  const paintIndexToExtruder: { [key: string]: number } = {
-    '0C': 1, // Second filament (Green)
-    '8': 2, // Third filament (Red)
-    '4': 3, // Fourth filament (if exists)
-    '0': 0, // First filament
-    '12': 1, // Alternative decimal representation of 0C
-  };
+  // Get unique paint color indices from the model and sort them
+  const uniquePaintColors = Array.from(
+    new Set(
+      triangleArray
+        .map(t => t['@_paint_color'] || t['@_p:paint_color'])
+        .filter(pc => pc !== undefined)
+    )
+  ).sort();
+
+  console.log('Unique paint colors found:', uniquePaintColors);
+  console.log('Available project colors:', projectColors);
+
+  // Create dynamic mapping: first unique paint color -> first project color, etc.
+  const paintIndexToExtruder: { [key: string]: number } = {};
+  uniquePaintColors.forEach((paintColor, index) => {
+    paintIndexToExtruder[paintColor] = Math.min(
+      index,
+      projectColors.length - 1
+    );
+  });
+
+  console.log('Dynamic paint color mapping:', paintIndexToExtruder);
 
   // Apply triangle colors to vertices
   triangleArray.forEach((triangle: Triangle3MF) => {
@@ -976,9 +979,13 @@ function extractPaintColors(
       let color = paintColorMap.get(paintColor);
       if (!color) {
         const extruderIndex = paintIndexToExtruder[paintColor] ?? 0;
-        const hexColor = projectColors[extruderIndex] || '#000000';
+        const hexColor =
+          projectColors[extruderIndex] || projectColors[0] || '#FF0000';
         color = hexToRgb(hexColor);
         paintColorMap.set(paintColor, color);
+        console.log(
+          `Mapped paint color "${paintColor}" to extruder ${extruderIndex} with color ${hexColor}`
+        );
       }
 
       // Apply color to all three vertices of the triangle
