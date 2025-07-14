@@ -811,8 +811,8 @@ const ModelPreviewEnhanced = forwardRef<ModelPreviewRef, ModelPreviewProps>(
 
       const fileExtension = fileId.toLowerCase().split('.').pop();
 
-      // For 3MF files with plates, use Web Worker
-      if (fileExtension === '3mf' && plates.length > 0 && workerRef.current) {
+      // For 3MF files, use Web Worker to parse and render with paint colors
+      if (fileExtension === '3mf' && workerRef.current) {
         setIsLoading(true);
         setError(null);
 
