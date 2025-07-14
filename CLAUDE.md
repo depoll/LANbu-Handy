@@ -332,4 +332,8 @@ BAMBU_PRINTERS='[{"name":"X1C","ip":"192.168.1.100","access_code":"12345678"}]'
 - Check MQTT logs: `tail -f backend/logs/mqtt.log`
 - Monitor printer status: Check `/api/printers/all-statuses` endpoint
 - PWA debugging: Use Chrome DevTools Application tab
+
+## Development Debugging Notes
+
+- If you're making a change and getting feedback that nothing has changed, add (and observe) logging to let you know that it's actually running.
 ````
