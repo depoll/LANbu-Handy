@@ -1,5 +1,6 @@
 import JSZip from 'jszip';
 import { XMLParser } from 'fast-xml-parser';
+import * as pako from 'pako';
 
 // Worker-specific interfaces (can't import from main thread)
 interface PlateObject {
@@ -204,7 +205,7 @@ async function parse3MFPlate(
       trimValues: true,
       processEntities: true,
       allowBooleanAttributes: true,
-      ignoreNameSpace: true, // Remove namespace prefixes to handle p:paint_color
+      // ignoreNameSpace is not a valid option, removed
     });
 
     const doc = parser.parse(modelXml) as Document3MF;
@@ -265,7 +266,7 @@ async function parse3MFPlate(
           trimValues: true,
           processEntities: true,
           allowBooleanAttributes: true,
-          ignoreNameSpace: true,
+          // ignoreNameSpace is not a valid option, removed
           isArray: (_name, jpath) => {
             // Force certain elements to be arrays for consistent handling
             return [
@@ -949,7 +950,12 @@ function extractPaintColors(
     ];
 
     paintColorVariants.forEach(variant => {
-      const found = triangleArray.some(t => t[variant] !== undefined);
+      const found = triangleArray.some(t => {
+        const triangleWithVariant = t as Triangle3MF & {
+          [key: string]: unknown;
+        };
+        return triangleWithVariant[variant] !== undefined;
+      });
       console.log(`DEBUG ${variant}: ${found ? 'FOUND' : 'not found'}`);
     });
   }
@@ -1057,20 +1063,24 @@ function extractPaintColors(
         `🎨 Paint color ${paintColor} → table index ${colorIndex} → filament ${filamentIndex} (${projectColors[filamentIndex] || 'default'})`
       );
     } else if (paintColor.length > 2) {
-      // Complex paint colors (painted-cube): use first character in lookup table
-      const firstChar = paintColor.charAt(0);
-      const firstCharIndex = PAINT_COLOR_MAP.indexOf(firstChar);
-      if (firstCharIndex > 0) {
-        filamentIndex = firstCharIndex;
+      // Complex paint colors (painted-cube): decode hex texture data
+      const textureData = decodeHexTexture(paintColor);
+      if (textureData) {
+        // For complex textures, we'll need to subdivide the triangle
+        // For now, use the most common color as the primary color
+        filamentIndex = textureData.primaryFilamentIndex;
         console.log(
-          `🎨 Complex paint color ${paintColor.substring(0, 8)}... → first char ${firstChar} → table index ${firstCharIndex} → filament ${filamentIndex}`
+          `🎨 Complex paint color ${paintColor.substring(0, 8)}... → texture ${textureData.width}×${textureData.height} → primary filament ${filamentIndex}`
         );
+
+        // Store texture data for subdivision rendering (future enhancement)
+        // This will be used to create sub-triangles with proper color mapping
       } else {
         // Fallback: use position-based mapping
         const sortedIndex = uniquePaintColors.indexOf(paintColor);
         filamentIndex = (sortedIndex % projectColors.length) + 1;
         console.log(
-          `🎨 Paint color ${paintColor} (not in table) → position ${sortedIndex} → filament ${filamentIndex}`
+          `🎨 Paint color ${paintColor} (decode failed) → position ${sortedIndex} → filament ${filamentIndex}`
         );
       }
     } else {
@@ -1117,6 +1127,373 @@ function extractPaintColors(
   return { vertexColors, isPainted: true };
 }
 
+// Decode paint data - handles both Base64+zlib+RLE and hex RLE formats
+function decodePaintData(encodedData: string): number[] | null {
+  try {
+    // Check if this is hex-encoded RLE data (common format)
+    if (/^[0-9A-Fa-f]+$/.test(encodedData)) {
+      console.log('🎨 Detected hex RLE encoded paint data');
+      return decodeHexRLE(encodedData);
+    }
+
+    // Otherwise try Base64 + zlib + RLE pipeline
+    console.log('🎨 Detected Base64+zlib+RLE encoded paint data');
+    return decodeBase64ZlibRLE(encodedData);
+  } catch (error) {
+    console.error('Failed to decode paint data:', error);
+    return null;
+  }
+}
+
+// Decode hex RLE format: variable-length counts with continue bits
+function decodeHexRLE(hexData: string): number[] | null {
+  try {
+    const triangleFilaments: number[] = [];
+    let i = 0;
+
+    function hexToInt(hex: string): number {
+      return parseInt(hex, 16);
+    }
+
+    function hasContinueBit(nibble: number): boolean {
+      return (nibble & 0x8) !== 0;
+    }
+
+    function getDataBits(nibble: number): number {
+      return nibble & 0x7;
+    }
+
+    while (i < hexData.length) {
+      // Decode the count using variable-length encoding
+      let count = 0;
+      let bitPosition = 0;
+
+      while (i < hexData.length) {
+        const nibble = hexToInt(hexData[i]);
+        const dataBits = getDataBits(nibble);
+
+        // Add the data bits to the count at the current bit position
+        count |= dataBits << bitPosition;
+        bitPosition += 3;
+
+        i++;
+
+        // If continue bit is not set, we're done with this count
+        if (!hasContinueBit(nibble)) {
+          break;
+        }
+      }
+
+      // The actual run length is count + 1
+      const runLength = count + 1;
+
+      // The next character is the color index
+      if (i < hexData.length) {
+        const colorIndex = hexToInt(hexData[i]);
+        i++;
+
+        // Add 'runLength' entries with 'colorIndex'
+        for (let j = 0; j < runLength; j++) {
+          triangleFilaments.push(colorIndex);
+        }
+      } else {
+        console.warn(`Incomplete hex RLE data at position ${i}`);
+        break;
+      }
+    }
+
+    console.log(
+      `🎨 Decoded hex RLE paint data: ${triangleFilaments.length} assignments`
+    );
+    return triangleFilaments;
+  } catch (error) {
+    console.error('Failed to decode hex RLE paint data:', error);
+    return null;
+  }
+}
+
+// Decode Base64 + zlib + RLE format (legacy format)
+function decodeBase64ZlibRLE(encodedData: string): number[] | null {
+  try {
+    // Step 1: Base64 decode
+    const base64Chars =
+      'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+    let binary = '';
+
+    for (let i = 0; i < encodedData.length; i += 4) {
+      const quad = encodedData.substr(i, 4);
+      let bits = 0;
+      let validChars = 0;
+
+      for (let j = 0; j < quad.length && quad[j] !== '='; j++) {
+        const charIndex = base64Chars.indexOf(quad[j]);
+        if (charIndex >= 0) {
+          bits = (bits << 6) | charIndex;
+          validChars++;
+        }
+      }
+
+      if (validChars >= 2) binary += String.fromCharCode((bits >> 16) & 255);
+      if (validChars >= 3) binary += String.fromCharCode((bits >> 8) & 255);
+      if (validChars >= 4) binary += String.fromCharCode(bits & 255);
+    }
+
+    // Convert to Uint8Array for zlib
+    const compressed = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      compressed[i] = binary.charCodeAt(i);
+    }
+
+    // Step 2: zlib decompress using pako
+    let decompressed: Uint8Array;
+
+    try {
+      // Try to decompress with pako (handles zlib/deflate automatically)
+      decompressed = pako.inflate(compressed);
+      console.log(
+        `🗜️ Successfully decompressed ${compressed.length} → ${decompressed.length} bytes`
+      );
+    } catch (error) {
+      console.warn('Failed to decompress with pako, trying raw data:', error);
+      decompressed = compressed;
+    }
+
+    // Step 3: Run-Length Encoding decode
+    const triangleFilaments: number[] = [];
+
+    for (let i = 0; i < decompressed.length; i += 2) {
+      if (i + 1 < decompressed.length) {
+        const filamentId = decompressed[i];
+        const count = decompressed[i + 1];
+
+        // Add 'count' triangles with 'filamentId'
+        for (let j = 0; j < count; j++) {
+          triangleFilaments.push(filamentId);
+        }
+      }
+    }
+
+    console.log(
+      `🎨 Decoded Base64+zlib+RLE paint data: ${triangleFilaments.length} assignments`
+    );
+    return triangleFilaments;
+  } catch (error) {
+    console.error('Failed to decode Base64+zlib+RLE paint data:', error);
+    return null;
+  }
+}
+
+// Create objects using decoded per-triangle paint data
+function createObjectsFromEncodedPaintData(
+  mesh: Mesh3MF,
+  projectColors: string[],
+  baseId: string,
+  transform: Float32Array
+): PlateObject[] {
+  if (!mesh.triangles || !mesh.triangles.triangle || !mesh.vertices) {
+    return [];
+  }
+
+  const triangleArray = Array.isArray(mesh.triangles.triangle)
+    ? mesh.triangles.triangle
+    : [mesh.triangles.triangle];
+
+  const vertexArray = Array.isArray(mesh.vertices.vertex)
+    ? mesh.vertices.vertex
+    : [mesh.vertices.vertex];
+
+  // Handle per-triangle encoded data
+  const triangleFilaments: number[] = [];
+  console.log(`🎨 Processing ${triangleArray.length} triangles for paint data`);
+
+  // Assign colors to triangles based on their individual paint data
+  for (let i = 0; i < triangleArray.length; i++) {
+    const triangle = triangleArray[i];
+    const paintColor = getPaintColor(triangle);
+
+    if (paintColor && paintColor.length > 10) {
+      // This triangle has encoded paint data - decode it and CREATE SUBDIVISIONS
+      if (i < 5) {
+        console.log(
+          `🎨 Triangle ${i}: found paint data (length=${paintColor.length}), creating subdivisions`
+        );
+      }
+
+      // Try to decode using the new hex texture approach first
+      const textureData = decodeHexTexture(paintColor);
+      if (textureData) {
+        if (i < 5) {
+          console.log(
+            `🎨 Triangle ${i}: decoded hex texture ${textureData.width}×${textureData.height} with ${textureData.filamentData.length} pixels`
+          );
+        }
+
+        // Just use the dominant color for the entire triangle
+        triangleFilaments.push(textureData.primaryFilamentIndex);
+
+        if (i < 5) {
+          console.log(
+            `🎨 Triangle ${i}: using dominant filament ${textureData.primaryFilamentIndex} for entire triangle`
+          );
+        }
+
+        continue; // Skip the normal processing for this triangle
+      }
+
+      // Fallback to RLE decoding if hex texture fails
+      const decodedData = decodePaintData(paintColor);
+      if (decodedData && decodedData.length > 0) {
+        const colorCounts: { [color: number]: number } = {};
+        for (const color of decodedData) {
+          colorCounts[color] = (colorCounts[color] || 0) + 1;
+        }
+
+        if (i < 5) {
+          console.log(
+            `🎨 Triangle ${i}: RLE decoded ${decodedData.length} sub-triangles with colors:`,
+            Object.keys(colorCounts)
+              .map(c => `${c}:${colorCounts[Number(c)]}`)
+              .join(', ')
+          );
+        }
+
+        // Get the most common non-zero color (painted color)
+        let bestColor = 0;
+        let bestCount = 0;
+        for (const [color, count] of Object.entries(colorCounts)) {
+          const colorNum = parseInt(color);
+          if (colorNum !== 0 && count > bestCount) {
+            bestColor = colorNum;
+            bestCount = count;
+          }
+        }
+
+        if (bestColor === 0) {
+          for (const [color, count] of Object.entries(colorCounts)) {
+            const colorNum = parseInt(color);
+            if (count > bestCount) {
+              bestColor = colorNum;
+              bestCount = count;
+            }
+          }
+        }
+
+        if (i < 5) {
+          console.log(
+            `🎨 Triangle ${i}: assigned color ${bestColor} (most common in decoded data)`
+          );
+        }
+        triangleFilaments.push(bestColor);
+      } else {
+        if (i < 5) {
+          console.log(
+            `🎨 Triangle ${i}: failed to decode paint data, using default color 0`
+          );
+        }
+        triangleFilaments.push(0);
+      }
+    } else {
+      // No paint data, use default color (0)
+      if (i < 5) {
+        console.log(`🎨 Triangle ${i}: no paint data, using default color 0`);
+      }
+      triangleFilaments.push(0);
+    }
+  }
+
+  if (triangleFilaments.length === 0) {
+    console.warn('No paint data found');
+    return [];
+  }
+
+  // Group triangles by filament
+  const filamentGroups: { [filamentId: number]: Triangle3MF[] } = {};
+
+  triangleArray.forEach((triangle, index) => {
+    const filamentId = triangleFilaments[index] || 0; // Default to filament 0
+    if (!filamentGroups[filamentId]) {
+      filamentGroups[filamentId] = [];
+    }
+    filamentGroups[filamentId].push(triangle);
+  });
+
+  // Create separate objects for each filament
+  const objects: PlateObject[] = [];
+
+  Object.keys(filamentGroups).forEach(filamentIdStr => {
+    const filamentId = parseInt(filamentIdStr);
+    const triangles = filamentGroups[filamentId];
+
+    if (triangles.length === 0) return;
+
+    // Get unique vertices for this filament's triangles
+    const usedVertexIndices = new Set<number>();
+    triangles.forEach(triangle => {
+      usedVertexIndices.add(triangle['@_v1'] || 0);
+      usedVertexIndices.add(triangle['@_v2'] || 0);
+      usedVertexIndices.add(triangle['@_v3'] || 0);
+    });
+
+    const vertexIndexMap = new Map<number, number>();
+    const vertices: number[] = [];
+    const indices: number[] = [];
+
+    // Build vertex array and mapping
+    Array.from(usedVertexIndices)
+      .sort((a, b) => a - b)
+      .forEach((originalIndex, newIndex) => {
+        vertexIndexMap.set(originalIndex, newIndex);
+        const vertex = vertexArray[originalIndex];
+        if (vertex) {
+          vertices.push(
+            vertex['@_x'] || 0,
+            vertex['@_y'] || 0,
+            vertex['@_z'] || 0
+          );
+        }
+      });
+
+    // Build index array
+    triangles.forEach(triangle => {
+      const v1 = vertexIndexMap.get(triangle['@_v1'] || 0) ?? 0;
+      const v2 = vertexIndexMap.get(triangle['@_v2'] || 0) ?? 0;
+      const v3 = vertexIndexMap.get(triangle['@_v3'] || 0) ?? 0;
+      indices.push(v1, v2, v3);
+    });
+
+    // Map paint color index to actual filament index
+    // Paint color indices 0-C map to filament indices 0-12
+    let actualFilamentIndex = filamentId;
+    if (filamentId >= 0 && filamentId < projectColors.length) {
+      actualFilamentIndex = filamentId;
+    } else {
+      // Fallback for out-of-range indices
+      actualFilamentIndex = filamentId % projectColors.length;
+      console.warn(
+        `Paint color index ${filamentId} out of range, using ${actualFilamentIndex}`
+      );
+    }
+
+    // Create object with proper filament index
+    const object: PlateObject = {
+      id: `${baseId}_paint_${filamentId}`,
+      vertices: new Float32Array(vertices),
+      indices: new Uint32Array(indices),
+      transform,
+      filamentIndex: actualFilamentIndex,
+      isPainted: false, // Each separate object is single-colored, uses material color
+    };
+
+    objects.push(object);
+    console.log(
+      `🎨 Created object for paint color ${filamentId} → filament ${actualFilamentIndex} (${projectColors[actualFilamentIndex] || 'unknown'}) with ${triangles.length} triangles`
+    );
+  });
+
+  console.log(`🎨 Created ${objects.length} objects from encoded paint data`);
+  return objects;
+}
+
 // Create separate objects for each paint color region
 function createSeparateObjectsByPaintColor(
   mesh: Mesh3MF,
@@ -1136,6 +1513,26 @@ function createSeparateObjectsByPaintColor(
     ? mesh.vertices.vertex
     : [mesh.vertices.vertex];
 
+  // Check if any triangles have encoded paint data (long Base64 strings)
+  const hasEncodedPaintData = triangleArray.some(t => {
+    const paintColor = getPaintColor(t);
+    return paintColor && paintColor.length > 10; // Base64 encoded data is much longer
+  });
+
+  if (hasEncodedPaintData) {
+    console.log('🎨 Detected encoded paint data, using per-triangle decoding');
+    console.log(
+      `🎨 Available project colors: ${projectColors.map((c, i) => `${i}=${c}`).join(', ')}`
+    );
+    return createObjectsFromEncodedPaintData(
+      mesh,
+      projectColors,
+      baseId,
+      transform
+    );
+  }
+
+  // Fallback to old logic for simple paint colors
   // Get unique paint colors and create mapping
   const uniquePaintColors = Array.from(
     new Set(
@@ -1209,20 +1606,24 @@ function createSeparateObjectsByPaintColor(
         `🎨 Paint color ${paintColor} → table index ${colorIndex} → filament ${filamentIndex} (${projectColors[filamentIndex] || 'default'})`
       );
     } else if (paintColor.length > 2) {
-      // Complex paint colors (painted-cube): use first character in lookup table
-      const firstChar = paintColor.charAt(0);
-      const firstCharIndex = PAINT_COLOR_MAP.indexOf(firstChar);
-      if (firstCharIndex > 0) {
-        filamentIndex = firstCharIndex;
+      // Complex paint colors (painted-cube): decode hex texture data
+      const textureData = decodeHexTexture(paintColor);
+      if (textureData) {
+        // For complex textures, we'll need to subdivide the triangle
+        // For now, use the most common color as the primary color
+        filamentIndex = textureData.primaryFilamentIndex;
         console.log(
-          `🎨 Complex paint color ${paintColor.substring(0, 8)}... → first char ${firstChar} → table index ${firstCharIndex} → filament ${filamentIndex}`
+          `🎨 Complex paint color ${paintColor.substring(0, 8)}... → texture ${textureData.width}×${textureData.height} → primary filament ${filamentIndex}`
         );
+
+        // Store texture data for subdivision rendering (future enhancement)
+        // This will be used to create sub-triangles with proper color mapping
       } else {
         // Fallback: use position-based mapping
         const sortedIndex = uniquePaintColors.indexOf(paintColor);
         filamentIndex = (sortedIndex % projectColors.length) + 1;
         console.log(
-          `🎨 Paint color ${paintColor} (not in table) → position ${sortedIndex} → filament ${filamentIndex}`
+          `🎨 Paint color ${paintColor} (decode failed) → position ${sortedIndex} → filament ${filamentIndex}`
         );
       }
     } else {
@@ -1246,8 +1647,43 @@ function createSeparateObjectsByPaintColor(
 
   triangleArray.forEach(triangle => {
     const paintColor = getPaintColor(triangle);
-    const key = paintColor || defaultColorKey;
 
+    // Check if this is a complex paint color that needs subdivision
+    if (paintColor && paintColor.length > 2) {
+      const textureData = decodeHexTexture(paintColor);
+      if (textureData && textureData.filamentData.length > 1) {
+        // Subdivide this triangle based on texture data
+        const subdividedTriangles = subdivideTriangleWithTexture(
+          triangle,
+          textureData,
+          vertexArray
+        );
+
+        // Add subdivided triangles to appropriate groups
+        subdividedTriangles.forEach(subTriangle => {
+          const subKey = `subdivided_${subTriangle.filamentIndex}`;
+          if (!triangleGroups[subKey]) {
+            triangleGroups[subKey] = [];
+          }
+
+          // If we have new vertices, add them to the vertex array
+          if (subTriangle.newVertices) {
+            subTriangle.newVertices.forEach((vertex, index) => {
+              const vertexIndex = subTriangle.triangle[
+                `@_v${index + 1}` as keyof Triangle3MF
+              ] as number;
+              vertexArray[vertexIndex] = vertex;
+            });
+          }
+
+          triangleGroups[subKey].push(subTriangle.triangle);
+        });
+        return; // Skip adding the original triangle
+      }
+    }
+
+    // Handle simple paint colors or unpainted triangles normally
+    const key = paintColor || defaultColorKey;
     if (!triangleGroups[key]) {
       triangleGroups[key] = [];
     }
@@ -1341,12 +1777,411 @@ function createSeparateObjectsByPaintColor(
 
 // Helper function to get paint color from triangle with multiple attribute name support
 function getPaintColor(triangle: Triangle3MF): string | undefined {
+  const triangleWithPaint = triangle as Triangle3MF & {
+    paint_color?: string;
+    'p:paint_color'?: string;
+  };
+
   return (
     triangle['@_paint_color'] ||
     triangle['@_p:paint_color'] ||
-    triangle['paint_color'] ||
-    triangle['p:paint_color']
+    triangleWithPaint.paint_color ||
+    triangleWithPaint['p:paint_color']
   );
+}
+
+// Subdivide a triangle geometrically based on filament data to create colored segments
+function subdivideTriangleWithTexture(
+  triangle: Triangle3MF,
+  filamentData: {
+    width: number;
+    height: number;
+    filamentData: number[];
+    primaryFilamentIndex: number;
+  },
+  vertexArray: Vertex3MF[]
+): {
+  triangle: Triangle3MF;
+  filamentIndex: number;
+  newVertices?: Vertex3MF[];
+}[] {
+  const v1Index = triangle['@_v1'] || 0;
+  const v2Index = triangle['@_v2'] || 0;
+  const v3Index = triangle['@_v3'] || 0;
+
+  const v1 = vertexArray[v1Index];
+  const v2 = vertexArray[v2Index];
+  const v3 = vertexArray[v3Index];
+
+  const subdivisions: {
+    triangle: Triangle3MF;
+    filamentIndex: number;
+    newVertices?: Vertex3MF[];
+  }[] = [];
+  let nextVertexIndex = vertexArray.length;
+
+  // console.log(
+  //   `🔧 Subdividing triangle with ${filamentData.filamentData.length} filament pixels in ${filamentData.width}×${filamentData.height} grid`
+  // );
+
+  // Simple approach: Sample just a few key points on the triangle and create regions
+  // This creates 3-6 triangles instead of hundreds of tiny ones
+
+  // Find all unique filament colors in the texture
+  const filamentCounts = new Map<number, number>();
+  filamentData.filamentData.forEach(f => {
+    if (f !== 0) {
+      filamentCounts.set(f, (filamentCounts.get(f) || 0) + 1);
+    }
+  });
+
+  // If only one color, don't subdivide
+  if (filamentCounts.size <= 1) {
+    subdivisions.push({
+      triangle: triangle,
+      filamentIndex: filamentData.primaryFilamentIndex,
+    });
+    return subdivisions;
+  }
+  // Analyze texture to find painted regions
+  // The texture is mapped to the triangle using standard UV coordinates:
+  // - Bottom-left corner (v1) = (0, 0)
+  // - Bottom-right corner (v2) = (1, 0)
+  // - Top corner (v3) = (0, 1)
+
+  const paintedRegions: Array<{
+    centerU: number;
+    centerV: number;
+    filament: number;
+    radius: number;
+  }> = [];
+
+  // Use flood fill to find connected painted regions
+  const visited = new Array(filamentData.width * filamentData.height).fill(
+    false
+  );
+
+  for (let y = 0; y < filamentData.height; y++) {
+    for (let x = 0; x < filamentData.width; x++) {
+      const idx = y * filamentData.width + x;
+
+      if (!visited[idx]) {
+        const filament = filamentData.filamentData[idx];
+
+        // Skip background pixels
+        if (filament === 0 || filament === filamentData.primaryFilamentIndex) {
+          visited[idx] = true;
+          continue;
+        }
+
+        // Found a painted pixel - flood fill to find the entire region
+        const region: Array<{ x: number; y: number }> = [];
+        const queue = [{ x, y }];
+
+        while (queue.length > 0) {
+          const current = queue.shift()!;
+          const currentIdx = current.y * filamentData.width + current.x;
+
+          if (visited[currentIdx]) continue;
+          visited[currentIdx] = true;
+
+          if (filamentData.filamentData[currentIdx] === filament) {
+            region.push(current);
+
+            // Add neighbors
+            const neighbors = [
+              { x: current.x - 1, y: current.y },
+              { x: current.x + 1, y: current.y },
+              { x: current.x, y: current.y - 1 },
+              { x: current.x, y: current.y + 1 },
+            ];
+
+            for (const n of neighbors) {
+              if (
+                n.x >= 0 &&
+                n.x < filamentData.width &&
+                n.y >= 0 &&
+                n.y < filamentData.height
+              ) {
+                const nIdx = n.y * filamentData.width + n.x;
+                if (!visited[nIdx]) {
+                  queue.push(n);
+                }
+              }
+            }
+          }
+        }
+
+        // If region is significant, calculate its center and radius
+        if (region.length >= 5) {
+          // Calculate center
+          let centerX = 0,
+            centerY = 0;
+          region.forEach(p => {
+            centerX += p.x;
+            centerY += p.y;
+          });
+          centerX /= region.length;
+          centerY /= region.length;
+
+          // Calculate average radius
+          let avgRadius = 0;
+          region.forEach(p => {
+            const dx = p.x - centerX;
+            const dy = p.y - centerY;
+            avgRadius += Math.sqrt(dx * dx + dy * dy);
+          });
+          avgRadius /= region.length;
+
+          // Convert texture coordinates to barycentric UV coordinates
+          // The texture is mapped to the triangle with:
+          // (0,0) texture -> (0,0) UV -> v1 (bottom-left vertex)
+          // (width-1,0) texture -> (1,0) UV -> v2 (bottom-right vertex)
+          // (0,height-1) texture -> (0,1) UV -> v3 (top vertex)
+          const u = centerX / (filamentData.width - 1);
+          const v = centerY / (filamentData.height - 1);
+
+          // Only add regions that are within the triangle bounds
+          if (u >= 0 && v >= 0 && u + v <= 1) {
+            paintedRegions.push({
+              centerU: u,
+              centerV: v,
+              filament: filament,
+              radius:
+                avgRadius / Math.min(filamentData.width, filamentData.height),
+            });
+          }
+        }
+      }
+    }
+  }
+
+  console.log(
+    `🎨 Found ${paintedRegions.length} painted regions: ${paintedRegions.map(r => `fil${r.filament}(r=${r.radius.toFixed(2)})`).join(', ')}`
+  );
+
+  // Create subdivisions for each painted region
+  paintedRegions.forEach(region => {
+    // Create a fan of triangles to approximate the circular painted spot
+    const numSegments = 16; // More segments for smoother circles
+    const angleStep = (2 * Math.PI) / numSegments;
+
+    // Add the center point as a new vertex
+    const centerVertex: Vertex3MF = {
+      '@_x':
+        region.centerU * (v1['@_x'] || 0) +
+        region.centerV * (v2['@_x'] || 0) +
+        (1 - region.centerU - region.centerV) * (v3['@_x'] || 0),
+      '@_y':
+        region.centerU * (v1['@_y'] || 0) +
+        region.centerV * (v2['@_y'] || 0) +
+        (1 - region.centerU - region.centerV) * (v3['@_y'] || 0),
+      '@_z':
+        region.centerU * (v1['@_z'] || 0) +
+        region.centerV * (v2['@_z'] || 0) +
+        (1 - region.centerU - region.centerV) * (v3['@_z'] || 0),
+    };
+
+    const centerIndex = nextVertexIndex++;
+
+    // Create vertices around the perimeter
+    const perimeterVertices: Vertex3MF[] = [];
+    const perimeterIndices: number[] = [];
+
+    for (let i = 0; i < numSegments; i++) {
+      const angle = i * angleStep;
+      const u = region.centerU + region.radius * Math.cos(angle);
+      const v = region.centerV + region.radius * Math.sin(angle);
+
+      // Ensure we stay within triangle bounds
+      const clampedU = Math.max(0, Math.min(u, 1));
+      const clampedV = Math.max(0, Math.min(v, 1));
+      const w = 1 - clampedU - clampedV;
+
+      if (w >= 0) {
+        const vertex: Vertex3MF = {
+          '@_x':
+            clampedU * (v1['@_x'] || 0) +
+            clampedV * (v2['@_x'] || 0) +
+            w * (v3['@_x'] || 0),
+          '@_y':
+            clampedU * (v1['@_y'] || 0) +
+            clampedV * (v2['@_y'] || 0) +
+            w * (v3['@_y'] || 0),
+          '@_z':
+            clampedU * (v1['@_z'] || 0) +
+            clampedV * (v2['@_z'] || 0) +
+            w * (v3['@_z'] || 0),
+        };
+
+        perimeterVertices.push(vertex);
+        perimeterIndices.push(nextVertexIndex++);
+      }
+    }
+
+    // Create triangular fan from center to perimeter
+    for (let i = 0; i < perimeterIndices.length; i++) {
+      const nextI = (i + 1) % perimeterIndices.length;
+
+      const fanTriangle: Triangle3MF = {
+        '@_v1': centerIndex,
+        '@_v2': perimeterIndices[i],
+        '@_v3': perimeterIndices[nextI],
+      };
+
+      subdivisions.push({
+        triangle: fanTriangle,
+        filamentIndex: region.filament,
+        newVertices: i === 0 ? [centerVertex, ...perimeterVertices] : undefined,
+      });
+    }
+  });
+
+  // If no painted regions found, return original triangle
+  if (paintedRegions.length === 0) {
+    subdivisions.push({
+      triangle: triangle,
+      filamentIndex: filamentData.primaryFilamentIndex,
+    });
+    return subdivisions;
+  }
+
+  // TODO: Add background triangulation
+  // For now, we're only creating the painted spots
+  // In a complete implementation, we would also triangulate the remaining area
+
+  console.log(
+    `🔧 Subdivided triangle into ${subdivisions.length} triangles for ${paintedRegions.length} painted regions`
+  );
+  return subdivisions;
+}
+
+// Decode hex paint data into filament indices (each character = filament index)
+function decodeHexTexture(hexString: string): {
+  width: number;
+  height: number;
+  filamentData: number[];
+  primaryFilamentIndex: number;
+} | null {
+  try {
+    console.log(
+      `🎨 Decoding hex paint data: ${hexString.length} characters (each char = paint color)`
+    );
+
+    // PAINT_COLOR_MAP from Bambu Studio / OpenSCAD source
+    const PAINT_COLOR_MAP = [
+      '',
+      '8',
+      '0C',
+      '1C',
+      '2C',
+      '3C',
+      '4C',
+      '5C',
+      '6C',
+      '7C',
+      '8C',
+      '9C',
+      'AC',
+      'BC',
+      'CC',
+      'DC',
+    ];
+
+    // Parse hex string - each character is a paint color index (0-9, A-F)
+    const filamentData: number[] = [];
+    for (let i = 0; i < hexString.length; i++) {
+      const char = hexString.charAt(i);
+      const paintColorIndex = parseInt(char, 16); // Convert hex digit to number (0-15)
+
+      // Map paint color index to actual filament index
+      // Index 0 = no paint (background), Index 1+ = paint colors
+      let filamentIndex = 0; // Default to background/no paint
+      if (paintColorIndex > 0 && paintColorIndex < PAINT_COLOR_MAP.length) {
+        // Map to filament index: paint color 1-15 → filament 1-15
+        filamentIndex = paintColorIndex;
+      }
+
+      filamentData.push(filamentIndex);
+    }
+
+    if (filamentData.length === 0) return null;
+
+    console.log(`🎨 Parsed ${filamentData.length} filament indices`);
+
+    // Determine grid dimensions - try to find best rectangular fit
+    const totalPixels = filamentData.length;
+    let bestWidth = 1,
+      bestHeight = totalPixels;
+
+    // Find factors that create reasonable aspect ratios
+    for (let w = 1; w <= Math.sqrt(totalPixels); w++) {
+      if (totalPixels % w === 0) {
+        const h = totalPixels / w;
+        const aspectRatio = Math.max(w, h) / Math.min(w, h);
+        if (aspectRatio < 20) {
+          // Allow wider aspect ratios for painted textures
+          bestWidth = w;
+          bestHeight = h;
+        }
+      }
+    }
+
+    console.log(`🎨 Grid dimensions: ${bestWidth}×${bestHeight}`);
+
+    // Count non-background pixels and analyze filament usage
+    const nonBackgroundCount = filamentData.filter(f => f !== 0).length;
+    const filamentCounts = new Map<number, number>();
+    filamentData.forEach(f => {
+      filamentCounts.set(f, (filamentCounts.get(f) || 0) + 1);
+    });
+
+    console.log(
+      `🎨 Non-background pixels: ${nonBackgroundCount}/${totalPixels} (${((nonBackgroundCount / totalPixels) * 100).toFixed(1)}%)`
+    );
+
+    // Log filament usage distribution
+    const sortedFilaments = Array.from(filamentCounts.entries()).sort(
+      (a, b) => b[1] - a[1]
+    );
+    console.log(
+      `🎨 Filament distribution: ${sortedFilaments.map(([f, c]) => `${f}(${c}px/${((c / totalPixels) * 100).toFixed(1)}%)`).join(', ')}`
+    );
+
+    // Find the most common non-background filament as primary
+    const nonBackgroundFilamentCounts = new Map<number, number>();
+    for (const filament of filamentData) {
+      if (filament !== 0) {
+        nonBackgroundFilamentCounts.set(
+          filament,
+          (nonBackgroundFilamentCounts.get(filament) || 0) + 1
+        );
+      }
+    }
+
+    let primaryFilamentIndex = 1;
+    let maxCount = 0;
+    for (const [filament, count] of nonBackgroundFilamentCounts) {
+      if (count > maxCount) {
+        maxCount = count;
+        primaryFilamentIndex = filament;
+      }
+    }
+
+    console.log(
+      `🎨 Primary filament: ${primaryFilamentIndex} (${maxCount} pixels)`
+    );
+
+    return {
+      width: bestWidth,
+      height: bestHeight,
+      filamentData,
+      primaryFilamentIndex,
+    };
+  } catch (error) {
+    console.error('Failed to decode hex paint data:', error);
+    return null;
+  }
 }
 
 // Helper function to convert hex color to RGB
@@ -1393,7 +2228,7 @@ async function loadSingleComponentMesh(
       textNodeName: '#text',
       parseAttributeValue: true,
       trimValues: true,
-      ignoreNameSpace: true,
+      // ignoreNameSpace is not a valid option, removed
     });
 
     const doc = parser.parse(modelXml) as Document3MF;

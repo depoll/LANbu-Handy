@@ -250,14 +250,25 @@ const ModelPreviewEnhanced = forwardRef<ModelPreviewRef, ModelPreviewProps>(
         projectColors?: string[],
         isPainted?: boolean
       ): THREE.Material => {
+        console.log(`createFilamentMaterial called with:`, {
+          filamentIndex,
+          projectColors,
+          isPainted,
+          projectColorsLength: projectColors?.length,
+        });
+
         // For painted models, use vertex colors
         if (isPainted) {
+          console.log(
+            `Creating painted material for filament ${filamentIndex}`
+          );
           const material = new THREE.MeshPhongMaterial({
             vertexColors: true, // Enable vertex colors
             side: THREE.DoubleSide,
             shininess: 100,
           });
           material.userData.isPainted = true;
+          console.log(`Created painted material:`, material);
           return material;
         }
 
@@ -354,7 +365,18 @@ const ModelPreviewEnhanced = forwardRef<ModelPreviewRef, ModelPreviewProps>(
               'color',
               new THREE.BufferAttribute(obj.vertexColors, 3)
             );
-            console.log(`Added vertex colors to object ${obj.id}`);
+            console.log(`Added vertex colors to object ${obj.id}:`, {
+              vertexColorsLength: obj.vertexColors.length,
+              vertexColorsSample: obj.vertexColors.slice(0, 15), // First 5 vertices (15 values)
+              isPainted: obj.isPainted,
+              filamentIndex: obj.filamentIndex,
+            });
+          } else {
+            console.log(`No vertex colors for object ${obj.id}:`, {
+              hasVertexColors: !!obj.vertexColors,
+              isPainted: obj.isPainted,
+              filamentIndex: obj.filamentIndex,
+            });
           }
 
           // Create material with filament color
@@ -781,12 +803,15 @@ const ModelPreviewEnhanced = forwardRef<ModelPreviewRef, ModelPreviewProps>(
         // Extract filament index from mesh user data
         const filamentIndex = mesh.userData.filamentIndex || 0;
 
-        console.log(`Object ${name}: filamentIndex=${filamentIndex}`);
+        console.log(
+          `Object ${name}: filamentIndex=${filamentIndex}, isPainted=${mesh.userData.isPainted}`
+        );
+        console.log(`Project colors for update:`, projectColorsRef.current);
 
         // Get new material with updated color, using stored project colors
         const newMaterial = createFilamentMaterial(
           filamentIndex,
-          projectColorsRef.current,
+          projectColorsRef.current || undefined,
           mesh.userData.isPainted
         );
 
@@ -797,6 +822,13 @@ const ModelPreviewEnhanced = forwardRef<ModelPreviewRef, ModelPreviewProps>(
 
         // Apply new material
         mesh.material = newMaterial;
+
+        console.log(`Updated material for ${name}:`, {
+          materialType: newMaterial.type,
+          isPainted: mesh.userData.isPainted,
+          hasVertexColors: newMaterial.vertexColors,
+          geometryHasColorAttribute: !!mesh.geometry.getAttribute('color'),
+        });
       });
 
       // Force re-render
