@@ -44,7 +44,7 @@ export function FileBrowser({
         acc.push({ name: part, path });
         return acc;
       },
-      [{ name: 'Root', path: '' }]
+      [{ name: 'SD Card', path: '' }]
     );
 
   return (
