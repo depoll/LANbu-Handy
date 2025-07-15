@@ -258,8 +258,76 @@
 .model-input-section,
 .config-section,
 .status-section,
-.print-section {
+.print-section,
+.preview-section {
   margin-bottom: 2rem;
+}
+
+/* Model Preview Section */
+.preview-section {
+  background: var(--color-bg-accent);
+  border-radius: 12px;
+  padding: 1rem;
+  border: 1px solid var(--color-border-primary);
+}
+
+.config-preview {
+  margin: 0;
+}
+
+.model-preview-enhanced {
+  background: var(--color-bg-primary);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.model-preview-enhanced .model-preview-header {
+  padding: 0.75rem 1rem;
+  background: var(--color-bg-accent);
+  border-bottom: 1px solid var(--color-border-primary);
+}
+
+.model-preview-enhanced .model-preview-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  color: var(--color-text-primary);
+}
+
+.model-preview-enhanced .plate-indicator {
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.model-preview-enhanced .loading-text,
+.model-preview-enhanced .error-text {
+  font-size: 0.85rem;
+  margin-left: 1rem;
+}
+
+.model-preview-enhanced .loading-text {
+  color: var(--color-text-secondary);
+}
+
+.model-preview-enhanced .error-text {
+  color: var(--color-error);
+}
+
+.model-preview-enhanced .model-preview-container {
+  position: relative;
+  background: var(--color-bg-secondary);
+}
+
+.model-preview-enhanced .preview-note {
+  padding: 0.75rem 1rem;
+  background: var(--color-bg-accent);
+  border-top: 1px solid var(--color-border-primary);
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+}
+
+.model-preview-enhanced .preview-note small {
+  display: block;
+  line-height: 1.4;
 }
 
 /* Placeholder States */

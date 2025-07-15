@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 # Auto-fix linting issues for LANbu Handy
 
@@ -10,7 +10,12 @@ echo "🔧 Running LANbu Handy Auto-fix..."
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
-cd "$PROJECT_ROOT"
+# Debug: Show current directory and project root
+echo "Current directory: $(pwd)"
+echo "Script directory: $SCRIPT_DIR"
+echo "Project root: $PROJECT_ROOT"
+
+cd "$PROJECT_ROOT" || { echo "Failed to change to project root"; exit 1; }
 
 # First, run the formatter to fix what can be automatically fixed
 echo "📝 Running code formatter..."

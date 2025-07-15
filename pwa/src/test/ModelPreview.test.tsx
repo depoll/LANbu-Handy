@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import ModelPreview from '../components/ModelPreview';
+import ModelPreviewEnhanced from '../components/ModelPreviewEnhanced';
 import { FilamentRequirement, FilamentMapping } from '../types/api';
 
 // Mock Three.js
@@ -152,31 +152,31 @@ describe('ModelPreview Component', () => {
   });
 
   it('renders without crashing', () => {
-    render(<ModelPreview fileId="test-file.stl" />);
+    render(<ModelPreviewEnhanced fileId="test-file.stl" />);
 
     expect(screen.getByText('Model Preview')).toBeInTheDocument();
   });
 
   it('shows loading state initially', () => {
-    render(<ModelPreview fileId="test-file.stl" />);
+    render(<ModelPreviewEnhanced fileId="test-file.stl" />);
 
     expect(screen.getByText('Loading model...')).toBeInTheDocument();
   });
 
   it('renders preview container with correct dimensions', () => {
-    render(<ModelPreview fileId="test-file.stl" />);
+    render(<ModelPreviewEnhanced fileId="test-file.stl" />);
 
     const container = document.querySelector('.model-preview-container');
     expect(container).toBeInTheDocument();
     expect(container).toHaveStyle({
       width: '100%',
-      height: '300px',
+      height: '500px',
     });
   });
 
   it('shows multi-material warning for multicolor models', () => {
     render(
-      <ModelPreview
+      <ModelPreviewEnhanced
         fileId="test-file.3mf"
         filamentRequirements={mockFilamentRequirements}
         filamentMappings={mockFilamentMappings}
@@ -184,7 +184,9 @@ describe('ModelPreview Component', () => {
     );
 
     expect(
-      screen.getByText(/Multi-material models show simplified color preview/)
+      screen.getByText(
+        /Colors update in real-time as you configure filament mappings/
+      )
     ).toBeInTheDocument();
   });
 
@@ -197,7 +199,7 @@ describe('ModelPreview Component', () => {
     };
 
     render(
-      <ModelPreview
+      <ModelPreviewEnhanced
         fileId="test-file.stl"
         filamentRequirements={singleColorRequirements}
         filamentMappings={[mockFilamentMappings[0]]}
@@ -205,25 +207,30 @@ describe('ModelPreview Component', () => {
     );
 
     expect(
-      screen.queryByText(/Multi-material models show simplified color preview/)
+      screen.queryByText(
+        /Colors update in real-time as you configure filament mappings/
+      )
     ).not.toBeInTheDocument();
   });
 
   it('applies custom className', () => {
     render(
-      <ModelPreview fileId="test-file.stl" className="custom-preview-class" />
+      <ModelPreviewEnhanced
+        fileId="test-file.stl"
+        className="custom-preview-class"
+      />
     );
 
-    const previewDiv = document.querySelector('.model-preview');
+    const previewDiv = document.querySelector('.model-preview-enhanced');
     expect(previewDiv).toHaveClass('custom-preview-class');
   });
 
   it('handles file ID changes', () => {
-    const { rerender } = render(<ModelPreview fileId="file1.stl" />);
+    const { rerender } = render(<ModelPreviewEnhanced fileId="file1.stl" />);
 
     expect(screen.getByText('Loading model...')).toBeInTheDocument();
 
-    rerender(<ModelPreview fileId="file2.stl" />);
+    rerender(<ModelPreviewEnhanced fileId="file2.stl" />);
 
     // Should still show loading for the new file
     expect(screen.getByText('Loading model...')).toBeInTheDocument();
@@ -231,7 +238,7 @@ describe('ModelPreview Component', () => {
 
   it('handles empty filament mappings', () => {
     render(
-      <ModelPreview
+      <ModelPreviewEnhanced
         fileId="test-file.stl"
         filamentRequirements={mockFilamentRequirements}
         filamentMappings={[]}
@@ -244,22 +251,24 @@ describe('ModelPreview Component', () => {
 
   it('handles different file extensions correctly', () => {
     // Test STL file
-    const { rerender } = render(<ModelPreview fileId="test-file.stl" />);
+    const { rerender } = render(
+      <ModelPreviewEnhanced fileId="test-file.stl" />
+    );
     expect(screen.getByText('Loading model...')).toBeInTheDocument();
 
     // Test 3MF file
-    rerender(<ModelPreview fileId="test-file.3mf" />);
+    rerender(<ModelPreviewEnhanced fileId="test-file.3mf" />);
     expect(screen.getByText('Loading model...')).toBeInTheDocument();
 
     // Test unsupported file
-    rerender(<ModelPreview fileId="test-file.unsupported" />);
-    // Should show error for unsupported type
-    expect(screen.getByText(/Unsupported file type/)).toBeInTheDocument();
+    rerender(<ModelPreviewEnhanced fileId="test-file.unsupported" />);
+    // Enhanced component falls back to thumbnail for unsupported files
+    expect(screen.getByText('Loading model...')).toBeInTheDocument();
   });
 
   it('handles missing filament requirements', () => {
     render(
-      <ModelPreview
+      <ModelPreviewEnhanced
         fileId="test-file.stl"
         filamentMappings={mockFilamentMappings}
       />
@@ -268,7 +277,9 @@ describe('ModelPreview Component', () => {
     // Should render without errors even without filament requirements
     expect(screen.getByText('Model Preview')).toBeInTheDocument();
     expect(
-      screen.queryByText(/Multi-material models show simplified color preview/)
+      screen.queryByText(
+        /Colors update in real-time as you configure filament mappings/
+      )
     ).not.toBeInTheDocument();
   });
 });
