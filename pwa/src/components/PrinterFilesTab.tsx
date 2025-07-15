@@ -76,9 +76,37 @@ export function PrinterFilesTab() {
   useEffect(() => {
     if (currentPrinterId && currentPrinterId !== previousPrinterIdRef.current) {
       previousPrinterIdRef.current = currentPrinterId;
-      loadFiles(''); // Always start at root when printer changes
+      // Load files at root when printer changes
+      setIsLoading(true);
+      setError(null);
+
+      const url = `/api/printer/${currentPrinterId}/files`;
+
+      fetch(url)
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(`Failed to load files: ${response.statusText}`);
+          }
+          return response.json();
+        })
+        .then((data: FileListResponse) => {
+          if (data.success) {
+            setFiles(data.files);
+            setCurrentPath(data.current_path);
+          } else {
+            throw new Error(data.message || 'Failed to load files');
+          }
+        })
+        .catch(err => {
+          const message = err instanceof Error ? err.message : 'Unknown error';
+          setError(message);
+          showError(message);
+        })
+        .finally(() => {
+          setIsLoading(false);
+        });
     }
-  }, [currentPrinterId, loadFiles]);
+  }, [currentPrinterId, showError]);
 
   const handleNavigate = useCallback(
     (path: string) => {

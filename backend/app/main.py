@@ -3714,6 +3714,13 @@ async def list_printer_files(printer_id: str, path: str = ""):
             f"list_printer_files called with printer_id='{printer_id}', path='{path}'"
         )
 
+        # Validate path to prevent directory traversal
+        if path and (".." in path or path.startswith("/")):
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid path: Path cannot contain '..' or start with '/'",
+            )
+
         # Get printer configuration
         printer_config = config.get_printer_by_id(printer_id)
         if not printer_config:
@@ -3778,6 +3785,13 @@ async def download_printer_file(printer_id: str, path: str):
         HTTPException: If printer not found or download fails
     """
     try:
+        # Validate path to prevent directory traversal
+        if path and (".." in path or path.startswith("/")):
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid path: Path cannot contain '..' or start with '/'",
+            )
+
         # Get printer configuration
         printer_config = config.get_printer_by_id(printer_id)
         if not printer_config:
@@ -3794,8 +3808,14 @@ async def download_printer_file(printer_id: str, path: str):
         )
 
         if not success:
+            # Use 404 for file not found, 500 for other errors
+            if error and "not found" in error.lower():
+                status_code = 404
+            else:
+                status_code = 500
+
             raise HTTPException(
-                status_code=500, detail=error or "Failed to download file"
+                status_code=status_code, detail=error or "Failed to download file"
             )
 
         # Determine MIME type
@@ -3837,6 +3857,13 @@ async def get_file_thumbnail(printer_id: str, path: str):
         HTTPException: If printer not found or thumbnail extraction fails
     """
     try:
+        # Validate path to prevent directory traversal
+        if path and (".." in path or path.startswith("/")):
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid path: Path cannot contain '..' or start with '/'",
+            )
+
         # Get printer configuration
         printer_config = config.get_printer_by_id(printer_id)
         if not printer_config:
@@ -3853,8 +3880,18 @@ async def get_file_thumbnail(printer_id: str, path: str):
         )
 
         if not success:
+            # Use 404 for file not found, 400 for invalid file type, 500 for others
+            if error and "not found" in error.lower():
+                status_code = 404
+            elif error and (
+                "invalid" in error.lower() or "not supported" in error.lower()
+            ):
+                status_code = 400
+            else:
+                status_code = 500
+
             raise HTTPException(
-                status_code=500, detail=error or "Failed to get thumbnail"
+                status_code=status_code, detail=error or "Failed to get thumbnail"
             )
 
         # Return the thumbnail as a streaming response

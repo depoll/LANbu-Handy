@@ -6,6 +6,7 @@ we use curl as a subprocess which has full support for FTPS with session reuse.
 """
 
 import logging
+import os
 import shutil
 import subprocess
 import urllib.parse
@@ -13,6 +14,36 @@ from pathlib import Path
 from typing import Optional, Tuple
 
 logger = logging.getLogger(__name__)
+
+
+def validate_path(path: str) -> str:
+    """
+    Validate and sanitize file paths to prevent directory traversal attacks.
+
+    Args:
+        path: The path to validate
+
+    Returns:
+        Sanitized path
+
+    Raises:
+        ValueError: If path contains dangerous patterns
+    """
+    if not path:
+        return ""
+
+    # Normalize the path to handle various representations
+    normalized = os.path.normpath(path)
+
+    # Check for directory traversal attempts
+    if ".." in normalized or normalized.startswith("/"):
+        raise ValueError(f"Invalid path: {path}")
+
+    # Ensure the path doesn't try to escape the FTP root
+    if os.path.isabs(normalized):
+        raise ValueError(f"Absolute paths not allowed: {path}")
+
+    return normalized.replace("\\", "/")  # Ensure forward slashes for FTP
 
 
 class CurlFTPSClient:
@@ -59,8 +90,16 @@ class CurlFTPSClient:
         ]
 
         # Build URL - for implicit FTPS, use ftps:// protocol
-        # URL-encode the remote path to handle special characters and spaces
-        encoded_path = urllib.parse.quote(remote_path, safe="/") if remote_path else ""
+        # Validate path first to prevent directory traversal
+        try:
+            validated_path = validate_path(remote_path) if remote_path else ""
+        except ValueError as e:
+            raise ValueError(f"Invalid remote path: {e}")
+
+        # URL-encode the validated path to handle special characters and spaces
+        encoded_path = (
+            urllib.parse.quote(validated_path, safe="/") if validated_path else ""
+        )
 
         # For directory listing operations, ensure path ends with / if it's not empty
         if operation == "list" and encoded_path and not encoded_path.endswith("/"):
@@ -79,8 +118,8 @@ class CurlFTPSClient:
         elif operation == "download":
             cmd.extend(["-o", local_file] if local_file else ["-O"])  # Download
         elif operation == "delete":
-            # For DELE command, we don't URL-encode as it's an FTP command, not a URL
-            cmd.extend(["-Q", f"DELE {remote_path}"])  # Delete file
+            # For DELE command, we use the validated path
+            cmd.extend(["-Q", f"DELE {validated_path}"])  # Delete file
             url = f"ftps://{self.host}:{self.port}/"  # Use root for QUOTE commands
 
         cmd.append(url)

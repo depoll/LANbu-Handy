@@ -5,6 +5,7 @@ Provides file browsing, downloading, and thumbnail extraction for files
 stored on Bambu Lab printers' SD cards via FTP.
 """
 
+import contextlib
 import io
 import logging
 import mimetypes
@@ -20,6 +21,35 @@ from app.upload_progress_service import UploadProgressService
 from PIL import Image
 
 logger = logging.getLogger(__name__)
+
+# Constants
+GCODE_THUMBNAIL_READ_SIZE = 102400  # 100KB - thumbnails are typically at the beginning
+THUMBNAIL_MAX_SIZE = 400  # Maximum width/height for resized thumbnails
+
+
+@contextlib.contextmanager
+def temporary_download(suffix: str = ""):
+    """
+    Context manager for temporary file downloads that ensures cleanup.
+
+    Args:
+        suffix: File suffix for the temporary file
+
+    Yields:
+        Path object for the temporary file
+    """
+    temp_file = None
+    temp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_file:
+            temp_path = Path(temp_file.name)
+        yield temp_path
+    finally:
+        if temp_path and temp_path.exists():
+            try:
+                temp_path.unlink()
+            except Exception as e:
+                logger.warning(f"Failed to clean up temporary file {temp_path}: {e}")
 
 
 @dataclass
@@ -156,27 +186,26 @@ class FTPBrowserService:
         try:
             client = self._get_ftp_client(printer_config)
 
-            # Create temporary file
+            # Use context manager for temporary file
             suffix = Path(remote_path).suffix
+
+            # We need to handle the temp file specially since we're returning it
             with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_file:
                 local_path = Path(temp_file.name)
 
-            # Progress callback - skip for now due to async/sync mismatch
-            def progress_callback(percent: int, message: str):
-                # TODO: Fix async progress updates
-                logger.debug(f"Download progress: {percent}% - {message}")
-
-            # Download the file
-            success, message = client.download_file(
-                remote_path, str(local_path), progress_callback
-            )
+            # Download the file without progress callback
+            # Note: Progress tracking removed due to async/sync constraints
+            success, message = client.download_file(remote_path, str(local_path))
 
             if success:
                 return True, local_path, None
             else:
                 # Clean up on failure
                 if local_path.exists():
-                    local_path.unlink()
+                    try:
+                        local_path.unlink()
+                    except Exception as e:
+                        logger.warning(f"Failed to clean up temp file: {e}")
                 return False, None, message
 
         except Exception as e:
@@ -213,8 +242,14 @@ class FTPBrowserService:
 
                             # Optionally resize if too large
                             img = Image.open(io.BytesIO(thumbnail_data))
-                            if img.width > 400 or img.height > 400:
-                                img.thumbnail((400, 400), Image.Resampling.LANCZOS)
+                            if (
+                                img.width > THUMBNAIL_MAX_SIZE
+                                or img.height > THUMBNAIL_MAX_SIZE
+                            ):
+                                img.thumbnail(
+                                    (THUMBNAIL_MAX_SIZE, THUMBNAIL_MAX_SIZE),
+                                    Image.Resampling.LANCZOS,
+                                )
                                 output = io.BytesIO()
                                 img.save(output, format="PNG")
                                 thumbnail_data = output.getvalue()
@@ -249,8 +284,8 @@ class FTPBrowserService:
 
             # Read the first part of the gcode file (thumbnails are at the beginning)
             with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
-                # Read first 100KB which should contain thumbnail
-                content = f.read(102400)
+                # Read first part which should contain thumbnail
+                content = f.read(GCODE_THUMBNAIL_READ_SIZE)
 
             # Look for thumbnail patterns
             # Bambu Studio format: ; thumbnail begin 96x96 size_in_bytes
@@ -270,8 +305,11 @@ class FTPBrowserService:
 
                 # Resize if needed
                 img = Image.open(io.BytesIO(image_data))
-                if img.width > 400 or img.height > 400:
-                    img.thumbnail((400, 400), Image.Resampling.LANCZOS)
+                if img.width > THUMBNAIL_MAX_SIZE or img.height > THUMBNAIL_MAX_SIZE:
+                    img.thumbnail(
+                        (THUMBNAIL_MAX_SIZE, THUMBNAIL_MAX_SIZE),
+                        Image.Resampling.LANCZOS,
+                    )
                     output = io.BytesIO()
                     img.save(output, format="PNG")
                     image_data = output.getvalue()
@@ -360,8 +398,14 @@ class FTPBrowserService:
 
                         # Optionally resize if too large
                         img = Image.open(io.BytesIO(thumbnail_data))
-                        if img.width > 400 or img.height > 400:
-                            img.thumbnail((400, 400), Image.Resampling.LANCZOS)
+                        if (
+                            img.width > THUMBNAIL_MAX_SIZE
+                            or img.height > THUMBNAIL_MAX_SIZE
+                        ):
+                            img.thumbnail(
+                                (THUMBNAIL_MAX_SIZE, THUMBNAIL_MAX_SIZE),
+                                Image.Resampling.LANCZOS,
+                            )
                             output = io.BytesIO()
                             img.save(output, format="JPEG")
                             thumbnail_data = output.getvalue()

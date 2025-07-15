@@ -7,7 +7,7 @@ describe('FileBrowser Component', () => {
   const mockFiles: FileItem[] = [
     {
       name: 'folder1',
-      type: 'folder',
+      type: 'directory',
       size: 0,
       modified: '2024-01-01T12:00:00Z',
       path: '/folder1',
