@@ -103,6 +103,7 @@ export function FileBrowser({
       ) : (
         <FileList
           files={files}
+          printerId={printerId}
           onNavigate={onNavigate}
           onDownload={onDownload}
           onPrint={onPrint}

@@ -4,6 +4,7 @@ import './FileList.css';
 
 interface FileListProps {
   files: FileItem[];
+  printerId: string;
   onNavigate: (path: string) => void;
   onDownload: (file: FileItem) => void;
   onPrint: (file: FileItem) => void;
@@ -14,12 +15,16 @@ type SortDirection = 'asc' | 'desc';
 
 export function FileList({
   files,
+  printerId,
   onNavigate,
   onDownload,
   onPrint,
 }: FileListProps) {
   const [sortField, setSortField] = useState<SortField>('name');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [loadingThumbnails, setLoadingThumbnails] = useState<Set<string>>(
+    new Set()
+  );
 
   const handleSort = useCallback(
     (field: SortField) => {
@@ -93,6 +98,31 @@ export function FileList({
     return sortDirection === 'asc' ? ' ↑' : ' ↓';
   };
 
+  const getThumbnailUrl = (file: FileItem): string | null => {
+    if (file.has_thumbnail && file.type === 'file') {
+      return `/api/printer/${printerId}/thumbnail/${encodeURIComponent(
+        file.path
+      )}`;
+    }
+    return null;
+  };
+
+  const handleThumbnailError = useCallback((filePath: string) => {
+    setLoadingThumbnails(prev => {
+      const next = new Set(prev);
+      next.delete(filePath);
+      return next;
+    });
+  }, []);
+
+  const handleThumbnailLoad = useCallback((filePath: string) => {
+    setLoadingThumbnails(prev => {
+      const next = new Set(prev);
+      next.delete(filePath);
+      return next;
+    });
+  }, []);
+
   const handleRowClick = useCallback(
     (file: FileItem) => {
       if (file.type === 'directory') {
@@ -123,16 +153,40 @@ export function FileList({
           </tr>
         </thead>
         <tbody>
-          {sortedFiles.map(file => (
-            <tr
-              key={file.path}
-              className={`file-row ${file.type}`}
-              onClick={() => handleRowClick(file)}
-            >
-              <td className="file-name">
-                <span className="file-icon">{getFileIcon(file)}</span>
-                <span className="name-text">{file.name}</span>
-              </td>
+          {sortedFiles.map(file => {
+            const thumbnailUrl = getThumbnailUrl(file);
+            const isLoadingThumbnail = loadingThumbnails.has(file.path);
+
+            return (
+              <tr
+                key={file.path}
+                className={`file-row ${file.type}`}
+                onClick={() => handleRowClick(file)}
+              >
+                <td className="file-name">
+                  <div className="file-name-container">
+                    {thumbnailUrl ? (
+                      <div className="thumbnail-container">
+                        {isLoadingThumbnail && (
+                          <div className="thumbnail-loading">
+                            <div className="spinner-small"></div>
+                          </div>
+                        )}
+                        <img
+                          src={thumbnailUrl}
+                          alt={file.name}
+                          className="file-thumbnail"
+                          onLoad={() => handleThumbnailLoad(file.path)}
+                          onError={() => handleThumbnailError(file.path)}
+                          style={{ display: isLoadingThumbnail ? 'none' : 'block' }}
+                        />
+                      </div>
+                    ) : (
+                      <span className="file-icon">{getFileIcon(file)}</span>
+                    )}
+                    <span className="name-text">{file.name}</span>
+                  </div>
+                </td>
               <td className="file-type">{file.type}</td>
               <td className="file-size">
                 {file.type === 'file' ? formatFileSize(file.size) : '-'}
@@ -167,7 +221,8 @@ export function FileList({
                 )}
               </td>
             </tr>
-          ))}
+            );
+          })}
         </tbody>
       </table>
     </div>
