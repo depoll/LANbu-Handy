@@ -9,7 +9,6 @@ from typing import Dict, List, Optional
 
 from app.config import get_config
 from app.printer_config import PrinterConfig
-from app.printer_service import PrinterService
 from app.printer_status_monitor import printer_status_monitor
 from app.schemas import (
     AddPrinterRequest,
@@ -21,7 +20,10 @@ from app.schemas import (
     RemovePrinterResponse,
     SetActivePrinterRequest,
     SetActivePrinterResponse,
+    UpdatePrinterRequest,
 )
+from app.services import printer_service
+from app.utils import validate_ip_or_hostname
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
@@ -29,8 +31,6 @@ logger = logging.getLogger(__name__)
 
 # Initialize at module level
 router = APIRouter(prefix="/api", tags=["printers"])
-config = get_config()
-printer_service = PrinterService()
 
 
 # Models not in schemas.py
@@ -71,12 +71,25 @@ async def get_ams_status(printer_id: str):
     """
     logger.info(f"Getting AMS status for printer: {printer_id}")
     try:
+        # Check if any printers are configured
+        config = get_config()
+        if not config.is_printer_configured():
+            raise HTTPException(status_code=400, detail="No printers configured")
+
         # Get printer configuration
-        printer_config = config.get_printer_by_id(printer_id)
+        if printer_id == "default":
+            printer_config = config.get_default_printer()
+        else:
+            printer_config = config.get_printer_by_id(printer_id)
         if not printer_config:
-            raise HTTPException(
-                status_code=404, detail=f"Printer '{printer_id}' not found"
+            # Get list of available printers for error message
+            available_printers = config.get_printers()
+            printer_names = [p.name for p in available_printers]
+            detail = (
+                f"Printer '{printer_id}' not found. "
+                f"Available printers: {', '.join(printer_names)}"
             )
+            raise HTTPException(status_code=404, detail=detail)
 
         # Query AMS status
         success, ams_units, external_spool, error_msg = (
@@ -99,6 +112,16 @@ async def get_ams_status(printer_id: str):
     except HTTPException:
         raise
     except Exception as e:
+        from app.printer_service import PrinterMQTTError
+
+        # Handle MQTT-specific errors with expected message
+        if isinstance(e, PrinterMQTTError):
+            return AMSStatusResponse(
+                success=False,
+                message="MQTT communication error",
+                error_details=str(e),
+            )
+
         logger.error(f"Error getting AMS status: {e}")
         return AMSStatusResponse(
             success=False,
@@ -116,6 +139,7 @@ async def get_printer_status_debug(printer_id: str):
     """
     try:
         # Get printer configuration
+        config = get_config()
         printer_config = config.get_printer_by_id(printer_id)
         if not printer_config:
             raise HTTPException(
@@ -159,6 +183,7 @@ async def get_printer_status(printer_id: str):
     logger.info(f"Getting cached printer status for: {printer_id}")
     try:
         # Get printer configuration
+        config = get_config()
         printer_config = config.get_printer_by_id(printer_id)
         if not printer_config:
             raise HTTPException(
@@ -202,6 +227,7 @@ async def get_all_printer_statuses():
     """
     try:
         # Get all configured printers
+        config = get_config()
         printers = config.get_printers()
         if not printers:
             return {
@@ -245,6 +271,7 @@ async def get_cached_printer_status(printer_id: str):
     Returns immediately with cached status data rather than querying the printer.
     """
     try:
+        config = get_config()
         printer_config = config.get_printer_by_id(printer_id)
         if not printer_config:
             raise HTTPException(
@@ -285,6 +312,7 @@ async def refresh_printer_status(printer_id: str):
     Triggers an immediate status update for the specified printer.
     """
     try:
+        config = get_config()
         printer_config = config.get_printer_by_id(printer_id)
         if not printer_config:
             raise HTTPException(
@@ -330,16 +358,39 @@ async def set_active_printer(request: SetActivePrinterRequest):
     """
     logger.info(f"Setting active printer: {request.ip}")
     try:
+        # Validate IP address or hostname format
+        validated_ip = validate_ip_or_hostname(request.ip)
+
         # Create printer configuration
         printer_config = PrinterConfig(
-            name=request.name or f"Printer at {request.ip}",
-            ip=request.ip,
+            name=request.name or f"Printer at {validated_ip}",
+            ip=validated_ip,
             access_code=request.access_code,
             serial_number=request.serial_number,
         )
 
         # Set as active printer
-        config.set_active_printer(printer_config)
+        config = get_config()
+        config.set_active_printer(
+            ip=printer_config.ip,
+            access_code=printer_config.access_code,
+            name=printer_config.name,
+            serial_number=printer_config.serial_number,
+        )
+
+        # Auto-persist the printer if it doesn't already exist
+        existing_printer = config.get_printer_by_ip(printer_config.ip)
+        if not existing_printer:
+            try:
+                config.add_persistent_printer(printer_config)
+            except ValueError:
+                # Printer already exists, update it instead
+                config.update_persistent_printer(
+                    ip=printer_config.ip,
+                    name=printer_config.name,
+                    access_code=printer_config.access_code,
+                    serial_number=printer_config.serial_number,
+                )
 
         return SetActivePrinterResponse(
             success=True,
@@ -350,13 +401,14 @@ async def set_active_printer(request: SetActivePrinterRequest):
                 "has_access_code": bool(printer_config.access_code),
             },
         )
+    except HTTPException:
+        raise
+    except ValueError as e:
+        logger.error(f"Configuration error setting active printer: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error(f"Error setting active printer: {e}")
-        return SetActivePrinterResponse(
-            success=False,
-            message="Failed to set active printer",
-            error_details=str(e),
-        )
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
 @router.post("/printers/add", response_model=AddPrinterResponse)
@@ -368,8 +420,8 @@ async def add_printer(request: AddPrinterRequest):
     """
     logger.info(f"Adding printer: {request.ip}")
     try:
-        # Normalize IP address
-        ip = request.ip.strip().lower()
+        # Validate IP address or hostname format
+        ip = validate_ip_or_hostname(request.ip)
 
         # Create printer configuration
         printer_config = PrinterConfig(
@@ -380,27 +432,30 @@ async def add_printer(request: AddPrinterRequest):
         )
 
         # Add to persistent storage
-        success = config.add_printer(printer_config)
-        if not success:
-            return AddPrinterResponse(
-                success=False,
-                message=f"Printer with IP {ip} already exists",
-                error_details="Duplicate IP address",
+        config = get_config()
+        try:
+            config.add_persistent_printer(printer_config)
+        except ValueError:
+            raise HTTPException(
+                status_code=400, detail=f"Printer with IP {ip} already exists"
             )
 
-        # Save configuration
-        config.save_printers()
+        # Configuration is automatically saved by add_persistent_printer
 
         return AddPrinterResponse(
             success=True,
-            message=f"Printer {printer_config.name} added successfully",
+            message=f"Printer {printer_config.name} added successfully "
+            f"and permanently saved",
             printer_info={
                 "name": printer_config.name,
                 "ip": printer_config.ip,
                 "canonical_id": printer_config.canonical_id,
                 "has_access_code": bool(printer_config.access_code),
+                "is_persistent": True,  # All printers are now persistent
             },
         )
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error adding printer: {e}")
         return AddPrinterResponse(
@@ -420,7 +475,8 @@ async def remove_printer(request: RemovePrinterRequest):
     logger.info(f"Removing printer: {request.ip}")
     try:
         # Remove printer
-        success = config.remove_printer(request.ip)
+        config = get_config()
+        success = config.remove_persistent_printer(request.ip)
         if not success:
             return RemovePrinterResponse(
                 success=False,
@@ -428,12 +484,12 @@ async def remove_printer(request: RemovePrinterRequest):
                 error_details="Printer not in configuration",
             )
 
-        # Save configuration
-        config.save_printers()
+        # Configuration is automatically saved by add_persistent_printer
 
         return RemovePrinterResponse(
             success=True,
-            message=f"Printer at {request.ip} removed successfully",
+            message=f"Printer at {request.ip} removed successfully "
+            f"and removed from persistent storage",
         )
     except Exception as e:
         logger.error(f"Error removing printer: {e}")
@@ -452,6 +508,7 @@ async def get_persistent_printers():
     in the system.
     """
     try:
+        config = get_config()
         printers = config.get_printers()
         printer_list = [
             {
@@ -466,7 +523,7 @@ async def get_persistent_printers():
 
         return PersistentPrintersResponse(
             success=True,
-            message=f"Found {len(printer_list)} configured printers",
+            message=f"Found {len(printer_list)} persistent printers",
             printers=printer_list,
         )
     except Exception as e:
@@ -494,6 +551,7 @@ async def list_printer_files(printer_id: str, path: str = ""):
     """
     try:
         # Get printer configuration
+        config = get_config()
         printer_config = config.get_printer_by_id(printer_id)
         if not printer_config:
             raise HTTPException(
@@ -543,6 +601,7 @@ async def download_printer_file(printer_id: str, path: str):
 
     try:
         # Get printer configuration
+        config = get_config()
         printer_config = config.get_printer_by_id(printer_id)
         if not printer_config:
             raise HTTPException(
@@ -589,6 +648,7 @@ async def get_file_thumbnail(printer_id: str, path: str):
 
     try:
         # Get printer configuration
+        config = get_config()
         printer_config = config.get_printer_by_id(printer_id)
         if not printer_config:
             raise HTTPException(
@@ -706,6 +766,104 @@ async def get_build_volume(printer_model: str):
         )
 
 
+@router.patch("/printers/{ip}")
+async def update_printer(ip: str, request: UpdatePrinterRequest):
+    """
+    Update an existing printer configuration.
+    Args:
+        ip: Current IP address of the printer to update
+        request: Update data (name, access_code, serial_number, new_ip)
+    """
+    logger.info(f"Updating printer: {ip}")
+    try:
+        # Validate current IP address
+        try:
+            validate_ip_or_hostname(ip)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=f"Invalid IP address: {str(e)}")
+
+        # Check if printer exists
+        config = get_config()
+        existing_printer = config.get_printer_by_ip(ip)
+        if not existing_printer:
+            raise HTTPException(
+                status_code=404, detail=f"No printer found with IP address {ip}"
+            )
+
+        # Validate new IP if provided
+        new_ip = ip  # Default to current IP
+        if request.new_ip:
+            try:
+                new_ip = validate_ip_or_hostname(request.new_ip)
+            except ValueError as e:
+                raise HTTPException(
+                    status_code=400, detail=f"Invalid new IP address: {str(e)}"
+                )
+
+        # Update printer using config method
+        # The config method handles IP changes by removing old and adding new
+        success = False
+        if request.new_ip and request.new_ip != ip:
+            # IP is changing - need to remove old and add new
+            # First remove the old printer
+            config.remove_persistent_printer(ip)
+
+            # Create updated printer config
+            updated_printer = PrinterConfig(
+                name=(
+                    request.name if request.name is not None else existing_printer.name
+                ),
+                ip=new_ip,
+                access_code=(
+                    request.access_code
+                    if request.access_code is not None
+                    else existing_printer.access_code
+                ),
+                serial_number=(
+                    request.serial_number
+                    if request.serial_number is not None
+                    else existing_printer.serial_number
+                ),
+            )
+
+            # Add the new printer
+            config.add_persistent_printer(updated_printer)
+            success = True
+        else:
+            # IP is not changing - use update method
+            success = config.update_persistent_printer(
+                ip=ip,
+                name=request.name,
+                access_code=request.access_code,
+                serial_number=request.serial_number,
+            )
+
+        if not success:
+            raise HTTPException(
+                status_code=404, detail=f"No printer found with IP address {ip}"
+            )
+
+        # Get the updated printer info
+        updated_printer = config.get_printer_by_ip(new_ip)
+        if not updated_printer:
+            raise HTTPException(
+                status_code=500, detail="Failed to retrieve updated printer"
+            )
+
+        return {
+            "name": updated_printer.name,
+            "ip": updated_printer.ip,
+            "has_access_code": bool(updated_printer.access_code),
+            "has_serial_number": bool(updated_printer.serial_number),
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating printer: {e}")
+        raise HTTPException(status_code=500, detail=f"Error updating printer: {str(e)}")
+
+
 @router.post("/printer/{printer_id}/print-from-sd")
 async def print_from_sd_card(printer_id: str, request: PrintFromSDRequest):
     """
@@ -716,6 +874,7 @@ async def print_from_sd_card(printer_id: str, request: PrintFromSDRequest):
     """
     try:
         # Get printer configuration
+        config = get_config()
         printer_config = config.get_printer_by_id(printer_id)
         if not printer_config:
             raise HTTPException(

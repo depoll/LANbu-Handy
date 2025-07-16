@@ -17,7 +17,7 @@ class TestPlateFilamentRequirementsAPI(unittest.TestCase):
         """Set up test dependencies."""
         self.client = TestClient(app)
 
-    @patch("app.main.model_service")
+    @patch("app.routers.models.model_service")
     def test_get_plate_filament_requirements_success(self, mock_model_service):
         """Test successful plate filament requirements retrieval."""
         # Setup mocks
@@ -54,7 +54,7 @@ class TestPlateFilamentRequirementsAPI(unittest.TestCase):
             data["filament_requirements"]["filament_types"], ["PLA", "PLA"]
         )
 
-    @patch("app.main.model_service")
+    @patch("app.routers.models.model_service")
     def test_get_plate_filament_requirements_file_not_found(self, mock_model_service):
         """Test plate filament requirements with file not found."""
         # Setup mocks
@@ -73,7 +73,7 @@ class TestPlateFilamentRequirementsAPI(unittest.TestCase):
         data = response.json()
         self.assertIn("not found", data["detail"])
 
-    @patch("app.main.model_service")
+    @patch("app.routers.models.model_service")
     def test_get_plate_filament_requirements_invalid_plate(self, mock_model_service):
         """Test plate filament requirements with invalid plate index."""
         # Setup mocks
@@ -95,7 +95,7 @@ class TestPlateFilamentRequirementsAPI(unittest.TestCase):
         data = response.json()
         self.assertIn("No filament requirements found for plate 99", data["detail"])
 
-    @patch("app.main.model_service")
+    @patch("app.routers.models.model_service")
     def test_get_plate_filament_requirements_invalid_file_type(
         self, mock_model_service
     ):

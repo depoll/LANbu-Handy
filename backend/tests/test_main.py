@@ -49,15 +49,17 @@ class TestConfigEndpoint:
         """Test config endpoint when printer IP is configured."""
         from app.config import PrinterConfig
 
-        with patch("app.main.config") as mock_config:
+        with patch("app.routers.system.get_config") as mock_get_config:
             mock_printer = PrinterConfig(
                 name="Test Printer", ip="192.168.1.100", access_code="test123"
             )
+            mock_config = Mock()
             mock_config.is_printer_configured.return_value = True
             mock_config.get_printer_ip.return_value = "192.168.1.100"
             mock_config.get_printers.return_value = [mock_printer]
             mock_config.get_persistent_printers.return_value = []
             mock_config.get_active_printer.return_value = None
+            mock_get_config.return_value = mock_config
 
             response = client.get("/api/config")
             assert response.status_code == 200
@@ -72,12 +74,14 @@ class TestConfigEndpoint:
 
     def test_config_endpoint_without_printer_ip(self):
         """Test config endpoint when printer IP is not configured."""
-        with patch("app.main.config") as mock_config:
+        with patch("app.routers.system.get_config") as mock_get_config:
+            mock_config = Mock()
             mock_config.is_printer_configured.return_value = False
             mock_config.get_printer_ip.return_value = None
             mock_config.get_printers.return_value = []
             mock_config.get_persistent_printers.return_value = []
             mock_config.get_active_printer.return_value = None
+            mock_get_config.return_value = mock_config
 
             response = client.get("/api/config")
             assert response.status_code == 200
@@ -91,18 +95,20 @@ class TestConfigEndpoint:
         """Test config endpoint when multiple printers are configured."""
         from app.config import PrinterConfig
 
-        with patch("app.main.config") as mock_config:
+        with patch("app.routers.system.get_config") as mock_get_config:
             mock_printers = [
                 PrinterConfig(
                     name="Living Room", ip="192.168.1.100", access_code="test123"
                 ),
                 PrinterConfig(name="Garage", ip="192.168.1.101", access_code="test456"),
             ]
+            mock_config = Mock()
             mock_config.is_printer_configured.return_value = True
             mock_config.get_printer_ip.return_value = "192.168.1.100"
             mock_config.get_printers.return_value = mock_printers
             mock_config.get_persistent_printers.return_value = []
             mock_config.get_active_printer.return_value = None
+            mock_get_config.return_value = mock_config
 
             response = client.get("/api/config")
             assert response.status_code == 200
@@ -624,7 +630,7 @@ class TestConfiguredSliceEndpoint:
         assert "Model file not found" in response.json()["detail"]
 
     @patch("app.main.find_gcode_file")
-    @patch("app.main.slice_model")
+    @patch("app.routers.slicing.slice_model")
     def test_configured_slice_success(
         self, mock_slice_model, mock_find_gcode_file, temp_model_file
     ):
@@ -685,7 +691,7 @@ class TestConfiguredSliceEndpoint:
             # Clean up test file
             test_file_path.unlink(missing_ok=True)
 
-    @patch("app.main.slice_model")
+    @patch("app.routers.slicing.slice_model")
     def test_configured_slice_failure(self, mock_slice_model, temp_model_file):
         """Test configured slicing failure with mocked CLI."""
         from app.slicer_service import CLIResult
@@ -832,27 +838,27 @@ class TestJobStartEndpoint:
         assert data["job_steps"]["slice"]["success"] is False
         assert "Slicing failed" in data["job_steps"]["slice"]["message"]
 
-    @patch("app.main.config.is_printer_configured")
-    @patch("app.main.config.get_printers")
-    @patch("app.main.download_model_step")
-    @patch("app.main.slice_model_step")
-    @patch("app.main.upload_gcode_step")
-    @patch("app.main.start_print_step")
+    @patch("app.routers.printing.get_config")
+    @patch("app.routers.printing.download_model_step")
+    @patch("app.routers.printing.slice_model_step")
+    @patch("app.routers.printing.upload_gcode_step")
+    @patch("app.routers.printing.start_print_step")
     def test_job_start_complete_success(
         self,
         mock_start_print_step,
         mock_upload_step,
         mock_slice_step,
         mock_download_step,
-        mock_get_printers,
-        mock_is_configured,
+        mock_get_config,
         temp_model_file,
     ):
         """Test job start endpoint with complete success."""
         from app.config import PrinterConfig
 
-        mock_is_configured.return_value = True
-        mock_get_printers.return_value = [
+        # Mock config object
+        mock_config = mock_get_config.return_value
+        mock_config.is_printer_configured.return_value = True
+        mock_config.get_printers.return_value = [
             PrinterConfig("Test Printer", "192.168.1.100", "test123")
         ]
 
@@ -927,51 +933,44 @@ class TestJobStartEndpoint:
 class TestAMSStatusEndpoint:
     """Test cases for AMS status endpoints."""
 
-    @patch("app.main.config")
+    @patch("app.routers.printers.get_config")
     @pytest.mark.asyncio
-    async def test_ams_status_successful(self, mock_config):
+    async def test_ams_status_successful(self, mock_get_config):
         """Test successful AMS status query."""
         from app.config import PrinterConfig
-        from app.printer_service import AMSFilament, AMSStatusResult, AMSUnit
+        from app.schemas import AMSFilamentResponse, AMSUnitResponse
 
         # Mock configuration object
+        mock_config = mock_get_config.return_value
         mock_config.is_printer_configured.return_value = True
         test_printer = PrinterConfig(
             name="test-printer", ip="192.168.1.100", access_code="12345678"
         )
         mock_config.get_printer_by_id.return_value = test_printer
+        mock_config.get_printers.return_value = [test_printer]
 
         # Mock successful AMS query result
-        filament1 = AMSFilament(
+        filament1 = AMSFilamentResponse(
             slot_id=0, filament_type="PLA", color="Red", material_id="BAMBU_PLA_RED"
         )
-        filament2 = AMSFilament(slot_id=1, filament_type="PETG", color="Blue")
-        ams_unit = AMSUnit(unit_id=0, filaments=[filament1, filament2])
+        filament2 = AMSFilamentResponse(slot_id=1, filament_type="PETG", color="Blue")
+        ams_unit = AMSUnitResponse(unit_id=0, filaments=[filament1, filament2])
 
         # Mock the printer service queries
         with patch(
-            "app.main.printer_service.query_printer_status_async",
+            "app.services.printer_service.query_ams_status",
             new_callable=AsyncMock,
-        ) as mock_status:
-            with patch(
-                "app.main.printer_service.query_ams_status_async",
-                new_callable=AsyncMock,
-            ) as mock_query:
-                # Mock printer status to indicate AMS is present
-                mock_status.return_value = Mock(
-                    success=True,
-                    ams_units=[Mock()],  # Non-empty to indicate AMS exists
-                    external_spool=None,
-                )
+        ) as mock_query:
+            # Mock AMS status query to return success and AMS units
+            mock_query.return_value = (
+                True,  # success
+                [ams_unit],  # ams_units
+                None,  # external_spool
+                None,  # error_msg
+            )
 
-                mock_query.return_value = AMSStatusResult(
-                    success=True,
-                    message="AMS status retrieved successfully",
-                    ams_units=[ams_unit],
-                )
-
-                # Make the request
-                response = client.get("/api/printer/test-printer/ams-status")
+            # Make the request
+            response = client.get("/api/printer/test-printer/ams-status")
 
             # Verify response
             assert response.status_code == 200
@@ -1003,9 +1002,10 @@ class TestAMSStatusEndpoint:
             mock_config.get_printer_by_id.assert_called_once_with("test-printer")
             mock_query.assert_called_once_with(test_printer)
 
-    @patch("app.main.config")
-    def test_ams_status_no_printers_configured(self, mock_config):
+    @patch("app.routers.printers.get_config")
+    def test_ams_status_no_printers_configured(self, mock_get_config):
         """Test AMS status when no printers are configured."""
+        mock_config = mock_get_config.return_value
         mock_config.is_printer_configured.return_value = False
 
         response = client.get("/api/printer/any-printer/ams-status")
@@ -1013,11 +1013,12 @@ class TestAMSStatusEndpoint:
         assert response.status_code == 400
         assert "No printers configured" in response.json()["detail"]
 
-    @patch("app.main.config")
-    def test_ams_status_printer_not_found(self, mock_config):
+    @patch("app.routers.printers.get_config")
+    def test_ams_status_printer_not_found(self, mock_get_config):
         """Test AMS status when printer is not found."""
         from app.config import PrinterConfig
 
+        mock_config = mock_get_config.return_value
         mock_config.is_printer_configured.return_value = True
         mock_config.get_printer_by_id.return_value = None
         mock_config.get_printers.return_value = [
@@ -1033,14 +1034,14 @@ class TestAMSStatusEndpoint:
         assert "printer1" in data["detail"]
         assert "printer2" in data["detail"]
 
-    @patch("app.main.config")
+    @patch("app.routers.printers.get_config")
     @pytest.mark.asyncio
-    async def test_ams_status_default_printer(self, mock_config):
+    async def test_ams_status_default_printer(self, mock_get_config):
         """Test AMS status using 'default' printer ID."""
         from app.config import PrinterConfig
-        from app.printer_service import AMSStatusResult
 
         # Mock configuration
+        mock_config = mock_get_config.return_value
         mock_config.is_printer_configured.return_value = True
         test_printer = PrinterConfig(
             name="default-printer", ip="192.168.1.100", access_code="12345678"
@@ -1049,123 +1050,98 @@ class TestAMSStatusEndpoint:
 
         # Mock AMS query result
         with patch(
-            "app.main.printer_service.query_printer_status_async",
+            "app.services.printer_service.query_ams_status",
             new_callable=AsyncMock,
-        ) as mock_status:
-            with patch(
-                "app.main.printer_service.query_ams_status_async",
-                new_callable=AsyncMock,
-            ) as mock_query:
-                # Mock printer status to indicate AMS is present
-                mock_status.return_value = Mock(
-                    success=True,
-                    ams_units=[Mock()],  # Non-empty to indicate AMS exists
-                    external_spool=None,
-                )
+        ) as mock_query:
+            # Mock AMS status query to return success with empty AMS units
+            mock_query.return_value = (
+                True,  # success
+                [],  # ams_units (empty list)
+                None,  # external_spool
+                None,  # error_msg
+            )
 
-                mock_query.return_value = AMSStatusResult(
-                    success=True, message="AMS status retrieved", ams_units=[]
-                )
+            # Make the request with 'default' printer ID
+            response = client.get("/api/printer/default/ams-status")
 
-                # Make the request with 'default' printer ID
-                response = client.get("/api/printer/default/ams-status")
+            assert response.status_code == 200
+            data = response.json()
+            assert data["success"] is True
 
-                assert response.status_code == 200
-                data = response.json()
-                assert data["success"] is True
+            # Verify default printer was used
+            mock_config.get_default_printer.assert_called_once()
+            mock_query.assert_called_once_with(test_printer)
 
-                # Verify default printer was used
-                mock_config.get_default_printer.assert_called_once()
-                mock_query.assert_called_once_with(test_printer)
-
-    @patch("app.main.config")
+    @patch("app.routers.printers.get_config")
     @pytest.mark.asyncio
-    async def test_ams_status_query_failure(self, mock_config):
+    async def test_ams_status_query_failure(self, mock_get_config):
         """Test AMS status when query fails."""
         from app.config import PrinterConfig
-        from app.printer_service import AMSStatusResult
 
         # Mock configuration
+        mock_config = mock_get_config.return_value
         mock_config.is_printer_configured.return_value = True
         test_printer = PrinterConfig(
             name="test-printer", ip="192.168.1.100", access_code="12345678"
         )
-        mock_config.get_printer_by_id.return_value = test_printer
+        mock_get_config.get_printer_by_id.return_value = test_printer
 
         # Mock failed AMS query
         with patch(
-            "app.main.printer_service.query_printer_status_async",
+            "app.services.printer_service.query_ams_status",
             new_callable=AsyncMock,
-        ) as mock_status:
-            with patch(
-                "app.main.printer_service.query_ams_status_async",
-                new_callable=AsyncMock,
-            ) as mock_query:
-                # Mock printer status to indicate AMS is present
-                mock_status.return_value = Mock(
-                    success=True,
-                    ams_units=[Mock()],  # Non-empty to indicate AMS exists
-                    external_spool=None,
-                )
+        ) as mock_query:
+            # Mock AMS status query to return failure
+            mock_query.return_value = (
+                False,  # success
+                None,  # ams_units
+                None,  # external_spool
+                "MQTT communication failed",  # error_msg
+            )
 
-                mock_query.return_value = AMSStatusResult(
-                    success=False,
-                    message="MQTT communication failed",
-                    error_details="Connection timeout",
-                )
+            response = client.get("/api/printer/test-printer/ams-status")
 
-                response = client.get("/api/printer/test-printer/ams-status")
+            # API returns 200 with error in body
+            assert response.status_code == 200
+            data = response.json()
 
-                # API returns 200 with error in body
-                assert response.status_code == 200
-                data = response.json()
+            assert data["success"] is False
+            assert data["message"] == "Failed to query AMS status"
+            assert "MQTT communication failed" in data["error_details"]
+            assert data["ams_units"] is None
 
-                assert data["success"] is False
-                assert data["message"] == "MQTT communication failed"
-                assert data["error_details"] == "Connection timeout"
-                assert data["ams_units"] is None
-
-    @patch("app.main.config")
+    @patch("app.routers.printers.get_config")
     @pytest.mark.asyncio
-    async def test_ams_status_mqtt_exception(self, mock_config):
+    async def test_ams_status_mqtt_exception(self, mock_get_config):
         """Test AMS status when MQTT exception is raised."""
         from app.config import PrinterConfig
         from app.printer_service import PrinterMQTTError
 
         # Mock configuration
+        mock_config = mock_get_config.return_value
         mock_config.is_printer_configured.return_value = True
         test_printer = PrinterConfig(
             name="test-printer", ip="192.168.1.100", access_code="12345678"
         )
-        mock_config.get_printer_by_id.return_value = test_printer
+        mock_get_config.get_printer_by_id.return_value = test_printer
 
         # Mock MQTT exception
         with patch(
-            "app.main.printer_service.query_printer_status_async",
+            "app.services.printer_service.query_ams_status",
             new_callable=AsyncMock,
-        ) as mock_status:
-            with patch(
-                "app.main.printer_service.query_ams_status_async",
-                new_callable=AsyncMock,
-            ) as mock_query:
-                # Mock printer status to indicate AMS is present
-                mock_status.return_value = Mock(
-                    success=True,
-                    ams_units=[Mock()],  # Non-empty to indicate AMS exists
-                    external_spool=None,
-                )
+        ) as mock_query:
+            # Mock MQTT exception being raised
+            mock_query.side_effect = PrinterMQTTError("MQTT broker unreachable")
 
-                mock_query.side_effect = PrinterMQTTError("MQTT broker unreachable")
+            response = client.get("/api/printer/test-printer/ams-status")
 
-                response = client.get("/api/printer/test-printer/ams-status")
+            # API returns 200 with error in body
+            assert response.status_code == 200
+            data = response.json()
 
-                # API returns 200 with error in body
-                assert response.status_code == 200
-                data = response.json()
-
-                assert data["success"] is False
-                assert data["message"] == "MQTT communication error"
-                assert "MQTT broker unreachable" in data["error_details"]
+            assert data["success"] is False
+            assert data["message"] == "MQTT communication error"
+            assert "MQTT broker unreachable" in data["error_details"]
 
 
 class TestUploadProgress:
@@ -1301,10 +1277,19 @@ class TestOriginalFilenamePreservation:
             "selected_plate_index": 0,
         }
 
-        with patch("app.main.Path.exists") as mock_exists:
-            mock_exists.return_value = True
+        with patch("app.routers.slicing.model_service") as mock_model_service:
+            # Mock model service to validate file extension and provide temp_dir
+            from unittest.mock import MagicMock
 
-            with patch("app.main.slice_model") as mock_slice:
+            mock_temp_dir = MagicMock()
+            mock_model_service.temp_dir = mock_temp_dir
+            mock_file_path = MagicMock()
+            mock_file_path.exists.return_value = True
+            mock_file_path.name = file_id
+            mock_temp_dir.__truediv__.return_value = mock_file_path
+            mock_model_service.validate_file_extension.return_value = True
+
+            with patch("app.routers.slicing.slice_model") as mock_slice:
                 mock_slice.return_value = Mock(success=True, exit_code=0)
 
                 with patch("app.main.find_gcode_file") as mock_find:

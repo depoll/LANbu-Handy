@@ -16,9 +16,9 @@ class TestPlateSelectionAPI(unittest.TestCase):
         """Set up test dependencies."""
         self.client = TestClient(app)
 
-    @patch("app.main.slice_model")
+    @patch("app.routers.slicing.slice_model")
     @patch("app.main.find_gcode_file")
-    @patch("app.main.model_service")
+    @patch("app.routers.slicing.model_service")
     def test_configured_slice_with_plate_selection(
         self, mock_model_service, mock_find_gcode, mock_slice_model
     ):
@@ -28,6 +28,7 @@ class TestPlateSelectionAPI(unittest.TestCase):
         mock_model_service.temp_dir.__truediv__ = MagicMock(
             return_value=MagicMock(exists=MagicMock(return_value=True))
         )
+        mock_model_service.validate_file_extension.return_value = True
 
         mock_slice_model.return_value = MagicMock(success=True)
         mock_find_gcode.return_value = "/fake/path/output.gcode"
@@ -60,9 +61,9 @@ class TestPlateSelectionAPI(unittest.TestCase):
         self.assertIsInstance(options, dict)
         self.assertEqual(len(options), 0)
 
-    @patch("app.main.slice_model")
+    @patch("app.routers.slicing.slice_model")
     @patch("app.main.find_gcode_file")
-    @patch("app.main.model_service")
+    @patch("app.routers.slicing.model_service")
     def test_configured_slice_without_plate_selection(
         self, mock_model_service, mock_find_gcode, mock_slice_model
     ):
@@ -72,6 +73,7 @@ class TestPlateSelectionAPI(unittest.TestCase):
         mock_model_service.temp_dir.__truediv__ = MagicMock(
             return_value=MagicMock(exists=MagicMock(return_value=True))
         )
+        mock_model_service.validate_file_extension.return_value = True
 
         mock_slice_model.return_value = MagicMock(success=True)
         mock_find_gcode.return_value = "/fake/path/output.gcode"
@@ -103,9 +105,9 @@ class TestPlateSelectionAPI(unittest.TestCase):
         self.assertIsInstance(options, dict)
         self.assertEqual(len(options), 0)
 
-    @patch("app.main.slice_model")
+    @patch("app.routers.slicing.slice_model")
     @patch("app.main.find_gcode_file")
-    @patch("app.main.model_service")
+    @patch("app.routers.slicing.model_service")
     def test_configured_slice_with_null_plate_selection(
         self, mock_model_service, mock_find_gcode, mock_slice_model
     ):
@@ -115,6 +117,7 @@ class TestPlateSelectionAPI(unittest.TestCase):
         mock_model_service.temp_dir.__truediv__ = MagicMock(
             return_value=MagicMock(exists=MagicMock(return_value=True))
         )
+        mock_model_service.validate_file_extension.return_value = True
 
         mock_slice_model.return_value = MagicMock(success=True)
         mock_find_gcode.return_value = "/fake/path/output.gcode"

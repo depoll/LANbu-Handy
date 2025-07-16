@@ -6,7 +6,6 @@ import logging
 
 from app.model_service import (
     ModelDownloadError,
-    ModelService,
     ModelValidationError,
 )
 from app.schemas import (
@@ -15,7 +14,10 @@ from app.schemas import (
     ModelURLRequest,
     PlateInfoResponse,
 )
-from app.thumbnail_service import ThumbnailGenerationError, ThumbnailService
+
+# Import services from services module for test compatibility
+from app.services import model_service, thumbnail_service
+from app.thumbnail_service import ThumbnailGenerationError
 from app.utils import handle_model_errors
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
@@ -23,10 +25,6 @@ from fastapi.responses import FileResponse
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/model", tags=["models"])
-
-# Initialize services
-model_service = ModelService()
-thumbnail_service = ThumbnailService()
 
 
 @router.post("/submit-url", response_model=ModelSubmissionResponse)

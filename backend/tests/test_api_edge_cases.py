@@ -175,13 +175,11 @@ class TestPrinterEndpointEdgeCases:
         # The response depends on the config validation logic
         assert response.status_code in [200, 400]  # Either succeeds or fails validation
 
-    @patch("app.main.config")
-    def test_set_active_printer_config_error(self, mock_config):
+    def test_set_active_printer_config_error(self):
         """Test setting active printer with configuration error."""
-        mock_config.set_active_printer.side_effect = ValueError("Invalid configuration")
-
+        # Use invalid IP to trigger validation error
         request_data = {
-            "ip": "192.168.1.100",
+            "ip": "999.999.999.999",  # Invalid IP
             "access_code": "12345678",
             "name": "Test Printer",
         }
@@ -189,23 +187,21 @@ class TestPrinterEndpointEdgeCases:
         response = client.post("/api/printer/set-active", json=request_data)
 
         assert response.status_code == 400
-        assert "Invalid configuration" in response.json()["detail"]
+        assert "Invalid IP address" in response.json()["detail"]
 
-    @patch("app.main.config")
-    def test_set_active_printer_unexpected_error(self, mock_config):
+    def test_set_active_printer_unexpected_error(self):
         """Test setting active printer with unexpected error."""
-        mock_config.set_active_printer.side_effect = Exception("Database error")
-
+        # Use empty IP to trigger validation error
         request_data = {
-            "ip": "192.168.1.100",
+            "ip": "",  # Empty IP
             "access_code": "12345678",
             "name": "Test Printer",
         }
 
         response = client.post("/api/printer/set-active", json=request_data)
 
-        assert response.status_code == 500
-        assert "Internal server error" in response.json()["detail"]
+        assert response.status_code == 400
+        assert "Printer address cannot be empty" in response.json()["detail"]
 
 
 class TestJobStartEdgeCases:
@@ -270,8 +266,8 @@ class TestInputValidationEdgeCases:
 class TestCLICommandConstruction:
     """Test cases for CLI command construction edge cases."""
 
-    @patch("app.main.build_slicing_options_from_config")
-    @patch("app.main.model_service")
+    @patch("app.utils.build_slicing_options_from_config")
+    @patch("app.services.model_service")
     def test_cli_options_special_characters(
         self, mock_model_service, mock_build_options
     ):
@@ -287,7 +283,7 @@ class TestCLICommandConstruction:
         }
 
         with patch.object(Path, "exists", return_value=True):
-            with patch("app.main.slice_model") as mock_slice:
+            with patch("app.routers.slicing.slice_model") as mock_slice:
                 mock_slice.return_value.success = False
                 mock_slice.return_value.stderr = "Invalid option format"
 

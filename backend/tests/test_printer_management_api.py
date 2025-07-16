@@ -131,7 +131,10 @@ class TestPrinterManagementAPI:
         assert response.status_code == 200
         data = response.json()
         # With new behavior, all printers are permanently saved
-        assert "Hostname Printer permanently saved" in data["message"]
+        assert (
+            "Hostname Printer added successfully and permanently saved"
+            in data["message"]
+        )
         assert data["printer_info"]["ip"] == "printer.local"
 
     def test_add_printer_duplicate_ip_persistent(self):
@@ -184,7 +187,7 @@ class TestPrinterManagementAPI:
         assert response.status_code == 200
         data = response.json()
         assert data["success"] is False
-        assert "No printer found" in data["message"]
+        assert "Printer with IP 192.168.1.200 not found" in data["message"]
 
     def test_get_persistent_printers_empty(self):
         """Test getting persistent printers when none exist."""

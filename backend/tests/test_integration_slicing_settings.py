@@ -202,7 +202,7 @@ class TestSlicingIntegration:
             test_content = "; Test G-code\nG28\nG1 X100 Y100"
             test_file.write_text(test_content)
 
-            with patch("app.main.get_gcode_output_dir") as mock_dir:
+            with patch("app.routers.printing.get_gcode_output_dir") as mock_dir:
                 mock_dir.return_value = gcode_dir
 
                 # Test successful download
@@ -211,7 +211,7 @@ class TestSlicingIntegration:
                 assert response.headers["content-type"] == "text/x-gcode; charset=utf-8"
                 assert (
                     response.headers["content-disposition"]
-                    == "attachment; filename=test.gcode"
+                    == 'attachment; filename="test.gcode"'
                 )
                 assert response.content.decode() == test_content
 

@@ -8,7 +8,6 @@ import logging
 import time
 
 from app.config import get_config
-from app.model_service import ModelService
 from app.schemas import (
     ConfiguredSliceRequest,
     PlateInfoResponse,
@@ -18,6 +17,7 @@ from app.schemas import (
     StartProgressSliceRequest,
     StartProgressSliceResponse,
 )
+from app.services import model_service
 from app.slice_progress_service import slice_progress_service
 from app.slicer_service import slice_model
 from app.utils import (
@@ -30,9 +30,6 @@ from fastapi.responses import StreamingResponse
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/slice", tags=["slicing"])
-
-# Initialize services
-model_service = ModelService()
 
 
 @router.post("/defaults", response_model=SliceResponse)
@@ -61,14 +58,42 @@ async def slice_with_defaults(request: SliceRequest):
         config = get_config()
         if config.is_printer_configured():
             active_printer = config.get_active_printer()
-            if active_printer:
-                printer_model = active_printer.get_printer_model()
-                if printer_model:
-                    slicing_options["printer_model"] = printer_model
+            if active_printer and active_printer.serial_number:
+                from app.utils import get_printer_model_from_serial
+
+                printer_model = get_printer_model_from_serial(
+                    active_printer.serial_number
+                )
+                if printer_model and printer_model != "Unknown":
+                    # Don't add printer_model to slicing_options as it's not a valid
+                    # CLI option. Instead, we'll use it for the printer_model_id param
                     logger.info(f"Using detected printer model: {printer_model}")
 
         # Perform slicing
-        gcode_path = slice_model(model_file_path, slicing_options)
+        import app.main
+
+        output_dir = app.main.get_gcode_output_dir()
+        slice_result = app.main.slice_model(
+            input_path=model_file_path, output_dir=output_dir, options=slicing_options
+        )
+
+        if not slice_result.success:
+            return SliceResponse(
+                success=False,
+                message="Slicing failed",
+                error_details=slice_result.stderr or slice_result.stdout,
+            )
+
+        # Find the generated G-code file
+        try:
+            gcode_path = app.main.find_gcode_file(output_dir)
+        except FileNotFoundError as e:
+            return SliceResponse(
+                success=False,
+                message=f"Slicing completed but no G-code file generated: {str(e)}",
+                gcode_filename=None,
+                plates=None,
+            )
 
         # Extract and parse updated plate information if 3MF
         updated_plates = None
@@ -101,12 +126,13 @@ async def slice_with_defaults(request: SliceRequest):
             updated_plates=updated_plates,
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Slicing error: {str(e)}", exc_info=True)
-        return SliceResponse(
-            success=False,
-            message="Slicing failed",
-            error_details=str(e),
+        # Convert to HTTPException with proper status code for API consistency
+        raise HTTPException(
+            status_code=500, detail=f"Internal server error during slicing: {str(e)}"
         )
 
 
@@ -137,25 +163,58 @@ async def slice_with_configuration(request: ConfiguredSliceRequest):
         if not model_service.validate_file_extension(model_file_path.name):
             raise HTTPException(status_code=400, detail="Invalid file type for slicing")
 
-        # Get printer configuration for model detection
-        config = get_config()
-        active_printer = None
-        if config.is_printer_configured():
-            active_printer = config.get_active_printer()
-
         # Build slicing options from the configured request
         slicing_options = build_slicing_options_from_config(
-            request=request,
-            active_printer=active_printer,
-            model_file_path=model_file_path,
+            filament_mappings=request.filament_mappings,
+            build_plate_type=request.build_plate_type,
+            selected_plate_index=request.selected_plate_index,
+            printer_model=request.printer_model,
+            nozzle_diameter=request.nozzle_diameter,
+            print_quality=request.print_quality,
+            filament_types=request.filament_types,
+            filament_colors=request.filament_colors,
         )
 
         # Add preview image if provided
         if request.preview_image:
             slicing_options["preview_image"] = request.preview_image
 
+        # Extract model name for output naming
+        model_name = request.original_filename
+        if not model_name and "_" in request.file_id:
+            # Extract original filename from file_id (remove UUID prefix)
+            model_name = request.file_id.split("_", 1)[1]
+
         # Perform slicing
-        gcode_path = slice_model(model_file_path, slicing_options)
+        from app.utils import get_gcode_output_dir
+
+        output_dir = get_gcode_output_dir()
+        slice_result = slice_model(
+            input_path=model_file_path,
+            output_dir=output_dir,
+            options=slicing_options,
+            model_name=model_name,
+        )
+
+        if not slice_result.success:
+            return SliceResponse(
+                success=False,
+                message="Slicing failed",
+                error_details=slice_result.stderr or slice_result.stdout,
+            )
+
+        # Find the generated G-code file
+        try:
+            import app.main
+
+            gcode_path = app.main.find_gcode_file(output_dir)
+        except FileNotFoundError as e:
+            return SliceResponse(
+                success=False,
+                message=f"Slicing completed but no G-code file generated: {str(e)}",
+                gcode_filename=None,
+                plates=None,
+            )
 
         # Extract and parse updated plate information if 3MF
         updated_plates = None
@@ -183,17 +242,18 @@ async def slice_with_configuration(request: ConfiguredSliceRequest):
 
         return SliceResponse(
             success=True,
-            message="Model sliced successfully with custom configuration",
+            message="Model sliced successfully with user configuration",
             gcode_path=str(gcode_path),
             updated_plates=updated_plates,
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Slicing error: {str(e)}", exc_info=True)
-        return SliceResponse(
-            success=False,
-            message="Slicing failed",
-            error_details=str(e),
+        # Convert to HTTPException with proper status code for API consistency
+        raise HTTPException(
+            status_code=500, detail=f"Internal server error during slicing: {str(e)}"
         )
 
 
@@ -234,12 +294,6 @@ async def slice_plates_sequentially(request: ConfiguredSliceRequest):
         plate_count = len(model_info.plates)
         logger.info(f"Starting sequential slice of {plate_count} plates")
 
-        # Get printer configuration for model detection
-        config = get_config()
-        active_printer = None
-        if config.is_printer_configured():
-            active_printer = config.get_active_printer()
-
         # Store paths to individual plate G-code files
         gcode_paths = []
         errors = []
@@ -266,13 +320,25 @@ async def slice_plates_sequentially(request: ConfiguredSliceRequest):
 
                 # Build slicing options for this plate
                 slicing_options = build_slicing_options_from_config(
-                    request=plate_request,
-                    active_printer=active_printer,
-                    model_file_path=model_file_path,
+                    filament_mappings=plate_request.filament_mappings,
+                    build_plate_type=plate_request.build_plate_type,
+                    selected_plate_index=plate_request.selected_plate_index,
+                    printer_model=plate_request.printer_model,
+                    nozzle_diameter=plate_request.nozzle_diameter,
+                    print_quality=plate_request.print_quality,
+                    filament_types=plate_request.filament_types,
+                    filament_colors=plate_request.filament_colors,
                 )
 
                 # Perform slicing for this plate
-                gcode_path = slice_model(model_file_path, slicing_options)
+                from app.utils import get_gcode_output_dir
+
+                output_dir = get_gcode_output_dir()
+                gcode_path = slice_model(
+                    input_path=model_file_path,
+                    output_dir=output_dir,
+                    options=slicing_options,
+                )
                 gcode_paths.append(gcode_path)
 
                 logger.info(f"Successfully sliced plate {plate_index}: {gcode_path}")
@@ -321,12 +387,13 @@ async def slice_plates_sequentially(request: ConfiguredSliceRequest):
             error_details="; ".join(errors) if errors else None,
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Sequential slicing error: {str(e)}", exc_info=True)
-        return SliceResponse(
-            success=False,
-            message="Sequential slicing failed",
-            error_details=str(e),
+        # Convert to HTTPException with proper status code for API consistency
+        raise HTTPException(
+            status_code=500, detail=f"Internal server error during slicing: {str(e)}"
         )
 
 
@@ -377,6 +444,8 @@ async def start_slice_with_progress(request: StartProgressSliceRequest):
             session_id=session_id,
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Failed to start slicing job: {str(e)}", exc_info=True)
         return StartProgressSliceResponse(

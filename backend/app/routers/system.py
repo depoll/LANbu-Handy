@@ -10,7 +10,7 @@ from app.config import get_config
 from app.printer_service import PrinterService
 from app.printer_status_monitor import printer_status_monitor
 from app.thumbnail_service import ThumbnailService
-from fastapi import APIRouter, FastAPI, HTTPException
+from fastapi import APIRouter, FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -115,15 +115,11 @@ async def status():
 
 
 @router.get("/api/config")
-async def get_app_config(app: FastAPI):
+async def get_app_config():
     """
     Get application configuration status.
     """
-    config = getattr(app.state, "config", None)
-    if config is None:
-        raise HTTPException(
-            status_code=503, detail="Service starting up, please try again in a moment"
-        )
+    config = get_config()
 
     printers = config.get_printers()
     persistent_printers = config.get_persistent_printers()

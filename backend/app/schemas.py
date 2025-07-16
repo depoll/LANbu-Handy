@@ -66,6 +66,20 @@ class ConfiguredSliceRequest(BaseModel):
     preview_image: Optional[str] = None  # Base64 PNG preview image
 
 
+class SetActivePrinterRequest(BaseModel):
+    ip: str
+    access_code: str = ""
+    name: Optional[str] = None
+    serial_number: str = ""
+
+
+class SetActivePrinterResponse(BaseModel):
+    success: bool
+    message: str
+    printer_info: Optional[Dict] = None
+    error_details: Optional[str] = None
+
+
 class SliceResponse(BaseModel):
     success: bool
     message: str
@@ -136,20 +150,6 @@ class PrinterStatusResponse(BaseModel):
     nozzle_diameter: Optional[float] = None
     ams_units: Optional[List[AMSUnitResponse]] = None
     external_spool: Optional[ExternalSpoolResponse] = None
-    error_details: Optional[str] = None
-
-
-class SetActivePrinterRequest(BaseModel):
-    ip: str
-    access_code: str = ""
-    name: Optional[str] = None
-    serial_number: str = ""
-
-
-class SetActivePrinterResponse(BaseModel):
-    success: bool
-    message: str
-    printer_info: Optional[Dict] = None
     error_details: Optional[str] = None
 
 

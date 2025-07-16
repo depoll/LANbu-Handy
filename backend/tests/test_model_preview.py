@@ -53,14 +53,20 @@ class TestModelPreviewEndpoint:
         finally:
             temp_path.unlink(missing_ok=True)
 
-    @patch("app.main.model_service")
+    @patch("app.routers.models.model_service")
     def test_get_model_preview_success_stl(
         self, mock_model_service, client, temp_model_file
     ):
         """Test successful preview of STL file"""
-        # Mock the model service temp directory to point to our test file's directory
-        mock_model_service.temp_dir = temp_model_file.parent
+        # Mock the model service temp directory and path operations
+        from unittest.mock import MagicMock
+
+        mock_temp_dir = MagicMock()
+        mock_model_service.temp_dir = mock_temp_dir
         mock_model_service.validate_file_extension.return_value = True
+
+        # Mock the path operations explicitly - return the actual file path
+        mock_temp_dir.__truediv__.return_value = temp_model_file
 
         try:
             response = client.get(f"/api/model/preview/{temp_model_file.name}")
@@ -69,7 +75,7 @@ class TestModelPreviewEndpoint:
         finally:
             temp_model_file.unlink(missing_ok=True)
 
-    @patch("app.main.model_service")
+    @patch("app.routers.models.model_service")
     def test_get_model_preview_success_3mf(self, mock_model_service, client):
         """Test successful preview of 3MF file"""
         # Create a temporary 3MF file
@@ -80,9 +86,15 @@ class TestModelPreviewEndpoint:
 
             temp_3mf = Path(f.name)
 
-        # Mock the model service temp directory
-        mock_model_service.temp_dir = temp_3mf.parent
+        # Mock the model service temp directory and path operations
+        from unittest.mock import MagicMock
+
+        mock_temp_dir = MagicMock()
+        mock_model_service.temp_dir = mock_temp_dir
         mock_model_service.validate_file_extension.return_value = True
+
+        # Mock the path operations explicitly - return the actual file path
+        mock_temp_dir.__truediv__.return_value = temp_3mf
 
         try:
             response = client.get(f"/api/model/preview/{temp_3mf.name}")

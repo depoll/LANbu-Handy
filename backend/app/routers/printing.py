@@ -6,15 +6,18 @@ import logging
 
 from app.config import get_config
 from app.filament_matching_service import FilamentMatchingService
-from app.job_orchestration import orchestrate_job_start
+from app.job_orchestration import (
+    download_model_step,
+    slice_model_step,
+    start_print_step,
+    upload_gcode_step,
+)
 from app.model_service import FilamentRequirement
 from app.printer_service import (
     AMSFilament,
     AMSStatusResult,
     AMSUnit,
     ExternalSpool,
-    send_gcode_to_printer,
-    send_print_command,
 )
 from app.schemas import (
     FilamentMatchRequest,
@@ -23,6 +26,7 @@ from app.schemas import (
     JobStartRequest,
     JobStartResponse,
 )
+from app.services import model_service, printer_service
 from app.upload_progress_service import upload_progress_service
 from app.utils import get_gcode_output_dir
 from fastapi import APIRouter, Body, HTTPException
@@ -128,19 +132,92 @@ async def start_basic_job(request: JobStartRequest):
                     f"({printer_config.canonical_id})"
                 )
         logger.info(f"Starting job for printer: {printer_config.canonical_id}")
-        # Call the orchestration function with the specific printer
-        result = await orchestrate_job_start(
-            model_url=request.model_url,
-            job_steps=job_steps,
-            printer_config=printer_config,
+
+        # Step 1: Download model
+        download_result = await download_model_step(model_service, request.model_url)
+        job_steps["download"].update(
+            {
+                "success": download_result["success"],
+                "message": download_result["message"],
+                "details": download_result["details"],
+            }
         )
-        # Successful job
-        return JobStartResponse(
-            success=True,
-            message=result.get("message", "Job completed successfully"),
-            job_steps=job_steps,
-            updated_plates=result.get("updated_plates"),
+
+        if not download_result["success"]:
+            return JobStartResponse(
+                success=False,
+                message="Job failed at download step",
+                job_steps=job_steps,
+                error_details=download_result["details"],
+            )
+
+        file_path = download_result["file_path"]
+
+        # Step 2: Slice model
+        slice_result = slice_model_step(file_path, printer_config)
+        job_steps["slice"].update(
+            {
+                "success": slice_result["success"],
+                "message": slice_result["message"],
+                "details": slice_result["details"],
+            }
         )
+
+        if not slice_result["success"]:
+            return JobStartResponse(
+                success=False,
+                message="Job failed at slicing step",
+                job_steps=job_steps,
+                error_details=slice_result["details"],
+            )
+
+        gcode_path = slice_result["gcode_path"]
+
+        # Step 3: Upload G-code
+        upload_result = await upload_gcode_step(
+            printer_service, printer_config, gcode_path
+        )
+        job_steps["upload"].update(
+            {
+                "success": upload_result["success"],
+                "message": upload_result["message"],
+                "details": upload_result["details"],
+            }
+        )
+
+        if not upload_result["success"]:
+            return JobStartResponse(
+                success=False,
+                message="Job failed at upload step",
+                job_steps=job_steps,
+                error_details=upload_result["details"],
+            )
+
+        gcode_filename = upload_result["gcode_filename"]
+
+        # Step 4: Start print
+        print_result = start_print_step(printer_service, printer_config, gcode_filename)
+        job_steps["print"].update(
+            {
+                "success": print_result["success"],
+                "message": print_result["message"],
+                "details": print_result["details"],
+            }
+        )
+
+        if print_result["success"]:
+            return JobStartResponse(
+                success=True,
+                message="Job completed successfully - print started",
+                job_steps=job_steps,
+            )
+        else:
+            return JobStartResponse(
+                success=False,
+                message="Job failed at print initiation step",
+                job_steps=job_steps,
+                error_details=print_result["details"],
+            )
     except HTTPException:
         # Re-raise HTTP exceptions as-is
         raise
@@ -222,7 +299,9 @@ async def start_print_job(request: dict = Body(...)):
             )
         # Step 1: Upload G-code to printer
         logger.info(f"Uploading {gcode_filename} to printer {printer_config.ip}")
-        upload_result = await send_gcode_to_printer(gcode_path, printer_config)
+        upload_result = await printer_service.send_gcode_to_printer(
+            gcode_path, printer_config
+        )
         if not upload_result.success:
             logger.error(f"Failed to upload: {upload_result.error_details}")
             return JobStartResponse(
@@ -239,7 +318,7 @@ async def start_print_job(request: dict = Body(...)):
             )
         # Step 2: Start the print
         logger.info(f"Starting print on printer {printer_config.ip}")
-        print_result = await send_print_command(
+        print_result = await printer_service.send_print_command(
             gcode_filename, upload_result.remote_path, printer_config
         )
         if not print_result["success"]:
@@ -353,7 +432,9 @@ async def send_to_printer(request: dict = Body(...)):
             )
         # Upload G-code to printer (without starting print)
         logger.info(f"Uploading {gcode_filename} to printer {printer_config.ip}")
-        upload_result = await send_gcode_to_printer(gcode_path, printer_config)
+        upload_result = await printer_service.send_gcode_to_printer(
+            gcode_path, printer_config
+        )
         if not upload_result.success:
             logger.error(f"Failed to upload: {upload_result.error_details}")
             raise HTTPException(
