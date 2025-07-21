@@ -11,7 +11,8 @@ import uuid
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from app.model_service import ModelDownloadError, ModelService, ModelValidationError
+from app.model_schemas import ModelDownloadError, ModelValidationError
+from app.model_service import ModelService
 from app.printer_service import PrinterService
 from app.slicer_service import slice_model
 from app.upload_progress_service import upload_progress_service

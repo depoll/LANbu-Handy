@@ -10,8 +10,8 @@ import tempfile
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from app.model_service import ModelDownloadError, ModelValidationError
-from app.printer_service import PrinterCommunicationError, PrinterMQTTError
+from app.model_schemas import ModelDownloadError, ModelValidationError
+from app.printer_schemas import PrinterCommunicationError, PrinterMQTTError
 from app.settings_builder import SettingsBuilder
 from fastapi import HTTPException
 

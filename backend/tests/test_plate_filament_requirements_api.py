@@ -6,7 +6,7 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 from app.main import app
-from app.model_service import FilamentRequirement
+from app.model_schemas import FilamentRequirement
 from fastapi.testclient import TestClient
 
 

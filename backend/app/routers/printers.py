@@ -112,7 +112,7 @@ async def get_ams_status(printer_id: str):
     except HTTPException:
         raise
     except Exception as e:
-        from app.printer_service import PrinterMQTTError
+        from app.printer_schemas import PrinterMQTTError
 
         # Handle MQTT-specific errors with expected message
         if isinstance(e, PrinterMQTTError):

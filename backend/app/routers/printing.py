@@ -12,8 +12,8 @@ from app.job_orchestration import (
     start_print_step,
     upload_gcode_step,
 )
-from app.model_service import FilamentRequirement
-from app.printer_service import (
+from app.model_schemas import FilamentRequirement
+from app.printer_schemas import (
     AMSFilament,
     AMSStatusResult,
     AMSUnit,

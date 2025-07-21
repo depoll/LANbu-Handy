@@ -11,8 +11,8 @@ from app.filament_matching_service import (
     FilamentMatchingResult,
     FilamentMatchingService,
 )
-from app.model_service import FilamentRequirement
-from app.printer_service import AMSFilament, AMSStatusResult, AMSUnit
+from app.model_schemas import FilamentRequirement
+from app.printer_schemas import AMSFilament, AMSStatusResult, AMSUnit
 
 
 @pytest.fixture

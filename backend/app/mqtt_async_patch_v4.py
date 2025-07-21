@@ -45,7 +45,7 @@ async def run_mqtt_query_async_pooled(
         MQTTOperationCancelled: If the operation was cancelled
         PrinterMQTTError: If the MQTT operation fails
     """
-    from app.printer_service import PrinterMQTTError
+    from app.printer_schemas import PrinterMQTTError
 
     # Check if we should skip this printer due to backoff
     if mqtt_connection_pool.should_skip_printer(printer_config.ip):

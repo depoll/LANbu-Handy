@@ -8,11 +8,11 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import httpx
 import pytest
-from app.model_service import (
+from app.model_schemas import (
     ModelDownloadError,
-    ModelService,
     ModelValidationError,
 )
+from app.model_service import ModelService
 
 
 class TestModelService:

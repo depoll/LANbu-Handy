@@ -13,7 +13,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 from app.config import PrinterConfig
-from app.printer_service import (
+from app.printer_schemas import (
     AMSFilament,
     AMSStatusResult,
     AMSUnit,
@@ -24,8 +24,8 @@ from app.printer_service import (
     PrinterConnectionError,
     PrinterFileTransferError,
     PrinterMQTTError,
-    PrinterService,
 )
+from app.printer_service import PrinterService
 
 TEST_AMS_RESPONSE_DATA = {
     "ams": {
@@ -517,7 +517,7 @@ class TestPrinterService:
     @pytest.fixture
     def printer_service(self):
         """Create a printer service instance for testing."""
-        return PrinterService(timeout=10)
+        return PrinterService(ftp_timeout=10, mqtt_timeout=10)
 
     @pytest.fixture
     def test_printer_config(self):
@@ -548,12 +548,14 @@ G1 X10 Y10 F3000 ; Move to position
     def test_printer_service_init_default(self):
         """Test printer service initialization with defaults."""
         service = PrinterService()
-        assert service.timeout == PrinterService.DEFAULT_FTP_TIMEOUT
+        assert service.ftp_service.timeout == 30
+        assert service.mqtt_service.timeout == 30
 
     def test_printer_service_init_custom_timeout(self):
         """Test printer service initialization with custom timeout."""
-        service = PrinterService(timeout=60)
-        assert service.timeout == 60
+        service = PrinterService(ftp_timeout=45, mqtt_timeout=60)
+        assert service.ftp_service.timeout == 45
+        assert service.mqtt_service.timeout == 60
 
 
 class TestUploadGcode:
@@ -562,7 +564,7 @@ class TestUploadGcode:
     @pytest.fixture
     def printer_service(self):
         """Create a printer service instance for testing."""
-        return PrinterService(timeout=10)
+        return PrinterService(ftp_timeout=10, mqtt_timeout=10)
 
     @pytest.fixture
     def test_printer_config(self):
@@ -795,7 +797,7 @@ class TestConnectionTesting:
     @pytest.fixture
     def printer_service(self):
         """Create a printer service instance for testing."""
-        return PrinterService(timeout=10)
+        return PrinterService(ftp_timeout=10, mqtt_timeout=10)
 
     @pytest.fixture
     def test_printer_config(self):
@@ -885,13 +887,13 @@ class TestIntegration:
 
     def test_service_constants(self, printer_service):
         """Test that service constants are properly defined."""
-        assert hasattr(PrinterService, "DEFAULT_FTP_PORT")
-        assert hasattr(PrinterService, "DEFAULT_FTP_TIMEOUT")
-        assert hasattr(PrinterService, "DEFAULT_UPLOAD_PATH")
+        from app.ftp_service import FTPService
 
-        assert PrinterService.DEFAULT_FTP_PORT == 990
-        assert PrinterService.DEFAULT_FTP_TIMEOUT == 30
-        assert PrinterService.DEFAULT_UPLOAD_PATH == "models"
+        assert hasattr(FTPService, "DEFAULT_FTP_TIMEOUT")
+        assert hasattr(FTPService, "DEFAULT_UPLOAD_PATH")
+
+        assert FTPService.DEFAULT_FTP_TIMEOUT == 30
+        assert FTPService.DEFAULT_UPLOAD_PATH == "models"
 
     def test_logging_integration(self, printer_service, test_printer_config):
         """Test that logging works correctly."""
@@ -913,7 +915,7 @@ class TestEndToEndWithMockFTP:
     @pytest.fixture
     def printer_service(self):
         """Create a printer service instance for testing."""
-        return PrinterService(timeout=5)
+        return PrinterService(ftp_timeout=5, mqtt_timeout=5)
 
     @pytest.fixture
     def test_printer_config(self):
@@ -1059,7 +1061,7 @@ class TestStartPrint:
     @pytest.fixture
     def printer_service(self):
         """Create a printer service instance for testing."""
-        return PrinterService(timeout=10)
+        return PrinterService(ftp_timeout=10, mqtt_timeout=10)
 
     @pytest.fixture
     def test_printer_config(self):
@@ -1438,7 +1440,9 @@ class TestAMSQuery:
         """Test parsing valid AMS data."""
         response_data = TEST_AMS_RESPONSE_DATA
 
-        ams_units, external_spool = printer_service._parse_ams_data(response_data)
+        ams_units, external_spool = printer_service.mqtt_service._parse_ams_data(
+            response_data
+        )
 
         assert len(ams_units) == 3
 
@@ -1538,7 +1542,9 @@ class TestAMSQuery:
             }
         }
 
-        ams_units, external_spool = printer_service._parse_ams_data(response_data)
+        ams_units, external_spool = printer_service.mqtt_service._parse_ams_data(
+            response_data
+        )
 
         assert len(ams_units) == 0
         assert external_spool is not None
@@ -1553,13 +1559,17 @@ class TestAMSQuery:
         # Missing AMS data
         response_data = {"status": "ok"}
 
-        ams_units, external_spool = printer_service._parse_ams_data(response_data)
+        ams_units, external_spool = printer_service.mqtt_service._parse_ams_data(
+            response_data
+        )
         assert len(ams_units) == 0
 
         # Malformed data
         response_data = {"ams": "invalid"}
 
-        ams_units, external_spool = printer_service._parse_ams_data(response_data)
+        ams_units, external_spool = printer_service.mqtt_service._parse_ams_data(
+            response_data
+        )
         assert len(ams_units) == 0
 
     def test_parse_ams_data_x1c_style_external_spool(self, printer_service):
@@ -1579,7 +1589,9 @@ class TestAMSQuery:
             },
         }
 
-        ams_units, external_spool = printer_service._parse_ams_data(response_data)
+        ams_units, external_spool = printer_service.mqtt_service._parse_ams_data(
+            response_data
+        )
 
         assert len(ams_units) == 0
         assert external_spool is not None
@@ -1595,7 +1607,7 @@ class TestMQTTIntegration:
     @pytest.fixture
     def printer_service(self):
         """Create a printer service instance for testing."""
-        return PrinterService(timeout=10)
+        return PrinterService(ftp_timeout=10, mqtt_timeout=10)
 
     @pytest.fixture
     def test_printer_config(self):
@@ -1697,10 +1709,11 @@ class TestMQTTIntegration:
 
     def test_mqtt_service_constants(self, printer_service):
         """Test that MQTT constants are properly defined."""
-        assert hasattr(printer_service, "DEFAULT_MQTT_PORT")
-        assert hasattr(printer_service, "DEFAULT_MQTT_TIMEOUT")
-        assert hasattr(printer_service, "DEFAULT_MQTT_KEEPALIVE")
+        mqtt_service = printer_service.mqtt_service
+        assert hasattr(mqtt_service, "DEFAULT_MQTT_PORT")
+        assert hasattr(mqtt_service, "DEFAULT_MQTT_TIMEOUT")
+        assert hasattr(mqtt_service, "DEFAULT_MQTT_KEEPALIVE")
 
-        assert printer_service.DEFAULT_MQTT_PORT == 8883
-        assert printer_service.DEFAULT_MQTT_TIMEOUT == 30
-        assert printer_service.DEFAULT_MQTT_KEEPALIVE == 60
+        assert mqtt_service.DEFAULT_MQTT_PORT == 8883
+        assert mqtt_service.DEFAULT_MQTT_TIMEOUT == 30
+        assert mqtt_service.DEFAULT_MQTT_KEEPALIVE == 60

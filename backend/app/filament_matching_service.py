@@ -10,8 +10,8 @@ import re
 from dataclasses import dataclass
 from typing import List, Optional, Tuple
 
-from app.model_service import FilamentRequirement
-from app.printer_service import AMSFilament, AMSStatusResult, AMSUnit
+from app.model_schemas import FilamentRequirement
+from app.printer_schemas import AMSFilament, AMSStatusResult, AMSUnit
 
 logger = logging.getLogger(__name__)
 

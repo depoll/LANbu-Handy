@@ -183,7 +183,7 @@ async def run_mqtt_query_async(
         MQTTOperationCancelled: If the operation was cancelled
         PrinterMQTTError: If the MQTT operation fails
     """
-    from app.printer_service import PrinterMQTTError
+    from app.printer_schemas import PrinterMQTTError
 
     # First, cancel any existing operations for this printer
     cancel_printer_mqtt_operations(printer_config.ip)
@@ -269,7 +269,8 @@ async def run_mqtt_query_async(
 # Monkey patch to add async support to PrinterService
 def add_async_support_to_printer_service():
     """Add async support to the existing PrinterService class."""
-    from app.printer_service import PrinterMQTTError, PrinterService
+    from app.printer_schemas import PrinterMQTTError
+    from app.printer_service import PrinterService
 
     # Store original methods for fallback
     original_query_ams_status = PrinterService.query_ams_status

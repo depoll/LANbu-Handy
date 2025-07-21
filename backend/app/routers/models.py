@@ -4,7 +4,7 @@ Model management endpoints for LANbu Handy
 
 import logging
 
-from app.model_service import (
+from app.model_schemas import (
     ModelDownloadError,
     ModelValidationError,
 )

@@ -8,8 +8,8 @@ import tempfile
 from pathlib import Path
 
 import pytest
-from app.model_service import ModelDownloadError, ModelValidationError
-from app.printer_service import PrinterCommunicationError, PrinterMQTTError
+from app.model_schemas import ModelDownloadError, ModelValidationError
+from app.printer_schemas import PrinterCommunicationError, PrinterMQTTError
 from app.utils import (
     build_slicing_options_from_config,
     find_gcode_file,

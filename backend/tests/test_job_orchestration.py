@@ -14,7 +14,7 @@ from app.job_orchestration import (
     start_print_step,
     upload_gcode_step,
 )
-from app.model_service import ModelDownloadError, ModelValidationError
+from app.model_schemas import ModelDownloadError, ModelValidationError
 from app.slicer_service import CLIResult
 
 

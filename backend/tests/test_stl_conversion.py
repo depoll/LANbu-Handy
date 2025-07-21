@@ -7,7 +7,8 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pytest
-from app.model_service import ModelService, ModelValidationError
+from app.model_schemas import ModelValidationError
+from app.model_service import ModelService
 
 
 class TestModelServiceSTLConversion:

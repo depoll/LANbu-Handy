@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 from app.main import app
-from app.model_service import ModelDownloadError, ModelValidationError
+from app.model_schemas import ModelDownloadError, ModelValidationError
 from fastapi.testclient import TestClient
 
 client = TestClient(app)
@@ -203,7 +203,7 @@ class TestModelSubmissionEndpoint:
         """Test model submission includes filament requirements for .3mf files."""
         from pathlib import Path
 
-        from app.model_service import FilamentRequirement
+        from app.model_schemas import FilamentRequirement
 
         # Mock successful download
         mock_file_path = Path("/tmp/test.3mf")
@@ -1115,7 +1115,7 @@ class TestAMSStatusEndpoint:
     async def test_ams_status_mqtt_exception(self, mock_get_config):
         """Test AMS status when MQTT exception is raised."""
         from app.config import PrinterConfig
-        from app.printer_service import PrinterMQTTError
+        from app.printer_schemas import PrinterMQTTError
 
         # Mock configuration
         mock_config = mock_get_config.return_value

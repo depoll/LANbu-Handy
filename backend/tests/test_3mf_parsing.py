@@ -5,7 +5,8 @@ import tempfile
 import zipfile
 from pathlib import Path
 
-from app.model_service import FilamentRequirement, ModelService
+from app.model_schemas import FilamentRequirement
+from app.model_service import ModelService
 
 
 class TestFilamentRequirement:
