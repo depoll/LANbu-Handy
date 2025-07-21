@@ -1,6 +1,10 @@
 {
   "permissions": {
-    "additionalDirectories": ["/opt/bambu-studio-resources", "/tmp"]
+    "additionalDirectories": [
+      "/opt/bambu-studio-resources",
+      "/tmp",
+      "/workspace-worktrees"
+    ]
   },
   "hooks": {
     "PostToolUse": [

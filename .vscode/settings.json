@@ -4,13 +4,11 @@
     ],
     "python.testing.unittestEnabled": false,
     "python.testing.pytestEnabled": true,
-
     // Auto-format on save
     "editor.formatOnSave": true,
     "editor.codeActionsOnSave": {
         "source.organizeImports": "explicit"
     },
-
     // Python formatting
     "[python]": {
         "editor.defaultFormatter": "ms-python.black-formatter",
@@ -19,7 +17,6 @@
             "source.organizeImports": "explicit"
         }
     },
-
     // TypeScript/JavaScript formatting
     "[typescript]": {
         "editor.defaultFormatter": "esbenp.prettier-vscode",
@@ -37,7 +34,6 @@
         "editor.defaultFormatter": "esbenp.prettier-vscode",
         "editor.formatOnSave": true
     },
-
     // JSON/CSS/HTML formatting
     "[json]": {
         "editor.defaultFormatter": "esbenp.prettier-vscode",
@@ -51,17 +47,16 @@
         "editor.defaultFormatter": "esbenp.prettier-vscode",
         "editor.formatOnSave": true
     },
-
     // Python linting
     "python.linting.enabled": true,
     "python.linting.flake8Enabled": true,
     "python.linting.pylintEnabled": false,
-
     // TypeScript/ESLint
     "eslint.validate": [
         "javascript",
         "javascriptreact",
         "typescript",
         "typescriptreact"
-    ]
+    ],
+    "window.title": "${activeEditorShort}${separator}${rootName}${separator}${profileName}"
 }
