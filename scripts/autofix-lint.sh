@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # Auto-fix linting issues for LANbu Handy
 

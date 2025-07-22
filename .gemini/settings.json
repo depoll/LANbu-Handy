@@ -3,6 +3,9 @@
     "playwright": {
       "command": "npx",
       "args": ["@playwright/mcp", "--browser", "chromium"]
+    },
+    "context7": {
+      "httpUrl": "https://mcp.context7.com/mcp"
     }
   }
 }

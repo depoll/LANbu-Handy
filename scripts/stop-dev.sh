@@ -4,12 +4,66 @@
 # This is useful when servers are orphaned or start-dev.sh didn't clean up properly
 # NOTE: This script is careful to avoid killing VSCode-related processes, SSH connections,
 # or other critical processes that would disconnect you from the dev container
+# Supports worktree-specific ports via .env file
 
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
 NC='\033[0m' # No Color
+
+# Function to load environment variables from .env file
+load_env() {
+    local env_file="${1:-.env}"
+    if [ -f "$env_file" ]; then
+        echo -e "${GREEN}Loading environment from: $env_file${NC}"
+        # Load variables line by line to handle special characters properly
+        while IFS= read -r line; do
+            # Skip comments and empty lines
+            [[ $line =~ ^[[:space:]]*# ]] && continue
+            [[ $line =~ ^[[:space:]]*$ ]] && continue
+            # Export the variable
+            export "$line"
+        done < "$env_file"
+        return 0
+    else
+        echo -e "${YELLOW}No .env file found at: $env_file${NC}"
+        echo -e "${YELLOW}Using default port configuration${NC}"
+        return 1
+    fi
+}
+
+# Load environment variables
+# Store the original directory and find project root
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Detect project root more robustly
+if [[ "$SCRIPT_DIR" == */scripts ]]; then
+    # Script is in scripts/ directory
+    PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+else
+    # Script is likely in project root or symlinked
+    PROJECT_ROOT="$SCRIPT_DIR"
+fi
+
+# Check if we're in a worktree by looking for .git file (not directory)
+if [ -f "$PROJECT_ROOT/.git" ]; then
+    echo -e "${BLUE}Detected git worktree environment${NC}"
+fi
+
+ENV_FILE="$PROJECT_ROOT/.env"
+
+# Try to load .env file and set defaults if not found
+load_env "$ENV_FILE"
+
+# Set default values if not defined in environment
+BACKEND_PORT=${BACKEND_PORT:-8000}
+FRONTEND_PORT=${FRONTEND_PORT:-3000}
+
+echo -e "${BLUE}Stopping servers for configuration:${NC}"
+echo -e "  Backend port: $BACKEND_PORT"
+echo -e "  Frontend port: $FRONTEND_PORT"
 
 echo -e "${YELLOW}Stopping LANbu Handy development servers...${NC}"
 
@@ -89,27 +143,27 @@ else
     echo -e "${YELLOW}No backend server was running.${NC}"
 fi
 
-# Kill processes on port 8000 - try graceful shutdown first
-if command -v lsof >/dev/null 2>&1 && lsof -ti:8000 >/dev/null 2>&1; then
+# Kill processes on configured backend port - try graceful shutdown first
+if command -v lsof >/dev/null 2>&1 && lsof -ti:$BACKEND_PORT >/dev/null 2>&1; then
     # Try SIGTERM first, then SIGKILL if needed
-    lsof -ti:8000 | xargs -r kill 2>/dev/null || true
+    lsof -ti:$BACKEND_PORT | xargs -r kill 2>/dev/null || true
     sleep 1
-    if lsof -ti:8000 >/dev/null 2>&1; then
-        lsof -ti:8000 | xargs -r kill -9 2>/dev/null || true
+    if lsof -ti:$BACKEND_PORT >/dev/null 2>&1; then
+        lsof -ti:$BACKEND_PORT | xargs -r kill -9 2>/dev/null || true
     fi
-    echo -e "${GREEN}Killed processes on port 8000.${NC}"
+    echo -e "${GREEN}Killed processes on port $BACKEND_PORT.${NC}"
 elif command -v netstat >/dev/null 2>&1; then
     # Use netstat as fallback
-    PIDS=$(netstat -tlnp 2>/dev/null | grep :8000 | awk '{print $7}' | cut -d'/' -f1 | grep -E '^[0-9]+$' || true)
+    PIDS=$(netstat -tlnp 2>/dev/null | grep :$BACKEND_PORT | awk '{print $7}' | cut -d'/' -f1 | grep -E '^[0-9]+$' || true)
     if [ -n "$PIDS" ]; then
         echo "$PIDS" | xargs -r kill 2>/dev/null || true
         sleep 1
         # Force kill if still running
-        PIDS=$(netstat -tlnp 2>/dev/null | grep :8000 | awk '{print $7}' | cut -d'/' -f1 | grep -E '^[0-9]+$' || true)
+        PIDS=$(netstat -tlnp 2>/dev/null | grep :$BACKEND_PORT | awk '{print $7}' | cut -d'/' -f1 | grep -E '^[0-9]+$' || true)
         if [ -n "$PIDS" ]; then
             echo "$PIDS" | xargs -r kill -9 2>/dev/null || true
         fi
-        echo -e "${GREEN}Killed processes on port 8000.${NC}"
+        echo -e "${GREEN}Killed processes on port $BACKEND_PORT.${NC}"
     fi
 fi
 
@@ -168,11 +222,11 @@ ESBUILD_PIDS=$(pgrep -f "esbuild.*service" | while read pid; do
     fi
 done)
 
-# Also check for vite processes listening on port 3000
+# Also check for vite processes listening on configured frontend port
 if command -v lsof >/dev/null 2>&1; then
-    PORT_3000_PIDS=$(lsof -ti:3000 2>/dev/null || true)
-    if [ -n "$PORT_3000_PIDS" ]; then
-        VITE_PIDS="${VITE_PIDS}${VITE_PIDS:+$'\n'}${PORT_3000_PIDS}"
+    FRONTEND_PORT_PIDS=$(lsof -ti:$FRONTEND_PORT 2>/dev/null || true)
+    if [ -n "$FRONTEND_PORT_PIDS" ]; then
+        VITE_PIDS="${VITE_PIDS}${VITE_PIDS:+$'\n'}${FRONTEND_PORT_PIDS}"
     fi
 fi
 
@@ -203,35 +257,35 @@ fi
 echo -e "\n${YELLOW}Checking server status...${NC}"
 
 # Check backend port
-PORT_8000_FREE=true
-if command -v lsof >/dev/null 2>&1 && lsof -i:8000 >/dev/null 2>&1; then
-    PORT_8000_FREE=false
-elif command -v netstat >/dev/null 2>&1 && netstat -tln 2>/dev/null | grep -q :8000; then
-    PORT_8000_FREE=false
-elif command -v ss >/dev/null 2>&1 && ss -tln | grep -q :8000; then
-    PORT_8000_FREE=false
+BACKEND_PORT_FREE=true
+if command -v lsof >/dev/null 2>&1 && lsof -i:$BACKEND_PORT >/dev/null 2>&1; then
+    BACKEND_PORT_FREE=false
+elif command -v netstat >/dev/null 2>&1 && netstat -tln 2>/dev/null | grep -q :$BACKEND_PORT; then
+    BACKEND_PORT_FREE=false
+elif command -v ss >/dev/null 2>&1 && ss -tln | grep -q :$BACKEND_PORT; then
+    BACKEND_PORT_FREE=false
 fi
 
-if [ "$PORT_8000_FREE" = false ]; then
-    echo -e "${RED}Warning: Backend server still running on port 8000!${NC}"
+if [ "$BACKEND_PORT_FREE" = false ]; then
+    echo -e "${RED}Warning: Backend server still running on port $BACKEND_PORT!${NC}"
 else
-    echo -e "${GREEN}✓ Backend server stopped (port 8000 free)${NC}"
+    echo -e "${GREEN}✓ Backend server stopped (port $BACKEND_PORT free)${NC}"
 fi
 
 # Check PWA port
-PORT_3000_FREE=true
-if command -v lsof >/dev/null 2>&1 && lsof -i:3000 >/dev/null 2>&1; then
-    PORT_3000_FREE=false
-elif command -v netstat >/dev/null 2>&1 && netstat -tln 2>/dev/null | grep -q :3000; then
-    PORT_3000_FREE=false
-elif command -v ss >/dev/null 2>&1 && ss -tln | grep -q :3000; then
-    PORT_3000_FREE=false
+FRONTEND_PORT_FREE=true
+if command -v lsof >/dev/null 2>&1 && lsof -i:$FRONTEND_PORT >/dev/null 2>&1; then
+    FRONTEND_PORT_FREE=false
+elif command -v netstat >/dev/null 2>&1 && netstat -tln 2>/dev/null | grep -q :$FRONTEND_PORT; then
+    FRONTEND_PORT_FREE=false
+elif command -v ss >/dev/null 2>&1 && ss -tln | grep -q :$FRONTEND_PORT; then
+    FRONTEND_PORT_FREE=false
 fi
 
-if [ "$PORT_3000_FREE" = false ]; then
-    echo -e "${RED}Warning: PWA server still running on port 3000!${NC}"
+if [ "$FRONTEND_PORT_FREE" = false ]; then
+    echo -e "${RED}Warning: PWA server still running on port $FRONTEND_PORT!${NC}"
 else
-    echo -e "${GREEN}✓ PWA server stopped (port 3000 free)${NC}"
+    echo -e "${GREEN}✓ PWA server stopped (port $FRONTEND_PORT free)${NC}"
 fi
 
 # Final targeted cleanup for any missed LANbu Handy processes
@@ -252,35 +306,35 @@ if [ -n "$REMAINING_ESBUILD" ]; then
 fi
 
 # Only clean up processes that are definitely ours, not VSCode's
-# Check for any remaining processes on our dev ports
+# Check for any remaining processes on our configured dev ports
 if command -v lsof >/dev/null 2>&1; then
-    # Check port 3000 for any remaining processes
-    PORT_3000_REMAINING=$(lsof -ti:3000 2>/dev/null || true)
-    if [ -n "$PORT_3000_REMAINING" ]; then
-        echo -e "${YELLOW}Found remaining processes on port 3000, cleaning up...${NC}"
-        echo "$PORT_3000_REMAINING" | xargs -r kill -9 2>/dev/null || true
+    # Check frontend port for any remaining processes
+    FRONTEND_PORT_REMAINING=$(lsof -ti:$FRONTEND_PORT 2>/dev/null || true)
+    if [ -n "$FRONTEND_PORT_REMAINING" ]; then
+        echo -e "${YELLOW}Found remaining processes on port $FRONTEND_PORT, cleaning up...${NC}"
+        echo "$FRONTEND_PORT_REMAINING" | xargs -r kill -9 2>/dev/null || true
     fi
 
-    # Check port 8000 for any remaining processes
-    PORT_8000_REMAINING=$(lsof -ti:8000 2>/dev/null || true)
-    if [ -n "$PORT_8000_REMAINING" ]; then
-        echo -e "${YELLOW}Found remaining processes on port 8000, cleaning up...${NC}"
-        echo "$PORT_8000_REMAINING" | xargs -r kill -9 2>/dev/null || true
+    # Check backend port for any remaining processes
+    BACKEND_PORT_REMAINING=$(lsof -ti:$BACKEND_PORT 2>/dev/null || true)
+    if [ -n "$BACKEND_PORT_REMAINING" ]; then
+        echo -e "${YELLOW}Found remaining processes on port $BACKEND_PORT, cleaning up...${NC}"
+        echo "$BACKEND_PORT_REMAINING" | xargs -r kill -9 2>/dev/null || true
     fi
 else
     # Use ps and grep as fallback since lsof is not available
-    # Find processes listening on port 8000
-    PORT_8000_PIDS=$(netstat -tlnp 2>/dev/null | grep :8000 | awk '{print $7}' | cut -d'/' -f1 | grep -E '^[0-9]+$' || true)
-    if [ -n "$PORT_8000_PIDS" ]; then
-        echo -e "${YELLOW}Found processes on port 8000, cleaning up...${NC}"
-        echo "$PORT_8000_PIDS" | xargs -r kill -9 2>/dev/null || true
+    # Find processes listening on backend port
+    BACKEND_PORT_PIDS=$(netstat -tlnp 2>/dev/null | grep :$BACKEND_PORT | awk '{print $7}' | cut -d'/' -f1 | grep -E '^[0-9]+$' || true)
+    if [ -n "$BACKEND_PORT_PIDS" ]; then
+        echo -e "${YELLOW}Found processes on port $BACKEND_PORT, cleaning up...${NC}"
+        echo "$BACKEND_PORT_PIDS" | xargs -r kill -9 2>/dev/null || true
     fi
 
-    # Find processes listening on port 3000
-    PORT_3000_PIDS=$(netstat -tlnp 2>/dev/null | grep :3000 | awk '{print $7}' | cut -d'/' -f1 | grep -E '^[0-9]+$' || true)
-    if [ -n "$PORT_3000_PIDS" ]; then
-        echo -e "${YELLOW}Found processes on port 3000, cleaning up...${NC}"
-        echo "$PORT_3000_PIDS" | xargs -r kill -9 2>/dev/null || true
+    # Find processes listening on frontend port
+    FRONTEND_PORT_PIDS=$(netstat -tlnp 2>/dev/null | grep :$FRONTEND_PORT | awk '{print $7}' | cut -d'/' -f1 | grep -E '^[0-9]+$' || true)
+    if [ -n "$FRONTEND_PORT_PIDS" ]; then
+        echo -e "${YELLOW}Found processes on port $FRONTEND_PORT, cleaning up...${NC}"
+        echo "$FRONTEND_PORT_PIDS" | xargs -r kill -9 2>/dev/null || true
     fi
 fi
 
