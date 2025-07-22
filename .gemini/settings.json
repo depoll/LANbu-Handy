@@ -5,7 +5,8 @@
       "args": ["@playwright/mcp", "--browser", "chromium"]
     },
     "context7": {
-      "httpUrl": "https://mcp.context7.com/mcp"
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp"]
     }
   }
 }
