@@ -262,10 +262,11 @@ const ModelPreviewEnhanced = forwardRef<ModelPreviewRef, ModelPreviewProps>(
           console.log(
             `Creating painted material for filament ${filamentIndex}`
           );
-          const material = new THREE.MeshPhongMaterial({
+          const material = new THREE.MeshStandardMaterial({
             vertexColors: true, // Enable vertex colors
             side: THREE.DoubleSide,
-            shininess: 100,
+            roughness: 0.5,
+            metalness: 0.1,
           });
           material.userData.isPainted = true;
           console.log(`Created painted material:`, material);
@@ -279,10 +280,12 @@ const ModelPreviewEnhanced = forwardRef<ModelPreviewRef, ModelPreviewProps>(
 
         if (!isMapped) {
           // Pulsing material for unmapped filaments
-          const material = new THREE.MeshPhongMaterial({
+          const material = new THREE.MeshStandardMaterial({
             color: new THREE.Color(color),
             emissive: new THREE.Color(color),
             emissiveIntensity: 0.2,
+            roughness: 0.5,
+            metalness: 0.1,
           });
 
           // Store original emissive intensity for animation
@@ -294,9 +297,13 @@ const ModelPreviewEnhanced = forwardRef<ModelPreviewRef, ModelPreviewProps>(
         }
 
         // Normal material for mapped filaments
-        return new THREE.MeshPhongMaterial({
+        // Use MeshStandardMaterial for better color representation
+        return new THREE.MeshStandardMaterial({
           color: new THREE.Color(color),
-          shininess: 100,
+          roughness: 0.5,
+          metalness: 0.1,
+          emissive: new THREE.Color(color),
+          emissiveIntensity: 0.2, // Self-illumination for brighter colors
         });
       },
       [filamentMappings, getFilamentColor]
@@ -399,9 +406,12 @@ const ModelPreviewEnhanced = forwardRef<ModelPreviewRef, ModelPreviewProps>(
           matrix.fromArray(obj.transform);
 
           // Log transform details
+          const position = new THREE.Vector3().setFromMatrixPosition(matrix);
+          const scale = new THREE.Vector3().setFromMatrixScale(matrix);
           console.log(`Object ${obj.id} transform:`, {
-            matrix: obj.transform,
-            position: new THREE.Vector3().setFromMatrixPosition(matrix),
+            matrix: Array.from(obj.transform),
+            position: { x: position.x, y: position.y, z: position.z },
+            scale: { x: scale.x, y: scale.y, z: scale.z },
           });
 
           mesh.applyMatrix4(matrix);
@@ -471,11 +481,13 @@ const ModelPreviewEnhanced = forwardRef<ModelPreviewRef, ModelPreviewProps>(
           // Build plate surface on XY plane at Z=0 (bed level in 3MF coordinates)
           const plateGeometry = new THREE.PlaneGeometry(plateWidth, plateDepth);
           // PlaneGeometry is already on XY plane, perfect for 3MF coordinates
-          const plateMaterial = new THREE.MeshPhongMaterial({
+          const plateMaterial = new THREE.MeshStandardMaterial({
             color: 0xf8f8f8,
             transparent: true,
             opacity: 0.15,
             side: THREE.DoubleSide,
+            roughness: 0.8,
+            metalness: 0,
           });
           const buildPlate = new THREE.Mesh(plateGeometry, plateMaterial);
           buildPlate.position.set(center.x, center.y, plateZ - 0.1); // Slightly below grid at bed level
@@ -602,6 +614,32 @@ const ModelPreviewEnhanced = forwardRef<ModelPreviewRef, ModelPreviewProps>(
         setError(error.message);
         setIsLoading(false);
 
+        // Clean up any existing 3D scene before showing thumbnail
+        if (sceneRef.current) {
+          // Remove all objects from scene
+          while (sceneRef.current.children.length > 0) {
+            const child = sceneRef.current.children[0];
+            if ('geometry' in child) (child as THREE.Mesh).geometry?.dispose();
+            if ('material' in child) {
+              const material = (child as THREE.Mesh).material;
+              if (Array.isArray(material)) {
+                material.forEach(m => m.dispose());
+              } else if (material) {
+                material.dispose();
+              }
+            }
+            sceneRef.current.remove(child);
+          }
+        }
+
+        // Remove canvas from DOM before showing thumbnail
+        if (mountRef.current && rendererRef.current) {
+          const canvas = rendererRef.current.domElement;
+          if (mountRef.current.contains(canvas)) {
+            mountRef.current.removeChild(canvas);
+          }
+        }
+
         // Try thumbnail fallback
         const thumbnailUrl =
           selectedPlateIndex !== null
@@ -681,12 +719,21 @@ const ModelPreviewEnhanced = forwardRef<ModelPreviewRef, ModelPreviewProps>(
         controls.minDistance = 5;
         controls.maxDistance = 1000; // Increased from 200 to allow zooming out much further
 
-        // Improved lighting setup for better visibility and stability
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+        // Bright lighting setup for accurate color representation
+        // Very high ambient light for bright colors
+        const ambientLight = new THREE.AmbientLight(0xffffff, 1.0);
         scene.add(ambientLight);
 
+        // Hemisphere light for natural lighting
+        const hemisphereLight = new THREE.HemisphereLight(
+          0xffffff,
+          0xffffff,
+          0.6
+        );
+        scene.add(hemisphereLight);
+
         // Main key light from front-right
-        const keyLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        const keyLight = new THREE.DirectionalLight(0xffffff, 1.5);
         keyLight.position.set(200, 200, 200);
         keyLight.castShadow = true;
         keyLight.shadow.mapSize.width = 2048;
@@ -700,14 +747,19 @@ const ModelPreviewEnhanced = forwardRef<ModelPreviewRef, ModelPreviewProps>(
         scene.add(keyLight);
 
         // Fill light from back-left
-        const fillLight = new THREE.DirectionalLight(0xffffff, 0.3);
+        const fillLight = new THREE.DirectionalLight(0xffffff, 0.8);
         fillLight.position.set(-100, 150, -100);
         scene.add(fillLight);
 
         // Additional side light for better form definition
-        const sideLight = new THREE.DirectionalLight(0xffffff, 0.2);
+        const sideLight = new THREE.DirectionalLight(0xffffff, 0.6);
         sideLight.position.set(100, 50, -200);
         scene.add(sideLight);
+
+        // Top light to brighten upward-facing surfaces
+        const topLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        topLight.position.set(0, 300, 0);
+        scene.add(topLight);
 
         // Build plate is now created dynamically with each model to maintain proper 3MF layout
         console.log(
@@ -726,7 +778,7 @@ const ModelPreviewEnhanced = forwardRef<ModelPreviewRef, ModelPreviewProps>(
           // Pulse unmapped materials
           const time = Date.now() * 0.003;
           plateObjectsRef.current.forEach(mesh => {
-            const material = mesh.material as THREE.MeshPhongMaterial;
+            const material = mesh.material as THREE.MeshStandardMaterial;
             if (material.userData.isUnmapped) {
               material.emissiveIntensity = 0.2 + Math.sin(time) * 0.15;
             }
@@ -848,17 +900,35 @@ const ModelPreviewEnhanced = forwardRef<ModelPreviewRef, ModelPreviewProps>(
         setIsLoading(true);
         setError(null);
 
-        // Fetch the 3MF file
+        // Fetch the 3MF file with retry logic
         console.log('Fetching 3MF file with fileId:', fileId);
-        fetch(`/api/model/preview/${fileId}`)
-          .then(response => {
-            if (!response.ok) {
-              throw new Error(
-                `Failed to fetch file: ${response.status} ${response.statusText}`
+
+        const fetchWithRetry = async (
+          url: string,
+          retries = 3
+        ): Promise<ArrayBuffer> => {
+          for (let i = 0; i < retries; i++) {
+            try {
+              const response = await fetch(url);
+              if (!response.ok) {
+                throw new Error(
+                  `Failed to fetch file: ${response.status} ${response.statusText}`
+                );
+              }
+              return await response.arrayBuffer();
+            } catch (err) {
+              console.warn(`Fetch attempt ${i + 1} failed:`, err);
+              if (i === retries - 1) throw err;
+              // Wait a bit before retrying (exponential backoff)
+              await new Promise(resolve =>
+                setTimeout(resolve, 1000 * Math.pow(2, i))
               );
             }
-            return response.arrayBuffer();
-          })
+          }
+          throw new Error('Failed to fetch after all retries');
+        };
+
+        fetchWithRetry(`/api/model/preview/${fileId}`)
           .then(arrayBuffer => {
             // Parse the specific plate or all plates
             const targetPlate =
@@ -1099,7 +1169,10 @@ const ModelPreviewEnhanced = forwardRef<ModelPreviewRef, ModelPreviewProps>(
                 alignItems: 'center',
                 justifyContent: 'center',
                 height: '100%',
+                width: '100%',
                 padding: '20px',
+                position: 'relative',
+                overflow: 'hidden',
               }}
             >
               <img
@@ -1109,6 +1182,7 @@ const ModelPreviewEnhanced = forwardRef<ModelPreviewRef, ModelPreviewProps>(
                   maxWidth: '100%',
                   maxHeight: '460px',
                   objectFit: 'contain',
+                  display: 'block',
                 }}
                 onError={() => {
                   setError('Failed to load model preview and thumbnail');

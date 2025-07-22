@@ -803,10 +803,17 @@ async def get_model_preview(file_id: str):
         else:
             media_type = "application/octet-stream"
 
+        # Get file size for proper Content-Length header
+        file_size = model_file_path.stat().st_size
+
         return FileResponse(
             path=model_file_path,
             media_type=media_type,
             filename=model_file_path.name,
+            headers={
+                "Content-Length": str(file_size),
+                "Cache-Control": "private, max-age=3600",
+            },
         )
 
     except HTTPException:
