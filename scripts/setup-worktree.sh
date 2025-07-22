@@ -320,6 +320,23 @@ main() {
         fi
     done
 
+    # Copy Claude Code and Gemini configurations
+    echo -e "${YELLOW}Copying Claude Code and Gemini configurations...${NC}"
+
+    # Copy Claude Code configuration directory
+    if [ -d "$PROJECT_ROOT/.claude" ]; then
+        cp -r "$PROJECT_ROOT/.claude" "$worktree_dir/"
+        echo -e "${GREEN}✓ Copied Claude Code configuration (.claude/)${NC}"
+        config_copied=true
+    fi
+
+    # Copy MCP configuration
+    if [ -f "$PROJECT_ROOT/.mcp.json" ]; then
+        cp "$PROJECT_ROOT/.mcp.json" "$worktree_dir/"
+        echo -e "${GREEN}✓ Copied MCP configuration (.mcp.json)${NC}"
+        config_copied=true
+    fi
+
     if [ "$config_copied" = false ]; then
         echo -e "${YELLOW}No configuration files found to copy${NC}"
         echo -e "${BLUE}You can add printer configurations later via the UI${NC}"
