@@ -10,6 +10,9 @@ import {
   FilamentMatchResponse,
 } from '../types/api';
 
+// Constants
+const AUTO_SLICE_DELAY = 100; // Delay in ms to batch rapid config changes
+
 // Shared build plate configuration
 const BUILD_PLATES = [
   {
@@ -404,7 +407,7 @@ function PlateSelector({
   const [failedThumbnails, setFailedThumbnails] = useState<Set<string>>(
     new Set()
   );
-  const autoSliceTimerRef = useRef<number | null>(null);
+  const autoSliceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [isMatching, setIsMatching] = useState(false);
   const [matchingError, setMatchingError] = useState<string | null>(null);
 
@@ -867,7 +870,7 @@ function PlateSelector({
         autoSliceTimerRef.current = setTimeout(() => {
           autoSliceTimerRef.current = null;
           triggerSequentialSlicing();
-        }, 100); // Short delay to batch rapid config changes
+        }, AUTO_SLICE_DELAY); // Short delay to batch rapid config changes
       }
     }
   }, [

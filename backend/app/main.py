@@ -804,7 +804,11 @@ async def get_model_preview(file_id: str):
             media_type = "application/octet-stream"
 
         # Get file size for proper Content-Length header
-        file_size = model_file_path.stat().st_size
+        try:
+            file_size = model_file_path.stat().st_size
+        except OSError as e:
+            logger.error(f"Failed to get file size for {model_file_path}: {e}")
+            raise HTTPException(status_code=500, detail="Unable to access model file")
 
         return FileResponse(
             path=model_file_path,

@@ -15,6 +15,44 @@ import {
   AMSStatusResponse,
 } from '../types/api';
 
+// Constants for 3D rendering and materials
+const MATERIAL_CONSTANTS = {
+  ROUGHNESS: 0.5,
+  METALNESS: 0.1,
+  EMISSIVE_INTENSITY: 0.2,
+  BUILD_PLATE_OPACITY: 0.15,
+  BUILD_PLATE_ROUGHNESS: 0.8,
+  BUILD_PLATE_OFFSET: 0.1,
+} as const;
+
+const CAMERA_CONSTANTS = {
+  DISTANCE_MULTIPLIER: 1.2,
+  HEIGHT_MULTIPLIER: 0.6,
+  NEAR_PLANE: 0.1,
+  FAR_PLANE: 2000,
+  MAX_DISTANCE: 1000,
+} as const;
+
+const LIGHTING_CONSTANTS = {
+  AMBIENT_INTENSITY: 1.0,
+  KEY_LIGHT_INTENSITY: 1.5,
+  FILL_LIGHT_INTENSITY: 0.8,
+  SIDE_LIGHT_INTENSITY: 0.6,
+  TOP_LIGHT_INTENSITY: 0.8,
+  SHADOW_CAMERA_SIZE: 200,
+} as const;
+
+const CONTROLS_CONSTANTS = {
+  DAMPING_FACTOR: 0.05,
+  ROTATE_SPEED: 0.5,
+  ZOOM_SPEED: 0.8,
+} as const;
+
+const RETRY_CONSTANTS = {
+  BASE_DELAY: 1000,
+  MAX_RETRIES: 3,
+} as const;
+
 // Web Worker types
 interface PlateObject {
   id: string;
@@ -265,8 +303,8 @@ const ModelPreviewEnhanced = forwardRef<ModelPreviewRef, ModelPreviewProps>(
           const material = new THREE.MeshStandardMaterial({
             vertexColors: true, // Enable vertex colors
             side: THREE.DoubleSide,
-            roughness: 0.5,
-            metalness: 0.1,
+            roughness: MATERIAL_CONSTANTS.ROUGHNESS,
+            metalness: MATERIAL_CONSTANTS.METALNESS,
           });
           material.userData.isPainted = true;
           console.log(`Created painted material:`, material);
@@ -283,14 +321,14 @@ const ModelPreviewEnhanced = forwardRef<ModelPreviewRef, ModelPreviewProps>(
           const material = new THREE.MeshStandardMaterial({
             color: new THREE.Color(color),
             emissive: new THREE.Color(color),
-            emissiveIntensity: 0.2,
-            roughness: 0.5,
-            metalness: 0.1,
+            emissiveIntensity: MATERIAL_CONSTANTS.EMISSIVE_INTENSITY,
+            roughness: MATERIAL_CONSTANTS.ROUGHNESS,
+            metalness: MATERIAL_CONSTANTS.METALNESS,
           });
 
           // Store original emissive intensity for animation
           // Using userData to avoid TypeScript any type
-          material.userData.originalEmissiveIntensity = 0.2;
+          material.userData.originalEmissiveIntensity = MATERIAL_CONSTANTS.EMISSIVE_INTENSITY;
           material.userData.isUnmapped = true;
 
           return material;
@@ -484,13 +522,13 @@ const ModelPreviewEnhanced = forwardRef<ModelPreviewRef, ModelPreviewProps>(
           const plateMaterial = new THREE.MeshStandardMaterial({
             color: 0xf8f8f8,
             transparent: true,
-            opacity: 0.15,
+            opacity: MATERIAL_CONSTANTS.BUILD_PLATE_OPACITY,
             side: THREE.DoubleSide,
-            roughness: 0.8,
+            roughness: MATERIAL_CONSTANTS.BUILD_PLATE_ROUGHNESS,
             metalness: 0,
           });
           const buildPlate = new THREE.Mesh(plateGeometry, plateMaterial);
-          buildPlate.position.set(center.x, center.y, plateZ - 0.1); // Slightly below grid at bed level
+          buildPlate.position.set(center.x, center.y, plateZ - MATERIAL_CONSTANTS.BUILD_PLATE_OFFSET); // Slightly below grid at bed level
           buildPlate.receiveShadow = true;
           buildPlateGroup.add(buildPlate);
 
@@ -556,10 +594,10 @@ const ModelPreviewEnhanced = forwardRef<ModelPreviewRef, ModelPreviewProps>(
 
             // Calculate camera distance to fit the model nicely
             const fov = cameraRef.current.fov * (Math.PI / 180); // Convert to radians
-            const cameraDistance = (maxDimension / 2 / Math.tan(fov / 2)) * 1.2; // 1.2 for some padding
+            const cameraDistance = (maxDimension / 2 / Math.tan(fov / 2)) * CAMERA_CONSTANTS.DISTANCE_MULTIPLIER; // 1.2 for some padding
 
             // Position camera so front of build plate is parallel to viewport
-            const cameraHeight = cameraDistance * 0.6; // Slightly elevated view
+            const cameraHeight = cameraDistance * CAMERA_CONSTANTS.HEIGHT_MULTIPLIER; // Slightly elevated view
             const cameraX = 0; // Center on X axis
             const cameraZ = cameraDistance; // Position directly in front
 
@@ -679,8 +717,8 @@ const ModelPreviewEnhanced = forwardRef<ModelPreviewRef, ModelPreviewProps>(
         const camera = new THREE.PerspectiveCamera(
           75,
           width / height,
-          0.1,
-          2000 // Increased far plane to handle very large models
+          CAMERA_CONSTANTS.NEAR_PLANE,
+          CAMERA_CONSTANTS.FAR_PLANE // Increased far plane to handle very large models
         );
         // Set initial camera position (will be adjusted when model loads)
         const maxBuildDim = Math.max(
@@ -688,8 +726,8 @@ const ModelPreviewEnhanced = forwardRef<ModelPreviewRef, ModelPreviewProps>(
           buildVolume.depth,
           buildVolume.height
         );
-        const cameraDistance = maxBuildDim * 1.2; // More reasonable initial distance
-        const cameraHeight = maxBuildDim * 0.8;
+        const cameraDistance = maxBuildDim * CAMERA_CONSTANTS.DISTANCE_MULTIPLIER; // More reasonable initial distance
+        const cameraHeight = maxBuildDim * CAMERA_CONSTANTS.HEIGHT_MULTIPLIER;
 
         camera.position.set(0, cameraHeight, cameraDistance); // Front-facing initial position
         camera.lookAt(0, 0, 0);
@@ -713,15 +751,15 @@ const ModelPreviewEnhanced = forwardRef<ModelPreviewRef, ModelPreviewProps>(
         // Add orbit controls
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
-        controls.dampingFactor = 0.05;
-        controls.rotateSpeed = 0.5;
-        controls.zoomSpeed = 0.8;
+        controls.dampingFactor = CONTROLS_CONSTANTS.DAMPING_FACTOR;
+        controls.rotateSpeed = CONTROLS_CONSTANTS.ROTATE_SPEED;
+        controls.zoomSpeed = CONTROLS_CONSTANTS.ZOOM_SPEED;
         controls.minDistance = 5;
-        controls.maxDistance = 1000; // Increased from 200 to allow zooming out much further
+        controls.maxDistance = CAMERA_CONSTANTS.MAX_DISTANCE; // Increased from 200 to allow zooming out much further
 
         // Bright lighting setup for accurate color representation
         // Very high ambient light for bright colors
-        const ambientLight = new THREE.AmbientLight(0xffffff, 1.0);
+        const ambientLight = new THREE.AmbientLight(0xffffff, LIGHTING_CONSTANTS.AMBIENT_INTENSITY);
         scene.add(ambientLight);
 
         // Hemisphere light for natural lighting
@@ -733,7 +771,7 @@ const ModelPreviewEnhanced = forwardRef<ModelPreviewRef, ModelPreviewProps>(
         scene.add(hemisphereLight);
 
         // Main key light from front-right
-        const keyLight = new THREE.DirectionalLight(0xffffff, 1.5);
+        const keyLight = new THREE.DirectionalLight(0xffffff, LIGHTING_CONSTANTS.KEY_LIGHT_INTENSITY);
         keyLight.position.set(200, 200, 200);
         keyLight.castShadow = true;
         keyLight.shadow.mapSize.width = 2048;
@@ -747,17 +785,17 @@ const ModelPreviewEnhanced = forwardRef<ModelPreviewRef, ModelPreviewProps>(
         scene.add(keyLight);
 
         // Fill light from back-left
-        const fillLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        const fillLight = new THREE.DirectionalLight(0xffffff, LIGHTING_CONSTANTS.FILL_LIGHT_INTENSITY);
         fillLight.position.set(-100, 150, -100);
         scene.add(fillLight);
 
         // Additional side light for better form definition
-        const sideLight = new THREE.DirectionalLight(0xffffff, 0.6);
+        const sideLight = new THREE.DirectionalLight(0xffffff, LIGHTING_CONSTANTS.SIDE_LIGHT_INTENSITY);
         sideLight.position.set(100, 50, -200);
         scene.add(sideLight);
 
         // Top light to brighten upward-facing surfaces
-        const topLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        const topLight = new THREE.DirectionalLight(0xffffff, LIGHTING_CONSTANTS.TOP_LIGHT_INTENSITY);
         topLight.position.set(0, 300, 0);
         scene.add(topLight);
 
@@ -921,7 +959,7 @@ const ModelPreviewEnhanced = forwardRef<ModelPreviewRef, ModelPreviewProps>(
               if (i === retries - 1) throw err;
               // Wait a bit before retrying (exponential backoff)
               await new Promise(resolve =>
-                setTimeout(resolve, 1000 * Math.pow(2, i))
+                setTimeout(resolve, RETRY_CONSTANTS.BASE_DELAY * Math.pow(2, i))
               );
             }
           }
