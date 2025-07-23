@@ -173,7 +173,7 @@ const ModelPreviewEnhanced = forwardRef<ModelPreviewRef, ModelPreviewProps>(
     const getFilamentColor = useCallback(
       (filamentIndex: number, projectColors?: string[]): number => {
         const mapping = filamentMappings.find(
-          m => m.filament_index === filamentIndex
+          (m) => m.filament_index === filamentIndex
         );
 
         console.log(
@@ -201,11 +201,11 @@ const ModelPreviewEnhanced = forwardRef<ModelPreviewRef, ModelPreviewProps>(
           // Check AMS units
           if (amsStatus.ams_units) {
             const unit = amsStatus.ams_units.find(
-              u => u.unit_id === mapping.ams_unit_id
+              (u) => u.unit_id === mapping.ams_unit_id
             );
             if (unit) {
               const filament = unit.filaments.find(
-                f => f.slot_id === mapping.ams_slot_id
+                (f) => f.slot_id === mapping.ams_slot_id
               );
               console.log(
                 `Found filament in AMS ${mapping.ams_unit_id} slot ${mapping.ams_slot_id}:`,
@@ -312,7 +312,7 @@ const ModelPreviewEnhanced = forwardRef<ModelPreviewRef, ModelPreviewProps>(
         }
 
         const isMapped = filamentMappings.some(
-          m => m.filament_index === filamentIndex
+          (m) => m.filament_index === filamentIndex
         );
         const color = getFilamentColor(filamentIndex, projectColors);
 
@@ -356,7 +356,7 @@ const ModelPreviewEnhanced = forwardRef<ModelPreviewRef, ModelPreviewProps>(
 
         // Clear model objects from the scene (preserve lights, grid, and build plate)
         const objectsToRemove: THREE.Object3D[] = [];
-        sceneRef.current.traverse(child => {
+        sceneRef.current.traverse((child) => {
           if (child instanceof THREE.Mesh || child instanceof THREE.Group) {
             if (
               !(child instanceof THREE.Light) &&
@@ -369,13 +369,13 @@ const ModelPreviewEnhanced = forwardRef<ModelPreviewRef, ModelPreviewProps>(
           }
         });
 
-        objectsToRemove.forEach(obj => {
+        objectsToRemove.forEach((obj) => {
           sceneRef.current?.remove(obj);
           if (obj instanceof THREE.Mesh) {
             if (obj.geometry) obj.geometry.dispose();
             if (obj.material) {
               if (Array.isArray(obj.material)) {
-                obj.material.forEach(m => m.dispose());
+                obj.material.forEach((m) => m.dispose());
               } else {
                 obj.material.dispose();
               }
@@ -394,7 +394,7 @@ const ModelPreviewEnhanced = forwardRef<ModelPreviewRef, ModelPreviewProps>(
         projectColorsRef.current = plateContents.projectFilamentColors || null;
 
         // Process each object
-        plateContents.objects.forEach(obj => {
+        plateContents.objects.forEach((obj) => {
           // Create geometry from object data
           const geometry = new THREE.BufferGeometry();
           geometry.setAttribute(
@@ -661,7 +661,7 @@ const ModelPreviewEnhanced = forwardRef<ModelPreviewRef, ModelPreviewProps>(
             if ('material' in child) {
               const material = (child as THREE.Mesh).material;
               if (Array.isArray(material)) {
-                material.forEach(m => m.dispose());
+                material.forEach((m) => m.dispose());
               } else if (material) {
                 material.dispose();
               }
@@ -815,7 +815,7 @@ const ModelPreviewEnhanced = forwardRef<ModelPreviewRef, ModelPreviewProps>(
 
           // Pulse unmapped materials
           const time = Date.now() * 0.003;
-          plateObjectsRef.current.forEach(mesh => {
+          plateObjectsRef.current.forEach((mesh) => {
             const material = mesh.material as THREE.MeshStandardMaterial;
             if (material.userData.isUnmapped) {
               material.emissiveIntensity = 0.2 + Math.sin(time) * 0.15;
@@ -958,7 +958,7 @@ const ModelPreviewEnhanced = forwardRef<ModelPreviewRef, ModelPreviewProps>(
               console.warn(`Fetch attempt ${i + 1} failed:`, err);
               if (i === retries - 1) throw err;
               // Wait a bit before retrying (exponential backoff)
-              await new Promise(resolve =>
+              await new Promise((resolve) =>
                 setTimeout(resolve, RETRY_CONSTANTS.BASE_DELAY * Math.pow(2, i))
               );
             }
@@ -967,7 +967,7 @@ const ModelPreviewEnhanced = forwardRef<ModelPreviewRef, ModelPreviewProps>(
         };
 
         fetchWithRetry(`/api/model/preview/${fileId}`)
-          .then(arrayBuffer => {
+          .then((arrayBuffer) => {
             // Parse the specific plate or all plates
             const targetPlate =
               selectedPlateIndex !== null ? selectedPlateIndex : 0;
@@ -978,7 +978,7 @@ const ModelPreviewEnhanced = forwardRef<ModelPreviewRef, ModelPreviewProps>(
               plateIndex: targetPlate,
             });
           })
-          .catch(err => {
+          .catch((err) => {
             console.error('Failed to fetch 3MF file:', err);
             handleLoadError(err);
           });
@@ -993,10 +993,10 @@ const ModelPreviewEnhanced = forwardRef<ModelPreviewRef, ModelPreviewProps>(
 
             // Clear any existing objects
             sceneRef.current?.children
-              .filter(child => child.name.startsWith('plate_group'))
-              .forEach(child => {
+              .filter((child) => child.name.startsWith('plate_group'))
+              .forEach((child) => {
                 sceneRef.current?.remove(child);
-                child.traverse(obj => {
+                child.traverse((obj) => {
                   if ('geometry' in obj) {
                     const mesh = obj as THREE.Mesh;
                     mesh.geometry?.dispose();
