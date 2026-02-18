@@ -18,7 +18,7 @@ export function useProactiveAMSStatus({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastFetch, setLastFetch] = useState<Date | null>(null);
-  const intervalRef = useRef<number | null>(null);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const mountedRef = useRef(true);
   const onStatusUpdateRef = useRef(onStatusUpdate);
 

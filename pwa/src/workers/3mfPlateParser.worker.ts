@@ -776,28 +776,48 @@ async function parse3MFPlate(
 function parseTransformMatrix(transformStr: string): Float32Array {
   const values = transformStr.split(/\s+/).map(v => parseFloat(v));
   if (values.length === 12) {
-    // 3x4 matrix - convert to 4x4
+    // 3x4 matrix in row-major order from 3MF
+    // Format: m00 m01 m02 m03 m10 m11 m12 m13 m20 m21 m22 m23
+    // Convert to 4x4 matrix in column-major order for Three.js
     return new Float32Array([
-      values[0],
-      values[1],
-      values[2],
-      0,
-      values[3],
-      values[4],
-      values[5],
-      0,
-      values[6],
-      values[7],
-      values[8],
-      0,
-      values[9],
-      values[10],
-      values[11],
-      1,
+      values[0], // m00
+      values[3], // m10
+      values[6], // m20
+      0, // m30
+      values[1], // m01
+      values[4], // m11
+      values[7], // m21
+      0, // m31
+      values[2], // m02
+      values[5], // m12
+      values[8], // m22
+      0, // m32
+      values[9], // m03 (translation X)
+      values[10], // m13 (translation Y)
+      values[11], // m23 (translation Z)
+      1, // m33
     ]);
   } else if (values.length === 16) {
-    // Already 4x4
-    return new Float32Array(values);
+    // Already 4x4 - assume it's in row-major order from 3MF
+    // Convert to column-major order for Three.js
+    return new Float32Array([
+      values[0], // m00
+      values[4], // m10
+      values[8], // m20
+      values[12], // m30
+      values[1], // m01
+      values[5], // m11
+      values[9], // m21
+      values[13], // m31
+      values[2], // m02
+      values[6], // m12
+      values[10], // m22
+      values[14], // m32
+      values[3], // m03
+      values[7], // m13
+      values[11], // m23
+      values[15], // m33
+    ]);
   }
   // Return identity matrix as fallback
   return new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
@@ -1221,7 +1241,7 @@ function decodeBase64ZlibRLE(encodedData: string): number[] | null {
     let binary = '';
 
     for (let i = 0; i < encodedData.length; i += 4) {
-      const quad = encodedData.substr(i, 4);
+      const quad = encodedData.substring(i, i + 4);
       let bits = 0;
       let validChars = 0;
 
@@ -2263,18 +2283,20 @@ async function loadSingleComponentMesh(
   }
 }
 
-// Multiply two 4x4 transformation matrices
+// Multiply two 4x4 transformation matrices (both in column-major order)
 function multiplyMatrices(a: Float32Array, b: Float32Array): Float32Array {
   const result = new Float32Array(16);
 
-  // Matrix multiplication for 4x4 matrices
-  for (let i = 0; i < 4; i++) {
-    for (let j = 0; j < 4; j++) {
+  // Matrix multiplication for 4x4 matrices in column-major order
+  // result = a * b
+  for (let col = 0; col < 4; col++) {
+    for (let row = 0; row < 4; row++) {
       let sum = 0;
       for (let k = 0; k < 4; k++) {
-        sum += a[i * 4 + k] * b[k * 4 + j];
+        // a[row][k] * b[k][col] in column-major indexing
+        sum += a[row + k * 4] * b[k + col * 4];
       }
-      result[i * 4 + j] = sum;
+      result[row + col * 4] = sum;
     }
   }
 
